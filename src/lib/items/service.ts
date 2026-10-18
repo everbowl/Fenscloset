@@ -115,6 +115,20 @@ export async function createItemFromEntry(personId: string, entryId: string, edi
 }
 
 /** "SAME?": fold this photo into an item that already exists instead of making a second one. */
+/**
+ * "Another one like my Black crew tee" (Jeff, 18 Oct 2026): copy everything but the color from a
+ * piece the person owns onto the entry (name, category, brand, size, fabric, seasons, dress code,
+ * pattern), so the new photo only needs its color checked.
+ */
+export async function mirrorFromItem(personId: string, entryId: string, itemId: string): Promise<TagResult> {
+  const item = await db.item.findUnique({ where: { id: itemId }, select: { ownerId: true, name: true, categoryId: true, subcategoryId: true, brandId: true, size: true, brand: { select: { name: true } }, fabrics: { select: { id: true }, take: 1 }, seasons: { select: { id: true } }, formalities: { select: { id: true }, take: 1 }, patterns: { select: { id: true }, take: 1 } } });
+  if (!item || item.ownerId !== personId) throw new ItemError("Not yours.", 403);
+  return saveEntryEdits(personId, entryId, {
+    name: item.name ?? undefined, categoryId: item.categoryId, subcategoryId: item.subcategoryId, brandId: item.brandId, brandText: item.brand?.name ?? null, sizeText: item.size,
+    fabricId: item.fabrics[0]?.id ?? null, seasonIds: item.seasons.map((x) => x.id), formalityId: item.formalities[0]?.id ?? null, patternId: item.patterns[0]?.id ?? null,
+  });
+}
+
 export async function mergeIntoItem(personId: string, entryId: string, itemId: string): Promise<void> {
   const entry = await ownedEntry(personId, entryId);
   const item = await db.item.findUnique({ where: { id: itemId }, select: { ownerId: true, photos: { select: { kind: true } } } });

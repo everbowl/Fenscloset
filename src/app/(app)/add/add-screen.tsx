@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Banner } from "@/components/ui/banner";
@@ -25,6 +25,8 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
   const { batch, upload, loaded, addFiles, retryFailedUploads } = useImportQueue();
   const pickRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
+  /** Linear (Jeff, 18 Oct 2026): first pick the door, then the photo panel opens. */
+  const [door, setDoor] = useState<"photo" | null>(null);
 
   async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -50,10 +52,33 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
   if (!loaded) return <div><PageHeader title="Add" accent="clothes" /><div className="h-[380px] bg-bone" /></div>;
 
   if (!hasBatch) {
+    if (door !== "photo") {
+      return (
+        <div>
+          {inputs}
+          <PageHeader title="Add" accent="clothes" />
+          <p className="mono text-graphite">How are you adding?</p>
+          <div className="mt-4 flex flex-col gap-2.5" data-testid="add-doors">
+            <button type="button" onClick={() => setDoor("photo")} className="flex min-h-[72px] w-full items-center justify-between bg-ink px-5 text-left text-paper" data-testid="door-photo">
+              <span><span className="mono block text-[12px] uppercase tracking-[0.16em]">From photos</span><span className="mono mt-1 block text-[11px] text-paper/70">Hanger or flat-lay shots · one piece each</span></span>
+              <CameraIcon />
+            </button>
+            <Link href="/add/store?tab=link" className="flex min-h-[64px] w-full items-center justify-between border border-ink px-5 text-left" data-testid="add-by-link">
+              <span><span className="mono block text-[12px] uppercase tracking-[0.16em]">From a store link</span><span className="mono mt-1 block text-[11px] text-graphite">Paste the product page · pick color, size, how many</span></span>
+              <span className="mono">→</span>
+            </Link>
+            <Link href="/add/store?tab=receipt" className="flex min-h-[64px] w-full items-center justify-between border border-ink px-5 text-left" data-testid="add-by-receipt">
+              <span><span className="mono block text-[12px] uppercase tracking-[0.16em]">From a receipt</span><span className="mono mt-1 block text-[11px] text-graphite">A photo of the receipt · the store's own product photos</span></span>
+              <span className="mono">→</span>
+            </Link>
+          </div>
+        </div>
+      );
+    }
     return (
       <div>
         {inputs}
-        <PageHeader title="Add" accent="clothes" />
+        <PageHeader title="Add" accent="clothes" aside={<button type="button" onClick={() => setDoor(null)} className="mono mono-11 py-2" data-testid="door-back">Other ways</button>} />
         <p className="mono text-graphite">Hanger or flat-lay photos · one piece per photo</p>
         <button type="button" onClick={() => pickRef.current?.click()} className="mt-4 flex h-[380px] w-full flex-col items-center justify-center gap-3 bg-bone">
           <CameraIcon />
@@ -65,13 +90,6 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
           <Button size="lg" variant="secondary" aria-label="Take a photo" className="w-[54px] px-0" onClick={() => cameraRef.current?.click()}><CameraIcon /></Button>
         </div>
         <p className="mono mt-4 text-center text-graphite">Then confirm each piece with one tap</p>
-        <div className="mt-5 border-t border-ink pt-4" data-testid="add-from-store">
-          <p className="mono text-graphite">Or add from a store</p>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <Link href="/add/store?tab=link" className="mono flex h-[54px] items-center justify-center border border-ink text-[12px] uppercase tracking-[0.16em] text-ink" data-testid="add-by-link">By link</Link>
-            <Link href="/add/store?tab=receipt" className="mono flex h-[54px] items-center justify-center border border-ink text-[12px] uppercase tracking-[0.16em] text-ink" data-testid="add-by-receipt">By receipt</Link>
-          </div>
-        </div>
         {tips}
       </div>
     );

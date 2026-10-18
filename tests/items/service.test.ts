@@ -9,7 +9,7 @@ import { seed } from "../../prisma/seed";
 import { newKey, putObject } from "@/lib/storage";
 import { getOrCreateOpenBatch, openBatch, registerEntry } from "@/lib/import/service";
 import { drainQueue } from "@/lib/import/queue";
-import { createItemFromEntry, mergeIntoItem, saveEntryEdits, skipEntry } from "@/lib/items/service";
+import { createItemFromEntry, mergeIntoItem, mirrorFromItem, saveEntryEdits, skipEntry } from "@/lib/items/service";
 import { findLikelyDuplicate } from "@/lib/items/duplicates";
 import { loadTagLists } from "@/lib/ai/tag-item";
 import type { EntryAiResult } from "@/lib/import/process";
@@ -93,5 +93,22 @@ describe("confirm → item", () => {
     expect(merged.photos.length).toBe(6);
     expect(merged.photos.filter((p) => p.isPrimary).length).toBe(1);
     expect(await db.item.count()).toBe(1);
+  });
+
+  it("'another one like it' copies everything but the color from a piece you own; not from someone else's", async () => {
+    const first = await readyEntry();
+    const lists = await loadTagLists();
+    const red = lists.colors.find((c) => c.name === "Red")!;
+    const linen = lists.fabrics.find((f) => f.name === "Linen") ?? lists.fabrics[0];
+    const brand = await db.brand.findFirstOrThrow();
+    const owned = await createItemFromEntry(jeffId, first.id, { name: "Lulu crew tee", colorIds: [red.id], sizeText: "L", brandId: brand.id, brandText: brand.name, fabricId: linen.id });
+    const again = await readyEntry(250, 1);
+    const before = (again.aiResult as EntryAiResult).tags;
+    const tags = await mirrorFromItem(jeffId, again.id, owned.id);
+    expect(tags).toMatchObject({ name: "Lulu crew tee", categoryId: before.categoryId, brandId: brand.id, brandText: brand.name, sizeText: "L", fabricId: linen.id });
+    expect(tags.colorIds).toEqual(before.colorIds); // the new photo keeps its own color
+    expect(tags.seasonIds.length).toBeGreaterThan(0);
+    const mya = await db.person.findFirstOrThrow({ where: { name: "Mya" } });
+    await expect(mirrorFromItem(mya.id, again.id, owned.id)).rejects.toMatchObject({ status: 403 });
   });
 });

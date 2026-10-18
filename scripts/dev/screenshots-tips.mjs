@@ -11,7 +11,7 @@ for (const [tag, ctx] of [["phone", { ...devices["iPhone 15"] }], ["desktop", { 
   const page = await (await browser.newContext(ctx)).newPage();
   await page.goto(base + "/login"); await page.getByLabel("Email").fill("jeff@everbowl.com"); await page.getByLabel("Password").fill("closet-rocks-2026");
   await page.getByRole("button", { name: "Sign in" }).click(); await page.waitForURL(/today/);
-  await page.goto(base + "/add"); await page.getByTestId("photo-tips").waitFor(); await page.getByTestId("tip-tab-Shoes").click(); await page.waitForTimeout(300);
+  await page.goto(base + "/add"); await page.getByTestId("door-photo").click(); await page.getByTestId("photo-tips").waitFor(); await page.getByTestId("tip-tab-Shoes").click(); await page.waitForTimeout(300);
   await page.screenshot({ path: `${out}/80-add-tips-${tag}.png`, fullPage: true });
   await page.goto(base + "/help/add"); await page.getByTestId("help-topic").waitFor(); await page.waitForTimeout(300);
   await page.screenshot({ path: `${out}/81-help-add-${tag}.png`, fullPage: true });

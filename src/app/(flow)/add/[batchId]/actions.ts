@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePerson } from "@/lib/auth/current";
-import { attachEntryPhoto, createItemFromEntry, ItemError, mergeIntoItem, saveEntryEdits, skipEntry, type ItemEdits } from "@/lib/items/service";
+import { attachEntryPhoto, createItemFromEntry, ItemError, mergeIntoItem, saveEntryEdits, skipEntry, type ItemEdits, mirrorFromItem } from "@/lib/items/service";
 import { readBackForEntry, readLabelForEntry } from "@/lib/import/process";
 import { keepSmooth, smoothEntry } from "@/lib/import/smooth-entry";
 import { SmoothError } from "@/lib/images/smooth";
@@ -30,6 +30,11 @@ export async function confirmEntryAction(batchId: string, entryId: string, edits
 export async function skipEntryAction(batchId: string, entryId: string): Promise<ActionResult> {
   const person = await requirePerson();
   try { await skipEntry(person.id, entryId); revalidatePath(`/add/${batchId}`); return { ok: true, value: undefined }; } catch (e) { return fail(e); }
+}
+
+export async function mirrorEntryAction(entryId: string, itemId: string): Promise<ActionResult<TagResult>> {
+  const person = await requirePerson();
+  try { return { ok: true, value: await mirrorFromItem(person.id, entryId, itemId) }; } catch (e) { return fail(e); }
 }
 
 export async function mergeEntryAction(batchId: string, entryId: string, itemId: string): Promise<ActionResult> {

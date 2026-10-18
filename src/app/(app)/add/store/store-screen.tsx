@@ -81,6 +81,8 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
   const [added, setAdded] = useState<number>(0);
   const [pending, start] = useTransition();
   const [busy, setBusy] = useState<"lookup" | "photos" | "add" | null>(null);
+  /** Linear (Jeff, 18 Oct 2026): one question at a time. Color is asked only when the store lists colors, size likewise. */
+  const [step, setStep] = useState<"color" | "size" | "qty">("color");
 
   function lookup() {
     setError(undefined); setProduct(null); setPicks(null); setAdded(0); setBusy("lookup");
@@ -88,13 +90,17 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
       const r = await lookupProductAction(url);
       setBusy(null);
       if (!r.ok) { setError(r.error); return; }
-      setProduct(r.value); setColor(r.value.colors[0] ?? ""); setSize(""); setQty(1); setImageUrl(r.value.colorImages[r.value.colors[0] ?? ""] ?? r.value.imageUrl);
+      setProduct(r.value); setColor(""); setSize(""); setQty(1); setImageUrl(r.value.imageUrl);
+      setStep(r.value.colors.length ? "color" : r.value.sizes.length ? "size" : "qty");
     });
   }
   function pickColor(c: string) {
     setColor(c); setPicks(null);
     if (product?.colorImages[c]) setImageUrl(product.colorImages[c]);
+    setStep(product?.sizes.length ? "size" : "qty");
   }
+  function pickSize(v: string) { setSize(v); setStep("qty"); }
+  function again() { setAdded(0); setStep(product?.colors.length ? "color" : product?.sizes.length ? "size" : "qty"); }
   function findPhotos() {
     if (!product || !color.trim()) return;
     setError(undefined); setBusy("photos");
@@ -133,24 +139,35 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
             <h2 className="serif text-[26px] leading-tight" data-testid="product-name">{product.name}</h2>
             <p className="mono mt-1 text-graphite">{[product.brandText, product.storeName, product.priceText].filter(Boolean).join(" · ")}</p>
           </div>
-          <Field label="Color" htmlFor="store-color">
-            <Pills options={product.colors} value={color} onPick={pickColor} testPrefix="color" />
-            <Input id="store-color" value={color} onChange={(e) => { setColor(e.target.value); setPicks(null); }} placeholder="Black" data-testid="store-color" />
-            {canSearch && color.trim() && !product.colorImages[color] ? <button type="button" onClick={findPhotos} disabled={pending} className="mono mt-2 self-start py-2" data-testid="find-photos">{busy === "photos" ? "Searching…" : "Find a photo in this color"}</button> : null}
-            {picks && picks.length ? <PhotoPicks picks={picks} chosen={imageUrl} onPick={setImageUrl} /> : null}
-          </Field>
-          <Field label="Size" htmlFor="store-size">
-            <Pills options={product.sizes} value={size} onPick={setSize} testPrefix="size" />
-            <Input id="store-size" value={size} onChange={(e) => setSize(e.target.value)} placeholder="M · 32 · 8" data-testid="store-size" />
-          </Field>
-          <Field label="How many">
-            <Stepper value={qty} onChange={setQty} />
-          </Field>
-          <Button size="lg" onClick={add} disabled={pending || !imageUrl} data-testid="add-to-closet">{busy === "add" ? "Adding…" : `Add ${qty > 1 ? `${qty} ` : ""}to closet`}</Button>
+          <ol className="mono flex gap-3 text-graphite" aria-label="Steps">
+            {([["color", "Color"], ["size", "Size"], ["qty", "How many"]] as const).filter(([k]) => k === "qty" || (k === "color" ? product.colors.length : product.sizes.length)).map(([k, l], i) => <li key={k} className={step === k ? "text-ink" : ""}>{i + 1} {l}</li>)}
+          </ol>
+          {step === "color" ? (
+            <Field label="Which color?" htmlFor="store-color" hint="Tap one, or type it and press Next.">
+              <Pills options={product.colors} value={color} onPick={pickColor} testPrefix="color" />
+              <div className="flex gap-2"><Input id="store-color" value={color} onChange={(e) => { setColor(e.target.value); setPicks(null); }} placeholder="Black" data-testid="store-color" /><Button type="button" variant="secondary" onClick={() => pickColor(color.trim())} disabled={!color.trim()} data-testid="color-next">Next</Button></div>
+            </Field>
+          ) : null}
+          {step !== "color" && color ? <p className="mono" data-testid="chosen-color">Color · {color} <button type="button" onClick={() => setStep("color")} className="ml-2 text-graphite">change</button></p> : null}
+          {step !== "color" && canSearch && color.trim() && !product.colorImages[color] && !picks ? <button type="button" onClick={findPhotos} disabled={pending} className="mono self-start py-2" data-testid="find-photos">{busy === "photos" ? "Searching…" : "Find a photo in this color"}</button> : null}
+          {picks && picks.length ? <PhotoPicks picks={picks} chosen={imageUrl} onPick={setImageUrl} /> : null}
+          {step === "size" ? (
+            <Field label="Which size?" htmlFor="store-size" hint="Tap one, type it, or skip.">
+              <Pills options={product.sizes} value={size} onPick={pickSize} testPrefix="size" />
+              <div className="flex gap-2"><Input id="store-size" value={size} onChange={(e) => setSize(e.target.value)} placeholder="M · 32 · 8" data-testid="store-size" /><Button type="button" variant="secondary" onClick={() => pickSize(size.trim())} data-testid="size-next">{size.trim() ? "Next" : "Skip"}</Button></div>
+            </Field>
+          ) : null}
+          {step === "qty" && size ? <p className="mono" data-testid="chosen-size">Size · {size} <button type="button" onClick={() => setStep("size")} className="ml-2 text-graphite">change</button></p> : null}
+          {step === "qty" ? (
+            <Field label="How many of this one?">
+              <Stepper value={qty} onChange={setQty} />
+            </Field>
+          ) : null}
+          {step === "qty" && added === 0 ? <Button size="lg" onClick={add} disabled={pending || !imageUrl} data-testid="add-to-closet">{busy === "add" ? "Adding…" : `Add ${qty > 1 ? `${qty} ` : ""}to closet`}</Button> : null}
           {added > 0 ? (
             <div className="flex items-center justify-between border-y border-ink py-2.5" data-testid="added-strip">
-              <span className="mono tracking-[0.1em]">{added} added · change color or size to add more</span>
-              <Link href="/add" className="mono py-2 tracking-[0.1em]">Confirm →</Link>
+              <span className="mono tracking-[0.1em]">{added} added</span>
+              <div className="flex gap-4"><button type="button" onClick={again} className="mono py-2 tracking-[0.1em]" data-testid="add-another-color">Another color or size</button><Link href="/add" className="mono py-2 tracking-[0.1em]">Confirm →</Link></div>
             </div>
           ) : null}
         </div>

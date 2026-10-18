@@ -10,7 +10,7 @@ import type { Named, TagLists, TagResult } from "@/lib/ai/tag-item";
 import type { ItemEdits } from "@/lib/items/service";
 import type { DuplicateHint } from "@/lib/items/duplicates";
 import { shrinkPhoto } from "@/lib/import/client-queue";
-import { attachPhotoAction, confirmEntryAction, keepSmoothAction, mergeEntryAction, saveEditsAction, skipEntryAction, smoothEntryAction } from "./actions";
+import { attachPhotoAction, confirmEntryAction, keepSmoothAction, mergeEntryAction, mirrorEntryAction, saveEditsAction, skipEntryAction, smoothEntryAction } from "./actions";
 import { PickSheet, Row, TextSheet } from "@/components/items/row-editor";
 import type { MyBrand } from "@/lib/profiles/brands";
 import { sizeFor } from "@/lib/profiles/size-options";
@@ -43,6 +43,15 @@ const nameOf = (xs: Named[], id: string | null) => xs.find((x) => x.id === id)?.
 /** Design 03: one tap per item when the tags are right. */
 export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists, counter, progress, duplicate, canEditLists, readyCount, canSmooth, myBrands }: Props) {
   const [askMore, setAskMore] = useState(true);
+  /** "Another one like X?" asks once per entry (dismissal survives a reload through sessionStorage). */
+  const [askLike, setAskLike] = useState<boolean>(() => Boolean(duplicate) && typeof window !== "undefined" && !window.sessionStorage.getItem(`like-asked:${entry.id}`));
+  const [mirrored, setMirrored] = useState(false);
+  function dismissLike() { setAskLike(false); try { window.sessionStorage.setItem(`like-asked:${entry.id}`, "1"); } catch { /* private mode */ } }
+  function mirror() {
+    if (!duplicate) return;
+    dismissLike();
+    start(async () => { const r = await mirrorEntryAction(entry.id, duplicate.itemId); if (!r.ok) { setError(r.error); return; } setTags(r.value); setMirrored(true); });
+  }
   const router = useRouter();
   const [tags, setTags] = useState(initial);
   const [lists, setLists] = useState(initialLists);
@@ -188,8 +197,8 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
       ) : null}
 
       {duplicate ? (
-        <div className="mx-5 mt-3 flex items-center justify-between border-y border-ink py-2.5">
-          <span className="mono tracking-[0.1em]">Looks like one you own</span>
+        <div className="mx-5 mt-3 flex items-center justify-between border-y border-ink py-2.5" data-testid="duplicate-row">
+          <span className="mono tracking-[0.1em]">{mirrored ? `Details copied from ${duplicate.name ?? "it"} · check the color` : "Looks like one you own"}</span>
           <div className="flex items-center gap-2.5">
             <div className="h-9 w-[30px] overflow-hidden bg-bone">{duplicate.thumbKey ? <img src={`/api/photo/${duplicate.thumbKey}`} alt={duplicate.name ?? "Item you own"} className="size-full object-cover" /> : null}</div>
             <button type="button" onClick={merge} disabled={pending} className="mono py-2 tracking-[0.1em]">Same?</button>
@@ -272,6 +281,20 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
           <button type="button" onClick={() => backRef.current?.click()} className="flex h-12 items-center justify-between border-b border-line text-[15px]" data-testid="add-back">Back of the piece<span className="mono text-graphite">Graphic · cut</span></button>
           <button type="button" onClick={() => wornRef.current?.click()} className="flex h-12 items-center justify-between border-b border-line text-[15px]">Worn photo<span className="mono text-graphite">How it fits</span></button>
         </div>
+      </Sheet>
+      {/* Another one like a piece you own: copy its details, add the photo to it, or start fresh */}
+      <Sheet open={askLike && Boolean(duplicate)} onClose={dismissLike} title="Another one like this?">
+        {duplicate ? (
+          <div className="flex flex-col gap-4" data-testid="like-sheet">
+            <div className="flex items-center gap-3">
+              <div className="h-[72px] w-[60px] overflow-hidden bg-bone">{duplicate.thumbKey ? <img src={`/api/photo/${duplicate.thumbKey}`} alt="" className="size-full object-cover" /> : null}</div>
+              <p className="text-[15px] leading-snug">You own <strong>{duplicate.name ?? "a piece like this"}</strong>. Is this another one of the same?</p>
+            </div>
+            <button type="button" onClick={mirror} className="mono flex h-[54px] w-full items-center justify-center bg-ink text-[12px] uppercase tracking-[0.16em] text-paper" data-testid="like-mirror">Yes · same piece, new color or size</button>
+            <button type="button" onClick={() => { dismissLike(); merge(); }} className="mono flex h-[46px] w-full items-center justify-center border border-ink text-[12px] uppercase tracking-[0.16em]" data-testid="like-merge">It&apos;s this exact one · add the photo to it</button>
+            <button type="button" onClick={dismissLike} className="mono flex h-[46px] w-full items-center justify-center text-graphite" data-testid="like-new">No · a new piece</button>
+          </div>
+        ) : null}
       </Sheet>
     </div>
   );

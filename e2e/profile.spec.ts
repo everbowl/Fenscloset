@@ -146,6 +146,18 @@ test("my brands & sizes: add Lululemon with a size per item type and a link, the
   await page.getByTestId("confirm-next").click();
   await expect(page.getByRole("heading", { name: /All done/ })).toBeVisible();
 
+  // the same photo again: "Another one like this?" → Yes copies the details (brand, size, name) onto the new piece
+  await page.goto("/add");
+  await page.getByTestId("pick-photos").setInputFiles({ name: "tee2.jpg", mimeType: "image/jpeg", buffer });
+  await expect(page.getByRole("link", { name: /Confirm 1 ready/ })).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("link", { name: /Confirm 1 ready/ }).click();
+  await expect(page.getByTestId("like-sheet")).toContainText("Is this another one of the same?");
+  await page.getByTestId("like-mirror").click();
+  await expect(page.getByTestId("row-brand")).toContainText("Lululemon · L");
+  await expect(page.getByTestId("duplicate-row")).toContainText("Details copied");
+  await page.getByTestId("confirm-next").click();
+  await expect(page.getByRole("heading", { name: /All done/ })).toBeVisible();
+
   // the new piece carries the brand's store link; "Added · another?" strip is on the item after its own photo
   await page.goto("/closet");
   await page.getByTestId("item-card").first().click();

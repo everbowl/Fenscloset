@@ -1,0 +1,33 @@
+/** Dev-only: the linear Add flow (three doors, link steps, "Another one like this?"). */
+import { chromium, devices } from "@playwright/test";
+import { execSync } from "node:child_process";
+import sharp from "sharp";
+const out = process.argv[2];
+const env = { ...process.env, DATABASE_URL: "postgresql://postgres@localhost:5433/fenscloset_e2e", DEV_MODE: "true", SEED_FORCE: "true", MOCK_S3: "true" };
+execSync(`psql -h localhost -p 5433 -U postgres -d fenscloset_e2e -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'`, { stdio: "ignore" });
+execSync("npx prisma migrate deploy && npx tsx prisma/seed.ts && npx tsx e2e/set-password.ts jeff@everbowl.com closet-rocks-2026", { stdio: "ignore", env });
+const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || undefined });
+const base = "http://localhost:3100";
+const ctx = await browser.newContext({ ...devices["iPhone 15"] });
+const page = await ctx.newPage();
+const swatch = await sharp({ create: { width: 600, height: 800, channels: 3, background: { r: 214, g: 196, b: 168 } } }).jpeg().toBuffer();
+await page.route(/mock\.example\/.*\.(jpg|png)/, (route) => route.fulfill({ body: swatch, contentType: "image/jpeg" }));
+await page.goto(base + "/login");
+await page.getByLabel("Email").fill("jeff@everbowl.com"); await page.getByLabel("Password").fill("closet-rocks-2026");
+await page.getByRole("button", { name: "Sign in" }).click(); await page.waitForURL(/today/);
+await page.goto(base + "/add"); await page.getByTestId("add-doors").waitFor(); await page.waitForTimeout(300); await page.screenshot({ path: `${out}/131-add-three-doors.png` });
+await page.getByTestId("add-by-link").click(); await page.getByTestId("store-url").fill("https://mock.example/products/linen-blazer"); await page.getByTestId("lookup").click();
+await page.getByTestId("product-name").waitFor(); await page.waitForTimeout(300); await page.screenshot({ path: `${out}/132-link-step-color.png`, fullPage: true });
+await page.getByTestId("color-Black").click(); await page.waitForTimeout(300); await page.screenshot({ path: `${out}/133-link-step-size.png`, fullPage: true });
+await page.getByTestId("size-M").click(); await page.waitForTimeout(300); await page.screenshot({ path: `${out}/134-link-step-how-many.png`, fullPage: true });
+// a photo twice → "Another one like this?"
+const tee = await sharp({ create: { width: 800, height: 1100, channels: 3, background: { r: 24, g: 28, b: 40 } } }).composite([{ input: await sharp({ create: { width: 800, height: 300, channels: 3, background: { r: 255, g: 255, b: 255 } } }).png().toBuffer(), top: 0, left: 0 }]).jpeg().toBuffer();
+await page.goto(base + "/add"); await page.getByTestId("pick-photos").setInputFiles({ name: "tee.jpg", mimeType: "image/jpeg", buffer: tee });
+await page.getByRole("link", { name: /Confirm 1 ready/ }).waitFor({ timeout: 30000 }); await page.getByRole("link", { name: /Confirm 1 ready/ }).click();
+await page.getByRole("button", { name: "Rename" }).click(); await page.getByRole("dialog").getByLabel("Name").fill("Navy crew tee"); await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+await page.getByTestId("confirm-next").click(); await page.getByRole("heading", { name: /All done/ }).waitFor();
+await page.goto(base + "/add"); await page.getByTestId("pick-photos").setInputFiles({ name: "tee2.jpg", mimeType: "image/jpeg", buffer: tee });
+await page.getByRole("link", { name: /Confirm 1 ready/ }).waitFor({ timeout: 30000 }); await page.getByRole("link", { name: /Confirm 1 ready/ }).click();
+await page.getByTestId("like-sheet").waitFor(); await page.waitForTimeout(400); await page.screenshot({ path: `${out}/135-another-like-this.png` });
+await page.getByTestId("like-mirror").click(); await page.getByTestId("duplicate-row").waitFor(); await page.waitForTimeout(400); await page.screenshot({ path: `${out}/136-details-copied.png`, fullPage: true });
+await browser.close();
