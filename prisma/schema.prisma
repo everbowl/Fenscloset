@@ -332,7 +332,7 @@ model ItemPhoto {
   id        String    @id @default(cuid())
   itemId    String
   kind      PhotoKind
-  bucketKey String
+  bucketKey String    @unique
   width     Int?
   height    Int?
   isPrimary Boolean   @default(false)
