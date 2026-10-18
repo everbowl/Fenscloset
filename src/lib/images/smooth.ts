@@ -60,10 +60,29 @@ export async function smoothGarment(input: Buffer, fetchImpl: typeof fetch = fet
   const height = meta.height ?? 0;
   if (!width || !height) throw new SmoothError("That photo could not be read.");
   const flat = await sharp(input).rotate().flatten({ background: "#ffffff" }).jpeg({ quality: 92 }).toBuffer();
-  const edited = process.env.MOCK_SMOOTH === "true" ? await sharp(flat).blur(2).jpeg().toBuffer() : await googleSmooth(flat, fetchImpl);
-  if (!hasAlpha) return { data: await sharp(edited).jpeg({ quality: 90 }).toBuffer(), contentType: "image/jpeg" };
-  const alpha = await sharp(input).rotate().ensureAlpha().extractChannel("alpha").toBuffer();
-  const rgb = await sharp(edited).resize(width, height, { fit: "fill" }).removeAlpha().toBuffer();
-  const data = await sharp(rgb).joinChannel(alpha).png().toBuffer();
+  const editedBuf = process.env.MOCK_SMOOTH === "true" ? await sharp(flat).blur(2).jpeg().toBuffer() : await googleSmooth(flat, fetchImpl);
+  if (!hasAlpha) return { data: await sharp(editedBuf).jpeg({ quality: 90 }).toBuffer(), contentType: "image/jpeg" };
+  const original = await sharp(input).rotate().ensureAlpha().raw().toBuffer();
+  const edited = await sharp(editedBuf).resize(width, height, { fit: "fill" }).removeAlpha().raw().toBuffer();
+  const rgba = restoreEdges(edited, original);
+  const data = await sharp(rgba, { raw: { width, height, channels: 4 } }).png().toBuffer();
   return { data, contentType: "image/png" };
+}
+
+/**
+ * Inside the silhouette, the editor sometimes pulls a sleeve or shoulder inward and leaves the white
+ * paper it was shown on. Where the edit is near-white and the original was not, put the original
+ * pixel back, so the outline stays the garment's. Returns RGBA with the original alpha.
+ */
+export function restoreEdges(editedRgb: Buffer, originalRgba: Buffer): Buffer {
+  const n = originalRgba.length / 4;
+  const out = Buffer.alloc(n * 4);
+  for (let i = 0; i < n; i++) {
+    const a = originalRgba[i * 4 + 3];
+    let r = editedRgb[i * 3], g = editedRgb[i * 3 + 1], b = editedRgb[i * 3 + 2];
+    const or = originalRgba[i * 4], og = originalRgba[i * 4 + 1], ob = originalRgba[i * 4 + 2];
+    if (a > 0 && Math.min(r, g, b) > 232 && Math.min(or, og, ob) < 225) { r = or; g = og; b = ob; }
+    out[i * 4] = r; out[i * 4 + 1] = g; out[i * 4 + 2] = b; out[i * 4 + 3] = a;
+  }
+  return out;
 }

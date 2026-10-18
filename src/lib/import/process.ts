@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { getObject, newKey, NotFoundError, putObject } from "@/lib/storage";
 import { removeBackground, RemoveBgError } from "@/lib/images/remove-bg";
-import { makeThumb, normalizeOriginal, toAiImage } from "@/lib/images/thumb";
+import { fitCutout, makeThumb, normalizeOriginal, toAiImage } from "@/lib/images/thumb";
 import { phash } from "@/lib/images/phash";
 import { loadTagLists, tagItem, type TagResult } from "@/lib/ai/tag-item";
 import { readLabel } from "@/lib/ai/read-label";
@@ -42,7 +42,7 @@ export async function processEntry(entryId: string): Promise<ProcessOutcome> {
     let cutout: Buffer | null = null;
     let cutoutKey: string | null = entry.cutoutKey;
     try {
-      cutout = await removeBackground(normalized);
+      cutout = await fitCutout(await removeBackground(normalized));
       cutoutKey = newKey("cutouts", ownerId, "image/png");
       await putObject(cutoutKey, cutout, "image/png");
     } catch (e) {

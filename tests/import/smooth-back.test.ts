@@ -12,7 +12,8 @@ import { drainQueue } from "@/lib/import/queue";
 import { attachEntryPhoto, createItemFromEntry, saveEntryEdits } from "@/lib/items/service";
 import { readBackForEntry, type EntryAiResult } from "@/lib/import/process";
 import { keepSmooth, smoothEntry } from "@/lib/import/smooth-entry";
-import { isSmoothConfigured, smoothGarment } from "@/lib/images/smooth";
+import { isSmoothConfigured, restoreEdges, smoothGarment } from "@/lib/images/smooth";
+import { fitCutout } from "@/lib/images/thumb";
 
 async function photo() {
   return sharp({ create: { width: 500, height: 700, channels: 3, background: { r: 40, g: 30, b: 30 } } })
@@ -54,6 +55,27 @@ describe("smooth wrinkles + back photo", () => {
     expect(alpha[alpha.length - 1]).toBe(255);
     const plain = await smoothGarment(await photo());
     expect(plain.contentType).toBe("image/jpeg");
+  });
+
+  it("a cutout is trimmed to the piece with a slim margin, so it fills the box", async () => {
+    const roomy = await sharp({ create: { width: 400, height: 600, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+      .composite([{ input: await sharp({ create: { width: 200, height: 300, channels: 4, background: { r: 120, g: 90, b: 60, alpha: 1 } } }).png().toBuffer(), top: 150, left: 100 }])
+      .png().toBuffer();
+    const meta = await sharp(await fitCutout(roomy)).metadata();
+    expect(meta.width).toBe(200 + 2 * 12);
+    expect(meta.height).toBe(300 + 2 * 12);
+    const opaque = await sharp({ create: { width: 50, height: 50, channels: 3, background: { r: 1, g: 2, b: 3 } } }).png().toBuffer();
+    expect(await fitCutout(opaque)).toEqual(opaque); // nothing transparent to trim: untouched (the mock cutter returns opaque PNGs)
+  });
+
+  it("puts the garment back where the editor left white paper inside the outline", () => {
+    // two pixels: both inside the silhouette; the editor whited out the first, kept the second
+    const original = Buffer.from([120, 90, 60, 255, 30, 30, 30, 255]);
+    const edited = Buffer.from([250, 250, 250, 40, 40, 40]);
+    expect([...restoreEdges(edited, original)]).toEqual([120, 90, 60, 255, 40, 40, 40, 255]);
+    // a genuinely white garment stays white
+    const white = Buffer.from([245, 245, 245, 255]);
+    expect([...restoreEdges(Buffer.from([250, 250, 250]), white)]).toEqual([250, 250, 250, 255]);
   });
 
   it("SMOOTH parks a copy; UNDO throws it away; KEEP makes it the cutout with a fresh thumbnail", async () => {

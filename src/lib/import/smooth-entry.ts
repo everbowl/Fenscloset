@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { deleteObject, getObject, newKey, putObject } from "@/lib/storage";
 import { smoothGarment } from "@/lib/images/smooth";
-import { makeThumb } from "@/lib/images/thumb";
+import { fitCutout, makeThumb } from "@/lib/images/thumb";
 import { ItemError } from "@/lib/items/service";
 
 /**
@@ -22,8 +22,9 @@ export async function smoothEntry(personId: string, entryId: string): Promise<{ 
   const source = entry.cutoutKey ?? entry.originalKey;
   const { body } = await getObject(source);
   const out = await smoothGarment(body);
+  const data = out.contentType === "image/png" ? await fitCutout(out.data) : out.data;
   const smoothKey = newKey("cutouts", personId, out.contentType);
-  await putObject(smoothKey, out.data, out.contentType);
+  await putObject(smoothKey, data, out.contentType);
   await db.importEntry.update({ where: { id: entryId }, data: { smoothKey } });
   return { smoothKey };
 }
