@@ -50,3 +50,19 @@ describe("seed", () => {
     expect(jeff.devPasswordActive).toBe(false);
   });
 });
+
+describe("seed guard", () => {
+  it("does nothing on a database that already has people unless SEED_FORCE is set", async () => {
+    await resetDb();
+    process.env.DEV_MODE = "true";
+    process.env.SEED_FORCE = "true";
+    await seed();
+    await db.brand.deleteMany({ where: { name: "Nike" } });
+    delete process.env.SEED_FORCE;
+    await seed();
+    expect(await db.brand.count({ where: { name: "Nike" } })).toBe(0); // admin's deletion survives a deploy
+    process.env.SEED_FORCE = "true";
+    await seed();
+    expect(await db.brand.count({ where: { name: "Nike" } })).toBe(1);
+  });
+});

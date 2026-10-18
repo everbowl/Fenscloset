@@ -17,8 +17,17 @@ async function seedSimple(delegate: SimpleDelegate, names: string[]) {
   }
 }
 
+/**
+ * Seeds defaults. Runs on every deploy, so it only acts on an EMPTY database: once people exist,
+ * admins own every list and the seed must never re-create something they deleted or renamed.
+ * Set SEED_FORCE=true to re-run the upserts on purpose (local dev / tests).
+ */
 export async function seed() {
   const devMode = isDevMode();
+  if ((await db.person.count()) > 0 && process.env.SEED_FORCE !== "true") {
+    console.log("Seed skipped: database already has people.");
+    return;
+  }
 
   // People
   const ids: Record<string, string> = {};
