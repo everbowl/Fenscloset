@@ -1,6 +1,6 @@
 # Fen's Closet — Build Plan (v1, awaiting approval)
 
-Status: DRAFT — nothing is built until Jeff approves this plan and answers the questions at the bottom.
+Status: APPROVED by Jeff on 2026-10-18. Decisions: Q1 B (remove.bg), Q2 A (Opus 5.5 everywhere), Q3 B (Twilio SMS invites), Q4 B (Jeff creates the Railway project), Q5 A (new Anthropic key), Q6 B (www is the real site; GoDaddy forwards the bare domain), Q7 A (no shareable board images), Q8 A (Olivia = member), Q9 B (Jeff creates `main`).
 Branch: `claude/fens-closet-app-1ovr5e`
 Domain: fenscloset.com (GoDaddy)
 
@@ -15,11 +15,11 @@ Domain: fenscloset.com (GoDaddy)
 | Database | **Postgres on Railway + Prisma ORM** | Relational data (people, items, closets, wear history) is a textbook Postgres job. Prisma gives typed queries and safe migrations. |
 | Photo storage | **Railway Storage Bucket (S3-compatible)** | Phones upload straight to the bucket with presigned URLs, so the API never holds a 10 MB photo in memory. $0.015/GB-month, free egress. |
 | Image processing | **sharp** (Node) | Resize, thumbnails, outfit-board compositing, perceptual hashes for duplicate detection. |
-| Background removal | **Decision needed — see Q1.** Recommended: self-hosted open-source model (`rembg`) in a second small Railway service. | Photos of a minor never leave your Railway project. No per-image fee. |
+| Background removal | **remove.bg API** (Q1 = B) | Best-in-class edges. Per-image fee; cutouts are cached so each photo is sent once. |
 | AI | **Claude API** (`claude-opus-5-5`, vision) | Auto-tagging, label reading, selfie check-in reading, outfit generation, shopping fit verdicts. See Q2 for the model choice. |
 | Auth | **Built in-house**: argon2id password hashing, server-side sessions in Postgres, httpOnly cookies, email reset tokens, invite tokens | No third-party auth vendor, no monthly fee, no lock-in. Full control of DEV MODE rules. |
 | Email | **Resend** (free tier: 3,000 emails/month) | Forgot-password emails and invite emails from `@fenscloset.com`. |
-| Text invites | **Decision needed — see Q3.** Recommended: "Share link" via iMessage (zero cost). | Twilio SMS needs carrier registration and a monthly number; overkill for a family. |
+| Text invites | **Twilio SMS** (Q3 = B) + email via Resend | Real text messages with the invite link. |
 | Weather | **Open-Meteo** (free, no API key) + Open-Meteo Geocoding + Zippopotam.us for zip → coordinates (free) | Hourly temp/rain/wind for 16 days, no signup. Attribution line "Weather by Open-Meteo" is required by their license. |
 | Calendar | **Google Calendar API** via Google OAuth (free) | Each person connects their own Google account. |
 | PWA | Web manifest + service worker (Serwist) + IndexedDB upload queue | Installable on iPhone home screen; batch uploads survive closing the app. |
