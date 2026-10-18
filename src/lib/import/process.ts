@@ -9,7 +9,8 @@ import { AiError } from "@/lib/ai/claude";
 import type { ImportEntry } from "@/generated/prisma/client";
 
 /** What lands in ImportEntry.aiResult. */
-export type EntryAiResult = { tags: TagResult; warnings: string[]; label?: { brand: string | null; size: string | null } };
+/** `edited` lists the tag fields the person changed on the card, so a later re-read never undoes them. */
+export type EntryAiResult = { tags: TagResult; warnings: string[]; label?: { brand: string | null; size: string | null }; edited?: string[] };
 
 export type ProcessOutcome = { status: ImportEntry["status"]; error?: string };
 
@@ -88,6 +89,28 @@ export async function readLabelForEntry(entryId: string, labelKey: string): Prom
     ? { ...current, label: { brand: label.brand, size: label.size }, tags: { ...current.tags, brandText: label.brand ?? current.tags.brandText, brandId: brand?.id ?? current.tags.brandId, sizeText: label.size ?? current.tags.sizeText } }
     : { tags: emptyTags(label.brand, brand?.id ?? null, label.size), warnings: [], label: { brand: label.brand, size: label.size } };
   await db.importEntry.update({ where: { id: entryId }, data: { labelKey, aiResult: JSON.parse(JSON.stringify(next)) } });
+  return next;
+}
+
+/**
+ * A back photo was added on the card: Claude reads front and back together. Fields the person already
+ * edited, and a brand or size read off the label, stay as they are; the rest take the two-photo read.
+ */
+export async function readBackForEntry(entryId: string, backKey: string): Promise<EntryAiResult | null> {
+  const entry = await db.importEntry.findUnique({ where: { id: entryId } });
+  if (!entry) return null;
+  const current = (entry.aiResult as EntryAiResult | null) ?? { tags: emptyTags(null, null, null), warnings: [] };
+  const front = await toAiImage((await getObject(entry.cutoutKey ?? entry.originalKey)).body);
+  const back = await toAiImage((await getObject(backKey)).body);
+  const lists = await loadTagLists();
+  const fresh = await tagItem({ image: front, back, lists });
+  const keep = new Set(current.edited ?? []);
+  if (current.label) { keep.add("brandText"); keep.add("brandId"); keep.add("sizeText"); }
+  const merged: TagResult = { ...fresh };
+  for (const k of keep) (merged as unknown as Record<string, unknown>)[k] = (current.tags as unknown as Record<string, unknown>)[k];
+  if (keep.has("categoryId")) merged.subcategoryId = current.tags.subcategoryId;
+  const next: EntryAiResult = { ...current, tags: merged };
+  await db.importEntry.update({ where: { id: entryId }, data: { backKey, aiResult: JSON.parse(JSON.stringify(next)) } });
   return next;
 }
 

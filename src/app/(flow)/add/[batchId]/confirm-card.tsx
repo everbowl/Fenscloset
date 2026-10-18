@@ -10,12 +10,13 @@ import type { Named, TagLists, TagResult } from "@/lib/ai/tag-item";
 import type { ItemEdits } from "@/lib/items/service";
 import type { DuplicateHint } from "@/lib/items/duplicates";
 import { shrinkPhoto } from "@/lib/import/client-queue";
-import { attachPhotoAction, confirmEntryAction, mergeEntryAction, saveEditsAction, skipEntryAction } from "./actions";
+import { attachPhotoAction, confirmEntryAction, keepSmoothAction, mergeEntryAction, saveEditsAction, skipEntryAction, smoothEntryAction } from "./actions";
 import { PickSheet, Row, TextSheet } from "@/components/items/row-editor";
 
 type Props = {
   batchId: string;
-  entry: { id: string; photoKey: string; labelKey: string | null; wornKey: string | null; warnings: string[] };
+  entry: { id: string; photoKey: string; labelKey: string | null; wornKey: string | null; backKey: string | null; smoothKey: string | null; warnings: string[] };
+  canSmooth: boolean;
   tags: TagResult;
   lists: TagLists;
   counter: string;
@@ -36,7 +37,7 @@ function Title({ name }: { name: string }) {
 const nameOf = (xs: Named[], id: string | null) => xs.find((x) => x.id === id)?.name ?? null;
 
 /** Design 03: one tap per item when the tags are right. */
-export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists, counter, progress, duplicate, canEditLists, readyCount }: Props) {
+export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists, counter, progress, duplicate, canEditLists, readyCount, canSmooth }: Props) {
   const router = useRouter();
   const [tags, setTags] = useState(initial);
   const [lists, setLists] = useState(initialLists);
@@ -45,9 +46,35 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
   const [pending, start] = useTransition();
   const labelRef = useRef<HTMLInputElement>(null);
   const wornRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState<"label" | "worn" | null>(null);
+  const backRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState<"label" | "worn" | "back" | null>(null);
   const [labelKey, setLabelKey] = useState(entry.labelKey);
   const [wornKey, setWornKey] = useState(entry.wornKey);
+  const [backKey, setBackKey] = useState(entry.backKey);
+  const [photoKey, setPhotoKey] = useState(entry.photoKey);
+  const [smoothKey, setSmoothKey] = useState(entry.smoothKey);
+  const [smoothing, setSmoothing] = useState(false);
+  const [showBefore, setShowBefore] = useState(false);
+  const [side, setSide] = useState<"front" | "back">("front");
+  const shownKey = side === "back" && backKey ? backKey : smoothKey && !showBefore ? smoothKey : photoKey;
+
+  function smooth() {
+    setError(undefined); setSmoothing(true); setSide("front"); setShowBefore(false);
+    start(async () => {
+      const r = await smoothEntryAction(entry.id);
+      setSmoothing(false);
+      if (!r.ok) { setError(r.error); return; }
+      setSmoothKey(r.value.smoothKey);
+    });
+  }
+  function decideSmooth(keep: boolean) {
+    setError(undefined);
+    start(async () => {
+      const r = await keepSmoothAction(batchId, entry.id, keep);
+      if (!r.ok) { setError(r.error); return; }
+      setPhotoKey(r.value.photoKey); setSmoothKey(null); setShowBefore(false);
+    });
+  }
 
   const category = lists.categories.find((c) => c.id === tags.categoryId) ?? null;
   const subName = category ? nameOf(category.subcategories, tags.subcategoryId) : null;
@@ -80,21 +107,23 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
   function skip() { start(async () => { await skipEntryAction(batchId, entry.id); router.refresh(); }); }
   function merge() { if (!duplicate) return; start(async () => { const r = await mergeEntryAction(batchId, entry.id, duplicate.itemId); if (!r.ok) { setError(r.error); return; } router.refresh(); }); }
 
-  async function onPhoto(kind: "label" | "worn", e: React.ChangeEvent<HTMLInputElement>) {
+  async function onPhoto(kind: "label" | "worn" | "back", e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
     setUploading(kind); setError(undefined); setSheet(null);
     try {
       const blob = await shrinkPhoto(file);
-      const signRes = await fetch("/api/uploads/sign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contentType: blob.type || "image/jpeg", kind: kind === "label" ? "labels" : "worn" }) });
+      const signRes = await fetch("/api/uploads/sign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contentType: blob.type || "image/jpeg", kind: kind === "label" ? "labels" : kind === "worn" ? "worn" : "originals" }) });
       const signed = (await signRes.json()) as { key: string; url: string; headers: Record<string, string>; error?: string };
       if (!signRes.ok) throw new Error(signed.error || "Upload failed.");
       const put = await fetch(signed.url, { method: "PUT", headers: signed.headers, body: blob });
       if (!put.ok) throw new Error("Upload failed.");
       const r = await attachPhotoAction(entry.id, kind, signed.key);
       if (!r.ok) throw new Error(r.error);
-      if (kind === "label") { setLabelKey(signed.key); if (r.value) setTags(r.value); } else setWornKey(signed.key);
+      if (kind === "label") { setLabelKey(signed.key); if (r.value) setTags(r.value); }
+      else if (kind === "back") { setBackKey(signed.key); setSide("back"); if (r.value) setTags(r.value); }
+      else setWornKey(signed.key);
     } catch (err) {
       setError((err as Error).message);
     } finally { setUploading(null); }
@@ -106,6 +135,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
     <div className="flex flex-1 flex-col">
       <input ref={labelRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPhoto("label", e)} data-testid="label-photo" />
       <input ref={wornRef} type="file" accept="image/*" className="hidden" onChange={(e) => onPhoto("worn", e)} data-testid="worn-photo" />
+      <input ref={backRef} type="file" accept="image/*" className="hidden" onChange={(e) => onPhoto("back", e)} data-testid="back-photo" />
 
       <div className="flex h-14 items-center justify-between px-2">
         <Link href="/add" aria-label="Close, progress is saved" className="flex size-11 items-center justify-center text-ink">
@@ -121,9 +151,35 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
       </div>
 
       <div className="relative mx-5 h-[400px] bg-bone">
-        <img src={`/api/photo/${entry.photoKey}`} alt="" className="size-full object-contain" />
+        <img src={`/api/photo/${shownKey}`} alt="" className="size-full object-contain" data-testid="confirm-photo" />
+        {smoothing ? <span className="mono mono-11 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-paper px-3 py-2">Smoothing…</span> : null}
+        {smoothKey && side === "front" ? <span className="mono mono-11 absolute left-2 top-2 bg-paper px-2.5 py-1.5">{showBefore ? "Before" : "Smoothed"}</span> : null}
         <div className="absolute inset-x-0 bottom-0 h-[3px] bg-black/[0.12]"><div className="h-[3px] bg-ink" style={{ width: `${progress}%` }} /></div>
       </div>
+
+      {backKey || canSmooth ? (
+        <div className="flex min-h-[44px] items-center justify-between px-5 pt-2" data-testid="photo-tools">
+          <div className="flex gap-1.5">
+            {backKey ? (
+              <>
+                <button type="button" onClick={() => setSide("front")} aria-pressed={side === "front"} className={`mono mono-11 h-9 px-3 ${side === "front" ? "bg-ink text-paper" : "border border-ink"}`} data-testid="photo-front">Front</button>
+                <button type="button" onClick={() => setSide("back")} aria-pressed={side === "back"} className={`mono mono-11 h-9 px-3 ${side === "back" ? "bg-ink text-paper" : "border border-ink"}`} data-testid="photo-back">Back</button>
+              </>
+            ) : null}
+          </div>
+          {canSmooth && side === "front" ? (
+            smoothKey ? (
+              <div className="flex gap-1.5">
+                <button type="button" onPointerDown={() => setShowBefore(true)} onPointerUp={() => setShowBefore(false)} onPointerLeave={() => setShowBefore(false)} onClick={() => setShowBefore((v) => !v)} className="mono mono-11 h-9 border border-ink px-3" data-testid="smooth-before">Before</button>
+                <button type="button" onClick={() => decideSmooth(false)} disabled={pending} className="mono mono-11 h-9 border border-ink px-3" data-testid="smooth-undo">Undo</button>
+                <button type="button" onClick={() => decideSmooth(true)} disabled={pending} className="mono mono-11 h-9 bg-ink px-3 text-paper" data-testid="smooth-keep">Keep</button>
+              </div>
+            ) : (
+              <button type="button" onClick={smooth} disabled={smoothing || pending} className="mono mono-11 h-9 border border-ink px-3 disabled:opacity-60" data-testid="smooth">{smoothing ? "Smoothing…" : "Smooth wrinkles"}</button>
+            )
+          ) : null}
+        </div>
+      ) : null}
 
       {duplicate ? (
         <div className="mx-5 mt-3 flex items-center justify-between border-y border-ink py-2.5">
@@ -147,8 +203,8 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
       </div>
 
       {error ? <div className="px-5 pt-3"><Banner tone="danger" title={error} /></div> : null}
-      {uploading ? <p className="mono px-5 pt-3 text-graphite">{uploading === "label" ? "Reading the label…" : "Saving the photo…"}</p> : null}
-      {labelKey || wornKey ? <p className="mono px-5 pt-3 text-graphite">{[labelKey ? "Label photo added" : null, wornKey ? "Worn photo added" : null].filter(Boolean).join(" · ")}</p> : null}
+      {uploading ? <p className="mono px-5 pt-3 text-graphite">{uploading === "label" ? "Reading the label…" : uploading === "back" ? "Reading front and back…" : "Saving the photo…"}</p> : null}
+      {labelKey || wornKey || backKey ? <p className="mono px-5 pt-3 text-graphite" data-testid="photo-status">{[backKey ? "Back photo added" : null, labelKey ? "Label photo added" : null, wornKey ? "Worn photo added" : null].filter(Boolean).join(" · ")}</p> : null}
 
       <div className="mt-auto flex gap-2.5 px-5 pb-[26px] pt-5">
         <button type="button" onClick={confirm} disabled={pending || Boolean(uploading)} data-testid="confirm-next" className="h-[54px] flex-1 bg-ink font-mono text-[12px] uppercase tracking-[0.16em] text-paper disabled:opacity-60">
@@ -184,6 +240,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
       <Sheet open={sheet === "camera"} onClose={() => setSheet(null)} title="Add a photo">
         <div className="flex flex-col">
           <button type="button" onClick={() => labelRef.current?.click()} className="flex h-12 items-center justify-between border-b border-line text-[15px]">Scan the label<span className="mono text-graphite">Brand · size</span></button>
+          <button type="button" onClick={() => backRef.current?.click()} className="flex h-12 items-center justify-between border-b border-line text-[15px]" data-testid="add-back">Back of the piece<span className="mono text-graphite">Graphic · cut</span></button>
           <button type="button" onClick={() => wornRef.current?.click()} className="flex h-12 items-center justify-between border-b border-line text-[15px]">Worn photo<span className="mono text-graphite">How it fits</span></button>
         </div>
       </Sheet>

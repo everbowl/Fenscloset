@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { requirePerson } from "@/lib/auth/current";
 import { attachEntryPhoto, createItemFromEntry, ItemError, mergeIntoItem, saveEntryEdits, skipEntry, type ItemEdits } from "@/lib/items/service";
-import { readLabelForEntry } from "@/lib/import/process";
+import { readBackForEntry, readLabelForEntry } from "@/lib/import/process";
+import { keepSmooth, smoothEntry } from "@/lib/import/smooth-entry";
+import { SmoothError } from "@/lib/images/smooth";
 import { abandonBatch, ImportError } from "@/lib/import/service";
 import { parseKey } from "@/lib/storage";
 import type { TagResult } from "@/lib/ai/tag-item";
@@ -11,7 +13,7 @@ import type { TagResult } from "@/lib/ai/tag-item";
 export type ActionResult<T = undefined> = { ok: true; value: T } | { ok: false; error: string };
 
 function fail(e: unknown): { ok: false; error: string } {
-  if (e instanceof ItemError || e instanceof ImportError) return { ok: false, error: e.message };
+  if (e instanceof ItemError || e instanceof ImportError || e instanceof SmoothError) return { ok: false, error: e.message };
   console.error(e);
   return { ok: false, error: "Something went wrong. Try again." };
 }
@@ -40,19 +42,35 @@ export async function saveEditsAction(entryId: string, edits: ItemEdits): Promis
   try { return { ok: true, value: await saveEntryEdits(person.id, entryId, edits) }; } catch (e) { return fail(e); }
 }
 
-/** After the phone uploaded a label or worn photo (key already in the bucket). Labels get read by Claude. */
-export async function attachPhotoAction(entryId: string, kind: "label" | "worn", key: string): Promise<ActionResult<TagResult | null>> {
+/** After the phone uploaded a label, worn or back photo (key already in the bucket). Labels and backs get read by Claude. */
+export async function attachPhotoAction(entryId: string, kind: "label" | "worn" | "back", key: string): Promise<ActionResult<TagResult | null>> {
   const person = await requirePerson();
   const parsed = parseKey(key);
-  if (!parsed || parsed.ownerId !== person.id || parsed.kind !== (kind === "label" ? "labels" : "worn")) return { ok: false, error: "That photo is not yours." };
+  const wantKind = kind === "label" ? "labels" : kind === "worn" ? "worn" : "originals";
+  if (!parsed || parsed.ownerId !== person.id || parsed.kind !== wantKind) return { ok: false, error: "That photo is not yours." };
   try {
     await attachEntryPhoto(person.id, entryId, kind, key);
     if (kind === "label") {
       const res = await readLabelForEntry(entryId, key);
       return { ok: true, value: res?.tags ?? null };
     }
+    if (kind === "back") {
+      const res = await readBackForEntry(entryId, key);
+      return { ok: true, value: res?.tags ?? null };
+    }
     return { ok: true, value: null };
   } catch (e) { return fail(e); }
+}
+
+/** SMOOTH: a wrinkle-free copy, parked until KEEP or UNDO. */
+export async function smoothEntryAction(entryId: string): Promise<ActionResult<{ smoothKey: string }>> {
+  const person = await requirePerson();
+  try { return { ok: true, value: await smoothEntry(person.id, entryId) }; } catch (e) { return fail(e); }
+}
+
+export async function keepSmoothAction(batchId: string, entryId: string, keep: boolean): Promise<ActionResult<{ photoKey: string }>> {
+  const person = await requirePerson();
+  try { const v = await keepSmooth(person.id, entryId, keep); revalidatePath(`/add/${batchId}`); return { ok: true, value: v }; } catch (e) { return fail(e); }
 }
 
 export async function abandonBatchAction(batchId: string): Promise<ActionResult> {

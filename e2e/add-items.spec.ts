@@ -57,6 +57,29 @@ test.describe("add clothes", () => {
     await dialog.getByLabel("Name").fill("Black crew tee");
     await dialog.getByRole("button", { name: "Save" }).click();
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Black crew tee");
+
+    // smooth wrinkles: parked until KEEP; the rename survives the back-photo re-read
+    const before = await page.getByTestId("confirm-photo").getAttribute("src");
+    await page.getByTestId("smooth").click();
+    await expect(page.getByTestId("smooth-keep")).toBeVisible({ timeout: 20_000 });
+    expect(await page.getByTestId("confirm-photo").getAttribute("src")).not.toBe(before);
+    await page.getByTestId("smooth-undo").click();
+    await expect(page.getByTestId("smooth")).toBeVisible();
+    expect(await page.getByTestId("confirm-photo").getAttribute("src")).toBe(before);
+    await page.getByTestId("smooth").click();
+    await expect(page.getByTestId("smooth-keep")).toBeVisible({ timeout: 20_000 });
+    await page.getByTestId("smooth-keep").click();
+    await expect(page.getByTestId("smooth")).toBeVisible();
+    expect(await page.getByTestId("confirm-photo").getAttribute("src")).not.toBe(before);
+
+    // back of the piece
+    await page.getByRole("button", { name: "Add a label or worn photo" }).click();
+    await page.getByTestId("add-back").click();
+    await page.getByTestId("back-photo").setInputFiles((await fixtures())[2]);
+    await expect(page.getByTestId("photo-status")).toContainText("Back photo added");
+    await expect(page.getByTestId("photo-back")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Black crew tee");
+    await page.getByTestId("photo-front").click();
     await page.getByTestId("confirm-next").click();
     await expect(page.getByTestId("confirm-counter")).toHaveText("002 / 003");
 

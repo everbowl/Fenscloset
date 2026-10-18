@@ -32,7 +32,7 @@ export type ItemView = {
 type SheetKind = "category" | "subcategory" | "color" | "pattern" | "fabric" | "season" | "formality" | "occasion" | "tag" | "brand" | "store" | "size" | "price" | "date" | "url" | "notes" | "closets" | "share" | "rename" | "photo" | "delete" | null;
 
 const LAUNDRY_WORD: Record<LaundryStatus, string> = { clean: "Clean", dirty: "Laundry", cleaners: "At cleaners" };
-const KIND_WORD: Record<PhotoKind, string> = { alone: "Photo", worn: "Worn", label: "Label", cutout: "Cutout", thumb: "Thumb" };
+const KIND_WORD: Record<PhotoKind, string> = { alone: "Photo", worn: "Worn", label: "Label", cutout: "Cutout", thumb: "Thumb", back: "Back" };
 
 function Title({ name }: { name: string }) {
   const words = name.trim().split(" ");
@@ -50,7 +50,7 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
   const [error, setError] = useState<string>();
   const [pending, start] = useTransition();
   const photoRef = useRef<HTMLInputElement>(null);
-  const [photoKind, setPhotoKind] = useState<"alone" | "worn" | "label">("alone");
+  const [photoKind, setPhotoKind] = useState<"alone" | "worn" | "label" | "back">("alone");
   const [uploading, setUploading] = useState(false);
 
   const name = (xs: { id: string; name: string }[], id: string | null) => xs.find((x) => x.id === id)?.name ?? null;
@@ -97,7 +97,7 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
         <Link href="/closet" aria-label="Back to closet" className="absolute left-2 top-2 flex size-11 items-center justify-center bg-paper text-ink">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden><path d="M15 5l-7 7 7 7" /></svg>
         </Link>
-        {photo?.kind === "worn" ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">Worn</span> : null}
+        {photo?.kind === "worn" || photo?.kind === "back" ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">{KIND_WORD[photo.kind]}</span> : null}
       </div>
       {it.photos.length > 1 ? (
         <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 pt-1.5 [scrollbar-width:none] lg:mx-0 lg:px-0 lg:pt-0">
@@ -211,7 +211,7 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
       <TextSheet open={sheet === "notes"} onClose={() => setSheet(null)} title="Fit notes" label="How it fits" value={it.fitNotes ?? ""} placeholder="Runs small · long in the arms" onSave={(v) => save({ fitNotes: v }, { fitNotes: v.trim() || null })} />
       <Sheet open={sheet === "photo"} onClose={() => setSheet(null)} title="Add a photo">
         <div className="flex flex-col">
-          {([["alone", "Another photo", "Hanger or flat-lay"], ["worn", "Worn photo", "How it fits"], ["label", "Label", "Brand · size"]] as const).map(([k, l, m]) => (
+          {([["alone", "Another photo", "Hanger or flat-lay"], ["back", "Back of the piece", "Graphic · cut"], ["worn", "Worn photo", "How it fits"], ["label", "Label", "Brand · size"]] as const).map(([k, l, m]) => (
             <button key={k} type="button" onClick={() => { setPhotoKind(k); photoRef.current?.click(); }} className="flex h-12 items-center justify-between border-b border-line text-[15px]">{l}<span className="mono text-graphite">{m}</span></button>
           ))}
           {it.photos.length > 1 && photo ? (

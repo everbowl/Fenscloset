@@ -1,3 +1,4 @@
+import { isSmoothConfigured } from "@/lib/images/smooth";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePerson, isAdmin } from "@/lib/auth/current";
@@ -59,7 +60,8 @@ export default async function ConfirmPage({ params, searchParams }: { params: Pr
     <ConfirmCard
       key={entry.id}
       batchId={batchId}
-      entry={{ id: entry.id, photoKey: entry.cutoutKey ?? entry.originalKey, labelKey: entry.labelKey, wornKey: entry.wornKey, warnings: ai.warnings }}
+      entry={{ id: entry.id, photoKey: entry.cutoutKey ?? entry.originalKey, labelKey: entry.labelKey, wornKey: entry.wornKey, backKey: entry.backKey, smoothKey: entry.smoothKey, warnings: ai.warnings }}
+      canSmooth={isSmoothConfigured()}
       tags={ai.tags}
       lists={lists}
       counter={`${pad(position)} / ${pad(summary.total)}`}

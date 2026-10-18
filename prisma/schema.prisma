@@ -380,6 +380,7 @@ enum PhotoKind {
   label
   cutout
   thumb
+  back
 }
 
 model ItemPhoto {
@@ -448,6 +449,8 @@ model ImportEntry {
   thumbKey    String?
   labelKey    String?
   wornKey     String?
+  backKey     String?
+  smoothKey   String?
   phash       String?
   aiResult    Json?
   error       String?

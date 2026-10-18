@@ -53,7 +53,8 @@ export async function saveEntryEdits(personId: string, entryId: string, edits: I
   const entry = await ownedEntry(personId, entryId);
   const ai = (entry.aiResult as EntryAiResult | null) ?? { tags: emptyTags(), warnings: [] };
   const tags = applyEdits(ai.tags, edits);
-  await db.importEntry.update({ where: { id: entryId }, data: { aiResult: JSON.parse(JSON.stringify({ ...ai, tags })) } });
+  const edited = [...new Set([...(ai.edited ?? []), ...Object.keys(edits).filter((k) => edits[k as keyof ItemEdits] !== undefined)])];
+  await db.importEntry.update({ where: { id: entryId }, data: { aiResult: JSON.parse(JSON.stringify({ ...ai, tags, edited })) } });
   return tags;
 }
 
@@ -94,6 +95,7 @@ export async function createItemFromEntry(personId: string, entryId: string, edi
             { kind: "alone", bucketKey: entry.originalKey, isPrimary: !entry.cutoutKey },
             ...(entry.cutoutKey ? [{ kind: "cutout" as const, bucketKey: entry.cutoutKey, isPrimary: true }] : []),
             ...(entry.thumbKey ? [{ kind: "thumb" as const, bucketKey: entry.thumbKey }] : []),
+            ...(entry.backKey ? [{ kind: "back" as const, bucketKey: entry.backKey }] : []),
             ...(entry.labelKey ? [{ kind: "label" as const, bucketKey: entry.labelKey }] : []),
             ...(entry.wornKey ? [{ kind: "worn" as const, bucketKey: entry.wornKey }] : []),
           ],
@@ -119,6 +121,7 @@ export async function mergeIntoItem(personId: string, entryId: string, itemId: s
         { itemId, kind: "alone", bucketKey: entry.originalKey, isPrimary: !hasPrimary && !entry.cutoutKey },
         ...(entry.cutoutKey ? [{ itemId, kind: "cutout" as const, bucketKey: entry.cutoutKey, isPrimary: !hasPrimary }] : []),
         ...(entry.thumbKey ? [{ itemId, kind: "thumb" as const, bucketKey: entry.thumbKey }] : []),
+        ...(entry.backKey ? [{ itemId, kind: "back" as const, bucketKey: entry.backKey }] : []),
         ...(entry.labelKey ? [{ itemId, kind: "label" as const, bucketKey: entry.labelKey }] : []),
         ...(entry.wornKey ? [{ itemId, kind: "worn" as const, bucketKey: entry.wornKey }] : []),
       ],
@@ -135,9 +138,9 @@ export async function skipEntry(personId: string, entryId: string): Promise<void
   await finishBatchIfDone(entry.batchId);
 }
 
-export async function attachEntryPhoto(personId: string, entryId: string, kind: "label" | "worn", key: string): Promise<void> {
+export async function attachEntryPhoto(personId: string, entryId: string, kind: "label" | "worn" | "back", key: string): Promise<void> {
   await ownedEntry(personId, entryId);
-  await db.importEntry.update({ where: { id: entryId }, data: kind === "label" ? { labelKey: key } : { wornKey: key } });
+  await db.importEntry.update({ where: { id: entryId }, data: kind === "label" ? { labelKey: key } : kind === "worn" ? { wornKey: key } : { backKey: key } });
 }
 
 export function emptyTags(): TagResult {
@@ -236,7 +239,7 @@ export async function cycleLaundry(viewer: { id: string; role: string }, itemId:
   return next;
 }
 
-export async function addItemPhoto(viewer: { id: string; role: string }, itemId: string, kind: "alone" | "worn" | "label", key: string): Promise<void> {
+export async function addItemPhoto(viewer: { id: string; role: string }, itemId: string, kind: "alone" | "worn" | "label" | "back", key: string): Promise<void> {
   const item = await ownedItem(viewer, itemId);
   const parsed = parseKeyOwner(key);
   if (!parsed || parsed !== item.ownerId) throw new ItemError("That photo is not this item's owner's.", 403);

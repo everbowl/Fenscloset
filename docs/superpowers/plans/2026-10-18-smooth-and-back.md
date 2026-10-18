@@ -1,0 +1,7 @@
+# Smooth wrinkles + back photo (approved 18 Oct 2026: L B, M A)
+
+**Smooth (L B).** A per-photo SMOOTH button on the confirm card, never automatic. The cutout goes to Google's image editor on Vertex (Gemini 2.5 Flash Image, same service account as try-on; `GOOGLE_VERTEX_SMOOTH_MODEL`, `GOOGLE_VERTEX_SMOOTH_LOCATION` default `global`) with a "smooth every wrinkle, change nothing else" instruction. The result is pasted back into the original silhouette (the cutout's alpha mask), stored under `cutouts/` as `ImportEntry.smoothKey`, and shown on the card with BEFORE · KEEP · UNDO. KEEP makes it the cutout and remakes the thumbnail; UNDO deletes it. `MOCK_SMOOTH=true` blurs instead for tests and screenshots.
+
+**Back photo (M A).** The camera button on the confirm card gets "Back of the piece". The photo is uploaded under `originals/`, saved as `ImportEntry.backKey`, shown beside the front on the card, stored with the item as a `back` photo (`PhotoKind.back`), and the piece is re-read by Claude with front and back together. Fields the person already edited on the card (tracked in `aiResult.edited`) and a scanned brand/size are kept; everything else takes the two-photo read. The item page can add a back photo too.
+
+**Verification.** Unit: smooth mock keep/undo, back attach + re-read keeps edits, item gets the back photo. Browser: confirm card adds a back photo and smooths then keeps. Screenshots for approval.

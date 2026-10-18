@@ -24,7 +24,7 @@ export async function cycleLaundryAction(itemId: string): Promise<Result<Laundry
   try { const s = await cycleLaundry(person, itemId); bust(itemId); return { ok: true, value: s }; } catch (e) { return fail(e); }
 }
 
-export async function addItemPhotoAction(itemId: string, kind: "alone" | "worn" | "label", key: string): Promise<Result> {
+export async function addItemPhotoAction(itemId: string, kind: "alone" | "worn" | "label" | "back", key: string): Promise<Result> {
   const person = await requirePerson();
   try { await addItemPhoto(person, itemId, kind, key); bust(itemId); return { ok: true, value: undefined }; } catch (e) { return fail(e); }
 }
