@@ -37,18 +37,35 @@ export const pendingStore = {
   clear: () => tx<undefined>("readwrite", (s) => s.clear()),
 };
 
-/** Shrinks a photo to ≤maxEdge on the long side and re-encodes as JPEG. Falls back to the original file. */
+/**
+ * Shrinks a photo to ≤maxEdge on the long side and re-encodes as JPEG. Falls back to the original file.
+ * The shrink happens in halving steps: one bilinear pass from a 4000px camera frame to 1600px skips
+ * pixels and turns knit and weave textures into moiré ripples, which then lives on in every copy.
+ */
 export async function shrinkPhoto(file: File, maxEdge = 1600): Promise<Blob> {
   try {
     const bitmap = await createImageBitmap(file);
     const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
     const w = Math.max(1, Math.round(bitmap.width * scale));
     const h = Math.max(1, Math.round(bitmap.height * scale));
+    let source: CanvasImageSource = bitmap;
+    let sw = bitmap.width;
+    let sh = bitmap.height;
+    while (sw / 2 >= w && sh / 2 >= h) {
+      const step = document.createElement("canvas");
+      step.width = Math.round(sw / 2); step.height = Math.round(sh / 2);
+      const sctx = step.getContext("2d");
+      if (!sctx) throw new Error("no canvas");
+      sctx.imageSmoothingEnabled = true; sctx.imageSmoothingQuality = "high";
+      sctx.drawImage(source, 0, 0, sw, sh, 0, 0, step.width, step.height);
+      source = step; sw = step.width; sh = step.height;
+    }
     const canvas = document.createElement("canvas");
     canvas.width = w; canvas.height = h;
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("no canvas");
-    ctx.drawImage(bitmap, 0, 0, w, h);
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(source, 0, 0, sw, sh, 0, 0, w, h);
     bitmap.close();
     const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.88));
     if (!blob) throw new Error("encode failed");
