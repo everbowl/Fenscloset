@@ -8,7 +8,7 @@ import { seed } from "../../prisma/seed";
 import { newKey, putObject } from "@/lib/storage";
 import { canViewKey } from "@/lib/photos/visibility";
 import { bodyPhotosAllowed, canSeeBodyData, canShopFor } from "@/lib/people/visibility";
-import { addBodyPhoto, getBodyProfile, getPrivacy, getStyleProfile, setBodyViewers, setMeasurement, setMinorBodyImageApproval, setShoppers, updateFavorites, updateStyle, upsertSize } from "@/lib/profiles/service";
+import { addBodyPhoto, getBodyProfile, setBodyPhotoPrivacy, getPrivacy, getStyleProfile, setBodyViewers, setMeasurement, setMinorBodyImageApproval, setShoppers, updateFavorites, updateStyle, upsertSize } from "@/lib/profiles/service";
 import { listEntries } from "@/lib/lists/service";
 
 describe("profiles & privacy", () => {
@@ -66,6 +66,32 @@ describe("profiles & privacy", () => {
     await expect(addBodyPhoto(mya, mya.id, newKey("bodies", mya.id, "image/jpeg"))).rejects.toThrow(/approval/);
     await setMinorBodyImageApproval(jeff, mya.id, true);
     expect(await bodyPhotosAllowed(mya.id)).toMatchObject({ allowed: true });
+  });
+
+  it("a photo locked 'only me' is invisible even to granted viewers; a minor's stays with parents", async () => {
+    const [jeff, olivia, mya, brittney] = await Promise.all([by("Jeff"), by("Olivia"), by("Mya"), by("Brittney")]);
+    await setBodyViewers(jeff, jeff.id, [olivia.id, brittney.id]);
+    const locked = newKey("bodies", jeff.id, "image/jpeg"); const open = newKey("bodies", jeff.id, "image/jpeg");
+    await putObject(locked, Buffer.from("u"), "image/jpeg"); await putObject(open, Buffer.from("s"), "image/jpeg");
+    await addBodyPhoto(jeff, jeff.id, locked, { onlyMe: true });
+    await addBodyPhoto(jeff, jeff.id, open);
+    expect((await getBodyProfile(jeff, jeff.id))!.photos.map((p) => p.onlyMe).sort()).toEqual([false, true]);
+    expect((await getBodyProfile(olivia, jeff.id))!.photos.map((p) => p.key)).toEqual([open]);
+    expect((await getBodyProfile(brittney, jeff.id))!.photos.map((p) => p.key)).toEqual([open]);
+    expect(await canViewKey(brittney, locked)).toBe(false);
+    expect(await canViewKey(olivia, locked)).toBe(false);
+    expect(await canViewKey(olivia, open)).toBe(true);
+    expect(await canViewKey(jeff, locked)).toBe(true);
+    const id = (await db.bodyPhoto.findUniqueOrThrow({ where: { bucketKey: locked } })).id;
+    await expect(setBodyPhotoPrivacy(olivia, jeff.id, id, false)).rejects.toMatchObject({ status: 403 });
+    await setBodyPhotoPrivacy(jeff, jeff.id, id, false);
+    expect(await canViewKey(olivia, locked)).toBe(true);
+    // minor: locked photo still visible to parents, never to a sibling
+    const myaKey = newKey("bodies", mya.id, "image/jpeg"); await putObject(myaKey, Buffer.from("m"), "image/jpeg");
+    await addBodyPhoto(mya, mya.id, myaKey, { onlyMe: true });
+    expect(await canViewKey(jeff, myaKey)).toBe(true);
+    expect(await canViewKey(olivia, myaKey)).toBe(false);
+    expect((await getBodyProfile(jeff, mya.id))!.photos).toHaveLength(1);
   });
 
   it("sizes by brand, style and favorites round-trip", async () => {

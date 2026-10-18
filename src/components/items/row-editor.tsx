@@ -23,7 +23,7 @@ export function Row({ label, value, muted, onClick, testId }: { label: string; v
 
 /**
  * Picker sheet for a list-backed row. Options come from the editable lists; admins get `+ Add`
- * right here so they never leave the screen. `multi` allows several (colours, seasons).
+ * right here so they never leave the screen. `multi` allows several (colors, seasons).
  */
 export function PickSheet({ open, onClose, title, kind, options, selected, multi, canAdd, onChange, parentId, onAdded }: {
   open: boolean; onClose: () => void; title: string; kind: ListKind; options: Named[]; selected: string[]; multi?: boolean;

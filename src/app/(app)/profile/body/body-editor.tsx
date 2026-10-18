@@ -12,9 +12,9 @@ import { PickSheet, Row, TextSheet } from "@/components/items/row-editor";
 import { InlineAdd } from "@/components/lists/inline-add";
 import { shrinkPhoto } from "@/lib/import/client-queue";
 import type { BodyProfileView, Named } from "@/lib/profiles/service";
-import { addBodyPhotoAction, removeBodyPhotoAction, removeSizeAction, setFitNotesAction, setMeasurementAction, upsertSizeAction } from "../actions";
+import { addBodyPhotoAction, removeBodyPhotoAction, removeSizeAction, setBodyPhotoPrivacyAction, setFitNotesAction, setMeasurementAction, upsertSizeAction } from "../actions";
 
-type Body = Omit<BodyProfileView, "photos"> & { photos: { id: string; key: string; takenAt: string }[] };
+type Body = Omit<BodyProfileView, "photos"> & { photos: { id: string; key: string; takenAt: string; onlyMe: boolean }[] };
 
 /**
  * Body profile (screen 11, undrawn): measurements from the editable list, sizes by brand, fit notes,
@@ -30,6 +30,8 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, brands, categor
   const [pickBrand, setPickBrand] = useState(false);
   const [pickCategory, setPickCategory] = useState(false);
   const [photoSheet, setPhotoSheet] = useState<string | null>(null);
+  const [askPrivacy, setAskPrivacy] = useState(false);
+  const [nextOnlyMe, setNextOnlyMe] = useState(false);
   const [error, setError] = useState<string>();
   const [uploading, setUploading] = useState(false);
   const [pending, start] = useTransition();
@@ -52,7 +54,7 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, brands, categor
       if (!signRes.ok) throw new Error(signed.error || "Upload failed.");
       const put = await fetch(signed.url, { method: "PUT", headers: signed.headers, body: blob });
       if (!put.ok) throw new Error("Upload failed.");
-      const r = await addBodyPhotoAction(ownerId, signed.key);
+      const r = await addBodyPhotoAction(ownerId, signed.key, nextOnlyMe);
       if (!r.ok) throw new Error(r.error);
       router.refresh();
     } catch (err) { setError((err as Error).message); } finally { setUploading(false); }
@@ -103,12 +105,13 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, brands, categor
             {isMinor && body.photosApprovedBy ? <p className="mono py-2 text-graphite">Approved by {body.photosApprovedBy} · seen by {ownerFirst} and parents only</p> : null}
             <div className="grid grid-cols-3 gap-1.5 pt-2">
               {body.photos.map((p) => (
-                <button key={p.id} type="button" onClick={() => canEdit && setPhotoSheet(p.id)} className="h-[150px] overflow-hidden bg-bone">
+                <button key={p.id} type="button" onClick={() => canEdit && setPhotoSheet(p.id)} className="relative h-[150px] overflow-hidden bg-bone" data-testid={p.onlyMe ? "body-photo-locked" : "body-photo-shared"}>
                   <img src={`/api/photo/${p.key}`} alt="Full-body photo" className="size-full object-cover" />
+                  {p.onlyMe ? <span className="mono absolute left-1.5 top-1.5 bg-paper px-1.5 py-1">Only me</span> : null}
                 </button>
               ))}
               {canEdit ? (
-                <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} className="flex h-[150px] flex-col items-center justify-center gap-2 bg-bone">
+                <button type="button" onClick={() => setAskPrivacy(true)} disabled={uploading} className="flex h-[150px] flex-col items-center justify-center gap-2 bg-bone" data-testid="add-body-photo">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden><path d="M3 8h4l2-3h6l2 3h4v12H3z" /><circle cx="12" cy="13.5" r="3.5" /></svg>
                   <span className="mono">{uploading ? "Saving…" : "Add photo"}</span>
                 </button>
@@ -137,8 +140,24 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, brands, categor
       </Sheet>
       <PickSheet open={pickBrand} onClose={() => setPickBrand(false)} title="Brand" kind="brand" options={brandList} selected={size?.brandId ? [size.brandId] : []} canAdd={canEditLists} onChange={(ids) => size && setSize({ ...size, brandId: ids[0] ?? "" })} onAdded={(e) => setBrandList((l) => [...l, e])} />
       <PickSheet open={pickCategory} onClose={() => setPickCategory(false)} title="For which category" kind="category" options={categories} selected={size?.categoryId ? [size.categoryId] : []} canAdd={false} onChange={(ids) => size && setSize({ ...size, categoryId: ids[0] ?? null })} />
+      <Sheet open={askPrivacy} onClose={() => setAskPrivacy(false)} title="Who can see this photo?">
+        <div className="flex flex-col">
+          <button type="button" data-testid="photo-only-me" onClick={() => { setNextOnlyMe(true); setAskPrivacy(false); fileRef.current?.click(); }} className="flex min-h-12 items-center justify-between gap-3 border-b border-line py-2 text-left text-[15px]">
+            <span>Only me<span className="mono block text-graphite">Nobody else, ever · the AI still uses it to dress you</span></span>
+          </button>
+          <button type="button" data-testid="photo-shared" onClick={() => { setNextOnlyMe(false); setAskPrivacy(false); fileRef.current?.click(); }} className="flex min-h-12 items-center justify-between gap-3 border-b border-line py-2 text-left text-[15px]">
+            <span>Everyone who can see my body profile<span className="mono block text-graphite">Currently {visibleTo.join(", ")}</span></span>
+          </button>
+        </div>
+      </Sheet>
       <Sheet open={Boolean(photoSheet)} onClose={() => setPhotoSheet(null)} title="This photo">
-        <Button variant="secondary" className="w-full" disabled={pending} onClick={() => { const id = photoSheet!; setPhotoSheet(null); run(() => removeBodyPhotoAction(ownerId, id)); }}>Remove photo</Button>
+        {(() => { const p = body.photos.find((x) => x.id === photoSheet); return p ? (
+          <div className="space-y-2.5">
+            <p className="mono text-graphite">{p.onlyMe ? "Locked · only you can see it" : `Seen by ${visibleTo.join(", ")}`}</p>
+            <Button variant="secondary" className="w-full" disabled={pending} data-testid="toggle-photo-lock" onClick={() => { setPhotoSheet(null); run(() => setBodyPhotoPrivacyAction(ownerId, p.id, !p.onlyMe)); }}>{p.onlyMe ? "Unlock for my body-profile viewers" : "Lock to only me"}</Button>
+            <Button variant="secondary" className="w-full" disabled={pending} onClick={() => { setPhotoSheet(null); run(() => removeBodyPhotoAction(ownerId, p.id)); }}>Remove photo</Button>
+          </div>
+        ) : null; })()}
       </Sheet>
     </div>
   );

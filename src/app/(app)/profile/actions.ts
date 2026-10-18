@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requirePerson } from "@/lib/auth/current";
 import { updatePersonDetails } from "@/lib/people/service";
 import {
-  addBodyPhoto, ProfileError, removeBodyPhoto, removeSize, setBodyViewers, setFitNotes, setMeasurement, setMinorBodyImageApproval,
+  addBodyPhoto, ProfileError, removeBodyPhoto, removeSize, setBodyPhotoPrivacy, setBodyViewers, setFitNotes, setMeasurement, setMinorBodyImageApproval,
   setNeverSuggest, setShoppers, updateFavorites, updateStyle, upsertSize,
 } from "@/lib/profiles/service";
 
@@ -34,8 +34,11 @@ export async function upsertSizeAction(ownerId: string, input: { id?: string; br
 export async function removeSizeAction(ownerId: string, id: string): Promise<Result> {
   const me = await requirePerson(); return run(() => removeSize(me, ownerId, id));
 }
-export async function addBodyPhotoAction(ownerId: string, key: string): Promise<Result> {
-  const me = await requirePerson(); return run(() => addBodyPhoto(me, ownerId, key));
+export async function addBodyPhotoAction(ownerId: string, key: string, onlyMe = false): Promise<Result> {
+  const me = await requirePerson(); return run(() => addBodyPhoto(me, ownerId, key, { onlyMe }));
+}
+export async function setBodyPhotoPrivacyAction(ownerId: string, photoId: string, onlyMe: boolean): Promise<Result> {
+  const me = await requirePerson(); return run(() => setBodyPhotoPrivacy(me, ownerId, photoId, onlyMe));
 }
 export async function removeBodyPhotoAction(ownerId: string, photoId: string): Promise<Result> {
   const me = await requirePerson(); return run(() => removeBodyPhoto(me, ownerId, photoId));

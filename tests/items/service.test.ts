@@ -83,7 +83,7 @@ describe("confirm → item", () => {
     expect(dup?.reason).toBe("photo");
     const none = await findLikelyDuplicate(jeffId, { phash: other.phash, categoryId: probeA.categoryId, colorIds: probeA.colorIds, brandId: null });
     expect(none).toBeNull();
-    // tag rule needs a brand: same category + colour alone is not enough
+    // tag rule needs a brand: same category + color alone is not enough
     const nike = lists.brands.find((b) => b.name === "Nike")!;
     expect(await findLikelyDuplicate(jeffId, { phash: null, categoryId: probeA.categoryId, colorIds: probeA.colorIds, brandId: nike.id })).toBeNull();
     await db.item.update({ where: { id: item.id }, data: { brandId: nike.id } });

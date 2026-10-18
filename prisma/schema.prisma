@@ -490,6 +490,8 @@ model BodyPhoto {
   id        String   @id @default(cuid())
   personId  String
   bucketKey String   @unique
+  /** Locked to the owner: nobody else sees it, the AI may still use it to dress the owner. */
+  onlyMe    Boolean  @default(false)
   takenAt   DateTime @default(now())
   person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
 

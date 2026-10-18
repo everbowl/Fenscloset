@@ -19,7 +19,7 @@ export async function canViewKey(viewer: Viewer, key: string): Promise<boolean> 
   if (!parsed) return false;
   if (viewer.status === "removed") return false;
   if (parsed.ownerId === viewer.id) return true;
-  if (parsed.kind === "bodies") return canSeeBodyData(viewer, parsed.ownerId);
+  if (parsed.kind === "bodies") return canSeeBodyPhotoKey(viewer, parsed.ownerId, key);
   const owner = await db.person.findUnique({ where: { id: parsed.ownerId }, select: { id: true, role: true, status: true } });
   if (!owner || owner.status === "removed") return false;
   if (owner.role === "minor") {
@@ -31,4 +31,19 @@ export async function canViewKey(viewer: Viewer, key: string): Promise<boolean> 
   if (!photo) return false;
   if (photo.kind === "worn" && owner.role === "minor") return false;
   return true;
+}
+
+/**
+ * Body photos follow the body-data rule, except a photo locked "only me": the owner alone sees it
+ * (a minor's locked photo stays visible to their parents, per the minors rule).
+ */
+export async function canSeeBodyPhotoKey(viewer: Viewer, ownerId: string, key: string): Promise<boolean> {
+  if (viewer.id === ownerId) return true;
+  const photo = await db.bodyPhoto.findUnique({ where: { bucketKey: key }, select: { onlyMe: true } });
+  if (photo?.onlyMe) {
+    const owner = await db.person.findUnique({ where: { id: ownerId }, select: { role: true } });
+    if (owner?.role !== "minor") return false;
+    return Boolean(await db.guardianLink.findUnique({ where: { minorId_parentId: { minorId: ownerId, parentId: viewer.id } } }));
+  }
+  return canSeeBodyData(viewer, ownerId);
 }

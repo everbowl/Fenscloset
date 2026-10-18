@@ -15,7 +15,7 @@ export type BodyProfileView = {
   fitNotes: string | null;
   measurements: { kindId: string; name: string; unit: string; value: string | null }[];
   sizes: { id: string; brandId: string; brandName: string; categoryId: string | null; categoryName: string | null; size: string }[];
-  photos: { id: string; key: string; takenAt: Date }[];
+  photos: { id: string; key: string; takenAt: Date; onlyMe: boolean }[];
   photosAllowed: boolean;
   photosApprovedBy?: string;
 };
@@ -49,11 +49,14 @@ export async function getBodyProfile(viewer: Viewer, ownerId: string): Promise<B
     bodyPhotosAllowed(ownerId),
   ]);
   const categories = await db.category.findMany({ where: { id: { in: sizes.map((s) => s.categoryId).filter((x): x is string => Boolean(x)) } }, select: { id: true, name: true } });
+  // A minor's locked photos stay visible to their parents; an adult's locked photos are theirs alone.
+  const ownerRole = (await db.person.findUnique({ where: { id: ownerId }, select: { role: true } }))?.role;
+  const isParentView = ownerRole === "minor" && viewer.id !== ownerId && Boolean(await db.guardianLink.findUnique({ where: { minorId_parentId: { minorId: ownerId, parentId: viewer.id } } }));
   return {
     fitNotes: profile?.fitNotes ?? null,
     measurements: kinds.map((k) => ({ kindId: k.id, name: k.name, unit: k.unit, value: values.find((v) => v.kindId === k.id)?.value ?? null })),
     sizes: sizes.map((s) => ({ id: s.id, brandId: s.brandId, brandName: s.brand.name, categoryId: s.categoryId, categoryName: categories.find((c) => c.id === s.categoryId)?.name ?? null, size: s.size })),
-    photos: allowed.allowed ? photos.map((p) => ({ id: p.id, key: p.bucketKey, takenAt: p.takenAt })) : [],
+    photos: allowed.allowed ? photos.filter((p) => !p.onlyMe || viewer.id === ownerId || isParentView).map((p) => ({ id: p.id, key: p.bucketKey, takenAt: p.takenAt, onlyMe: p.onlyMe })) : [],
     photosAllowed: allowed.allowed,
     photosApprovedBy: allowed.approvedBy,
   };
@@ -92,13 +95,21 @@ export async function removeSize(viewer: Viewer, ownerId: string, id: string): P
   await db.bodySizeByBrand.deleteMany({ where: { id, personId: ownerId } });
 }
 
-export async function addBodyPhoto(viewer: Viewer, ownerId: string, key: string): Promise<void> {
+export async function addBodyPhoto(viewer: Viewer, ownerId: string, key: string, opts: { onlyMe?: boolean } = {}): Promise<void> {
   await assertCanEdit(viewer, ownerId);
   const parsed = parseKey(key);
   if (!parsed || parsed.kind !== "bodies" || parsed.ownerId !== ownerId) throw new ProfileError("That photo is not this person's.", 403);
   const allowed = await bodyPhotosAllowed(ownerId);
   if (!allowed.allowed) throw new ProfileError("Body photos need a parent's approval first.", 403);
-  await db.bodyPhoto.create({ data: { personId: ownerId, bucketKey: key } });
+  await db.bodyPhoto.create({ data: { personId: ownerId, bucketKey: key, onlyMe: Boolean(opts.onlyMe) } });
+}
+
+/** Lock a photo to the owner ("only me") or open it to everyone who can see the body profile. */
+export async function setBodyPhotoPrivacy(viewer: Viewer, ownerId: string, photoId: string, onlyMe: boolean): Promise<void> {
+  await assertCanEdit(viewer, ownerId);
+  const photo = await db.bodyPhoto.findUnique({ where: { id: photoId } });
+  if (!photo || photo.personId !== ownerId) throw new ProfileError("Not yours.", 403);
+  await db.bodyPhoto.update({ where: { id: photoId }, data: { onlyMe } });
 }
 
 export async function removeBodyPhoto(viewer: Viewer, ownerId: string, photoId: string): Promise<void> {

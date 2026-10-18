@@ -25,7 +25,7 @@ type Props = {
   readyCount: number;
 };
 
-type SheetKind = "category" | "subcategory" | "colour" | "fabric" | "season" | "formality" | "brand" | "size" | "rename" | "camera" | null;
+type SheetKind = "category" | "subcategory" | "color" | "fabric" | "season" | "formality" | "brand" | "size" | "rename" | "camera" | null;
 
 function Title({ name }: { name: string }) {
   const words = name.trim().split(" ");
@@ -52,7 +52,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
   const category = lists.categories.find((c) => c.id === tags.categoryId) ?? null;
   const subName = category ? nameOf(category.subcategories, tags.subcategoryId) : null;
   const categoryValue = category ? `${category.name}${subName ? ` · ${subName}` : ""}` : "Pick a category";
-  const colourValue = tags.colorIds.map((id) => nameOf(lists.colors, id)).filter(Boolean).join(", ") || "Pick a colour";
+  const colorValue = tags.colorIds.map((id) => nameOf(lists.colors, id)).filter(Boolean).join(", ") || "Pick a color";
   const fabricName = nameOf(lists.fabrics, tags.fabricId);
   const fabricValue = fabricName ? `${fabricName}${tags.fabricConfidence < 0.6 ? " (best guess)" : ""}` : "Not sure";
   const seasonValue = tags.seasonIds.map((id) => nameOf(lists.seasons, id)).filter(Boolean).join(", ") || "Any";
@@ -138,7 +138,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
 
       <div className="flex flex-col px-5">
         <Row label="Category" value={categoryValue} muted={!category} onClick={() => setSheet("category")} testId="row-category" />
-        <Row label="Colour" value={colourValue} muted={!tags.colorIds.length} onClick={() => setSheet("colour")} testId="row-colour" />
+        <Row label="Color" value={colorValue} muted={!tags.colorIds.length} onClick={() => setSheet("color")} testId="row-color" />
         <Row label="Fabric" value={fabricValue} muted={!fabricName} onClick={() => setSheet("fabric")} />
         <Row label="Season" value={seasonValue} onClick={() => setSheet("season")} />
         <Row label="Dress code" value={formalityValue} muted={!tags.formalityId} onClick={() => setSheet("formality")} />
@@ -165,7 +165,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
       <PickSheet open={sheet === "subcategory"} onClose={() => setSheet(null)} title={category ? `${category.name} · type` : "Type"} kind="subcategory" parentId={category?.id} options={category?.subcategories ?? []} selected={tags.subcategoryId ? [tags.subcategoryId] : []} canAdd={canEditLists}
         onChange={(ids) => edit({ subcategoryId: ids[0] ?? null })}
         onAdded={(e) => setLists((l) => ({ ...l, categories: l.categories.map((c) => (c.id === category?.id ? { ...c, subcategories: [...c.subcategories, e] } : c)) }))} />
-      <PickSheet open={sheet === "colour"} onClose={() => setSheet(null)} title="Colour" kind="color" options={lists.colors} selected={tags.colorIds} multi canAdd={canEditLists}
+      <PickSheet open={sheet === "color"} onClose={() => setSheet(null)} title="Color" kind="color" options={lists.colors} selected={tags.colorIds} multi canAdd={canEditLists}
         onChange={(ids) => edit({ colorIds: ids })} onAdded={(e) => setLists((l) => ({ ...l, colors: [...l.colors, e] }))} />
       <PickSheet open={sheet === "fabric"} onClose={() => setSheet(null)} title="Fabric" kind="fabric" options={lists.fabrics} selected={tags.fabricId ? [tags.fabricId] : []} canAdd={canEditLists}
         onChange={(ids) => edit({ fabricId: ids[0] ?? null })} onAdded={(e) => setLists((l) => ({ ...l, fabrics: [...l.fabrics, e] }))} />

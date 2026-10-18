@@ -8,7 +8,7 @@ import { PickSheet, Row } from "@/components/items/row-editor";
 import type { Named, StyleProfileView } from "@/lib/profiles/service";
 import { setNeverSuggestAction, updateStyleAction } from "../actions";
 
-/** Style profile (screen 12, undrawn): loved / avoid colours, style words, never-suggest list. */
+/** Style profile (screen 12, undrawn): loved / avoid colors, style words, never-suggest list. */
 export function StyleEditor({ ownerId, style, colors, words, canEdit, canEditLists }: { ownerId: string; style: StyleProfileView; colors: Named[]; words: Named[]; canEdit: boolean; canEditLists: boolean }) {
   const router = useRouter();
   const [sheet, setSheet] = useState<"loved" | "avoid" | "words" | null>(null);
@@ -24,8 +24,8 @@ export function StyleEditor({ ownerId, style, colors, words, canEdit, canEditLis
     <div className="space-y-6">
       {error ? <Banner tone="danger" title={error} /> : null}
       <section>
-        <p className="mono border-b border-ink pb-2 text-graphite">Colours</p>
-        <Row label="Loved" value={names(colors, style.lovedColorIds) || "Pick colours"} muted={!style.lovedColorIds.length} onClick={() => open("loved")} testId="row-loved" />
+        <p className="mono border-b border-ink pb-2 text-graphite">Colors</p>
+        <Row label="Loved" value={names(colors, style.lovedColorIds) || "Pick colors"} muted={!style.lovedColorIds.length} onClick={() => open("loved")} testId="row-loved" />
         <Row label="Avoid" value={names(colors, style.avoidColorIds) || "None"} muted={!style.avoidColorIds.length} onClick={() => open("avoid")} />
       </section>
       <section>
@@ -42,8 +42,8 @@ export function StyleEditor({ ownerId, style, colors, words, canEdit, canEditLis
           </div>
         ))}
       </section>
-      <PickSheet open={sheet === "loved"} onClose={() => setSheet(null)} title="Loved colours" kind="color" options={colors} selected={style.lovedColorIds} multi canAdd={false} onChange={(ids) => save({ lovedColorIds: ids })} />
-      <PickSheet open={sheet === "avoid"} onClose={() => setSheet(null)} title="Colours to avoid" kind="color" options={colors} selected={style.avoidColorIds} multi canAdd={false} onChange={(ids) => save({ avoidColorIds: ids })} />
+      <PickSheet open={sheet === "loved"} onClose={() => setSheet(null)} title="Loved colors" kind="color" options={colors} selected={style.lovedColorIds} multi canAdd={false} onChange={(ids) => save({ lovedColorIds: ids })} />
+      <PickSheet open={sheet === "avoid"} onClose={() => setSheet(null)} title="Colors to avoid" kind="color" options={colors} selected={style.avoidColorIds} multi canAdd={false} onChange={(ids) => save({ avoidColorIds: ids })} />
       <PickSheet open={sheet === "words"} onClose={() => setSheet(null)} title="Style words" kind="styleWord" options={wordList} selected={style.styleWordIds} multi canAdd={canEditLists} onChange={(ids) => save({ styleWordIds: ids })} onAdded={(e) => setWordList((l) => [...l, e])} />
     </div>
   );

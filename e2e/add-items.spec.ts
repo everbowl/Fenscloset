@@ -38,7 +38,7 @@ test.describe("add clothes", () => {
     // confirm step, design 03
     await expect(page.getByTestId("confirm-counter")).toHaveText("001 / 003");
     await expect(page.getByTestId("row-category")).toContainText("Tops");
-    await expect(page.getByTestId("row-colour")).toContainText("Black");
+    await expect(page.getByTestId("row-color")).toContainText("Black");
     await expect(page.getByTestId("row-brand")).toContainText("Scan the label");
 
     // rename, then one tap

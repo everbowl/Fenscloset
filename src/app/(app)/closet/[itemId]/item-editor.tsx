@@ -24,7 +24,7 @@ export type ItemView = {
   photos: { id: string; kind: PhotoKind; key: string; isPrimary: boolean }[];
 };
 
-type SheetKind = "category" | "subcategory" | "colour" | "pattern" | "fabric" | "season" | "formality" | "occasion" | "tag" | "brand" | "store" | "size" | "price" | "date" | "url" | "notes" | "closets" | "share" | "rename" | "photo" | "delete" | null;
+type SheetKind = "category" | "subcategory" | "color" | "pattern" | "fabric" | "season" | "formality" | "occasion" | "tag" | "brand" | "store" | "size" | "price" | "date" | "url" | "notes" | "closets" | "share" | "rename" | "photo" | "delete" | null;
 
 const LAUNDRY_WORD: Record<LaundryStatus, string> = { clean: "Clean", dirty: "Laundry", cleaners: "At cleaners" };
 const KIND_WORD: Record<PhotoKind, string> = { alone: "Photo", worn: "Worn", label: "Label", cutout: "Cutout", thumb: "Thumb" };
@@ -121,7 +121,7 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
 
       <div className="flex flex-col">
         <Row label="Category" value={category ? `${category.name}${sub ? ` · ${sub}` : ""}` : "Pick a category"} muted={!category} onClick={() => open("category")} testId="row-category" />
-        <Row label="Colour" value={names(lists.colors, it.colorIds) || "Pick a colour"} muted={!it.colorIds.length} onClick={() => open("colour")} />
+        <Row label="Color" value={names(lists.colors, it.colorIds) || "Pick a color"} muted={!it.colorIds.length} onClick={() => open("color")} />
         <Row label="Pattern" value={name(lists.patterns, it.patternId) ?? "Not set"} muted={!it.patternId} onClick={() => open("pattern")} />
         <Row label="Fabric" value={name(lists.fabrics, it.fabricId) ?? "Not set"} muted={!it.fabricId} onClick={() => open("fabric")} />
         <Row label="Season" value={names(lists.seasons, it.seasonIds) || "Any"} onClick={() => open("season")} />
@@ -164,7 +164,7 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
       <PickSheet open={sheet === "subcategory"} onClose={() => setSheet(null)} title={category ? `${category.name} · type` : "Type"} kind="subcategory" parentId={category?.id} options={category?.subcategories ?? []} selected={it.subcategoryId ? [it.subcategoryId] : []} canAdd={canEditLists}
         onChange={(ids) => save({ subcategoryId: ids[0] ?? null }, { subcategoryId: ids[0] ?? null })}
         onAdded={(e) => setLists((l) => ({ ...l, categories: l.categories.map((c) => (c.id === category?.id ? { ...c, subcategories: [...c.subcategories, e] } : c)) }))} />
-      <PickSheet open={sheet === "colour"} onClose={() => setSheet(null)} title="Colour" kind="color" options={lists.colors} selected={it.colorIds} multi canAdd={canEditLists} onChange={(ids) => save({ colorIds: ids }, { colorIds: ids })} onAdded={(e) => setLists((l) => ({ ...l, colors: [...l.colors, e] }))} />
+      <PickSheet open={sheet === "color"} onClose={() => setSheet(null)} title="Color" kind="color" options={lists.colors} selected={it.colorIds} multi canAdd={canEditLists} onChange={(ids) => save({ colorIds: ids }, { colorIds: ids })} onAdded={(e) => setLists((l) => ({ ...l, colors: [...l.colors, e] }))} />
       <PickSheet open={sheet === "pattern"} onClose={() => setSheet(null)} title="Pattern" kind="pattern" options={lists.patterns} selected={it.patternId ? [it.patternId] : []} canAdd={canEditLists} onChange={(ids) => save({ patternId: ids[0] ?? null }, { patternId: ids[0] ?? null })} onAdded={(e) => setLists((l) => ({ ...l, patterns: [...l.patterns, e] }))} />
       <PickSheet open={sheet === "fabric"} onClose={() => setSheet(null)} title="Fabric" kind="fabric" options={lists.fabrics} selected={it.fabricId ? [it.fabricId] : []} canAdd={canEditLists} onChange={(ids) => save({ fabricId: ids[0] ?? null }, { fabricId: ids[0] ?? null })} onAdded={(e) => setLists((l) => ({ ...l, fabrics: [...l.fabrics, e] }))} />
       <PickSheet open={sheet === "season"} onClose={() => setSheet(null)} title="Season" kind="season" options={lists.seasons} selected={it.seasonIds} multi canAdd={canEditLists} onChange={(ids) => save({ seasonIds: ids }, { seasonIds: ids })} onAdded={(e) => setLists((l) => ({ ...l, seasons: [...l.seasons, e] }))} />

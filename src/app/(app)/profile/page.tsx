@@ -44,7 +44,7 @@ export default async function ProfilePage() {
   };
   const measured = body ? body.measurements.filter((m) => m.value).length : 0;
   const bodyMeta = !seeBody ? "Private" : measured || body?.sizes.length ? `${measured} measured · ${body!.sizes.length} sizes` : "Not filled in";
-  const styleMeta = names(words, style.styleWordIds) ?? (style.lovedColorIds.length ? `${style.lovedColorIds.length} loved colours` : "Not filled in");
+  const styleMeta = names(words, style.styleWordIds) ?? (style.lovedColorIds.length ? `${style.lovedColorIds.length} loved colors` : "Not filled in");
   const favMeta = [names(brands, favs.brandIds, 2), names(stores, favs.storeIds, 1)].filter(Boolean).join(" · ") || "None yet";
 
   return (
