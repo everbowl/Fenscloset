@@ -7,6 +7,7 @@ import { loadCandidates } from "@/lib/outfits/catalog";
 import { countCleanOut } from "@/lib/outfits/cleanout";
 import { unratedRecentFit } from "@/lib/fits/service";
 import { tryOnState } from "@/lib/tryon";
+import { isMannequinConfigured } from "@/lib/tryon/mannequin";
 import { getScales } from "@/lib/checkins/service";
 import { listEntries } from "@/lib/lists/service";
 import { getConnection, isGoogleConfigured } from "@/lib/plans/google";
@@ -61,6 +62,7 @@ export default async function TodayPage() {
       cleanOutCount={cleanOut}
       unrated={unrated}
       tryOn={tryOn}
+      mannequin={dress && tryOn !== "ready" && isMannequinConfigured()}
     />
   );
 }

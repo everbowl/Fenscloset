@@ -19,9 +19,9 @@ export class TryOnError extends Error {
 }
 
 export type TryOnState = "ready" | "off" | "minor" | "no_photo" | "unconfigured" | "not_you";
-export type TryOnView = { id: string; key: string; itemIds: string[]; createdAt: string; cached: boolean };
+export type TryOnView = { id: string; key: string; itemIds: string[]; createdAt: string; cached: boolean; /** On the shared mannequin, not the person (src/lib/tryon/mannequin.ts). */ mannequin?: boolean };
 
-const MAX_GARMENTS = 3;
+export const MAX_GARMENTS = 3;
 /** Garment order that reads best on a body: outer layer last. */
 const ORDER = ["Tops", "Dresses", "Bottoms", "Shoes", "Outerwear"];
 
@@ -57,7 +57,7 @@ async function assertReady(viewer: Viewer, personId: string) {
 }
 
 /** Dev/test stand-in: the body photo with each garment pasted on, so the UI and privacy can be tested without Google. */
-async function mockTryOn(person: Buffer, garments: Buffer[]): Promise<Buffer> {
+export async function mockTryOn(person: Buffer, garments: Buffer[]): Promise<Buffer> {
   const base = sharp(person).rotate().resize(600, 800, { fit: "cover" });
   const meta = { w: 600, h: 800 };
   const composites = await Promise.all(garments.map(async (g, i) => ({ input: await sharp(g).flatten({ background: "#ffffff" }).resize(Math.round(meta.w * 0.4), Math.round(meta.h * 0.3), { fit: "inside" }).png().toBuffer(), left: Math.round(meta.w * 0.3), top: Math.round(meta.h * (0.15 + i * 0.28)) })));
@@ -65,7 +65,7 @@ async function mockTryOn(person: Buffer, garments: Buffer[]): Promise<Buffer> {
 }
 
 /** Garment image for an item: the cutout when there is one, else the main photo. */
-async function garmentImages(itemIds: string[]): Promise<{ id: string; buf: Buffer }[]> {
+export async function garmentImages(itemIds: string[]): Promise<{ id: string; buf: Buffer }[]> {
   const items = await db.item.findMany({ where: { id: { in: itemIds } }, select: { id: true, category: { select: { name: true } }, photos: { select: { kind: true, bucketKey: true, isPrimary: true } } } });
   const sorted = items.sort((a, b) => ORDER.indexOf(a.category?.name ?? "") - ORDER.indexOf(b.category?.name ?? ""));
   const out: { id: string; buf: Buffer }[] = [];
@@ -106,6 +106,6 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
 }
 
 export async function listTryOns(personId: string, take = 12): Promise<TryOnView[]> {
-  const rows = await db.tryOn.findMany({ where: { personId }, orderBy: { createdAt: "desc" }, take });
+  const rows = await db.tryOn.findMany({ where: { personId, source: { not: { startsWith: "mannequin:" } } }, orderBy: { createdAt: "desc" }, take });
   return rows.map((r) => ({ id: r.id, key: r.bucketKey, itemIds: r.itemIds, createdAt: r.createdAt.toISOString(), cached: true }));
 }

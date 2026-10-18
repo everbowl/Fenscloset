@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { parseKey } from "@/lib/storage";
+import { MANNEQUIN_OWNER } from "@/lib/tryon/mannequin-key";
 import { canSeeBodyData } from "@/lib/people/visibility";
 import type { Role } from "@/generated/prisma/client";
 
@@ -23,6 +24,7 @@ export async function canViewKey(viewer: Viewer, key: string): Promise<boolean> 
   if (parsed.kind === "bodies") return canSeeBodyPhotoKey(viewer, parsed.ownerId, key);
   if (parsed.kind === "checkins" || parsed.kind === "inspo") return isParentOfMinor(viewer.id, parsed.ownerId);
   if (parsed.kind === "tryon") return false; // adults only, and the owner alone
+  if (parsed.kind === "mannequin") return canSeeMannequinKey(viewer, parsed.ownerId); // no body in it: the person and a minor's parents
   if (parsed.kind === "fits") return canSeeFitPhotoKey(viewer, parsed.ownerId, key);
   if (parsed.kind === "shop") return canSeeShopKey(viewer, parsed.ownerId, key);
   const owner = await db.person.findUnique({ where: { id: parsed.ownerId }, select: { id: true, role: true, status: true } });
@@ -51,6 +53,13 @@ export async function canSeeBodyPhotoKey(viewer: Viewer, ownerId: string, key: s
     return Boolean(await db.guardianLink.findUnique({ where: { minorId_parentId: { minorId: ownerId, parentId: viewer.id } } }));
   }
   return canSeeBodyData(viewer, ownerId);
+}
+
+/** A look on the mannequin shows clothes, not a body: the person it was made for and a minor's parents see it; the shared mannequin itself is for any active member. */
+export async function canSeeMannequinKey(viewer: Viewer, ownerId: string): Promise<boolean> {
+  if (ownerId === MANNEQUIN_OWNER) return true;
+  if (viewer.id === ownerId) return true;
+  return isParentOfMinor(viewer.id, ownerId);
 }
 
 async function isParentOfMinor(viewerId: string, minorId: string): Promise<boolean> {

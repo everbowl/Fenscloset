@@ -9,6 +9,7 @@ import { loadTodayContext, LOCATION_COOKIE } from "@/lib/today/context";
 import { assertCanDress, generateSuggestion, moreLooks, OutfitError, removePiece, swapPiece, wearBoard } from "@/lib/outfits/engine";
 import { rateFit, type FitRating } from "@/lib/fits/service";
 import { tryOnLook, TryOnError, type TryOnView } from "@/lib/tryon";
+import { mannequinLook } from "@/lib/tryon/mannequin";
 import { CheckInError, saveSelfie, saveTaps } from "@/lib/checkins/service";
 import { PlanError, setPlan } from "@/lib/plans";
 import { IMAGE_TYPES } from "@/lib/storage";
@@ -121,5 +122,20 @@ export async function tryOnAction(personId: string, suggestionId: string, index:
   } catch (e) {
     if (e instanceof TryOnError || e instanceof OutfitError) return { ok: false, error: e.message };
     console.error(e); return { ok: false, error: "The try-on didn’t come back. Try again." };
+  }
+}
+
+/** SEE IT ON without a body photo: the chosen board on the shared mannequin (minors and parents included). */
+export async function mannequinAction(personId: string, suggestionId: string, index: number): Promise<Result & { tryOn?: TryOnView }> {
+  const me = await requirePerson();
+  try {
+    const row = await db.outfitSuggestion.findFirst({ where: { id: suggestionId, personId } });
+    const board = (row?.outfits as { itemIds: string[] }[] | undefined)?.[index];
+    if (!board) return { ok: false, error: "That look isn’t here anymore." };
+    const tryOn = await mannequinLook(me, personId, board.itemIds, "today");
+    return { ok: true, tryOn };
+  } catch (e) {
+    if (e instanceof TryOnError || e instanceof OutfitError) return { ok: false, error: e.message };
+    console.error(e); return { ok: false, error: "The mannequin didn’t come back. Try again." };
   }
 }

@@ -14,7 +14,7 @@ import { cn } from "@/lib/cn";
 import type { BoardView } from "@/lib/outfits/engine";
 import type { Scale } from "@/lib/checkins/service";
 import type { TryOnState, TryOnView } from "@/lib/tryon";
-import { checkInSelfieAction, checkInTapsAction, moreAction, rateAction, regenerateAction, removeAction, setLocationAction, setPlanAction, setZipAction, swapAction, tryOnAction, wearAction } from "./actions";
+import { checkInSelfieAction, checkInTapsAction, mannequinAction, moreAction, rateAction, regenerateAction, removeAction, setLocationAction, setPlanAction, setZipAction, swapAction, tryOnAction, wearAction } from "./actions";
 import { RatingRow } from "../fits/rating-row";
 import { monoDate } from "@/lib/dates";
 
@@ -31,6 +31,8 @@ type Props = {
   unrated: { id: string; date: string; title: string } | null;
   /** Whether TRY IT ON is offered: ready, or why not (off → Settings link; no_photo → Body page link). Hidden for minors and others' closets. */
   tryOn: TryOnState;
+  /** SEE IT ON falls back to the shared mannequin (no body photo needed; minors and parents too) when the person's own try-on is not ready. */
+  mannequin: boolean;
 };
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -164,11 +166,14 @@ export function TodayScreen(p: Props) {
                 <Button variant="secondary" disabled={busy !== null} onClick={() => { const next = boards.length; run("more", () => moreAction(p.personId), () => setIndex(next)); }} data-testid="more-looks">{busy === "more" ? "Thinking…" : "More looks"}</Button>
               </div>
               {p.tryOn === "ready" ? (
-                <Button variant="secondary" disabled={busy !== null} onClick={() => { setBusy("tryon"); setError(undefined); start(async () => { const r = await tryOnAction(p.personId, p.suggestion!.id, index); setBusy(null); if (!r.ok) setError(r.error); else if (r.tryOn) { setTryOn(r.tryOn); setSheet("tryon"); } }); }} data-testid="try-on">{busy === "tryon" ? "Dressing you…" : "Try it on"}</Button>
-              ) : p.tryOn === "off" ? (
-                <Link href="/profile/settings" className="mono flex h-[46px] items-center justify-center border border-line text-graphite" data-testid="try-on-off">Try it on · turn on in Settings</Link>
+                <Button variant="secondary" disabled={busy !== null} onClick={() => { setBusy("tryon"); setError(undefined); start(async () => { const r = await tryOnAction(p.personId, p.suggestion!.id, index); setBusy(null); if (!r.ok) setError(r.error); else if (r.tryOn) { setTryOn(r.tryOn); setSheet("tryon"); } }); }} data-testid="try-on">{busy === "tryon" ? "Dressing you…" : "See it on"}</Button>
+              ) : p.mannequin ? (
+                <Button variant="secondary" disabled={busy !== null} onClick={() => { setBusy("tryon"); setError(undefined); start(async () => { const r = await mannequinAction(p.personId, p.suggestion!.id, index); setBusy(null); if (!r.ok) setError(r.error); else if (r.tryOn) { setTryOn(r.tryOn); setSheet("tryon"); } }); }} data-testid="see-on-mannequin">{busy === "tryon" ? "Dressing the mannequin…" : "See it on"}</Button>
+              ) : null}
+              {p.tryOn === "off" ? (
+                <Link href="/profile/settings" className="mono flex h-[38px] items-center justify-center text-graphite" data-testid="try-on-off">Want it on you? Turn on try-on in Settings</Link>
               ) : p.tryOn === "no_photo" ? (
-                <Link href="/profile/body" className="mono flex h-[46px] items-center justify-center border border-line text-graphite" data-testid="try-on-photo">Try it on · add a body photo first</Link>
+                <Link href="/profile/body" className="mono flex h-[38px] items-center justify-center text-graphite" data-testid="try-on-photo">Want it on you? Add a body photo first</Link>
               ) : null}
             </div>
           ) : null}
@@ -247,13 +252,13 @@ export function TodayScreen(p: Props) {
         {busy === "swap" ? <p className="mono mt-3 text-graphite">Thinking…</p> : null}
       </Sheet>
 
-      {/* Try-on: the look on your own body photo. Yours alone. */}
-      <Sheet open={sheet === "tryon"} onClose={() => setSheet(null)} title="On you">
+      {/* See it on: the look on your own body photo (yours alone), or on the shared mannequin (no body in it). */}
+      <Sheet open={sheet === "tryon"} onClose={() => setSheet(null)} title={tryOn?.mannequin ? "On a mannequin" : "On you"}>
         {tryOn ? (
           <div className="flex flex-col gap-3" data-testid="try-on-sheet">
-            <div className="h-[460px] overflow-hidden bg-bone"><img src={`/api/photo/${tryOn.key}`} alt="You wearing this look" className="size-full object-contain" /></div>
+            <div className="h-[460px] overflow-hidden bg-bone"><img src={`/api/photo/${tryOn.key}`} alt={tryOn.mannequin ? "This look on a mannequin" : "You wearing this look"} className="size-full object-contain" /></div>
             <p className="mono text-graphite">{board?.pieces.map((x) => x.label).join(" · ")}</p>
-            <p className="mono text-graphite">Only you can see this picture{tryOn.cached ? " · saved from before" : ""}</p>
+            <p className="mono text-graphite">{tryOn.mannequin ? `No body photo used${p.mine ? "" : ` · ${p.personName}’s look`}` : "Only you can see this picture"}{tryOn.cached ? " · saved from before" : ""}</p>
           </div>
         ) : null}
       </Sheet>

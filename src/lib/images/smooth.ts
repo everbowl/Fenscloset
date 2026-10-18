@@ -24,8 +24,11 @@ export function isSmoothConfigured(): boolean {
   return process.env.MOCK_SMOOTH === "true" || Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_JSON && process.env.GOOGLE_VERTEX_PROJECT);
 }
 
-/** One edit call: JPEG in, image bytes out. */
-async function googleSmooth(jpeg: Buffer, fetchImpl: typeof fetch): Promise<Buffer> {
+/**
+ * One Gemini image call: zero or more JPEG/PNG inputs plus a prompt, image bytes out. Shared by
+ * SMOOTH and the mannequin (src/lib/tryon/mannequin.ts).
+ */
+export async function googleImage(images: { data: Buffer; mimeType: "image/jpeg" | "image/png" }[], prompt: string, fetchImpl: typeof fetch = fetch): Promise<Buffer> {
   const project = process.env.GOOGLE_VERTEX_PROJECT!;
   const location = process.env.GOOGLE_VERTEX_SMOOTH_LOCATION || "global";
   const model = process.env.GOOGLE_VERTEX_SMOOTH_MODEL || "gemini-2.5-flash-image";
@@ -35,16 +38,21 @@ async function googleSmooth(jpeg: Buffer, fetchImpl: typeof fetch): Promise<Buff
     method: "POST",
     headers: { Authorization: `Bearer ${await accessToken(fetchImpl)}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ inlineData: { mimeType: "image/jpeg", data: jpeg.toString("base64") } }, { text: PROMPT }] }],
+      contents: [{ role: "user", parts: [...images.map((im) => ({ inlineData: { mimeType: im.mimeType, data: im.data.toString("base64") } })), { text: prompt }] }],
       generationConfig: { responseModalities: ["IMAGE"], temperature: 0.2 },
     }),
     signal: AbortSignal.timeout(90_000),
   });
-  if (!res.ok) throw new SmoothError(`Google image edit ${res.status}: ${(await res.text()).slice(0, 200)}`, 502);
+  if (!res.ok) throw new SmoothError(`Google image ${res.status}: ${(await res.text()).slice(0, 200)}`, 502);
   const json = (await res.json()) as { candidates?: { content?: { parts?: { inlineData?: { data?: string } }[] } }[] };
   const part = json.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
   if (!part?.inlineData?.data) throw new SmoothError("Google returned no image.", 502);
   return Buffer.from(part.inlineData.data, "base64");
+}
+
+/** One edit call: JPEG in, image bytes out. */
+async function googleSmooth(jpeg: Buffer, fetchImpl: typeof fetch): Promise<Buffer> {
+  return googleImage([{ data: jpeg, mimeType: "image/jpeg" }], PROMPT, fetchImpl);
 }
 
 /**

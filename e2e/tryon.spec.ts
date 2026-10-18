@@ -11,7 +11,14 @@ test.beforeAll(() => {
 test("try-on: off by default, opt in, needs a body photo, then a picture of the look on you (yours alone)", async ({ page }) => {
   await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
   await page.goto("/today");
+  // no try-on of his own yet: SEE IT ON dresses the mannequin (no body photo involved), with a nudge toward Settings
   await expect(page.getByTestId("try-on-off")).toBeVisible();
+  await page.getByTestId("see-on-mannequin").click();
+  await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("dialog")).toContainText("On a mannequin");
+  await expect(page.getByTestId("try-on-sheet")).toContainText("No body photo used");
+  await expect(page.getByTestId("try-on-sheet").locator("img")).toHaveAttribute("src", /\/api\/photo\/mannequin\//);
+  await page.keyboard.press("Escape");
   await page.goto("/profile/settings");
   await expect(page.getByTestId("tryon-toggle")).toHaveAttribute("aria-checked", "false");
   await page.getByTestId("tryon-toggle").click();
@@ -24,6 +31,7 @@ test("try-on: off by default, opt in, needs a body photo, then a picture of the 
   await page.getByTestId("body-photo").setInputFiles({ name: "me.jpg", mimeType: "image/jpeg", buffer });
   await expect(page.locator("[data-testid^=body-photo-]").first()).toBeVisible();
   await page.goto("/today");
+  await expect(page.getByTestId("see-on-mannequin")).toHaveCount(0);
   await page.getByTestId("try-on").click();
   await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId("try-on-sheet")).toContainText("Only you can see this picture");
