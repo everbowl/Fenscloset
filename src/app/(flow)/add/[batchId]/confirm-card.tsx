@@ -107,21 +107,22 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
       <input ref={labelRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPhoto("label", e)} data-testid="label-photo" />
       <input ref={wornRef} type="file" accept="image/*" className="hidden" onChange={(e) => onPhoto("worn", e)} data-testid="worn-photo" />
 
-      <div className="relative h-[380px] bg-bone">
-        <img src={`/api/photo/${entry.photoKey}`} alt="" className="size-full object-contain" />
-        <div className="absolute inset-x-0 top-0 flex h-14 items-center justify-between px-2">
-          <Link href="/add" aria-label="Close, progress is saved" className="flex size-11 items-center justify-center text-ink">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden><path d="M5 5l14 14M19 5 5 19" /></svg>
-          </Link>
-          <span className="mono mono-11 bg-paper px-2.5 py-1.5" data-testid="confirm-counter">{counter}</span>
-          <button type="button" onClick={skip} disabled={pending} className="mono mono-11 p-3">Skip</button>
-        </div>
-        <div className="absolute inset-x-0 bottom-0 h-[3px] bg-black/[0.12]"><div className="h-[3px] bg-ink" style={{ width: `${progress}%` }} /></div>
+      <div className="flex h-14 items-center justify-between px-2">
+        <Link href="/add" aria-label="Close, progress is saved" className="flex size-11 items-center justify-center text-ink">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden><path d="M5 5l14 14M19 5 5 19" /></svg>
+        </Link>
+        <span className="mono mono-11 px-2.5 py-1.5" data-testid="confirm-counter">{counter}</span>
+        <button type="button" onClick={skip} disabled={pending} className="mono mono-11 p-3">Skip</button>
       </div>
 
-      <div className="flex items-end justify-between px-5 pt-[18px]">
+      <div className="flex items-end justify-between px-5 pb-3">
         <Title name={tags.name} />
         <button type="button" onClick={() => setSheet("rename")} className="mono mono-11 py-2">Rename</button>
+      </div>
+
+      <div className="relative mx-5 h-[400px] bg-bone">
+        <img src={`/api/photo/${entry.photoKey}`} alt="" className="size-full object-contain" />
+        <div className="absolute inset-x-0 bottom-0 h-[3px] bg-black/[0.12]"><div className="h-[3px] bg-ink" style={{ width: `${progress}%` }} /></div>
       </div>
 
       {duplicate ? (
