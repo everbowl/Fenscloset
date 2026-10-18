@@ -26,7 +26,7 @@ export function InlineAdd({ kind, parentId, onCreated, label, variant = "ghost",
   const def = LIST_DEFS[kind];
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [extra, setExtra] = useState<{ hex?: string; url?: string }>({ hex: "#888888" });
+  const [extra, setExtra] = useState<{ hex?: string; url?: string; photoTip?: string }>({ hex: "#888888" });
   const [error, setError] = useState<string>();
   const [pending, start] = useTransition();
 

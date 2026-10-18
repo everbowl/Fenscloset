@@ -8,7 +8,7 @@ export const LIST_KINDS = [
 ] as const;
 export type ListKind = (typeof LIST_KINDS)[number];
 
-export type ExtraField = { name: "hex" | "url" | "unit"; label: string; type: "color" | "url" | "text"; required?: boolean; placeholder?: string };
+export type ExtraField = { name: "hex" | "url" | "unit" | "photoTip"; label: string; type: "color" | "url" | "text"; required?: boolean; placeholder?: string; maxLength?: number };
 
 export type ListKindDef = {
   kind: ListKind;
@@ -25,7 +25,7 @@ export type ListKindDef = {
 };
 
 export const LIST_DEFS: Record<ListKind, ListKindDef> = {
-  category: { kind: "category", label: "Categories", singular: "category", delegate: "category", extraFields: [], description: "Tops, bottoms, shoes… the main buckets every item lands in." },
+  category: { kind: "category", label: "Categories", singular: "category", delegate: "category", extraFields: [{ name: "photoTip", label: "Photo tip", type: "text", placeholder: "How to photograph this kind of piece", maxLength: 160 }], description: "Tops, bottoms, shoes… the main buckets every item lands in. The photo tip shows on Add clothes and in Help." },
   subcategory: { kind: "subcategory", label: "Subcategories", singular: "subcategory", delegate: "subcategory", extraFields: [], parent: { kind: "category", field: "categoryId", label: "Category" }, description: "Finer types inside a category, like T-shirt or Blouse inside Tops." },
   color: { kind: "color", label: "Colors", singular: "color", delegate: "color", extraFields: [{ name: "hex", label: "Swatch", type: "color", required: true }], description: "Colors the AI can tag and outfits can match on." },
   pattern: { kind: "pattern", label: "Patterns", singular: "pattern", delegate: "pattern", extraFields: [], description: "Solid, stripe, floral…" },

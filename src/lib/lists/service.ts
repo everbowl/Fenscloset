@@ -10,12 +10,14 @@ export type ListEntry = {
   hex?: string;
   url?: string | null;
   unit?: string;
+  /** categories only: how to photograph this kind of piece */
+  photoTip?: string | null;
   /** closets only */
   closetKind?: "personal" | "family" | "custom";
   ownerId?: string | null;
 };
 
-export type EntryInput = { name: string; parentId?: string | null; hex?: string; url?: string | null; unit?: string };
+export type EntryInput = { name: string; parentId?: string | null; hex?: string; url?: string | null; unit?: string; photoTip?: string | null };
 
 export class InUseError extends Error {
   constructor(public readonly count: number, public readonly what: string) {
@@ -60,6 +62,7 @@ function toEntry(kind: ListKind, row: AnyRow): ListEntry {
     isArchived: row.isArchived as boolean,
     parentId: def.parent ? (row[def.parent.field] as string) : undefined,
     hex: typeof row.hex === "string" ? row.hex : undefined,
+    photoTip: kind === "category" ? ((row.photoTip as string | null) ?? null) : undefined,
     url: kind === "store" ? ((row.url as string | null) ?? null) : undefined,
     unit: kind === "measurementKind" ? ((row.unit as string) ?? "") : undefined,
     closetKind: kind === "closet" ? (row.kind as ListEntry["closetKind"]) : undefined,
@@ -84,6 +87,7 @@ function extraData(kind: ListKind, input: EntryInput, forCreate: boolean): AnyRo
     }
   }
   if (kind === "measurementKind" && input.unit !== undefined) data.unit = (input.unit ?? "").trim().slice(0, 12);
+  if (kind === "category" && input.photoTip !== undefined) { const tip = (input.photoTip ?? "").trim().slice(0, 160); data.photoTip = tip || null; }
   if (kind === "store" && input.url !== undefined) {
     const url = (input.url ?? "").trim();
     data.url = url ? (url.startsWith("http") ? url : `https://${url}`) : null;

@@ -32,6 +32,8 @@ model Person {
   savedZip           String?
   /** Virtual try-on opt-in (adults only; never minors). Sends the person's body photo and garment images to the try-on provider. */
   tryOnEnabled       Boolean      @default(false)
+  /** "Don't show again" on the Add clothes photo tips. */
+  addTipsHidden      Boolean      @default(false)
   passwordHash       String?
   mustChangePassword Boolean      @default(false)
   devPasswordActive  Boolean      @default(false)
@@ -140,6 +142,8 @@ model Category {
   name          String
   sortOrder     Int           @default(0)
   isArchived    Boolean       @default(false)
+  /** How to photograph this kind of piece, shown on Add clothes and in Help. Admins edit it under Lists. */
+  photoTip      String?
   createdAt     DateTime      @default(now())
   subcategories Subcategory[]
   items         Item[]

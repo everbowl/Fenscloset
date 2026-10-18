@@ -26,6 +26,16 @@ test.describe("add clothes", () => {
   test("pick three photos, confirm with one tap each, reload mid-batch keeps the counter, all done", async ({ page }) => {
     await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
     await page.goto("/add");
+    // photo tips: general rules + a tab per category; hide for this person, bring back
+    await expect(page.getByTestId("photo-tips")).toContainText("One piece per photo");
+    await page.getByTestId("tip-tab-Shoes").click();
+    await expect(page.getByTestId("tip-text")).toContainText("toes toward you");
+    await page.getByTestId("hide-tips").click();
+    await expect(page.getByTestId("show-tips")).toBeVisible();
+    await page.reload();
+    await expect(page.getByTestId("photo-tips")).toHaveCount(0);
+    await page.getByTestId("show-tips").click();
+    await expect(page.getByTestId("photo-tips")).toBeVisible();
     await expect(page.getByRole("heading", { name: /Add clothes/ })).toBeVisible();
     await page.getByTestId("pick-photos").setInputFiles(await fixtures());
 

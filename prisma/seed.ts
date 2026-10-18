@@ -4,8 +4,7 @@ import { hashPassword } from "../src/lib/auth/password";
 import { isDevMode } from "../src/lib/auth/dev-mode";
 import {
   BODY_IMAGE_APPROVALS, BRANDS, CATEGORIES, CHECK_IN_SCALES, COLORS, DEV_PASSWORD, FABRICS, FORMALITY, MEASUREMENT_KINDS, OCCASIONS,
-  PATTERNS, PEOPLE, RULES, SEASONS, STORES, STYLE_WORDS, TAGS,
-} from "./seed-data";
+  PATTERNS, PEOPLE, RULES, SEASONS, STORES, STYLE_WORDS, TAGS, PHOTO_TIPS } from "./seed-data";
 
 type SimpleDelegate = {
   upsert: (args: { where: { name: string }; update: object; create: { name: string; sortOrder: number } }) => Promise<unknown>;
@@ -82,7 +81,8 @@ export async function seed() {
   // Categories + subcategories
   let ci = 0;
   for (const [name, subs] of Object.entries(CATEGORIES)) {
-    const cat = await db.category.upsert({ where: { name }, update: {}, create: { name, sortOrder: ci++ } });
+    const cat = await db.category.upsert({ where: { name }, update: {}, create: { name, sortOrder: ci++, photoTip: PHOTO_TIPS[name] ?? null } });
+    if (!cat.photoTip && PHOTO_TIPS[name]) await db.category.update({ where: { id: cat.id }, data: { photoTip: PHOTO_TIPS[name] } });
     for (const [si, sub] of subs.entries()) {
       await db.subcategory.upsert({
         where: { categoryId_name: { categoryId: cat.id, name: sub } },

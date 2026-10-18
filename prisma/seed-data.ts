@@ -7,6 +7,22 @@ export const PEOPLE = [
   { key: "mya", name: "Mya", email: null, role: "minor" as const, age: 15, guardians: ["jeff", "brittney"] },
 ];
 
+/** Default photo tips per category. Seeded only where a category has none, so admin edits stick. */
+export const PHOTO_TIPS: Record<string, string> = {
+  Tops: "Lay flat, buttoned or zipped, sleeves out to the sides. Front side up.",
+  Bottoms: "Lay flat, waistband at the top, legs straight. Fold nothing.",
+  Dresses: "Hang on a plain wall or lay flat full length. Straps and hem both in the frame.",
+  Outerwear: "Zip or button it, collar flat, sleeves out. Hang or lay flat, front side up.",
+  Shoes: "Both shoes side by side, toes toward you, on a plain floor. No box.",
+  Purses: "Stand it up, straps tucked behind, front facing you.",
+  Hats: "Front view, brim flat on the table, logo facing you.",
+  Belts: "Coil it loosely with the buckle on top and facing you.",
+  Jewelry: "On a plain white surface, close up, one piece at a time.",
+  Sunglasses: "Open, front view, lenses toward you, on a plain surface.",
+  Activewear: "Lay flat like a top or bottom. Shoot sports bras front side up.",
+  Swimwear: "Lay flat, front side up. Shoot a bikini top and bottom as two photos.",
+};
+
 export const CATEGORIES: Record<string, string[]> = {
   Tops: ["T-shirt", "Tank", "Blouse", "Button-down", "Sweater", "Hoodie", "Sweatshirt", "Crop top", "Bodysuit"],
   Bottoms: ["Jeans", "Trousers", "Shorts", "Skirt", "Leggings", "Joggers"],

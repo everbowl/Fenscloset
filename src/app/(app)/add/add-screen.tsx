@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef } from "react";
+import { useRef, type ReactNode } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Banner } from "@/components/ui/banner";
@@ -21,7 +21,7 @@ function CameraIcon() {
  * Add clothes: pick a batch of hanger / flat-lay photos. Uploads and tagging run in the
  * background (and survive closing the app); the counter follows the mockup's `042 / 150` chip.
  */
-export function AddScreen() {
+export function AddScreen({ tips }: { tips?: ReactNode }) {
   const { batch, upload, loaded, addFiles, retryFailedUploads } = useImportQueue();
   const pickRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -65,6 +65,7 @@ export function AddScreen() {
           <Button size="lg" variant="secondary" aria-label="Take a photo" className="w-[54px] px-0" onClick={() => cameraRef.current?.click()}><CameraIcon /></Button>
         </div>
         <p className="mono mt-4 text-center text-graphite">Then confirm each piece with one tap</p>
+        {tips}
       </div>
     );
   }

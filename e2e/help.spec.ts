@@ -16,6 +16,9 @@ test.describe("help", () => {
     await expect(page.getByRole("link", { name: "Open Today" })).toHaveAttribute("href", "/today");
     await page.getByRole("link", { name: /Next: Dress together/ }).click();
     await expect(page).toHaveURL(/\/help\/together$/);
+    await page.goto("/help/add");
+    await expect(page.getByTestId("help-topic")).toContainText("Before you start: One piece per photo");
+    await expect(page.getByTestId("help-topic")).toContainText("Shoes: Both shoes side by side");
   });
 
   test("unknown topic is a 404", async ({ page }) => {

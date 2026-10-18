@@ -5,8 +5,8 @@ import type { ExtraField } from "@/lib/lists/registry";
 /** Extra inputs (swatch, website) for kinds that have them. Shared by the editor and InlineAdd. */
 export function EntryExtraFields({ fields, values, onChange }: {
   fields: ExtraField[];
-  values: { hex?: string; url?: string | null; unit?: string };
-  onChange: (patch: { hex?: string; url?: string; unit?: string }) => void;
+  values: { hex?: string; url?: string | null; unit?: string; photoTip?: string | null };
+  onChange: (patch: { hex?: string; url?: string; unit?: string; photoTip?: string }) => void;
 }) {
   return (
     <>
@@ -26,7 +26,7 @@ export function EntryExtraFields({ fields, values, onChange }: {
           </Field>
         ) : f.type === "text" ? (
           <Field key={f.name} label={f.label} htmlFor={`field-${f.name}`}>
-            <Input id={`field-${f.name}`} value={values.unit ?? ""} onChange={(e) => onChange({ unit: e.target.value })} placeholder={f.placeholder} maxLength={12} />
+            <Input id={`field-${f.name}`} value={(f.name === "photoTip" ? values.photoTip : values.unit) ?? ""} onChange={(e) => onChange(f.name === "photoTip" ? { photoTip: e.target.value } : { unit: e.target.value })} placeholder={f.placeholder} maxLength={f.maxLength ?? 12} />
           </Field>
         ) : (
           <Field key={f.name} label={f.label} htmlFor={`field-${f.name}`}>
