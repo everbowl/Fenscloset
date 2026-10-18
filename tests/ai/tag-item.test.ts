@@ -8,11 +8,13 @@ describe("tagging constrained to the lists", () => {
 
   it("builds enums from the editable lists", async () => {
     const lists = await loadTagLists();
-    const schema = tagSchema(lists) as { properties: Record<string, { enum?: unknown[]; items?: { enum: string[] } }> };
+    const schema = tagSchema(lists) as { properties: Record<string, { enum?: unknown[]; items?: { enum: string[] }; anyOf?: { type: string; enum?: string[] }[] }> };
     expect(schema.properties.category.enum).toContain("Tops");
     expect(schema.properties.category.enum).toContain("unknown");
     expect(schema.properties.colors.items!.enum).toContain("Black");
-    expect(schema.properties.subcategory.enum).toContain(null);
+    // nullable enums are anyOf [string enum, null]: structured outputs reject enum with a type list
+    expect(schema.properties.subcategory.anyOf!.map((a) => a.type)).toEqual(["string", "null"]);
+    expect(schema.properties.subcategory.anyOf![0].enum).toContain("Jeans");
   });
 
   it("maps names the model returns onto ids, and anything outside the lists to null", async () => {
