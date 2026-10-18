@@ -3,13 +3,16 @@ import { ProfileError } from "@/lib/profiles/service";
 import type { Viewer } from "@/lib/people/visibility";
 
 /**
- * My brands & sizes (Jeff, 18 Oct 2026): the brands a person wears, their size in each, and the
- * brand's store link. The confirm card offers them as one-tap picks, so adding fifteen shirts is
- * "which brand?" and the size and link come along. Favorites (Person.favoriteBrands) say which
- * brands; BodySizeByBrand with no category holds the size; Brand.url holds the link, once, for all.
+ * My brands & sizes (Jeff, 18 Oct 2026): the brands a person wears, their size in each per item
+ * type (Tops L, Bottoms 32…), and the brand's store link. The confirm card offers them as one-tap
+ * picks, so adding fifteen shirts is "which brand?" and the right size and link come along.
+ * Favorites (Person.favoriteBrands) say which brands; BodySizeByBrand holds one size per category
+ * (categoryId null = any); Brand.url holds the link, once, for all.
  */
 
-export type MyBrand = { brandId: string; name: string; size: string | null; url: string | null };
+export type MyBrandSize = { categoryId: string | null; categoryName: string | null; size: string };
+export type MyBrand = { brandId: string; name: string; url: string | null; sizes: MyBrandSize[] };
+export { sizeFor } from "@/lib/profiles/size-options";
 
 async function assertCanEdit(viewer: Viewer, ownerId: string) {
   if (viewer.id === ownerId) return;
@@ -19,9 +22,15 @@ async function assertCanEdit(viewer: Viewer, ownerId: string) {
 
 export async function listMyBrands(ownerId: string): Promise<MyBrand[]> {
   const p = await db.person.findUniqueOrThrow({ where: { id: ownerId }, select: { favoriteBrands: { where: { isArchived: false }, orderBy: { name: "asc" }, select: { id: true, name: true, url: true } } } });
-  const sizes = await db.bodySizeByBrand.findMany({ where: { personId: ownerId, categoryId: null }, select: { brandId: true, size: true } });
-  return p.favoriteBrands.map((b) => ({ brandId: b.id, name: b.name, size: sizes.find((s) => s.brandId === b.id)?.size ?? null, url: b.url }));
+  const sizes = await db.bodySizeByBrand.findMany({ where: { personId: ownerId }, select: { brandId: true, categoryId: true, size: true } });
+  const cats = await db.category.findMany({ where: { isArchived: false }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true } });
+  const order = (id: string | null) => (id ? cats.findIndex((c) => c.id === id) : -1);
+  return p.favoriteBrands.map((b) => ({
+    brandId: b.id, name: b.name, url: b.url,
+    sizes: sizes.filter((s) => s.brandId === b.id).map((s) => ({ categoryId: s.categoryId, categoryName: cats.find((c) => c.id === s.categoryId)?.name ?? null, size: s.size })).sort((a, b2) => order(a.categoryId) - order(b2.categoryId)),
+  }));
 }
+
 
 function cleanUrl(input: string | null | undefined): string | null {
   const raw = (input ?? "").trim();
@@ -30,18 +39,21 @@ function cleanUrl(input: string | null | undefined): string | null {
   try { const u = new URL(withScheme); if (!u.hostname.includes(".")) throw new Error(); return u.toString().slice(0, 500); } catch { throw new ProfileError("That link doesn't look right."); }
 }
 
-/** Add or update a brand on the person's list: joins favorites, sets the size (empty clears it) and the brand link (empty leaves it). */
-export async function setMyBrand(viewer: Viewer, ownerId: string, input: { brandId: string; size?: string | null; url?: string | null }): Promise<void> {
+/**
+ * Add or update a brand on the person's list: joins favorites, sets each given category size
+ * (empty clears that one) and the brand link (empty string clears it, undefined leaves it).
+ */
+export async function setMyBrand(viewer: Viewer, ownerId: string, input: { brandId: string; url?: string | null; sizes?: { categoryId: string | null; size: string | null }[] }): Promise<void> {
   await assertCanEdit(viewer, ownerId);
   const brand = await db.brand.findUnique({ where: { id: input.brandId } });
   if (!brand || brand.isArchived) throw new ProfileError("That brand is gone from the list.");
   await db.person.update({ where: { id: ownerId }, data: { favoriteBrands: { connect: { id: brand.id } } } });
-  if (input.size !== undefined) {
-    const size = (input.size ?? "").trim().slice(0, 20);
-    const existing = await db.bodySizeByBrand.findFirst({ where: { personId: ownerId, brandId: brand.id, categoryId: null } });
+  for (const entry of input.sizes ?? []) {
+    const size = (entry.size ?? "").trim().slice(0, 20);
+    const existing = await db.bodySizeByBrand.findFirst({ where: { personId: ownerId, brandId: brand.id, categoryId: entry.categoryId } });
     if (!size) { if (existing) await db.bodySizeByBrand.delete({ where: { id: existing.id } }); }
     else if (existing) await db.bodySizeByBrand.update({ where: { id: existing.id }, data: { size } });
-    else await db.bodySizeByBrand.create({ data: { personId: ownerId, brandId: brand.id, categoryId: null, size } });
+    else await db.bodySizeByBrand.create({ data: { personId: ownerId, brandId: brand.id, categoryId: entry.categoryId, size } });
   }
   if (input.url !== undefined) {
     const url = cleanUrl(input.url);
@@ -52,5 +64,5 @@ export async function setMyBrand(viewer: Viewer, ownerId: string, input: { brand
 export async function removeMyBrand(viewer: Viewer, ownerId: string, brandId: string): Promise<void> {
   await assertCanEdit(viewer, ownerId);
   await db.person.update({ where: { id: ownerId }, data: { favoriteBrands: { disconnect: { id: brandId } } } });
-  await db.bodySizeByBrand.deleteMany({ where: { personId: ownerId, brandId, categoryId: null } });
+  await db.bodySizeByBrand.deleteMany({ where: { personId: ownerId, brandId } });
 }

@@ -4,7 +4,7 @@
  */
 export const LIST_KINDS = [
   "category", "subcategory", "color", "pattern", "fabric", "season", "formality", "occasion",
-  "tag", "brand", "store", "closet", "checkInScale", "checkInOption", "measurementKind", "styleWord",
+  "tag", "brand", "store", "closet", "checkInScale", "checkInOption", "measurementKind", "styleWord", "size",
 ] as const;
 export type ListKind = (typeof LIST_KINDS)[number];
 
@@ -17,7 +17,7 @@ export type ListKindDef = {
   /** Singular label for buttons ("+ Add brand"). */
   singular: string;
   /** Prisma delegate name on the client. */
-  delegate: "category" | "subcategory" | "color" | "pattern" | "fabric" | "season" | "formalityLevel" | "occasion" | "tag" | "brand" | "store" | "closet" | "checkInScale" | "checkInOption" | "measurementKind" | "styleWord";
+  delegate: "category" | "subcategory" | "color" | "pattern" | "fabric" | "season" | "formalityLevel" | "occasion" | "tag" | "brand" | "store" | "closet" | "checkInScale" | "checkInOption" | "measurementKind" | "styleWord" | "sizeOption";
   extraFields: ExtraField[];
   /** For nested lists: which kind owns entries and which column stores the parent id. */
   parent?: { kind: ListKind; field: "categoryId" | "scaleId"; label: string };
@@ -40,6 +40,7 @@ export const LIST_DEFS: Record<ListKind, ListKindDef> = {
   checkInScale: { kind: "checkInScale", label: "Check-in scales", singular: "scale", delegate: "checkInScale", extraFields: [], description: "The daily check-in questions: tan, hair, skin." },
   measurementKind: { kind: "measurementKind", label: "Body measurements", singular: "measurement", delegate: "measurementKind", extraFields: [{ name: "unit", label: "Unit", type: "text", placeholder: "in · lb · US" }], description: "What a body profile records: height, waist, shoe size… Each person fills in their own numbers." },
   styleWord: { kind: "styleWord", label: "Style words", singular: "style word", delegate: "styleWord", extraFields: [], description: "Words people pick to describe their style: minimal, classic, streetwear…" },
+  size: { kind: "size", label: "Sizes", singular: "size", delegate: "sizeOption", extraFields: [], parent: { kind: "category", field: "categoryId", label: "Category" }, description: "The sizes offered when someone records their size in a brand, per category: letters for tops, waist for bottoms, half sizes for shoes. Youth sizes live here too." },
   checkInOption: { kind: "checkInOption", label: "Check-in options", singular: "option", delegate: "checkInOption", extraFields: [], parent: { kind: "checkInScale", field: "scaleId", label: "Scale" }, description: "The answers available for each check-in scale." },
 };
 

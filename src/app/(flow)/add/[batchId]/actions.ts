@@ -63,9 +63,9 @@ export async function attachPhotoAction(entryId: string, kind: "label" | "worn" 
 }
 
 /** SMOOTH: a wrinkle-free copy, parked until KEEP or UNDO. */
-export async function smoothEntryAction(entryId: string): Promise<ActionResult<{ smoothKey: string }>> {
+export async function smoothEntryAction(entryId: string, strength: "normal" | "more" = "normal"): Promise<ActionResult<{ smoothKey: string }>> {
   const person = await requirePerson();
-  try { return { ok: true, value: await smoothEntry(person.id, entryId) }; } catch (e) { return fail(e); }
+  try { return { ok: true, value: await smoothEntry(person.id, entryId, strength) }; } catch (e) { return fail(e); }
 }
 
 export async function keepSmoothAction(batchId: string, entryId: string, keep: boolean): Promise<ActionResult<{ photoKey: string }>> {

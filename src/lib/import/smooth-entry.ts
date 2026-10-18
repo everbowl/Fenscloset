@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { deleteObject, getObject, newKey, putObject } from "@/lib/storage";
-import { smoothGarment } from "@/lib/images/smooth";
+import { smoothGarment, type SmoothStrength } from "@/lib/images/smooth";
 import { fitCutout, makeThumb } from "@/lib/images/thumb";
 import { ItemError } from "@/lib/items/service";
 
@@ -16,12 +16,13 @@ async function owned(personId: string, entryId: string) {
   return entry;
 }
 
-export async function smoothEntry(personId: string, entryId: string): Promise<{ smoothKey: string }> {
+export async function smoothEntry(personId: string, entryId: string, strength: SmoothStrength = "normal"): Promise<{ smoothKey: string }> {
   const entry = await owned(personId, entryId);
-  if (entry.smoothKey) return { smoothKey: entry.smoothKey };
+  if (entry.smoothKey && strength === "normal") return { smoothKey: entry.smoothKey };
+  if (entry.smoothKey) { await deleteObject(entry.smoothKey).catch(() => undefined); } // "Smooth more" replaces the parked copy
   const source = entry.cutoutKey ?? entry.originalKey;
   const { body } = await getObject(source);
-  const out = await smoothGarment(body);
+  const out = await smoothGarment(body, fetch, strength);
   const data = out.contentType === "image/png" ? await fitCutout(out.data) : out.data;
   const smoothKey = newKey("cutouts", personId, out.contentType);
   await putObject(smoothKey, data, out.contentType);

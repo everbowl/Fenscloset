@@ -17,7 +17,7 @@ import type { TryOnState, TryOnView } from "@/lib/tryon";
 
 const CALL_WORD = { FITS: "Fits · buy it", RISKY: "Risky · maybe", PASS: "Pass · skip it" } as const;
 
-export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn }: { meId: string; people: { id: string; name: string }[]; forPersonId: string; selected: LookupView | null; recent: LookupView[]; tryOn: TryOnState }) {
+export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn, mannequin }: { meId: string; people: { id: string; name: string }[]; forPersonId: string; selected: LookupView | null; recent: LookupView[]; tryOn: TryOnState; /** SEE IT ON dresses the shared mannequin when the person's own try-on is not ready. */ mannequin: boolean }) {
   const router = useRouter();
   const [, start] = useTransition();
   const [busy, setBusy] = useState<"link" | "photo" | "delete" | "tryon" | null>(null);
@@ -80,11 +80,10 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn 
             {selected.verdict.sizeNote ? <p className="mono mt-1.5 text-graphite">{selected.verdict.sizeNote}</p> : null}
             {!selected.verdict.usedBodyData ? <p className="mono mt-1.5 text-graphite">Judged on style and closet only</p> : null}
           </div>
-          {selected.imageKey && (tryOn === "ready" || tryOn === "off" || tryOn === "no_photo") ? (
+          {selected.imageKey && (tryOn === "ready" || mannequin) ? (
             <div className="mt-3">
-              {tryOn === "ready" ? (
-                <Button variant="secondary" className="w-full" disabled={busy !== null} onClick={() => { setBusy("tryon"); setError(undefined); start(async () => { const r = await tryOnLookupAction(selected.id); setBusy(null); if (!r.ok) setError(r.error); else if (r.tryOn) setOnMe(r.tryOn); }); }} data-testid="see-it-on-me">{busy === "tryon" ? "Dressing you…" : "See it on me"}</Button>
-              ) : <Link href={tryOn === "off" ? "/profile/settings" : "/profile/body"} className="mono flex h-[46px] items-center justify-center border border-line text-graphite">{tryOn === "off" ? "See it on me · turn on in Settings" : "See it on me · add a body photo first"}</Link>}
+              <Button variant="secondary" className="w-full" disabled={busy !== null} onClick={() => { setBusy("tryon"); setError(undefined); start(async () => { const r = await tryOnLookupAction(selected.id); setBusy(null); if (!r.ok) setError(r.error); else if (r.tryOn) setOnMe(r.tryOn); }); }} data-testid={tryOn === "ready" ? "see-it-on-me" : "see-on-mannequin"}>{busy === "tryon" ? (tryOn === "ready" ? "Dressing you…" : "Dressing the mannequin…") : "See it on"}</Button>
+              {tryOn === "off" || tryOn === "no_photo" ? <Link href={tryOn === "off" ? "/profile/settings" : "/profile/body"} className="mono flex h-[38px] items-center justify-center text-graphite" data-testid={tryOn === "off" ? "try-on-off" : "try-on-photo"}>{tryOn === "off" ? "Want it on you? Turn on try-on in Settings" : "Want it on you? Add a body photo first"}</Link> : null}
             </div>
           ) : null}
           {selected.similar.length ? (
@@ -165,11 +164,11 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn 
         </section>
       ) : null}
 
-      <Sheet open={onMe !== null} onClose={() => setOnMe(null)} title="On you">
+      <Sheet open={onMe !== null} onClose={() => setOnMe(null)} title={onMe?.mannequin ? "On a mannequin" : "On you"}>
         {onMe ? (
           <div className="flex flex-col gap-3" data-testid="see-it-on-me-sheet">
-            <div className="h-[460px] overflow-hidden bg-bone"><img src={`/api/photo/${onMe.key}`} alt="You wearing this piece" className="size-full object-contain" /></div>
-            <p className="mono text-graphite">Only you can see this picture{onMe.cached ? " · saved from before" : ""}</p>
+            <div className="h-[460px] overflow-hidden bg-bone"><img src={`/api/photo/${onMe.key}`} alt={onMe.mannequin ? "This piece on a mannequin" : "You wearing this piece"} className="size-full object-contain" /></div>
+            <p className="mono text-graphite">{onMe.mannequin ? "No body photo used" : "Only you can see this picture"}{onMe.cached ? " · saved from before" : ""}</p>
           </div>
         ) : null}
       </Sheet>

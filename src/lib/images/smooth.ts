@@ -62,7 +62,9 @@ async function googleSmooth(jpeg: Buffer, fetchImpl: typeof fetch): Promise<Buff
  * changing. A cutout (PNG with transparency) keeps its exact silhouette; a plain photo comes back as
  * a JPEG.
  */
-export async function smoothGarment(input: Buffer, fetchImpl: typeof fetch = fetch): Promise<{ data: Buffer; contentType: "image/png" | "image/jpeg" }> {
+export type SmoothStrength = "normal" | "more";
+
+export async function smoothGarment(input: Buffer, fetchImpl: typeof fetch = fetch, strength: SmoothStrength = "normal"): Promise<{ data: Buffer; contentType: "image/png" | "image/jpeg" }> {
   const src = sharp(input).rotate();
   const meta = await src.metadata();
   const hasAlpha = Boolean(meta.hasAlpha);
@@ -73,7 +75,7 @@ export async function smoothGarment(input: Buffer, fetchImpl: typeof fetch = fet
   const editedBuf = process.env.MOCK_SMOOTH === "true" ? await sharp(flat).blur(2).jpeg().toBuffer() : await googleSmooth(flat, fetchImpl);
   const original = await sharp(input).rotate().ensureAlpha().raw().toBuffer();
   const edited = await sharp(editedBuf).resize(width, height, { fit: "fill" }).removeAlpha().raw().toBuffer();
-  const rgba = await transferShading(original, edited, width, height);
+  const rgba = await transferShading(original, edited, width, height, strength);
   if (!hasAlpha) return { data: await sharp(rgba, { raw: { width, height, channels: 4 } }).removeAlpha().jpeg({ quality: 90 }).toBuffer(), contentType: "image/jpeg" };
   return { data: await sharp(rgba, { raw: { width, height, channels: 4 } }).png().toBuffer(), contentType: "image/png" };
 }
@@ -87,7 +89,9 @@ const lum = (r: number, g: number, b: number) => 0.299 * r + 0.587 * g + 0.114 *
  * white paper, or repainted a print in another color, the ratio is 1, so the outline and the print
  * stay the garment's. Returns RGBA with the original alpha.
  */
-export async function transferShading(originalRgba: Buffer, editedRgb: Buffer, width: number, height: number): Promise<Buffer> {
+export async function transferShading(originalRgba: Buffer, editedRgb: Buffer, width: number, height: number, strength: SmoothStrength = "normal"): Promise<Buffer> {
+  // "more" (Jeff, X B) pushes the light change further and reaches finer creases
+  const power = strength === "more" ? 1.6 : 1;
   const n = width * height;
   const origLum = Buffer.alloc(n);
   const editLum = Buffer.alloc(n);
@@ -114,14 +118,14 @@ export async function transferShading(originalRgba: Buffer, editedRgb: Buffer, w
     trustedE[i] = ok ? Math.round(e) : 0;
   }
   const blur = (buf: Buffer, sigma: number) => sharp(buf, { raw: { width, height, channels: 1 } }).blur(sigma).toColourspace("b-w").raw().toBuffer();
-  const sigma = Math.max(1.5, Math.min(width, height) / 80);
+  const sigma = Math.max(1.5, Math.min(width, height) / (strength === "more" ? 120 : 80));
   const wide = Math.max(4, Math.min(width, height) / 20); // reach across a print from the fabric around it
   const [bo, be, wo, we] = await Promise.all([blur(origLum, sigma), blur(editLum, sigma), blur(trustedO, wide), blur(trustedE, wide)]);
   const out = Buffer.alloc(n * 4);
   for (let i = 0; i < n; i++) {
     // trusted pixel: its own local light; untrusted (print, paper): the light of the trusted fabric around it
     const ratio = trusted[i] ? (be[i] + 2) / (bo[i] + 2) : wo[i] > 4 ? we[i] / wo[i] : 1;
-    const k = Math.min(2, Math.max(0.5, ratio));
+    const k = Math.min(strength === "more" ? 2.5 : 2, Math.max(0.4, Math.pow(ratio, power)));
     out[i * 4] = Math.min(255, Math.round(originalRgba[i * 4] * k));
     out[i * 4 + 1] = Math.min(255, Math.round(originalRgba[i * 4 + 1] * k));
     out[i * 4 + 2] = Math.min(255, Math.round(originalRgba[i * 4 + 2] * k));

@@ -4,7 +4,7 @@ import { hashPassword } from "../src/lib/auth/password";
 import { isDevMode } from "../src/lib/auth/dev-mode";
 import {
   BODY_IMAGE_APPROVALS, BRANDS, CATEGORIES, CHECK_IN_SCALES, COLORS, DEV_PASSWORD, FABRICS, FORMALITY, MEASUREMENT_KINDS, OCCASIONS,
-  PATTERNS, PEOPLE, RULES, SEASONS, STORES, STYLE_WORDS, TAGS, PHOTO_TIPS } from "./seed-data";
+  PATTERNS, PEOPLE, RULES, SEASONS, SIZE_OPTIONS, STORES, STYLE_WORDS, TAGS, PHOTO_TIPS } from "./seed-data";
 
 type SimpleDelegate = {
   upsert: (args: { where: { name: string }; update: object; create: { name: string; sortOrder: number } }) => Promise<unknown>;
@@ -89,6 +89,14 @@ export async function seed() {
         update: {},
         create: { categoryId: cat.id, name: sub, sortOrder: si },
       });
+    }
+  }
+
+  for (const [catName, sizes] of Object.entries(SIZE_OPTIONS)) {
+    const cat = await db.category.findUnique({ where: { name: catName } });
+    if (!cat) continue;
+    for (const [si, name] of sizes.entries()) {
+      await db.sizeOption.upsert({ where: { categoryId_name: { categoryId: cat.id, name } }, update: {}, create: { categoryId: cat.id, name, sortOrder: si } });
     }
   }
 

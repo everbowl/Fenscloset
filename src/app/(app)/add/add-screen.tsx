@@ -65,7 +65,13 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
           <Button size="lg" variant="secondary" aria-label="Take a photo" className="w-[54px] px-0" onClick={() => cameraRef.current?.click()}><CameraIcon /></Button>
         </div>
         <p className="mono mt-4 text-center text-graphite">Then confirm each piece with one tap</p>
-        <Link href="/add/store" className="mt-4 flex h-[46px] items-center justify-center border border-ink font-mono text-[11px] uppercase tracking-[0.14em] text-ink" data-testid="add-from-store">Add from a store · link or receipt</Link>
+        <div className="mt-5 border-t border-ink pt-4" data-testid="add-from-store">
+          <p className="mono text-graphite">Or add from a store</p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <Link href="/add/store?tab=link" className="mono flex h-[54px] items-center justify-center border border-ink text-[12px] uppercase tracking-[0.16em] text-ink" data-testid="add-by-link">By link</Link>
+            <Link href="/add/store?tab=receipt" className="mono flex h-[54px] items-center justify-center border border-ink text-[12px] uppercase tracking-[0.16em] text-ink" data-testid="add-by-receipt">By receipt</Link>
+          </div>
+        </div>
         {tips}
       </div>
     );
@@ -112,7 +118,13 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
         </Button>
       </div>
       <p className="mono mt-4 text-center text-graphite">Progress is saved · you can leave and come back</p>
-      <Link href="/add/store" className="mt-4 flex h-[46px] items-center justify-center border border-ink font-mono text-[11px] uppercase tracking-[0.14em] text-ink" data-testid="add-from-store">Add from a store · link or receipt</Link>
+      <div className="mt-5 border-t border-ink pt-4" data-testid="add-from-store">
+          <p className="mono text-graphite">Or add from a store</p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <Link href="/add/store?tab=link" className="mono flex h-[54px] items-center justify-center border border-ink text-[12px] uppercase tracking-[0.16em] text-ink" data-testid="add-by-link">By link</Link>
+            <Link href="/add/store?tab=receipt" className="mono flex h-[54px] items-center justify-center border border-ink text-[12px] uppercase tracking-[0.16em] text-ink" data-testid="add-by-receipt">By receipt</Link>
+          </div>
+        </div>
     </div>
   );
 }

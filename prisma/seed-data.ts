@@ -62,6 +62,18 @@ export const TAGS = ["Favorite", "Comfy", "Statement", "Basics", "Needs repair",
 export const BRANDS = ["Lululemon", "Nike", "Adidas", "Levi's", "Zara", "H&M", "Aritzia", "Free People", "Madewell", "J.Crew", "Abercrombie & Fitch", "Gap", "Old Navy", "Target", "Amazon", "Uniqlo", "Reformation", "Skims", "Alo", "Vuori", "Brandy Melville", "Urban Outfitters", "Anthropologie", "Nordstrom", "Steve Madden", "Birkenstock", "Converse", "New Balance", "Coach", "Kate Spade"];
 export const STORES = ["Nordstrom", "Target", "Amazon", "Zara", "Aritzia", "Lululemon", "Urban Outfitters", "Free People", "Madewell", "Abercrombie & Fitch", "Revolve", "Shein", "ASOS", "Nike", "Sephora"];
 
+/** Sizes offered per category (Jeff, 18 Oct 2026: size by item type). Editable under Admin → Lists → Sizes. */
+export const SIZE_OPTIONS: Record<string, string[]> = {
+  Tops: ["XS", "S", "M", "L", "XL", "XXL", "Youth S", "Youth M", "Youth L", "Youth XL"],
+  Outerwear: ["XS", "S", "M", "L", "XL", "XXL", "Youth S", "Youth M", "Youth L", "Youth XL"],
+  Activewear: ["XS", "S", "M", "L", "XL", "XXL", "Youth S", "Youth M", "Youth L", "Youth XL"],
+  Swimwear: ["XS", "S", "M", "L", "XL", "XXL", "Youth S", "Youth M", "Youth L", "Youth XL"],
+  Dresses: ["XS", "S", "M", "L", "XL", "XXL", "0", "2", "4", "6", "8", "10", "12", "14", "16", "Youth S", "Youth M", "Youth L", "Youth XL"],
+  Bottoms: ["XS", "S", "M", "L", "XL", "XXL", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "Youth 4", "Youth 5", "Youth 6", "Youth 7", "Youth 8", "Youth 10", "Youth 12", "Youth 14", "Youth 16"],
+  Shoes: ["5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12", "12.5", "13", "13.5", "14", "14.5", "15", "Youth 1", "Youth 2", "Youth 3", "Youth 4", "Youth 5", "Youth 6"],
+  Hats: ["S/M", "L/XL", "One size", "Youth"],
+  Belts: ["S", "M", "L", "XL", "28", "30", "32", "34", "36", "38", "40", "42", "44"],
+};
 export const MEASUREMENT_KINDS: { name: string; unit: string }[] = [
   { name: "Height", unit: "in" }, { name: "Weight", unit: "lb" }, { name: "Chest / bust", unit: "in" }, { name: "Waist", unit: "in" },
   { name: "Hips", unit: "in" }, { name: "Inseam", unit: "in" }, { name: "Shoulders", unit: "in" }, { name: "Sleeve", unit: "in" },
@@ -81,6 +93,15 @@ export const RULES = [
   { key: "noRepeatDays", value: "14", label: "No-repeat window (days)", description: "Don't suggest an outfit piece that was worn within this many days." },
   { key: "notWornMonths", value: "6", label: "Not-worn alert (months)", description: "Flag items that haven't been worn in this many months for a closet clean-out." },
   { key: "timezone", value: "America/Los_Angeles", label: "Household time zone", description: "Decides when 'today' starts for check-ins, looks and the Fits calendar." },
+  // Likely sizes from height and weight (adults only; a starting point, shown on the Body page and offered when recording a size in a brand).
+  { key: "sizeBandXsMaxLb", value: "125", label: "Likely size · XS up to (lb)", description: "Weight at or under this reads as XS for tops, outerwear and dresses." },
+  { key: "sizeBandSMaxLb", value: "150", label: "Likely size · S up to (lb)", description: "Weight at or under this reads as S." },
+  { key: "sizeBandMMaxLb", value: "180", label: "Likely size · M up to (lb)", description: "Weight at or under this reads as M." },
+  { key: "sizeBandLMaxLb", value: "210", label: "Likely size · L up to (lb)", description: "Weight at or under this reads as L." },
+  { key: "sizeBandXlMaxLb", value: "240", label: "Likely size · XL up to (lb)", description: "Weight at or under this reads as XL; above it, XXL." },
+  { key: "sizeTallIn", value: "74", label: "Likely size · tall from (in)", description: "Height at or above this bumps the letter size up one." },
+  { key: "sizeShortIn", value: "64", label: "Likely size · short up to (in)", description: "Height at or under this bumps the letter size down one." },
+  { key: "waistDivisorX10", value: "55", label: "Likely waist · divisor ×10", description: "Likely waist ≈ weight ÷ (this ÷ 10), nudged by height. 55 means weight ÷ 5.5: 170 lb → about 31." },
 ];
 
 export const DEV_PASSWORD = "0535";

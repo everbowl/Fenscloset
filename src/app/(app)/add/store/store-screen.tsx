@@ -18,8 +18,8 @@ import { addFromStoreAction, addReceiptLinesAction, colorPhotosAction, lookupPro
 type Tab = "link" | "receipt";
 
 /** Add from a store: a product link or a receipt → the store's photo and facts → the normal confirm card. */
-export function StoreScreen({ canSearch }: { canSearch: boolean }) {
-  const [tab, setTab] = useState<Tab>("link");
+export function StoreScreen({ canSearch, initialTab = "link" }: { canSearch: boolean; initialTab?: Tab }) {
+  const [tab, setTab] = useState<Tab>(initialTab);
   return (
     <div>
       <PageHeader title="Add from" accent="a store" aside={<Link href="/add" className="mono mono-11 py-2">Photos instead</Link>} />

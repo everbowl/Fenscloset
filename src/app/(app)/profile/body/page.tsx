@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { db } from "@/lib/db";
 import { getBodyProfile } from "@/lib/profiles/service";
+import { likelySizes, sizeOptionsByCategory } from "@/lib/profiles/sizes";
 import { resolveProfileTarget } from "../target";
 import { BodyEditor } from "./body-editor";
 
@@ -20,16 +21,18 @@ export default async function BodyProfilePage() {
       </div>
     );
   }
-  const [brands, categories, viewers] = await Promise.all([
+  const [brands, categories, viewers, sizeOptions, likely] = await Promise.all([
     db.brand.findMany({ where: { isArchived: false }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),
     db.category.findMany({ where: { isArchived: false }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),
     viewerNames(owner.id),
+    sizeOptionsByCategory(),
+    likelySizes(owner.id),
   ]);
   return (
     <div>
       <Link href="/profile" className="mono mb-3 inline-block text-graphite">← Profile</Link>
       <PageHeader title={mine ? "Body" : owner.first} accent="profile" />
-      <BodyEditor ownerId={owner.id} ownerFirst={owner.first} isMinor={owner.role === "minor"} body={{ ...body, photos: body.photos.map((p) => ({ ...p, takenAt: p.takenAt.toISOString() })) }} brands={brands} categories={categories} canEdit={canEdit} canEditLists={viewer.role === "admin"} visibleTo={viewers} />
+      <BodyEditor ownerId={owner.id} ownerFirst={owner.first} isMinor={owner.role === "minor"} body={{ ...body, photos: body.photos.map((p) => ({ ...p, takenAt: p.takenAt.toISOString() })) }} brands={brands} categories={categories} sizeOptions={sizeOptions} likely={likely} canEdit={canEdit} canEditLists={viewer.role === "admin"} visibleTo={viewers} />
     </div>
   );
 }

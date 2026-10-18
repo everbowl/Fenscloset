@@ -4,6 +4,8 @@ import { canShopFor } from "@/lib/people/visibility";
 import { getLookup, listRecent } from "@/lib/shop/engine";
 import { ShopScreen } from "./shop-screen";
 import { tryOnState } from "@/lib/tryon";
+import { isMannequinConfigured } from "@/lib/tryon/mannequin";
+import { canDress } from "@/lib/outfits/engine";
 
 export const metadata = { title: "Shop" };
 export const dynamic = "force-dynamic";
@@ -18,5 +20,6 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
   const forPersonId = forParam && allowed.some((p) => p.id === forParam) ? forParam : me.id;
   const [recent, selected] = await Promise.all([listRecent(me, forPersonId), l ? getLookup(me, l) : Promise.resolve(null)]);
   const tryOn = await tryOnState(me, forPersonId);
-  return <ShopScreen meId={me.id} people={allowed} forPersonId={forPersonId} selected={selected ?? recent[0] ?? null} recent={recent} tryOn={tryOn} />;
+  const mannequin = tryOn !== "ready" && isMannequinConfigured() && (await canDress(me, forPersonId));
+  return <ShopScreen meId={me.id} people={allowed} forPersonId={forPersonId} selected={selected ?? recent[0] ?? null} recent={recent} tryOn={tryOn} mannequin={mannequin} />;
 }

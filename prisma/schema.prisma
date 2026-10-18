@@ -146,6 +146,7 @@ model Category {
   photoTip      String?
   createdAt     DateTime      @default(now())
   subcategories Subcategory[]
+  sizes         SizeOption[]
   items         Item[]
 
   @@unique([name])
@@ -160,6 +161,22 @@ model Subcategory {
   createdAt  DateTime @default(now())
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   items      Item[]
+
+  @@unique([categoryId, name])
+}
+
+/**
+ * Editable list: the sizes offered for a category when someone records their size in a brand
+ * (Tops XS–XXL, Bottoms by waist, Shoes in half sizes…). Jeff, 18 Oct 2026: size by item type.
+ */
+model SizeOption {
+  id         String   @id @default(cuid())
+  name       String
+  categoryId String
+  sortOrder  Int      @default(0)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@unique([categoryId, name])
 }

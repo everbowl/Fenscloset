@@ -12,13 +12,15 @@ import type { DuplicateHint } from "@/lib/items/duplicates";
 import { shrinkPhoto } from "@/lib/import/client-queue";
 import { attachPhotoAction, confirmEntryAction, keepSmoothAction, mergeEntryAction, saveEditsAction, skipEntryAction, smoothEntryAction } from "./actions";
 import { PickSheet, Row, TextSheet } from "@/components/items/row-editor";
+import type { MyBrand } from "@/lib/profiles/brands";
+import { sizeFor } from "@/lib/profiles/size-options";
 
 type Props = {
   batchId: string;
   entry: { id: string; photoKey: string; labelKey: string | null; wornKey: string | null; backKey: string | null; smoothKey: string | null; warnings: string[] };
   canSmooth: boolean;
   /** From Profile → Brands: one tap fills brand, size and (at save) the store link. */
-  myBrands: { brandId: string; name: string; size: string | null; url: string | null }[];
+  myBrands: MyBrand[];
   tags: TagResult;
   lists: TagLists;
   counter: string;
@@ -61,10 +63,10 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
   const [side, setSide] = useState<"front" | "back">("front");
   const shownKey = side === "back" && backKey ? backKey : smoothKey && !showBefore ? smoothKey : photoKey;
 
-  function smooth() {
+  function smooth(strength: "normal" | "more" = "normal") {
     setError(undefined); setSmoothing(true); setSide("front"); setShowBefore(false);
     start(async () => {
-      const r = await smoothEntryAction(entry.id);
+      const r = await smoothEntryAction(entry.id, strength);
       setSmoothing(false);
       if (!r.ok) { setError(r.error); return; }
       setSmoothKey(r.value.smoothKey);
@@ -175,10 +177,11 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
               <div className="flex gap-1.5">
                 <button type="button" onPointerDown={() => setShowBefore(true)} onPointerUp={() => setShowBefore(false)} onPointerLeave={() => setShowBefore(false)} onClick={() => setShowBefore((v) => !v)} className="mono mono-11 h-9 border border-ink px-3" data-testid="smooth-before">Before</button>
                 <button type="button" onClick={() => decideSmooth(false)} disabled={pending} className="mono mono-11 h-9 border border-ink px-3" data-testid="smooth-undo">Undo</button>
+                <button type="button" onClick={() => smooth("more")} disabled={smoothing || pending} className="mono mono-11 h-9 border border-ink px-3 disabled:opacity-60" data-testid="smooth-more">{smoothing ? "Smoothing…" : "Smooth more"}</button>
                 <button type="button" onClick={() => decideSmooth(true)} disabled={pending} className="mono mono-11 h-9 bg-ink px-3 text-paper" data-testid="smooth-keep">Keep</button>
               </div>
             ) : (
-              <button type="button" onClick={smooth} disabled={smoothing || pending} className="mono mono-11 h-9 border border-ink px-3 disabled:opacity-60" data-testid="smooth">{smoothing ? "Smoothing…" : "Smooth wrinkles"}</button>
+              <button type="button" onClick={() => smooth()} disabled={smoothing || pending} className="mono mono-11 h-9 border border-ink px-3 disabled:opacity-60" data-testid="smooth">{smoothing ? "Smoothing…" : "Smooth wrinkles"}</button>
             )
           ) : null}
         </div>
@@ -210,9 +213,10 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
         <div className="mx-5 mt-3" data-testid="my-brand-pills">
           <p className="mono text-graphite">Your brands</p>
           <div className="-mx-5 mt-1.5 flex gap-1.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none]">
-            {myBrands.map((b) => (
-              <button key={b.brandId} type="button" onClick={() => edit({ brandId: b.brandId, brandText: b.name, ...(b.size ? { sizeText: b.size } : {}) })} className="mono mono-11 h-8 shrink-0 border border-ink px-3" data-testid={`my-brand-${b.brandId}`}>{b.name}{b.size ? ` · ${b.size}` : ""}</button>
-            ))}
+            {myBrands.map((b) => {
+              const size = sizeFor(b, tags.categoryId);
+              return <button key={b.brandId} type="button" onClick={() => edit({ brandId: b.brandId, brandText: b.name, ...(size ? { sizeText: size } : {}) })} className="mono mono-11 h-8 shrink-0 border border-ink px-3" data-testid={`my-brand-${b.brandId}`}>{b.name}{size ? ` · ${size}` : ""}</button>;
+            })}
             <button type="button" onClick={() => setSheet("brand")} className="mono mono-11 h-8 shrink-0 px-2 text-graphite">Other…</button>
           </div>
         </div>

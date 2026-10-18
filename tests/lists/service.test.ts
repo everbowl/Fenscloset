@@ -10,7 +10,7 @@ describe("editable lists", () => {
 
   it("creates, renames, archives and deletes entries of every simple kind", async () => {
     for (const kind of LIST_KINDS) {
-      const parentId = kind === "subcategory" ? (await listEntries("category"))[0].id : kind === "checkInOption" ? (await listEntries("checkInScale"))[0].id : undefined;
+      const parentId = kind === "subcategory" || kind === "size" ? (await listEntries("category"))[0].id : kind === "checkInOption" ? (await listEntries("checkInScale"))[0].id : undefined;
       const made = await createEntry(kind, { name: "  Zed  thing ", parentId, hex: "#123abc" });
       expect(made.name).toBe("Zed thing");
       if (kind === "color") expect(made.hex).toBe("#123ABC");

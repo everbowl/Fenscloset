@@ -45,13 +45,14 @@ async function assertCanDress(viewer: Viewer, personId: string) {
 }
 
 /** The look on the mannequin. `source` is "today" or "shop" for the record. */
-export async function mannequinLook(viewer: Viewer, personId: string, itemIds: string[], source: string, fetchImpl: typeof fetch = fetch): Promise<TryOnView> {
+export async function mannequinLook(viewer: Viewer, personId: string, itemIds: string[], source: string, extraGarment?: Buffer, fetchImpl: typeof fetch = fetch): Promise<TryOnView> {
   await assertCanDress(viewer, personId);
   if (!isMannequinConfigured()) throw new TryOnError("The mannequin isn’t set up on the site yet.");
   const ids = [...new Set(itemIds)].sort();
-  const hit = await db.tryOn.findFirst({ where: { personId, bodyPhotoKey: MANNEQUIN_BASE_KEY, itemIds: { equals: ids } }, orderBy: { createdAt: "desc" } });
+  const cacheIds = extraGarment ? [...ids, `extra:${source}`].sort() : ids;
+  const hit = await db.tryOn.findFirst({ where: { personId, bodyPhotoKey: MANNEQUIN_BASE_KEY, itemIds: { equals: cacheIds } }, orderBy: { createdAt: "desc" } });
   if (hit) return { id: hit.id, key: hit.bucketKey, itemIds: hit.itemIds, createdAt: hit.createdAt.toISOString(), cached: true, mannequin: true };
-  const garments = (await garmentImages(ids)).slice(0, MAX_GARMENTS);
+  const garments = [...(extraGarment ? [{ id: "extra", buf: extraGarment }] : []), ...(await garmentImages(ids))].slice(0, MAX_GARMENTS);
   if (!garments.length) throw new TryOnError("None of these pieces has a photo the mannequin can wear.");
   const base = await mannequinBase(fetchImpl);
   let picture: Buffer;
@@ -62,6 +63,6 @@ export async function mannequinLook(viewer: Viewer, personId: string, itemIds: s
   }
   const key = newKey("mannequin", personId, "image/jpeg");
   await putObject(key, picture, "image/jpeg");
-  const row = await db.tryOn.create({ data: { personId, bucketKey: key, itemIds: ids, bodyPhotoKey: MANNEQUIN_BASE_KEY, source: `mannequin:${source}` } });
+  const row = await db.tryOn.create({ data: { personId, bucketKey: key, itemIds: cacheIds, bodyPhotoKey: MANNEQUIN_BASE_KEY, source: `mannequin:${source}` } });
   return { id: row.id, key, itemIds: row.itemIds, createdAt: row.createdAt.toISOString(), cached: false, mannequin: true };
 }

@@ -11,8 +11,8 @@ test.describe("add from a store", () => {
   test("a product link becomes pieces with the store photo, facts and a store-photo mark; a receipt becomes lines", async ({ page }) => {
     await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
     await page.goto("/add");
-    await page.getByTestId("add-from-store").click();
-    await expect(page).toHaveURL(/\/add\/store$/);
+    await page.getByTestId("add-by-link").click();
+    await expect(page).toHaveURL(/\/add\/store\?tab=link$/);
     await page.getByTestId("store-url").fill("https://mock.example/products/linen-blazer");
     await page.getByTestId("lookup").click();
     await expect(page.getByTestId("product-name")).toHaveText("Linen Blazer");

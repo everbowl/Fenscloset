@@ -12,6 +12,9 @@ import { PickSheet, Row, TextSheet } from "@/components/items/row-editor";
 import { InlineAdd } from "@/components/lists/inline-add";
 import { shrinkPhoto } from "@/lib/import/client-queue";
 import type { BodyProfileView, Named } from "@/lib/profiles/service";
+import { SizeSheet } from "@/components/profile/size-sheet";
+import type { CategorySizes } from "@/lib/profiles/sizes";
+import { formatMeasurement, likelyFor, measurementOptions, type LikelySizes } from "@/lib/profiles/size-options";
 import { addBodyPhotoAction, removeBodyPhotoAction, removeSizeAction, setBodyPhotoPrivacyAction, setFitNotesAction, setMeasurementAction, upsertSizeAction } from "../actions";
 
 type Body = Omit<BodyProfileView, "photos"> & { photos: { id: string; key: string; takenAt: string; onlyMe: boolean }[] };
@@ -20,8 +23,8 @@ type Body = Omit<BodyProfileView, "photos"> & { photos: { id: string; key: strin
  * Body profile (screen 11, undrawn): measurements from the editable list, sizes by brand, fit notes,
  * full-body photos, and the "VISIBLE TO …" line. Edits save in place.
  */
-export function BodyEditor({ ownerId, ownerFirst, isMinor, body, brands, categories, canEdit, canEditLists, visibleTo }: {
-  ownerId: string; ownerFirst: string; isMinor: boolean; body: Body; brands: Named[]; categories: Named[]; canEdit: boolean; canEditLists: boolean; visibleTo: string[];
+export function BodyEditor({ ownerId, ownerFirst, isMinor, body, brands, categories, sizeOptions, likely, canEdit, canEditLists, visibleTo }: {
+  ownerId: string; ownerFirst: string; isMinor: boolean; body: Body; brands: Named[]; categories: Named[]; sizeOptions: CategorySizes[]; likely: LikelySizes | null; canEdit: boolean; canEditLists: boolean; visibleTo: string[];
 }) {
   const router = useRouter();
   const [measuring, setMeasuring] = useState<{ kindId: string; name: string; unit: string; value: string } | null>(null);
@@ -29,6 +32,7 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, brands, categor
   const [size, setSize] = useState<{ id?: string; brandId: string; categoryId: string | null; size: string } | null>(null);
   const [pickBrand, setPickBrand] = useState(false);
   const [pickCategory, setPickCategory] = useState(false);
+  const [pickSize, setPickSize] = useState(false);
   const [photoSheet, setPhotoSheet] = useState<string | null>(null);
   const [askPrivacy, setAskPrivacy] = useState(false);
   const [nextOnlyMe, setNextOnlyMe] = useState(false);
@@ -74,9 +78,12 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, brands, categor
       <section>
         <p className="mono border-b border-ink pb-2 text-graphite">Measurements</p>
         {body.measurements.map((m) => (
-          <Row key={m.kindId} label={m.name} value={m.value ? `${m.value}${m.unit ? ` ${m.unit}` : ""}` : "Add"} muted={!m.value} onClick={() => canEdit && setMeasuring({ kindId: m.kindId, name: m.name, unit: m.unit, value: m.value ?? "" })} testId={`measure-${m.name.toLowerCase().replace(/[^a-z]+/g, "-")}`} />
+          <Row key={m.kindId} label={m.name} value={m.value ? formatMeasurement(m, m.value) : "Add"} muted={!m.value} onClick={() => canEdit && setMeasuring({ kindId: m.kindId, name: m.name, unit: m.unit, value: m.value ?? "" })} testId={`measure-${m.name.toLowerCase().replace(/[^a-z]+/g, "-")}`} />
         ))}
         {canEditLists ? <div className="pt-2"><InlineAdd kind="measurementKind" label="Add a measurement" onCreated={() => router.refresh()} /></div> : null}
+        {likely ? (
+          <p className="mono mt-3 text-graphite" data-testid="likely-sizes">Likely sizes from height and weight: Tops {likely.letter} · Bottoms {likely.waist} · Dresses {likely.dress}. A starting point, not a measurement; set the real ones under Brands.</p>
+        ) : !isMinor ? <p className="mono mt-3 text-graphite">Add height and weight to see likely sizes.</p> : null}
       </section>
 
       <section>
@@ -123,14 +130,19 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, brands, categor
       </section>
 
       {/* Sheets */}
-      <TextSheet open={Boolean(measuring)} onClose={() => setMeasuring(null)} title={measuring?.name ?? ""} label={measuring?.unit ? `Value (${measuring.unit})` : "Value"} value={measuring?.value ?? ""} placeholder="e.g. 32" onSave={(v) => measuring && run(() => setMeasurementAction(ownerId, measuring.kindId, v))} />
+      <SizeSheet open={Boolean(measuring)} onClose={() => setMeasuring(null)} title={measuring?.name ?? ""} options={measuring ? measurementOptions(measuring) : []} value={measuring?.value || null} unit={measuring?.unit} format={measuring ? (v) => formatMeasurement(measuring, v) : undefined} testId="measure-sheet"
+        onPick={(v) => measuring && run(() => setMeasurementAction(ownerId, measuring.kindId, v ?? ""))} />
+      <SizeSheet open={pickSize} onClose={() => setPickSize(false)} title={size ? `${brandName(size.brandId)} · ${categoryName(size.categoryId)}` : ""} options={sizeOptions.find((c) => c.categoryId === size?.categoryId)?.options ?? []} value={size?.size || null} suggested={size?.categoryId ? likelyFor(likely, categoryName(size.categoryId)) : null}
+        onPick={(v) => size && setSize({ ...size, size: v ?? "" })} />
       <TextSheet open={notes} onClose={() => setNotes(false)} title="Fit notes" label="Notes" value={body.fitNotes ?? ""} placeholder="Long arms · short torso · size up in jackets" onSave={(v) => run(() => setFitNotesAction(ownerId, v))} />
       <Sheet open={Boolean(size)} onClose={() => setSize(null)} title={size?.id ? "Edit size" : "Add a size"}>
         {size ? (
           <form onSubmit={(e) => { e.preventDefault(); const s = size; setSize(null); run(() => upsertSizeAction(ownerId, s)); }} className="space-y-4">
             <Row label="Brand" value={brandName(size.brandId)} onClick={() => setPickBrand(true)} />
             <Row label="For" value={categoryName(size.categoryId)} onClick={() => setPickCategory(true)} />
-            <Field label="Size" htmlFor="size-value"><Input id="size-value" value={size.size} onChange={(e) => setSize({ ...size, size: e.target.value })} placeholder="M · 32 · 8 · EU 38" maxLength={20} autoFocus /></Field>
+            {sizeOptions.some((c) => c.categoryId === size.categoryId)
+              ? <Row label="Size" value={size.size || "Tap to pick"} muted={!size.size} onClick={() => setPickSize(true)} testId="size-pick" />
+              : <Field label="Size" htmlFor="size-value"><Input id="size-value" value={size.size} onChange={(e) => setSize({ ...size, size: e.target.value })} placeholder="M · 32 · 8 · EU 38" maxLength={20} autoFocus /></Field>}
             <div className="flex gap-2.5">
               <Button type="submit" className="flex-1" disabled={pending || !size.brandId}>Save</Button>
               {size.id ? <Button type="button" variant="secondary" onClick={() => { const id = size.id!; setSize(null); run(() => removeSizeAction(ownerId, id)); }}>Remove</Button> : null}

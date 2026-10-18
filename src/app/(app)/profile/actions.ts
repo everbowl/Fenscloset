@@ -63,8 +63,8 @@ export async function removeInspirationAction(ownerId: string, id: string): Prom
 export async function forgetTasteAction(ownerId: string, itemId?: string): Promise<Result> {
   const me = await requirePerson(); return run(() => forgetTasteFor(me, ownerId, itemId), ["/profile/style"]);
 }
-export async function setMyBrandAction(ownerId: string, input: { brandId: string; size?: string | null; url?: string | null }): Promise<Result> {
-  const me = await requirePerson(); return run(() => setMyBrand(me, ownerId, input), ["/profile/brands", "/add"]);
+export async function setMyBrandAction(ownerId: string, input: { brandId: string; url?: string | null; sizes?: { categoryId: string | null; size: string | null }[] }): Promise<Result> {
+  const me = await requirePerson(); return run(() => setMyBrand(me, ownerId, input), ["/profile/brands", "/profile/body", "/add"]);
 }
 export async function removeMyBrandAction(ownerId: string, brandId: string): Promise<Result> {
   const me = await requirePerson(); return run(() => removeMyBrand(me, ownerId, brandId), ["/profile/brands", "/add"]);

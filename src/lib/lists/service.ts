@@ -113,6 +113,7 @@ export async function inUseCount(kind: ListKind, id: string): Promise<{ count: n
     case "styleWord": return { count: await db.person.count({ where: { styleWords: { some: { id } } } }), what: "profiles" };
     case "closet": return { count: await db.itemCloset.count({ where: { closetId: id } }), what: "items" };
     case "checkInScale": return { count: await db.checkInOption.count({ where: { scaleId: id } }), what: "options" };
+    case "size": { const o = await db.sizeOption.findUnique({ where: { id } }); return { count: o ? await db.bodySizeByBrand.count({ where: { categoryId: o.categoryId, size: o.name } }) : 0, what: "profiles" }; }
     default: return { count: 0, what: "items" };
   }
 }

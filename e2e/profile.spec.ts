@@ -13,8 +13,7 @@ test("Jeff fills his body profile and settings; parents edit Mya's; Olivia is in
   await expect(page).toHaveURL(/\/profile\/body$/);
   await expect(page.getByText("Visible to Jeff")).toBeVisible();
   await page.getByTestId("measure-waist").click();
-  await page.getByRole("dialog").getByRole("textbox").fill("32");
-  await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  await page.getByTestId("measure-sheet").getByRole("option", { name: "32" }).click();
   await expect(page.getByTestId("measure-waist")).toContainText("32 in");
   await page.getByTestId("add-size").click();
   await page.getByRole("dialog").getByLabel("Size").fill("L");
@@ -37,9 +36,8 @@ test("Jeff fills his body profile and settings; parents edit Mya's; Olivia is in
   await expect(page.getByText("Visible to Mya, Jeff, Brittney only")).toBeVisible();
   await expect(page.getByText("Approved by Jeff")).toBeVisible();
   await page.getByTestId("measure-height").click();
-  await page.getByRole("dialog").getByRole("textbox").fill("64");
-  await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
-  await expect(page.getByTestId("measure-height")).toContainText("64 in");
+  await page.getByTestId("measure-sheet").getByRole("option", { name: `5'4"` }).click();
+  await expect(page.getByTestId("measure-height")).toContainText(`5'4"`);
   await page.getByRole("button", { name: /Mya menu/ }).click();
   await page.getByRole("option", { name: "Jeff" }).click();
   await expect(page.getByRole("button", { name: /Jeff menu/ })).toBeVisible();
@@ -108,17 +106,28 @@ test("inspiration board: add a look, see what it read, remove it", async ({ page
   await expect(page.getByTestId("inspiration-tile")).toHaveCount(0);
 });
 
-test("my brands & sizes: add Lululemon with size and link, then one tap on the confirm card fills brand and size", async ({ page }) => {
+test("my brands & sizes: add Lululemon with a size per item type and a link, then one tap on the confirm card fills brand and the right size", async ({ page }) => {
   await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  // height + weight → likely sizes, offered as the dashed chip
+  await page.goto("/profile/body");
+  await page.getByTestId("measure-height").click();
+  await page.getByTestId("measure-sheet").getByRole("option", { name: `6'0"` }).click();
+  await page.getByTestId("measure-weight").click();
+  await page.getByTestId("measure-sheet").getByRole("option", { name: "185" }).click();
+  await expect(page.getByTestId("likely-sizes")).toContainText("Tops L");
   await page.goto("/profile/brands");
   await expect(page.getByTestId("my-brands")).toContainText("None yet");
   await page.getByTestId("add-my-brand").click();
   await page.getByRole("dialog").getByRole("option", { name: "Lululemon" }).click();
-  await page.getByTestId("my-brand-size").fill("L");
+  await expect(page.getByTestId("my-size-tops")).toContainText("Likely L");
+  await page.getByTestId("my-size-tops").click();
+  await page.getByTestId("size-sheet").getByRole("option", { name: /^L/ }).click();
+  await page.getByTestId("my-size-bottoms").click();
+  await page.getByTestId("size-sheet").getByRole("option", { name: "32", exact: true }).click();
   await page.getByTestId("my-brand-url").fill("shop.lululemon.com");
   await page.getByTestId("save-my-brand").click();
   await expect(page.getByTestId("my-brands")).toContainText("Lululemon");
-  await expect(page.getByTestId("my-brands")).toContainText("Size L · shop.lululemon.com");
+  await expect(page.getByTestId("my-brands")).toContainText("Tops L · Bottoms 32 · shop.lululemon.com");
 
   // a fresh photo → confirm card offers "Lululemon · L" as one tap, and asks for more photos
   const buffer = Buffer.from(await (await import("sharp")).default({ create: { width: 800, height: 1100, channels: 3, background: { r: 20, g: 20, b: 20 } } }).jpeg().toBuffer());
