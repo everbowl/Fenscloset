@@ -12,7 +12,7 @@ import { drainQueue } from "@/lib/import/queue";
 import { attachEntryPhoto, createItemFromEntry, saveEntryEdits } from "@/lib/items/service";
 import { readBackForEntry, type EntryAiResult } from "@/lib/import/process";
 import { keepSmooth, smoothEntry } from "@/lib/import/smooth-entry";
-import { isSmoothConfigured, restoreEdges, smoothGarment } from "@/lib/images/smooth";
+import { isSmoothConfigured, smoothGarment, transferShading } from "@/lib/images/smooth";
 import { fitCutout } from "@/lib/images/thumb";
 
 async function photo() {
@@ -68,14 +68,40 @@ describe("smooth wrinkles + back photo", () => {
     expect(await fitCutout(opaque)).toEqual(opaque); // nothing transparent to trim: untouched (the mock cutter returns opaque PNGs)
   });
 
-  it("puts the garment back where the editor left white paper inside the outline", () => {
-    // two pixels: both inside the silhouette; the editor whited out the first, kept the second
-    const original = Buffer.from([120, 90, 60, 255, 30, 30, 30, 255]);
-    const edited = Buffer.from([250, 250, 250, 40, 40, 40]);
-    expect([...restoreEdges(edited, original)]).toEqual([120, 90, 60, 255, 40, 40, 40, 255]);
-    // a genuinely white garment stays white
-    const white = Buffer.from([245, 245, 245, 255]);
-    expect([...restoreEdges(Buffer.from([250, 250, 250]), white)]).toEqual([250, 250, 250, 255]);
+  it("takes only the shading from the edit: a wrinkle shadow lifts, a red stripe stays red, white paper is ignored", async () => {
+    const w = 60, h = 60;
+    const rgba = (fill: (x: number, y: number) => [number, number, number, number]) => {
+      const b = Buffer.alloc(w * h * 4);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const [r, g, bl, a] = fill(x, y); b.set([r, g, bl, a], (y * w + x) * 4); }
+      return b;
+    };
+    const rgb = (fill: (x: number, y: number) => [number, number, number]) => {
+      const b = Buffer.alloc(w * h * 3);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) b.set(fill(x, y), (y * w + x) * 3);
+      return b;
+    };
+    const px = (buf: Buffer, x: number, y: number) => [...buf.subarray((y * w + x) * 4, (y * w + x) * 4 + 4)];
+    // a blue garment with a dark wrinkle band (rows 20-27) and a thin red stripe (cols 40-43); the editor returns the garment flat
+    const shadow = (y: number) => y >= 20 && y < 28;
+    const stripe = (x: number) => x >= 40 && x < 44;
+    const original = rgba((x, y) => stripe(x) ? [220, 30, 30, 255] : shadow(y) ? [15, 15, 80, 255] : [30, 30, 160, 255]);
+    // the editor smoothed the band away and (badly) painted over the stripe too
+    const edited = rgb(() => [30, 30, 160]);
+    const out = await transferShading(original, edited, w, h);
+    const lifted = px(out, 10, 24); // in the band: brightened toward the garment color
+    expect(lifted[2]).toBeGreaterThan(130);
+    expect(lifted[3]).toBe(255);
+    const kept = px(out, 41, 50); // on the stripe: still red, not the editor's blue
+    expect(kept[0]).toBeGreaterThan(150);
+    expect(kept[2]).toBeLessThan(80);
+    expect(px(out, 10, 50)).toEqual([30, 30, 160, 255]); // plain garment untouched
+    // the editor whited out a corner of the garment: that region keeps the original
+    const whited = rgb((x, y) => x < 10 && y < 10 ? [250, 250, 250] : [30, 30, 160]);
+    const out2 = await transferShading(rgba(() => [30, 30, 160, 255]), whited, w, h);
+    expect(px(out2, 2, 2)).toEqual([30, 30, 160, 255]);
+    // transparent pixels stay transparent
+    const out3 = await transferShading(rgba((x) => x < 30 ? [0, 0, 0, 0] : [30, 30, 160, 255]), edited, w, h);
+    expect(px(out3, 5, 5)[3]).toBe(0);
   });
 
   it("SMOOTH parks a copy; UNDO throws it away; KEEP makes it the cutout with a fresh thumbnail", async () => {

@@ -48,9 +48,11 @@ async function googleSmooth(jpeg: Buffer, fetchImpl: typeof fetch): Promise<Buff
 }
 
 /**
- * Smooths a garment photo. A cutout (PNG with transparency) is flattened on white for the editor and
- * the result is pasted back into the original silhouette, so the background stays cut out and the
- * outline cannot drift. A plain photo comes back as a JPEG.
+ * Smooths a garment photo. The editor's result is used only for its shading (Jeff, 18 Oct 2026, S B):
+ * the piece's own pixels stay, print, color, lettering and cut untouched, and only the light across
+ * the fabric is taken from the smoothed version, so the wrinkle shadows lift without the garment
+ * changing. A cutout (PNG with transparency) keeps its exact silhouette; a plain photo comes back as
+ * a JPEG.
  */
 export async function smoothGarment(input: Buffer, fetchImpl: typeof fetch = fetch): Promise<{ data: Buffer; contentType: "image/png" | "image/jpeg" }> {
   const src = sharp(input).rotate();
@@ -61,28 +63,61 @@ export async function smoothGarment(input: Buffer, fetchImpl: typeof fetch = fet
   if (!width || !height) throw new SmoothError("That photo could not be read.");
   const flat = await sharp(input).rotate().flatten({ background: "#ffffff" }).jpeg({ quality: 92 }).toBuffer();
   const editedBuf = process.env.MOCK_SMOOTH === "true" ? await sharp(flat).blur(2).jpeg().toBuffer() : await googleSmooth(flat, fetchImpl);
-  if (!hasAlpha) return { data: await sharp(editedBuf).jpeg({ quality: 90 }).toBuffer(), contentType: "image/jpeg" };
   const original = await sharp(input).rotate().ensureAlpha().raw().toBuffer();
   const edited = await sharp(editedBuf).resize(width, height, { fit: "fill" }).removeAlpha().raw().toBuffer();
-  const rgba = restoreEdges(edited, original);
-  const data = await sharp(rgba, { raw: { width, height, channels: 4 } }).png().toBuffer();
-  return { data, contentType: "image/png" };
+  const rgba = await transferShading(original, edited, width, height);
+  if (!hasAlpha) return { data: await sharp(rgba, { raw: { width, height, channels: 4 } }).removeAlpha().jpeg({ quality: 90 }).toBuffer(), contentType: "image/jpeg" };
+  return { data: await sharp(rgba, { raw: { width, height, channels: 4 } }).png().toBuffer(), contentType: "image/png" };
 }
 
+const lum = (r: number, g: number, b: number) => 0.299 * r + 0.587 * g + 0.114 * b;
+
 /**
- * Inside the silhouette, the editor sometimes pulls a sleeve or shoulder inward and leaves the white
- * paper it was shown on. Where the edit is near-white and the original was not, put the original
- * pixel back, so the outline stays the garment's. Returns RGBA with the original alpha.
+ * Keeps the original garment and takes only the light from the edit: each pixel is the original
+ * scaled by the ratio of the edit's local brightness to the original's (both softly blurred, so
+ * print and texture are not part of the ratio). Where the editor pulled the garment away and left
+ * white paper, or repainted a print in another color, the ratio is 1, so the outline and the print
+ * stay the garment's. Returns RGBA with the original alpha.
  */
-export function restoreEdges(editedRgb: Buffer, originalRgba: Buffer): Buffer {
-  const n = originalRgba.length / 4;
+export async function transferShading(originalRgba: Buffer, editedRgb: Buffer, width: number, height: number): Promise<Buffer> {
+  const n = width * height;
+  const origLum = Buffer.alloc(n);
+  const editLum = Buffer.alloc(n);
+  const trustedO = Buffer.alloc(n); // original light on pixels where the edit is trusted, else 0
+  const trustedE = Buffer.alloc(n);
+  const trusted = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    const or = originalRgba[i * 4], og = originalRgba[i * 4 + 1], ob = originalRgba[i * 4 + 2], a = originalRgba[i * 4 + 3];
+    const r = editedRgb[i * 3], g = editedRgb[i * 3 + 1], b = editedRgb[i * 3 + 2];
+    // outside the cutout the editor saw white paper; treat it as unchanged
+    const flatR = a === 0 ? 255 : or, flatG = a === 0 ? 255 : og, flatB = a === 0 ? 255 : ob;
+    const o = lum(flatR, flatG, flatB);
+    const e = lum(r, g, b);
+    // The editor is trusted only where it changed the light, not the color: same hue and chroma,
+    // different brightness. White paper where the garment was, or a recolored/repainted print, is not.
+    const paper = Math.min(r, g, b) > 232 && Math.min(flatR, flatG, flatB) < 225;
+    const lo = o + 1, le = e + 1;
+    const recolored = Math.max(Math.abs(r / le - flatR / lo), Math.abs(g / le - flatG / lo), Math.abs(b / le - flatB / lo)) > 0.35;
+    const ok = a > 0 && !paper && !recolored;
+    trusted[i] = ok ? 1 : 0;
+    origLum[i] = Math.round(o);
+    editLum[i] = Math.round(ok ? e : o);
+    trustedO[i] = ok ? Math.round(o) : 0;
+    trustedE[i] = ok ? Math.round(e) : 0;
+  }
+  const blur = (buf: Buffer, sigma: number) => sharp(buf, { raw: { width, height, channels: 1 } }).blur(sigma).toColourspace("b-w").raw().toBuffer();
+  const sigma = Math.max(1.5, Math.min(width, height) / 80);
+  const wide = Math.max(4, Math.min(width, height) / 20); // reach across a print from the fabric around it
+  const [bo, be, wo, we] = await Promise.all([blur(origLum, sigma), blur(editLum, sigma), blur(trustedO, wide), blur(trustedE, wide)]);
   const out = Buffer.alloc(n * 4);
   for (let i = 0; i < n; i++) {
-    const a = originalRgba[i * 4 + 3];
-    let r = editedRgb[i * 3], g = editedRgb[i * 3 + 1], b = editedRgb[i * 3 + 2];
-    const or = originalRgba[i * 4], og = originalRgba[i * 4 + 1], ob = originalRgba[i * 4 + 2];
-    if (a > 0 && Math.min(r, g, b) > 232 && Math.min(or, og, ob) < 225) { r = or; g = og; b = ob; }
-    out[i * 4] = r; out[i * 4 + 1] = g; out[i * 4 + 2] = b; out[i * 4 + 3] = a;
+    // trusted pixel: its own local light; untrusted (print, paper): the light of the trusted fabric around it
+    const ratio = trusted[i] ? (be[i] + 2) / (bo[i] + 2) : wo[i] > 4 ? we[i] / wo[i] : 1;
+    const k = Math.min(2, Math.max(0.5, ratio));
+    out[i * 4] = Math.min(255, Math.round(originalRgba[i * 4] * k));
+    out[i * 4 + 1] = Math.min(255, Math.round(originalRgba[i * 4 + 1] * k));
+    out[i * 4 + 2] = Math.min(255, Math.round(originalRgba[i * 4 + 2] * k));
+    out[i * 4 + 3] = originalRgba[i * 4 + 3];
   }
   return out;
 }
