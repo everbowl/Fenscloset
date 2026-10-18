@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { forgetTaste } from "@/lib/outfits/taste";
 import { deleteObject, parseKey } from "@/lib/storage";
 import { bodyPhotosAllowed, canGrantBodyAccess, canSeeBodyData, type Viewer } from "@/lib/people/visibility";
 
@@ -144,6 +145,12 @@ export async function updateStyle(viewer: Viewer, ownerId: string, patch: { love
 export async function setNeverSuggest(viewer: Viewer, ownerId: string, itemId: string, never: boolean): Promise<void> {
   await assertCanEdit(viewer, ownerId);
   await db.item.updateMany({ where: { id: itemId, ownerId }, data: { neverSuggest: never } });
+}
+
+/** Taste memory lives with the style profile: the person (or a parent, for a minor) can forget lines. */
+export async function forgetTasteFor(viewer: Viewer, ownerId: string, itemId?: string): Promise<void> {
+  await assertCanEdit(viewer, ownerId);
+  await forgetTaste(ownerId, itemId);
 }
 
 // ---------- Favorites ----------

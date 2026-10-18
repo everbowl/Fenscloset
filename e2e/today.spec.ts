@@ -57,6 +57,12 @@ test("morning flow: Jeff gets three looks, checks in, sets the plan, swaps, wear
   await expect(page.getByTestId("visibility")).toContainText("Visible to Jeff only");
   await expect(page.getByTestId("day-with-fit")).toHaveCount(1);
 
+  // taste memory section exists on the Style page (one wear is not enough for a learned line yet)
+  await page.goto("/profile/style");
+  await expect(page.getByTestId("taste-memory")).toBeVisible();
+  await expect(page.getByTestId("taste-memory")).toContainText(/Nothing yet|Reaches for|Passed on/);
+  await page.goto("/fits");
+
   // share with Brittney
   await page.getByTestId("share").click();
   await page.getByRole("dialog").getByRole("option", { name: "Brittney" }).click();

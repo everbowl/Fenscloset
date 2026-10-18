@@ -9,6 +9,7 @@ import type { CheckInView } from "@/lib/checkins/service";
 import type { Viewer } from "@/lib/people/visibility";
 import type { Prisma } from "@/generated/prisma/client";
 import { fromDayKey } from "@/lib/dates";
+import { recordPassed, recordSwap, recordWorn } from "@/lib/outfits/taste";
 
 /**
  * Three looks for one person and one day, from their own closet. A text-only pass (tags, not photos; plan A1)
@@ -224,6 +225,7 @@ export async function moreLooks(personId: string, date: string, ctx: DayContext)
   const cand = await loadCandidates(personId, now);
   const shown = row.outfits as Board[];
   const inputs = inputsFrom(ctx, cand);
+  await recordPassed(personId, date, shown);
   const more = await composeLooks({ cands: cand.usable, inputs, style: await styleContext(personId), count: 3, excludeBoards: shown, now });
   if (!more.length) throw new OutfitError("No more combinations in the closet today. Add clothes or do laundry.");
   const updated = await db.outfitSuggestion.update({ where: { id: row.id }, data: { outfits: [...shown, ...more] as object[] } });
@@ -257,6 +259,7 @@ export async function swapPiece(personId: string, date: string, index: number, i
     const out = await structured<{ code: string; reason: string }>({ system: SYSTEM, prompt, schema: { type: "object", properties: { code: { type: "string" }, reason: { type: "string" } }, required: ["code", "reason"], additionalProperties: false }, effort: "low", maxTokens: 300 });
     replacement = codes.get(out.code.trim()) ?? sameCat[0]; reason = out.reason.trim();
   }
+  await recordSwap(personId, date, itemId, replacement.id, board.itemIds);
   const next = boards.map((b, i) => (i === index ? { itemIds: b.itemIds.map((id) => (id === itemId ? replacement.id : id)), reason } : b));
   const updated = await db.outfitSuggestion.update({ where: { id: row.id }, data: { outfits: next as object[] } });
   return view(updated);
@@ -280,8 +283,10 @@ export async function wearBoard(viewer: Viewer, personId: string, suggestionId: 
   await assertCanDress(viewer, personId);
   const row = await db.outfitSuggestion.findFirst({ where: { id: suggestionId, personId } });
   if (!row) throw new OutfitError("No looks yet today.");
-  const board = (row.outfits as Board[])[index];
+  const boards = row.outfits as Board[];
+  const board = boards[index];
   if (!board) throw new OutfitError("That look isn't here anymore.");
+  await recordPassed(personId, row.date, boards.filter((_, i) => i !== index));
   return wearItems(personId, row.date, board.itemIds, { title, outfitSuggestionId: row.id, now });
 }
 
@@ -290,6 +295,7 @@ export async function wearItems(personId: string, date: string, itemIds: string[
   const items = await db.item.findMany({ where: { id: { in: itemIds }, retiredAt: null }, select: { id: true } });
   if (!items.length) throw new OutfitError("Those pieces are gone from the closet.");
   const ids = items.map((i) => i.id);
+  await recordWorn(personId, date, ids);
   return db.$transaction(async (tx) => {
     const existing = opts.fitId ? await tx.fit.findUnique({ where: { id: opts.fitId } }) : await tx.fit.findFirst({ where: { personId, date }, orderBy: { createdAt: "asc" } });
     if (existing) {

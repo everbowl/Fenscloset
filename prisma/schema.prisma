@@ -64,6 +64,7 @@ model Person {
   approvalsGiven     MinorBodyImageApproval[] @relation("approvalParent")
   checkIns           CheckIn[]
   outfitSuggestions  OutfitSuggestion[]
+  lookFeedback       LookFeedback[]
   wearLogs           WearLog[]
   fits               Fit[]
   fitViews           FitViewer[]
@@ -632,6 +633,27 @@ model OutfitSuggestion {
   fits              Fit[]
 
   @@index([personId, date])
+}
+
+/// Taste memory: what a person actually chose when looks were offered. Feeds every later suggestion.
+enum LookFeedbackKind {
+  worn
+  passed
+  swapped_out
+  swapped_in
+}
+
+model LookFeedback {
+  id        String           @id @default(cuid())
+  personId  String
+  date      String
+  kind      LookFeedbackKind
+  itemIds   String[]         @default([])
+  itemId    String?
+  createdAt DateTime         @default(now())
+  person    Person           @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([personId, createdAt])
 }
 
 model WearLog {

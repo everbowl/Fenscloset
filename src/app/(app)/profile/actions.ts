@@ -7,6 +7,7 @@ import {
   addBodyPhoto, ProfileError, removeBodyPhoto, removeSize, setBodyPhotoPrivacy, setBodyViewers, setFitNotes, setMeasurement, setMinorBodyImageApproval,
   setNeverSuggest, setShoppers, updateFavorites, updateStyle, upsertSize,
 } from "@/lib/profiles/service";
+import { forgetTasteFor } from "@/lib/profiles/service";
 
 export type Result = { ok: true } | { ok: false; error: string };
 
@@ -48,6 +49,9 @@ export async function updateStyleAction(ownerId: string, patch: { lovedColorIds?
 }
 export async function setNeverSuggestAction(ownerId: string, itemId: string, never: boolean): Promise<Result> {
   const me = await requirePerson(); return run(() => setNeverSuggest(me, ownerId, itemId, never), ["/profile/style", `/closet/${itemId}`]);
+}
+export async function forgetTasteAction(ownerId: string, itemId?: string): Promise<Result> {
+  const me = await requirePerson(); return run(() => forgetTasteFor(me, ownerId, itemId), ["/profile/style"]);
 }
 export async function updateFavoritesAction(ownerId: string, patch: { brandIds?: string[]; storeIds?: string[] }): Promise<Result> {
   const me = await requirePerson(); return run(() => updateFavorites(me, ownerId, patch));
