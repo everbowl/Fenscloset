@@ -10,6 +10,7 @@ import {
 import { forgetTasteFor } from "@/lib/profiles/service";
 import { addInspiration, removeInspiration } from "@/lib/profiles/inspiration";
 import { deleteObject } from "@/lib/storage";
+import { setTryOnEnabled, TryOnError } from "@/lib/tryon";
 
 export type Result = { ok: true } | { ok: false; error: string };
 
@@ -19,7 +20,7 @@ async function run(fn: () => Promise<unknown>, paths: string[] = ["/profile", "/
     for (const p of paths) revalidatePath(p);
     return { ok: true };
   } catch (e) {
-    if (e instanceof ProfileError) return { ok: false, error: e.message };
+    if (e instanceof ProfileError || e instanceof TryOnError) return { ok: false, error: e.message };
     console.error(e);
     return { ok: false, error: "Something went wrong. Try again." };
   }
@@ -86,4 +87,8 @@ export async function setSavedZipAction(zip: string): Promise<Result> {
 }
 export async function setMinorBodyImageApprovalAction(minorId: string, approved: boolean): Promise<Result> {
   const me = await requirePerson(); return run(() => setMinorBodyImageApproval(me, minorId, approved), ["/profile/body", `/admin/people/${minorId}`]);
+}
+
+export async function setTryOnEnabledAction(enabled: boolean): Promise<Result> {
+  const me = await requirePerson(); return run(() => setTryOnEnabled(me, me.id, enabled), ["/profile/settings", "/today"]);
 }

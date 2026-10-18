@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { canShopFor } from "@/lib/people/visibility";
 import { getLookup, listRecent } from "@/lib/shop/engine";
 import { ShopScreen } from "./shop-screen";
+import { tryOnState } from "@/lib/tryon";
 
 export const metadata = { title: "Shop" };
 export const dynamic = "force-dynamic";
@@ -16,5 +17,6 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
   for (const p of people) if (await canShopFor(me, p.id)) allowed.push({ id: p.id, name: p.name.split(" ")[0] });
   const forPersonId = forParam && allowed.some((p) => p.id === forParam) ? forParam : me.id;
   const [recent, selected] = await Promise.all([listRecent(me, forPersonId), l ? getLookup(me, l) : Promise.resolve(null)]);
-  return <ShopScreen meId={me.id} people={allowed} forPersonId={forPersonId} selected={selected ?? recent[0] ?? null} recent={recent} />;
+  const tryOn = await tryOnState(me, forPersonId);
+  return <ShopScreen meId={me.id} people={allowed} forPersonId={forPersonId} selected={selected ?? recent[0] ?? null} recent={recent} tryOn={tryOn} />;
 }

@@ -12,14 +12,16 @@ import { TextSheet } from "@/components/items/row-editor";
 import { shrinkPhoto } from "@/lib/import/client-queue";
 import { cn } from "@/lib/cn";
 import type { LookupView } from "@/lib/shop/engine";
-import { deleteLookupAction, lookupLinkAction, lookupPhotoAction } from "./actions";
+import { deleteLookupAction, lookupLinkAction, lookupPhotoAction, tryOnLookupAction } from "./actions";
+import type { TryOnState, TryOnView } from "@/lib/tryon";
 
 const CALL_WORD = { FITS: "Fits · buy it", RISKY: "Risky · maybe", PASS: "Pass · skip it" } as const;
 
-export function ShopScreen({ meId, people, forPersonId, selected, recent }: { meId: string; people: { id: string; name: string }[]; forPersonId: string; selected: LookupView | null; recent: LookupView[] }) {
+export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn }: { meId: string; people: { id: string; name: string }[]; forPersonId: string; selected: LookupView | null; recent: LookupView[]; tryOn: TryOnState }) {
   const router = useRouter();
   const [, start] = useTransition();
-  const [busy, setBusy] = useState<"link" | "photo" | "delete" | null>(null);
+  const [busy, setBusy] = useState<"link" | "photo" | "delete" | "tryon" | null>(null);
+  const [onMe, setOnMe] = useState<TryOnView | null>(null);
   const [error, setError] = useState<string>();
   const [sheet, setSheet] = useState<"for" | "link" | null>(null);
   const [source, setSource] = useState<"screenshot" | "photo">("screenshot");
@@ -78,6 +80,13 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent }: { me
             {selected.verdict.sizeNote ? <p className="mono mt-1.5 text-graphite">{selected.verdict.sizeNote}</p> : null}
             {!selected.verdict.usedBodyData ? <p className="mono mt-1.5 text-graphite">Judged on style and closet only</p> : null}
           </div>
+          {selected.imageKey && (tryOn === "ready" || tryOn === "off" || tryOn === "no_photo") ? (
+            <div className="mt-3">
+              {tryOn === "ready" ? (
+                <Button variant="secondary" className="w-full" disabled={busy !== null} onClick={() => { setBusy("tryon"); setError(undefined); start(async () => { const r = await tryOnLookupAction(selected.id); setBusy(null); if (!r.ok) setError(r.error); else if (r.tryOn) setOnMe(r.tryOn); }); }} data-testid="see-it-on-me">{busy === "tryon" ? "Dressing you…" : "See it on me"}</Button>
+              ) : <Link href={tryOn === "off" ? "/profile/settings" : "/profile/body"} className="mono flex h-[46px] items-center justify-center border border-line text-graphite">{tryOn === "off" ? "See it on me · turn on in Settings" : "See it on me · add a body photo first"}</Link>}
+            </div>
+          ) : null}
           {selected.similar.length ? (
             <div className="mt-4">
               <p className="mono text-graphite">You already own similar</p>
@@ -156,6 +165,14 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent }: { me
         </section>
       ) : null}
 
+      <Sheet open={onMe !== null} onClose={() => setOnMe(null)} title="On you">
+        {onMe ? (
+          <div className="flex flex-col gap-3" data-testid="see-it-on-me-sheet">
+            <div className="h-[460px] overflow-hidden bg-bone"><img src={`/api/photo/${onMe.key}`} alt="You wearing this piece" className="size-full object-contain" /></div>
+            <p className="mono text-graphite">Only you can see this picture{onMe.cached ? " · saved from before" : ""}</p>
+          </div>
+        ) : null}
+      </Sheet>
       <Sheet open={sheet === "for"} onClose={() => setSheet(null)} title="Shopping for">
         <div className="flex flex-col" role="listbox">
           {people.map((p) => <Link key={p.id} href={`/shop?for=${p.id}`} role="option" aria-selected={p.id === forPersonId} onClick={() => setSheet(null)} className="flex h-12 items-center justify-between border-b border-line text-[15px]"><span>{p.id === meId ? `${p.name} (me)` : p.name}</span><span className={cn("mono", p.id === forPersonId ? "text-ink" : "text-transparent")}>✓</span></Link>)}

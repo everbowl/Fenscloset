@@ -30,6 +30,8 @@ model Person {
   birthdate          DateTime?
   avatarKey          String?
   savedZip           String?
+  /** Virtual try-on opt-in (adults only; never minors). Sends the person's body photo and garment images to the try-on provider. */
+  tryOnEnabled       Boolean      @default(false)
   passwordHash       String?
   mustChangePassword Boolean      @default(false)
   devPasswordActive  Boolean      @default(false)
@@ -66,6 +68,7 @@ model Person {
   outfitSuggestions  OutfitSuggestion[]
   lookFeedback       LookFeedback[]
   inspirationLooks   InspirationLook[]
+  tryOns             TryOn[]
   wearLogs           WearLog[]
   fits               Fit[]
   fitViews           FitViewer[]
@@ -651,6 +654,21 @@ model InspirationLook {
   notes     Json
   createdAt DateTime @default(now())
   person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([personId, createdAt])
+}
+
+/// A generated picture of the person wearing a look. Owner-only; adults only. Cached per person + pieces + body photo.
+model TryOn {
+  id           String   @id @default(cuid())
+  personId     String
+  /** `tryon/<personId>/…` */
+  bucketKey    String   @unique
+  itemIds      String[] @default([])
+  bodyPhotoKey String
+  source       String
+  createdAt    DateTime @default(now())
+  person       Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
 
   @@index([personId, createdAt])
 }

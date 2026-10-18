@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { requirePerson } from "@/lib/auth/current";
 import { deleteLookup, lookup, ShopError } from "@/lib/shop/engine";
-import { IMAGE_TYPES } from "@/lib/storage";
+import { getObject, IMAGE_TYPES } from "@/lib/storage";
+import { getLookup } from "@/lib/shop/engine";
+import { tryOnLook, TryOnError, type TryOnView } from "@/lib/tryon";
 
 export type Result = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -32,4 +34,20 @@ export async function lookupPhotoAction(forPersonId: string, form: FormData): Pr
 export async function deleteLookupAction(id: string): Promise<Result> {
   const me = await requirePerson();
   return run(() => deleteLookup(me, id));
+}
+
+/** SEE IT ON ME: the candidate piece (its store photo) on the shopper's own body photo, with the first pairing's other pieces. */
+export async function tryOnLookupAction(lookupId: string): Promise<Result & { tryOn?: TryOnView }> {
+  const me = await requirePerson();
+  try {
+    const v = await getLookup(me, lookupId);
+    if (!v) return { ok: false, error: "That lookup is gone." };
+    if (!v.imageKey) return { ok: false, error: "No picture of the piece to try on." };
+    const others = v.pairings[0]?.itemIds.filter((id) => id !== "candidate") ?? [];
+    const tryOn = await tryOnLook(me, v.forPersonId, others.slice(0, 2), `shop:${lookupId}`, (await getObject(v.imageKey)).body);
+    return { ok: true, tryOn };
+  } catch (e) {
+    if (e instanceof TryOnError || e instanceof ShopError) return { ok: false, error: e.message };
+    console.error(e); return { ok: false, error: "The try-on didn’t come back. Try again." };
+  }
 }

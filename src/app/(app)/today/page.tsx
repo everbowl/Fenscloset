@@ -6,6 +6,7 @@ import { canDress, getOrGenerate, getSuggestion, type Suggestion } from "@/lib/o
 import { loadCandidates } from "@/lib/outfits/catalog";
 import { countCleanOut } from "@/lib/outfits/cleanout";
 import { unratedRecentFit } from "@/lib/fits/service";
+import { tryOnState } from "@/lib/tryon";
 import { getScales } from "@/lib/checkins/service";
 import { listEntries } from "@/lib/lists/service";
 import { getConnection, isGoogleConfigured } from "@/lib/plans/google";
@@ -26,7 +27,7 @@ export default async function TodayPage() {
     loadTodayContext(me, personId), canDress(me, personId), loadCandidates(personId), getScales(), listEntries("occasion"), countCleanOut(personId),
     getConnection(personId),
   ]);
-  const unrated = dress ? await unratedRecentFit(personId, ctx.date) : null;
+  const [unrated, tryOn] = await Promise.all([dress ? unratedRecentFit(personId, ctx.date) : null, tryOnState(me, personId)]);
   const enough = cand.usable.length + cand.restingIds.length >= 2;
   let suggestion: Suggestion | null = null;
   try {
@@ -59,6 +60,7 @@ export default async function TodayPage() {
       enoughClothes={enough}
       cleanOutCount={cleanOut}
       unrated={unrated}
+      tryOn={tryOn}
     />
   );
 }

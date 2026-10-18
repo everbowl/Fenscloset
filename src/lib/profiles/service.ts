@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { forgetTaste } from "@/lib/outfits/taste";
+import { isTryOnConfigured } from "@/lib/tryon";
 import { deleteObject, parseKey } from "@/lib/storage";
 import { bodyPhotosAllowed, canGrantBodyAccess, canSeeBodyData, type Viewer } from "@/lib/people/visibility";
 
@@ -30,6 +31,8 @@ export type PrivacyView = {
   /** Fixed viewers (parents of a minor) that cannot be removed. */
   parentIds: string[];
   canGrant: boolean;
+  /** Virtual try-on (adults only): opted in, and whether the site has a provider. */
+  tryOn: { enabled: boolean; adult: boolean; configured: boolean; hasBodyPhoto: boolean };
 };
 
 /** Only the owner (or a parent of a minor owner) edits a profile. */
@@ -169,14 +172,16 @@ export async function updateFavorites(viewer: Viewer, ownerId: string, patch: { 
 // ---------- Privacy grants ----------
 
 export async function getPrivacy(ownerId: string): Promise<PrivacyView> {
-  const [p, body, shop, parents, canGrant] = await Promise.all([
-    db.person.findUniqueOrThrow({ where: { id: ownerId }, select: { savedZip: true } }),
+  const [p, body, shop, parents, canGrant, photo] = await Promise.all([
+    db.person.findUniqueOrThrow({ where: { id: ownerId }, select: { savedZip: true, role: true, tryOnEnabled: true } }),
     db.bodyDataGrant.findMany({ where: { ownerId }, select: { viewerId: true } }),
     db.shopForGrant.findMany({ where: { ownerId }, select: { shopperId: true } }),
     db.guardianLink.findMany({ where: { minorId: ownerId }, select: { parentId: true } }),
     canGrantBodyAccess(ownerId),
+    db.bodyPhoto.findFirst({ where: { personId: ownerId }, select: { id: true } }),
   ]);
-  return { savedZip: p.savedZip, bodyViewerIds: body.map((b) => b.viewerId), shopperIds: shop.map((s) => s.shopperId), parentIds: parents.map((g) => g.parentId), canGrant };
+  return { savedZip: p.savedZip, bodyViewerIds: body.map((b) => b.viewerId), shopperIds: shop.map((s) => s.shopperId), parentIds: parents.map((g) => g.parentId), canGrant,
+    tryOn: { enabled: p.tryOnEnabled, adult: p.role !== "minor", configured: isTryOnConfigured(), hasBodyPhoto: Boolean(photo) } };
 }
 
 /** Only the owner changes grants (a parent does not hand out a minor's data). Minors cannot grant at all. */

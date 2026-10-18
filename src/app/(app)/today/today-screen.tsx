@@ -13,7 +13,8 @@ import { PickSheet, TextSheet } from "@/components/items/row-editor";
 import { cn } from "@/lib/cn";
 import type { BoardView } from "@/lib/outfits/engine";
 import type { Scale } from "@/lib/checkins/service";
-import { checkInSelfieAction, checkInTapsAction, moreAction, rateAction, regenerateAction, setLocationAction, setPlanAction, setZipAction, swapAction, wearAction } from "./actions";
+import type { TryOnState, TryOnView } from "@/lib/tryon";
+import { checkInSelfieAction, checkInTapsAction, moreAction, rateAction, regenerateAction, setLocationAction, setPlanAction, setZipAction, swapAction, tryOnAction, wearAction } from "./actions";
 import { RatingRow } from "../fits/rating-row";
 import { monoDate } from "@/lib/dates";
 
@@ -28,6 +29,8 @@ type Props = {
   enoughClothes: boolean; cleanOutCount: number;
   /** The most recent fit (last 7 days) with no "how did it go?" answer yet. */
   unrated: { id: string; date: string; title: string } | null;
+  /** Whether TRY IT ON is offered: ready, or why not (off → Settings link; no_photo → Body page link). Hidden for minors and others' closets. */
+  tryOn: TryOnState;
 };
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -38,7 +41,8 @@ export function TodayScreen(p: Props) {
   const [, start] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string>();
-  const [sheet, setSheet] = useState<"checkin" | "plan" | "planText" | "swap" | "zip" | null>(null);
+  const [sheet, setSheet] = useState<"checkin" | "plan" | "planText" | "swap" | "zip" | "tryon" | null>(null);
+  const [tryOn, setTryOn] = useState<TryOnView | null>(null);
   const [index, setIndex] = useState(Math.max(0, p.suggestion?.wornIndex ?? 0));
   const scroller = useRef<HTMLDivElement>(null);
   const boards = p.suggestion?.boards ?? [];
@@ -140,6 +144,13 @@ export function TodayScreen(p: Props) {
                 <Button variant="secondary" disabled={busy !== null || worn} onClick={() => setSheet("swap")} data-testid="swap">Swap one piece</Button>
                 <Button variant="secondary" disabled={busy !== null} onClick={() => { const next = boards.length; run("more", () => moreAction(p.personId), () => setIndex(next)); }} data-testid="more-looks">{busy === "more" ? "Thinking…" : "More looks"}</Button>
               </div>
+              {p.tryOn === "ready" ? (
+                <Button variant="secondary" disabled={busy !== null} onClick={() => { setBusy("tryon"); setError(undefined); start(async () => { const r = await tryOnAction(p.personId, p.suggestion!.id, index); setBusy(null); if (!r.ok) setError(r.error); else if (r.tryOn) { setTryOn(r.tryOn); setSheet("tryon"); } }); }} data-testid="try-on">{busy === "tryon" ? "Dressing you…" : "Try it on"}</Button>
+              ) : p.tryOn === "off" ? (
+                <Link href="/profile/settings" className="mono flex h-[46px] items-center justify-center border border-line text-graphite" data-testid="try-on-off">Try it on · turn on in Settings</Link>
+              ) : p.tryOn === "no_photo" ? (
+                <Link href="/profile/body" className="mono flex h-[46px] items-center justify-center border border-line text-graphite" data-testid="try-on-photo">Try it on · add a body photo first</Link>
+              ) : null}
             </div>
           ) : null}
         </>
@@ -214,6 +225,17 @@ export function TodayScreen(p: Props) {
           ))}
         </div>
         {busy === "swap" ? <p className="mono mt-3 text-graphite">Thinking…</p> : null}
+      </Sheet>
+
+      {/* Try-on: the look on your own body photo. Yours alone. */}
+      <Sheet open={sheet === "tryon"} onClose={() => setSheet(null)} title="On you">
+        {tryOn ? (
+          <div className="flex flex-col gap-3" data-testid="try-on-sheet">
+            <div className="h-[460px] overflow-hidden bg-bone"><img src={`/api/photo/${tryOn.key}`} alt="You wearing this look" className="size-full object-contain" /></div>
+            <p className="mono text-graphite">{board?.pieces.map((x) => x.label).join(" · ")}</p>
+            <p className="mono text-graphite">Only you can see this picture{tryOn.cached ? " · saved from before" : ""}</p>
+          </div>
+        ) : null}
       </Sheet>
 
       <TextSheet open={sheet === "zip"} onClose={() => setSheet(null)} title="Weather for your zip" label="Zip code" value={p.savedZip ?? ""} placeholder="92101" onSave={(v) => run("zip", () => setZipAction(v))} />
