@@ -228,3 +228,4 @@ Built and tested (60 unit, 22 browser): body profile (editable measurement list,
 
 ## Phase 4 status (2026-10-18)
 - Built and tested (74 unit, 28 browser): Shop screen with shopping-for switcher (self, minors, grants), link lookups (store page title/image/price/brand via Open Graph and JSON-LD, mock in tests), screenshot and dressing-room photo lookups, Claude verdict FITS / RISKY / PASS with size note when body data is permitted, "you already own similar", three pairing boards with the new piece pinned first, "you might like" store search links from favorite stores (only on PASS or a missing category), recent list with remove. Screens pending Jeff approval; Jeff still to run the real-store test (3 links, 1 screenshot, 1 dressing-room photo).
+- Google Calendar connected and verified by Jeff (2026-10-18); OAuth client in Railway env; redirects built from APP_URL.
