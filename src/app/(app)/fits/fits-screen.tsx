@@ -70,15 +70,16 @@ export function FitsScreen(p: {
   const canSaveHere = p.canDress && p.selected <= p.today;
 
   return (
-    <div data-testid="fits">
-      <PageHeader title="Fits" aside={
+    <div data-testid="fits" className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-14">
+      <div className="lg:col-span-2"><PageHeader title="Fits" aside={
         <span className="flex items-center gap-0.5 text-ink">
           <Link href={`/fits?m=${monthKey(-1)}&d=${p.selected}`} aria-label="Previous month" className="flex size-9 items-center justify-center"><ChevronLeft className="size-3" strokeWidth={2} /></Link>
           <span data-testid="month-label">{monoMonth(p.year, p.month0)}</span>
           <Link href={`/fits?m=${monthKey(1)}&d=${p.selected}`} aria-label="Next month" className="flex size-9 items-center justify-center"><ChevronRight className="size-3" strokeWidth={2} /></Link>
         </span>
-      } />
-      {error ? <Banner tone="danger" title={error} className="mb-3" /> : null}
+      } /></div>
+      {error ? <Banner tone="danger" title={error} className="mb-3 lg:col-span-2" /> : null}
+      <div className="lg:col-start-1">
       <div className="mono grid grid-cols-7 border-b border-ink pb-2 text-graphite">{["S", "M", "T", "W", "T", "F", "S"].map((d, i) => <div key={i}>{d}</div>)}</div>
       <div className="grid grid-cols-7 gap-0.5 pt-1" data-testid="calendar">
         {cells.map((day, i) => {
@@ -88,7 +89,7 @@ export function FitsScreen(p: {
           const isToday = day === p.today, isSel = day === p.selected;
           return (
             <Link key={i} href={`/fits?m=${monthKey(0)}&d=${day}`} aria-label={day} aria-current={isSel ? "date" : undefined}
-              className={cn("relative h-[46px] overflow-hidden", fitsOn.length ? "bg-bone" : "bg-paper", isSel && "outline outline-2 -outline-offset-2 outline-ink")} data-testid={fitsOn.length ? "day-with-fit" : undefined}>
+              className={cn("relative h-[46px] overflow-hidden lg:h-[84px]", fitsOn.length ? "bg-bone" : "bg-paper", isSel && "outline outline-2 -outline-offset-2 outline-ink")} data-testid={fitsOn.length ? "day-with-fit" : undefined}>
               {img ? <img src={`/api/photo/${img}`} alt="" className="absolute inset-0 size-full object-cover" /> : null}
               <span className={cn("mono absolute left-1 top-[3px] px-[3px] py-px", isToday ? "bg-ink text-paper" : fitsOn.length ? "bg-paper text-ink" : "text-ink")}>{Number(day.slice(8))}</span>
             </Link>
@@ -96,7 +97,8 @@ export function FitsScreen(p: {
         })}
       </div>
 
-      <div className="mt-[18px] border-t border-ink pt-4">
+      </div>
+      <div className="mt-[18px] border-t border-ink pt-4 lg:col-start-2 lg:mt-0 lg:border-t-0 lg:pt-0">
         {selectedFits.length ? selectedFits.map((f) => (
           <section key={f.id} className="mb-8 flex flex-col gap-3" data-testid="fit-panel">
             <div className="flex items-end justify-between">

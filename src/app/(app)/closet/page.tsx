@@ -28,7 +28,7 @@ export default async function ClosetPage({ searchParams }: { searchParams: Promi
       <PageHeader title={view.kind === "family" ? "Family" : mine ? "Closet" : view.name} accent={view.kind === "family" ? "closet" : mine ? undefined : "closet"} aside={`${total} ${total === 1 ? "piece" : "pieces"}`} />
       <FilterTabs categories={categories} active={categoryId} basePath="/closet" q={q} canEdit={isAdmin(person)} />
       {items.length ? (
-        <div className="mt-4 grid grid-cols-2 gap-x-2.5 gap-y-[18px]">
+        <div className="mt-4 grid grid-cols-2 gap-x-2.5 gap-y-[18px] lg:grid-cols-4 lg:gap-x-4 lg:gap-y-7">
           {items.map((it) => <ItemCard key={it.id} item={it} showOwner={view.kind === "family"} />)}
         </div>
       ) : (

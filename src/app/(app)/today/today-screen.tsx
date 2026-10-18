@@ -88,9 +88,10 @@ export function TodayScreen(p: Props) {
   const title = p.evening ? "Tonight’s" : "Today’s";
 
   return (
-    <div data-testid="today">
+    <div data-testid="today" className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-14">
       {p.canDress ? <HeaderAction><button type="button" onClick={() => setSheet("checkin")} className="mono mono-11 px-2 py-3" data-testid="check-in">Check-in</button></HeaderAction> : null}
-      {error ? <Banner tone="danger" title={error} className="mb-3" /> : null}
+      {error ? <Banner tone="danger" title={error} className="mb-3 lg:col-start-2" /> : null}
+      <div className="lg:col-start-2">
       <PageHeader
         eyebrow={
           <div className="flex items-start justify-between gap-3">
@@ -101,9 +102,10 @@ export function TodayScreen(p: Props) {
         title={title} accent="look"
         aside={boards.length ? `${pad(index + 1)} / ${pad(boards.length)}` : "00 / 03"}
       />
+      </div>
 
       {p.weatherNote && p.canDress ? (
-        <div className="mb-4 flex items-center justify-between border-y border-ink py-2.5">
+        <div className="mb-4 flex items-center justify-between border-y border-ink py-2.5 lg:col-start-2">
           <span className="mono">{p.weatherNote === "failed" ? "Weather is unavailable right now" : "Where are you today?"}</span>
           <span className="flex gap-4">
             {p.weatherNote === "none" ? <button type="button" onClick={askLocation} disabled={busy === "location"} className="mono mono-11">{busy === "location" ? "Finding…" : "Use my location"}</button> : null}
@@ -114,17 +116,17 @@ export function TodayScreen(p: Props) {
 
       {boards.length ? (
         <>
-          <div ref={scroller} className="-mx-5 flex snap-x snap-mandatory overflow-x-auto scroll-smooth [scrollbar-width:none]" data-testid="boards">
+          <div ref={scroller} className="-mx-5 flex snap-x snap-mandatory overflow-x-auto scroll-smooth [scrollbar-width:none] lg:col-start-1 lg:row-start-1 lg:row-span-6 lg:mx-0" data-testid="boards">
             {boards.map((b, i) => <Board key={i} board={b} active={i === index} />)}
           </div>
           {board ? (
-            <div className="mt-3.5 flex flex-col gap-1">
+            <div className="mt-3.5 flex flex-col gap-1 lg:col-start-2 lg:mt-0">
               <p className="mono text-graphite" data-testid="piece-list">{board.pieces.map((x) => x.label).join(" · ")}</p>
               <p className="serif text-[21px] italic leading-[1.3]" data-testid="reason">{board.reason}</p>
             </div>
           ) : null}
           {p.canDress ? (
-            <div className="mt-4 flex flex-col gap-2">
+            <div className="mt-4 flex flex-col gap-2 lg:col-start-2">
               {worn ? (
                 <Link href="/fits" className="mono flex h-[54px] items-center justify-center bg-ink text-[12px] uppercase tracking-[0.16em] text-paper">Wearing this · see Fits</Link>
               ) : (
@@ -139,21 +141,21 @@ export function TodayScreen(p: Props) {
         </>
       ) : (
         <>
-          <div className="grid grid-cols-2 grid-rows-[196px_196px] gap-1.5">
+          <div className="grid grid-cols-2 grid-rows-[196px_196px] gap-1.5 lg:col-start-1 lg:row-start-1 lg:row-span-6 lg:grid-rows-[300px_300px]">
             <div className="row-span-2 bg-bone" /><div className="bg-bone" />
             <div className="grid grid-cols-2 gap-1.5"><div className="bg-bone" /><div className="bg-bone" /></div>
           </div>
-          <div className="mt-3.5 flex flex-col gap-1">
+          <div className="mt-3.5 flex flex-col gap-1 lg:col-start-2 lg:mt-0">
             <p className="mono text-graphite">No looks yet</p>
             <p className="serif text-[21px] italic leading-[1.3]">
               {p.enoughClothes ? (p.canDress ? "Something went wrong building today’s looks." : `${p.personName} hasn’t opened Today yet.`) : p.mine ? "Add clothes with the + button and your first three looks will appear here." : `${p.personName}’s closet needs a few more pieces first.`}
             </p>
           </div>
-          {p.enoughClothes && p.canDress ? <Button variant="secondary" className="mt-4 w-full" disabled={busy !== null} onClick={() => run("regen", () => regenerateAction(p.personId))}>{busy === "regen" ? "Thinking…" : "Try again"}</Button> : null}
+          {p.enoughClothes && p.canDress ? <Button variant="secondary" className="mt-4 w-full lg:col-start-2" disabled={busy !== null} onClick={() => run("regen", () => regenerateAction(p.personId))}>{busy === "regen" ? "Thinking…" : "Try again"}</Button> : null}
         </>
       )}
 
-      <Link href="/today/together" className="mt-[18px] flex items-center justify-between border-y border-ink py-3.5" data-testid="together-link">
+      <Link href="/today/together" className="mt-[18px] flex items-center justify-between border-y border-ink py-3.5 lg:col-start-2" data-testid="together-link">
         <span className="flex flex-col gap-0.5">
           <span className="serif text-[22px]">Going out <em>together?</em></span>
           <span className="mono text-graphite">Coordinate · Match · Contrast</span>
@@ -162,7 +164,7 @@ export function TodayScreen(p: Props) {
       </Link>
 
       {p.cleanOutCount > 0 && p.canDress ? (
-        <Link href="/closet/clean-out" className="mt-3 flex items-center justify-between border-b border-ink py-3.5" data-testid="clean-out-link">
+        <Link href="/closet/clean-out" className="mt-3 flex items-center justify-between border-b border-ink py-3.5 lg:col-start-2" data-testid="clean-out-link">
           <span className="flex flex-col gap-0.5">
             <span className="serif text-[22px]">Time for a <em>clean-out?</em></span>
             <span className="mono text-graphite">{p.cleanOutCount} {p.cleanOutCount === 1 ? "piece" : "pieces"} not worn in a while</span>
@@ -171,7 +173,7 @@ export function TodayScreen(p: Props) {
         </Link>
       ) : null}
 
-      {p.weather ? <p className="mono mt-5 text-graphite">Weather by Open-Meteo{p.weather.source === "mock" ? " · mock" : ""}</p> : null}
+      {p.weather ? <p className="mono mt-5 text-graphite lg:col-start-2">Weather by Open-Meteo{p.weather.source === "mock" ? " · mock" : ""}</p> : null}
 
       {/* Check-in: taps on each scale, or a selfie read by Claude. */}
       <CheckInSheet open={sheet === "checkin"} onClose={() => setSheet(null)} scales={p.scales} current={p.checkIn} busy={busy}
@@ -217,8 +219,8 @@ function Board({ board, active }: { board: BoardView; active: boolean }) {
     </div>
   );
   return (
-    <div className="w-full shrink-0 snap-center px-5" aria-hidden={!active} data-testid="board">
-      <div className="grid grid-cols-2 grid-rows-[196px_196px] gap-1.5">
+    <div className="w-full shrink-0 snap-center px-5 lg:px-0" aria-hidden={!active} data-testid="board">
+      <div className="grid grid-cols-2 grid-rows-[196px_196px] gap-1.5 lg:grid-rows-[300px_300px]">
         <Tile piece={hero} className="row-span-2" />
         <Tile piece={two} />
         <div className="grid grid-cols-2 gap-1.5"><Tile piece={three} /><Tile piece={four} /></div>

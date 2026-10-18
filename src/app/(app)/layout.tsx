@@ -18,12 +18,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const [views, view] = await Promise.all([viewableClosets(person), resolveView(person, cookieView)]);
   const current = view.kind === "family" ? "family" : view.personId;
   return (
-    <div className="min-h-dvh bg-paper">
+    <div className="flex min-h-dvh flex-col bg-paper">
       <ServiceWorkerRegistrar />
       <DevModeBanner />
       <AppHeader left={<PersonMenu views={views} current={current} isAdmin={isAdmin(person)} logout={logoutAction} setView={setViewAction} />} right={<HeaderActionSlot />} />
-      <main className="mx-auto w-full max-w-[480px] px-5 pb-28 pt-5">{children}</main>
+      {/* Desktop (Q17): the tab row sits under the header; on phones it is the pinned bottom bar. */}
       <AppNav />
+      <main className="mx-auto w-full max-w-[480px] px-5 pb-28 pt-5 lg:max-w-[1040px] lg:px-10 lg:pb-16 lg:pt-8">{children}</main>
     </div>
   );
 }

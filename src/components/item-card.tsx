@@ -7,7 +7,7 @@ export function ItemCard({ item, showOwner }: { item: ItemCardData; showOwner?: 
   const meta = [showOwner ? item.ownerName : null, item.categoryName, item.status].filter(Boolean).join(" · ");
   return (
     <Link href={`/closet/${item.id}`} className="flex flex-col gap-2" data-testid="item-card">
-      <div className="h-[214px] overflow-hidden bg-bone">
+      <div className="h-[214px] overflow-hidden bg-bone lg:h-[300px]">
         {item.thumbKey ? <img src={`/api/photo/${item.thumbKey}`} alt={item.name} className="size-full object-cover" loading="lazy" /> : null}
       </div>
       <div className="flex flex-col gap-[3px]">

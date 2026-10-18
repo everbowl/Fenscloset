@@ -50,7 +50,7 @@ export function TogetherScreen({ meId, people, canDressIds, occasions, isAdmin, 
       {error ? <Banner tone="danger" title={error} className="mb-3" /> : null}
 
       {editing ? (
-        <div className="space-y-6">
+        <div className="space-y-6 lg:max-w-[560px]">
           <section>
             <p className="mono border-b border-ink pb-2 text-graphite">Who</p>
             {people.map((p) => {
@@ -84,8 +84,8 @@ export function TogetherScreen({ meId, people, canDressIds, occasions, isAdmin, 
       ) : null}
 
       {session && !editing ? (
-        <div className="space-y-7" data-testid="together-boards">
-          <p className="mono text-graphite">{session.mode.toUpperCase()}{session.occasionLabel ? ` · ${session.occasionLabel.toUpperCase()}` : ""}</p>
+        <div className="space-y-7 lg:grid lg:grid-cols-3 lg:gap-x-8 lg:space-y-0" data-testid="together-boards">
+          <p className="mono text-graphite lg:col-span-3 lg:mb-4">{session.mode.toUpperCase()}{session.occasionLabel ? ` · ${session.occasionLabel.toUpperCase()}` : ""}</p>
           {session.boards.map((b) => (
             <section key={b.personId} data-testid={`together-board-${b.personName}`}>
               <p className="serif mb-2 text-[30px]">{b.personName}</p>
