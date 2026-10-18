@@ -71,6 +71,8 @@ model Person {
   togetherCreated    TogetherSession[]
   googleCalendar     GoogleCalendarConnection?
   dayPlans           DayPlan[]
+  shopLookups        ShoppingLookup[] @relation("shopper")
+  shopLookupsFor     ShoppingLookup[] @relation("shopTarget")
 }
 
 model Session {
@@ -717,4 +719,36 @@ model DayPlan {
   occasion   Occasion? @relation(fields: [occasionId], references: [id], onDelete: SetNull)
 
   @@id([personId, date])
+}
+
+// ---------- Shopping (Phase 4) ----------
+
+enum ShopSource {
+  link
+  screenshot
+  photo
+}
+
+/** One "should I buy this?" lookup: the candidate piece, who it is for, and what the app said. */
+model ShoppingLookup {
+  id              String     @id @default(cuid())
+  shopperId       String
+  forPersonId     String
+  source          ShopSource
+  inputUrl        String?
+  /** `shop/<shopperId>/…` — the screenshot / dressing-room photo, or the store image we fetched. */
+  imageKey        String?
+  title           String?
+  priceText       String?
+  brandText       String?
+  verdict         Json
+  similarItemIds  String[]   @default([])
+  pairings        Json
+  recommendations Json
+  createdAt       DateTime   @default(now())
+  shopper         Person     @relation("shopper", fields: [shopperId], references: [id], onDelete: Cascade)
+  forPerson       Person     @relation("shopTarget", fields: [forPersonId], references: [id], onDelete: Cascade)
+
+  @@index([shopperId, createdAt])
+  @@index([forPersonId, createdAt])
 }

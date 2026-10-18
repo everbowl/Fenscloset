@@ -23,6 +23,7 @@ export async function canViewKey(viewer: Viewer, key: string): Promise<boolean> 
   if (parsed.kind === "bodies") return canSeeBodyPhotoKey(viewer, parsed.ownerId, key);
   if (parsed.kind === "checkins") return isParentOfMinor(viewer.id, parsed.ownerId);
   if (parsed.kind === "fits") return canSeeFitPhotoKey(viewer, parsed.ownerId, key);
+  if (parsed.kind === "shop") return canSeeShopKey(viewer, parsed.ownerId, key);
   const owner = await db.person.findUnique({ where: { id: parsed.ownerId }, select: { id: true, role: true, status: true } });
   if (!owner || owner.status === "removed") return false;
   if (owner.role === "minor") {
@@ -61,4 +62,13 @@ export async function canSeeFitPhotoKey(viewer: Viewer, ownerId: string, key: st
   if (await isParentOfMinor(viewer.id, ownerId)) return true;
   const fit = await db.fit.findUnique({ where: { photoKey: key }, select: { viewers: { where: { personId: viewer.id }, select: { personId: true } } } });
   return Boolean(fit && fit.viewers.length);
+}
+
+/** A shopping photo is seen by the shopper who uploaded it, the person it was for, and a minor target's parents. */
+export async function canSeeShopKey(viewer: Viewer, shopperId: string, key: string): Promise<boolean> {
+  if (viewer.id === shopperId) return true;
+  const lookup = await db.shoppingLookup.findFirst({ where: { imageKey: key }, select: { forPersonId: true } });
+  if (!lookup) return false;
+  if (lookup.forPersonId === viewer.id) return true;
+  return isParentOfMinor(viewer.id, lookup.forPersonId);
 }
