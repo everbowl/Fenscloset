@@ -24,6 +24,6 @@ export default defineConfig({
     url: `http://localhost:${PORT}/api/health`,
     reuseExistingServer: false,
     timeout: 240_000,
-    env: { ...process.env, DATABASE_URL: "postgresql://postgres@localhost:5433/fenscloset_e2e", DEV_MODE: "true", SESSION_SECRET: "e2e", APP_URL: `http://localhost:${PORT}`, MOCK_S3: "true", MOCK_AI: "true", MOCK_WEATHER: "true", MOCK_GOOGLE: "true" },
+    env: { ...process.env, DATABASE_URL: "postgresql://postgres@localhost:5433/fenscloset_e2e", DEV_MODE: "true", SESSION_SECRET: "e2e", APP_URL: `http://localhost:${PORT}`, MOCK_S3: "true", MOCK_AI: "true", MOCK_WEATHER: "true", MOCK_GOOGLE: "true", MOCK_FETCH: "true" },
   },
 });
