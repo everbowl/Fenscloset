@@ -331,6 +331,10 @@ model Item {
   laundryStatus LaundryStatus @default(clean)
   neverSuggest  Boolean       @default(false)
   wearCount     Int           @default(0)
+  /// The photo of record is the store product shot, not the person own photo.
+  storePhoto    Boolean       @default(false)
+  /// wearCount when the person last answered a photo nudge (add one / not now).
+  photoNudgedAt Int?
   lastWornAt    DateTime?
   phash         String?
   aiConfidence  Json?
@@ -451,6 +455,8 @@ model ImportEntry {
   wornKey     String?
   backKey     String?
   smoothKey   String?
+  /// Set when the piece came from a store link or a receipt: name, brand, price, url, store, color, size, purchaseDate.
+  storeMeta   Json?
   phash       String?
   aiResult    Json?
   error       String?

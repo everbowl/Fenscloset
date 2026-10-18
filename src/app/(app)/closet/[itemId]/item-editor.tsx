@@ -12,7 +12,7 @@ import { shrinkPhoto } from "@/lib/import/client-queue";
 import type { ItemLists } from "@/lib/items/query";
 import type { ItemDetailEdits } from "@/lib/items/service";
 import type { LaundryStatus, PhotoKind } from "@/generated/prisma/client";
-import { addItemPhotoAction, cycleLaundryAction, deleteItemAction, removeItemPhotoAction, updateItemAction } from "./actions";
+import { addItemPhotoAction, cycleLaundryAction, deleteItemAction, notNowPhotoAction, removeItemPhotoAction, updateItemAction } from "./actions";
 import { unretireAction } from "../clean-out/actions";
 import { monoDate } from "@/lib/dates";
 
@@ -27,6 +27,8 @@ export type ItemView = {
   lastWornAt: string | null;
   wearHistory: { wornOn: string; title: string | null }[];
   retired: { reason: string; at: string } | null;
+  storePhoto: boolean;
+  photoNudge: "first" | "refresh" | null;
 };
 
 type SheetKind = "category" | "subcategory" | "color" | "pattern" | "fabric" | "season" | "formality" | "occasion" | "tag" | "brand" | "store" | "size" | "price" | "date" | "url" | "notes" | "closets" | "share" | "rename" | "photo" | "delete" | null;
@@ -97,7 +99,7 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
         <Link href="/closet" aria-label="Back to closet" className="absolute left-2 top-2 flex size-11 items-center justify-center bg-paper text-ink">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden><path d="M15 5l-7 7 7 7" /></svg>
         </Link>
-        {photo?.kind === "worn" || photo?.kind === "back" ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">{KIND_WORD[photo.kind]}</span> : null}
+        {photo?.kind === "worn" || photo?.kind === "back" ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">{KIND_WORD[photo.kind]}</span> : it.storePhoto && photo?.isPrimary ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">Store photo</span> : null}
       </div>
       {it.photos.length > 1 ? (
         <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 pt-1.5 [scrollbar-width:none] lg:mx-0 lg:px-0 lg:pt-0">
@@ -115,6 +117,15 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
       </div>
       <p className="mono mt-2 text-graphite">{[!it.mine ? it.ownerName : null, category?.name, it.status, it.isFavorite ? "Favorite" : null].filter(Boolean).join(" · ")}</p>
 
+      {canEdit && it.photoNudge && !it.retired ? (
+        <div className="mt-3 flex items-center justify-between border-y border-ink py-2.5" data-testid="photo-nudge">
+          <span className="mono tracking-[0.1em]">{it.photoNudge === "first" ? "Worn once · add a photo of your own?" : `Worn ${it.wearCount}× · time for a fresh photo?`}</span>
+          <div className="flex gap-3">
+            <button type="button" onClick={() => { setPhotoKind("alone"); photoRef.current?.click(); }} className="mono py-2 tracking-[0.1em]" data-testid="nudge-add">Add photo</button>
+            <button type="button" disabled={pending} onClick={() => start(async () => { const r = await notNowPhotoAction(it.id); if (!r.ok) setError(r.error); else { setIt((x) => ({ ...x, photoNudge: null })); router.refresh(); } })} className="mono py-2 tracking-[0.1em] text-graphite" data-testid="nudge-later">Not now</button>
+          </div>
+        </div>
+      ) : null}
       {it.retired ? (
         <div className="mt-3 flex items-center justify-between border-y border-ink py-2.5" data-testid="retired-strip">
           <span className="mono tracking-[0.1em]">Retired · {it.retired.reason === "sell" ? "to sell" : "to donate"}</span>

@@ -7,6 +7,7 @@ import { loadTagLists, tagItem, type TagResult } from "@/lib/ai/tag-item";
 import { readLabel } from "@/lib/ai/read-label";
 import { AiError } from "@/lib/ai/claude";
 import type { ImportEntry } from "@/generated/prisma/client";
+import type { StoreMeta } from "@/lib/store/add";
 
 /** What lands in ImportEntry.aiResult. */
 /** `edited` lists the tag fields the person changed on the card, so a later re-read never undoes them. */
@@ -59,7 +60,8 @@ export async function processEntry(entryId: string): Promise<ProcessOutcome> {
     const hash = await phash(source);
 
     const lists = await loadTagLists();
-    const tags = await tagItem({ image: await toAiImage(source), lists });
+    let tags = await tagItem({ image: await toAiImage(source), lists });
+    if (entry.storeMeta) tags = applyStoreMeta(tags, entry.storeMeta as StoreMeta, lists);
     const aiResult: EntryAiResult = { tags, warnings };
 
     await db.importEntry.update({
@@ -74,6 +76,23 @@ export async function processEntry(entryId: string): Promise<ProcessOutcome> {
     await db.importEntry.update({ where: { id: entryId }, data: { status: "failed", error: msg } });
     return { status: "failed", error: msg };
   }
+}
+
+/** A piece from a store link or receipt: the store's name, brand, size and color win over the guess. */
+export function applyStoreMeta(tags: TagResult, meta: StoreMeta, lists: { brands: { id: string; name: string }[]; colors: { id: string; name: string }[] }): TagResult {
+  const next = { ...tags };
+  if (meta.name) next.name = meta.name.slice(0, 80);
+  if (meta.brandText) {
+    next.brandText = meta.brandText;
+    next.brandId = lists.brands.find((b) => b.name.toLowerCase() === meta.brandText!.toLowerCase())?.id ?? tags.brandId;
+  }
+  if (meta.size) next.sizeText = meta.size;
+  if (meta.color) {
+    const words = meta.color.toLowerCase();
+    const hits = lists.colors.filter((c) => words.includes(c.name.toLowerCase())).map((c) => c.id);
+    if (hits.length) next.colorIds = hits;
+  }
+  return next;
 }
 
 /** Reads a label photo already uploaded for the entry and merges brand/size into its tags. */

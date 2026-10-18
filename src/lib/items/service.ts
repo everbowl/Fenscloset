@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { priceNumber, storeIdByName, type StoreMeta } from "@/lib/store/add";
 import { finishBatchIfDone } from "@/lib/import/service";
 import type { EntryAiResult } from "@/lib/import/process";
 import type { TagResult } from "@/lib/ai/tag-item";
@@ -73,6 +74,8 @@ export async function createItemFromEntry(personId: string, entryId: string, edi
   if (!tags.categoryId) throw new ItemError("Pick a category first.");
   const closetId = await personalClosetId(personId);
   const connect = (ids: string[]) => ({ connect: ids.map((id) => ({ id })) });
+  const meta = (entry.storeMeta as StoreMeta | null) ?? null;
+  const storeId = meta?.storeName ? await storeIdByName(meta.storeName) : null;
   const item = await db.$transaction(async (tx) => {
     const made = await tx.item.create({
       data: {
@@ -83,6 +86,7 @@ export async function createItemFromEntry(personId: string, entryId: string, edi
         brandId: tags.brandId,
         size: tags.sizeText,
         phash: entry.phash,
+        ...(meta ? { storeId, purchaseUrl: meta.url?.slice(0, 500) ?? null, purchasePrice: priceNumber(meta.priceText), purchaseDate: meta.purchaseDate ? new Date(`${meta.purchaseDate}T12:00:00Z`) : null, storePhoto: true } : {}),
         aiConfidence: JSON.parse(JSON.stringify({ confidence: tags.confidence, fabricConfidence: tags.fabricConfidence, warnings: ai.warnings })),
         colors: connect(tags.colorIds),
         patterns: connect(tags.patternId ? [tags.patternId] : []),
@@ -173,7 +177,7 @@ export type ItemDetailEdits = ItemEdits & {
 };
 
 async function ownedItem(viewer: { id: string; role: string }, itemId: string) {
-  const item = await db.item.findUnique({ where: { id: itemId }, select: { id: true, ownerId: true } });
+  const item = await db.item.findUnique({ where: { id: itemId }, select: { id: true, ownerId: true, storePhoto: true, wearCount: true, photoNudgedAt: true } });
   if (!item) throw new ItemError("That item is gone.", 404);
   if (item.ownerId !== viewer.id && viewer.role !== "admin") throw new ItemError("Only the owner or an admin can change this.", 403);
   return item;
@@ -244,7 +248,26 @@ export async function addItemPhoto(viewer: { id: string; role: string }, itemId:
   const parsed = parseKeyOwner(key);
   if (!parsed || parsed !== item.ownerId) throw new ItemError("That photo is not this item's owner's.", 403);
   const hasPrimary = (await db.itemPhoto.count({ where: { itemId, isPrimary: true } })) > 0;
-  await db.itemPhoto.create({ data: { itemId, kind, bucketKey: key, isPrimary: !hasPrimary && kind === "alone" } });
+  const replacesStorePhoto = kind === "alone" && item.storePhoto;
+  await db.$transaction(async (tx) => {
+    if (replacesStorePhoto) await tx.itemPhoto.updateMany({ where: { itemId }, data: { isPrimary: false } });
+    await tx.itemPhoto.create({ data: { itemId, kind, bucketKey: key, isPrimary: replacesStorePhoto || (!hasPrimary && kind === "alone") } });
+    if (kind === "alone") await tx.item.update({ where: { id: itemId }, data: { storePhoto: false, photoNudgedAt: item.wearCount } });
+  });
+}
+
+export type PhotoNudge = "first" | "refresh" | null;
+/** Jeff's rule: a store-photo piece asks for your own photo after one wear; every piece asks for a fresh one every 6 wears. Never required. */
+export function photoNudge(it: { storePhoto: boolean; wearCount: number; photoNudgedAt: number | null }): PhotoNudge {
+  if (it.storePhoto && it.wearCount >= 1 && it.photoNudgedAt === null) return "first";
+  if (it.wearCount >= 6 && it.wearCount - (it.photoNudgedAt ?? 0) >= 6) return "refresh";
+  return null;
+}
+
+/** NOT NOW on a photo nudge: ask again after another six wears. */
+export async function answerPhotoNudge(viewer: { id: string; role: string }, itemId: string): Promise<void> {
+  const item = await ownedItem(viewer, itemId);
+  await db.item.update({ where: { id: itemId }, data: { photoNudgedAt: item.wearCount } });
 }
 
 export async function removeItemPhoto(viewer: { id: string; role: string }, photoId: string): Promise<void> {

@@ -1,3 +1,4 @@
+import { photoNudge } from "@/lib/items/service";
 import { notFound } from "next/navigation";
 import { requirePerson } from "@/lib/auth/current";
 import { getItemDetail, loadItemLists, statusWord } from "@/lib/items/query";
@@ -37,6 +38,8 @@ export default async function ItemPage({ params }: { params: Promise<{ itemId: s
         lastWornAt: item.lastWornAt?.toISOString() ?? null,
         wearHistory: history.map((h) => ({ wornOn: h.wornOn, title: h.title })),
         retired: item.retiredAt ? { reason: item.retiredReason ?? "donate", at: item.retiredAt.toISOString() } : null,
+        storePhoto: item.storePhoto,
+        photoNudge: photoNudge(item),
       }}
       lists={lists}
       canEdit={canEditItem(person, item.ownerId)}

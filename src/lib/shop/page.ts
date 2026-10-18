@@ -2,7 +2,7 @@
  * Reads a store page for a link lookup (plan B1): title, description, image, price, brand from
  * Open Graph / meta / JSON-LD. Fetched server-side on Railway. MOCK_FETCH=true serves a canned page (tests, dev container).
  */
-export type ProductPage = { url: string; title: string | null; description: string | null; imageUrl: string | null; priceText: string | null; brandText: string | null };
+export type ProductPage = { url: string; title: string | null; description: string | null; imageUrl: string | null; priceText: string | null; brandText: string | null; siteName: string | null };
 
 export class PageError extends Error {
   constructor(message: string, public readonly code: "bad_url" | "blocked" | "unreachable") {
@@ -61,13 +61,13 @@ export function parseProductPage(url: string, html: string): ProductPage {
   const priceText = amount ? (currency && currency !== "USD" ? `${amount} ${currency}` : `$${amount.replace(/^\$/, "")}`) : null;
   let imageUrl = meta(html, ["og:image", "og:image:secure_url", "twitter:image"]) ?? ld.image ?? null;
   if (imageUrl && imageUrl.startsWith("/")) { try { imageUrl = new URL(imageUrl, url).toString(); } catch { imageUrl = null; } }
-  return { url, title, description: meta(html, ["og:description", "description"]), imageUrl, priceText, brandText: meta(html, ["product:brand", "og:brand", "brand"]) ?? ld.brand ?? null };
+  return { url, title, description: meta(html, ["og:description", "description"]), imageUrl, priceText, brandText: meta(html, ["product:brand", "og:brand", "brand"]) ?? ld.brand ?? null, siteName: meta(html, ["og:site_name"]) };
 }
 
 export const MOCK_PAGE = `<html><head><title>Linen Blazer | Mock Store</title>
 <meta property="og:title" content="Linen Blazer"><meta property="og:image" content="https://mock.example/blazer.jpg">
 <meta property="product:price:amount" content="128.00"><meta property="product:price:currency" content="USD"><meta property="product:brand" content="Everlane">
-<meta property="og:description" content="A breezy linen blazer in oatmeal."></head><body></body></html>`;
+<meta property="og:description" content="A breezy linen blazer in oatmeal."><meta property="og:site_name" content="Mock Store"></head><body></body></html>`;
 
 /** Fetch and parse a store page. */
 export async function readProductPage(input: string): Promise<ProductPage> {
