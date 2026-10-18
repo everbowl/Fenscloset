@@ -62,6 +62,14 @@ model Person {
   shopGrantsReceived ShopForGrant[]           @relation("shopGrantShopper")
   bodyImageApproval  MinorBodyImageApproval?  @relation("approvalMinor")
   approvalsGiven     MinorBodyImageApproval[] @relation("approvalParent")
+  checkIns           CheckIn[]
+  outfitSuggestions  OutfitSuggestion[]
+  wearLogs           WearLog[]
+  fits               Fit[]
+  fitViews           FitViewer[]
+  togetherPeople     TogetherPerson[]
+  togetherCreated    TogetherSession[]
+  googleCalendar     GoogleCalendarConnection?
 }
 
 model Session {
@@ -199,6 +207,8 @@ model Occasion {
   isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
   items      Item[]
+  fits       Fit[]
+  togetherSessions TogetherSession[]
 }
 
 model Tag {
@@ -259,6 +269,7 @@ model CheckInScale {
   isArchived Boolean         @default(false)
   createdAt  DateTime        @default(now())
   options    CheckInOption[]
+  answers    CheckInAnswer[]
 }
 
 model CheckInOption {
@@ -269,6 +280,7 @@ model CheckInOption {
   isArchived Boolean      @default(false)
   createdAt  DateTime     @default(now())
   scale      CheckInScale @relation(fields: [scaleId], references: [id], onDelete: Cascade)
+  answers    CheckInAnswer[]
 
   @@unique([scaleId, name])
 }
@@ -309,6 +321,11 @@ model Item {
   lastWornAt    DateTime?
   phash         String?
   aiConfidence  Json?
+  /** Retired from the closet by the clean-out (donated / sold); kept for history. */
+  retiredAt     DateTime?
+  retiredReason String?
+  /** KEEP on the clean-out screen hides the item from the list until this date. */
+  cleanOutSnoozedUntil DateTime?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -328,6 +345,8 @@ model Item {
   closets       ItemCloset[]
   shares        ItemShare[]
   importEntries ImportEntry[]
+  wearLogs      WearLog[]
+  fitItems      FitItem[]
 
   @@index([ownerId])
   @@index([ownerId, phash])
@@ -531,4 +550,156 @@ model MinorBodyImageApproval {
   approvedAt   DateTime @default(now())
   minor        Person   @relation("approvalMinor", fields: [minorId], references: [id], onDelete: Cascade)
   approvedBy   Person   @relation("approvalParent", fields: [approvedById], references: [id], onDelete: Cascade)
+}
+
+// ---------- Daily (Phase 3) ----------
+
+enum CheckInSource {
+  taps
+  selfie
+}
+
+/** One check-in per person per local day (YYYY-MM-DD). Answers reference the editable scales/options. */
+model CheckIn {
+  id        String        @id @default(cuid())
+  personId  String
+  date      String
+  source    CheckInSource @default(taps)
+  /** `checkins/<personId>/…` — seen by the owner (and a minor's parents) only. */
+  selfieKey String?       @unique
+  createdAt DateTime      @default(now())
+  person    Person        @relation(fields: [personId], references: [id], onDelete: Cascade)
+  answers   CheckInAnswer[]
+
+  @@unique([personId, date])
+}
+
+model CheckInAnswer {
+  checkInId String
+  scaleId   String
+  optionId  String
+  checkIn   CheckIn       @relation(fields: [checkInId], references: [id], onDelete: Cascade)
+  scale     CheckInScale  @relation(fields: [scaleId], references: [id], onDelete: Cascade)
+  option    CheckInOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@id([checkInId, scaleId])
+}
+
+enum TogetherMode {
+  coordinate
+  match
+  contrast
+}
+
+model TogetherSession {
+  id           String       @id @default(cuid())
+  mode         TogetherMode
+  occasionId   String?
+  occasionText String?
+  createdById  String
+  date         String
+  createdAt    DateTime     @default(now())
+  createdBy    Person       @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  occasion     Occasion?    @relation(fields: [occasionId], references: [id])
+  people       TogetherPerson[]
+  suggestions  OutfitSuggestion[]
+}
+
+model TogetherPerson {
+  sessionId String
+  personId  String
+  session   TogetherSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  person    Person          @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@id([sessionId, personId])
+}
+
+/** The looks shown to one person for one day: inputs (weather, plan, check-in) and the boards with reasons. */
+model OutfitSuggestion {
+  id                String           @id @default(cuid())
+  personId          String
+  date              String
+  inputs            Json
+  outfits           Json
+  togetherSessionId String?
+  createdAt         DateTime         @default(now())
+  person            Person           @relation(fields: [personId], references: [id], onDelete: Cascade)
+  togetherSession   TogetherSession? @relation(fields: [togetherSessionId], references: [id], onDelete: SetNull)
+  fits              Fit[]
+
+  @@index([personId, date])
+}
+
+model WearLog {
+  id        String   @id @default(cuid())
+  personId  String
+  itemId    String
+  wornOn    String
+  fitId     String?
+  createdAt DateTime @default(now())
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  fit       Fit?     @relation(fields: [fitId], references: [id], onDelete: SetNull)
+
+  @@index([personId, wornOn])
+  @@index([itemId, wornOn])
+}
+
+/** A worn look on the Fits calendar: pieces, optional photo of the night, who may see it. */
+model Fit {
+  id                 String   @id @default(cuid())
+  personId           String
+  date               String
+  title              String
+  occasionId         String?
+  /** `fits/<personId>/…` */
+  photoKey           String?  @unique
+  outfitSuggestionId String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  person             Person            @relation(fields: [personId], references: [id], onDelete: Cascade)
+  occasion           Occasion?         @relation(fields: [occasionId], references: [id])
+  outfitSuggestion   OutfitSuggestion? @relation(fields: [outfitSuggestionId], references: [id], onDelete: SetNull)
+  items              FitItem[]
+  viewers            FitViewer[]
+  wearLogs           WearLog[]
+
+  @@index([personId, date])
+}
+
+model FitItem {
+  fitId     String
+  itemId    String
+  sortOrder Int    @default(0)
+  fit       Fit    @relation(fields: [fitId], references: [id], onDelete: Cascade)
+  item      Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@id([fitId, itemId])
+}
+
+/** People tagged on a fit; they (plus the owner and a minor's parents) can see it. */
+model FitViewer {
+  fitId    String
+  personId String
+  fit      Fit    @relation(fields: [fitId], references: [id], onDelete: Cascade)
+  person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@id([fitId, personId])
+}
+
+model GoogleCalendarConnection {
+  personId     String   @id
+  email        String?
+  /** Encrypted with SESSION_SECRET; never shown. */
+  refreshToken String
+  calendarIds  String[] @default([])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  person       Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+}
+
+model WeatherCache {
+  key       String   @id
+  payload   Json
+  fetchedAt DateTime @default(now())
 }

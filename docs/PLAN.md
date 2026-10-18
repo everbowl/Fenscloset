@@ -220,3 +220,6 @@ Screens approved by Jeff (12-screen batch: Add, uploading, ready, Confirm, colou
 ## Phase 2 status (2026-10-18)
 
 Built and tested (60 unit, 22 browser): body profile (editable measurement list, sizes by brand, fit notes, full-body photos), style profile (loved/avoid colours, editable style words, never-suggest), favorite brands & stores, privacy grants (body data viewers, shop-for), minor body-photo approval (Mya by Jeff, seeded; parents toggle it on the People page), invite flow verified end-to-end (new person gets closet + empty profile; a minor's body data invisible to a sibling until the owner grants it; minors cannot grant). Undrawn screens built from spec parts; 10-screen batch approved by Jeff. Per-photo 'Only me' lock on body photos (Q16) and American spelling (Q15) shipped after approval.
+
+## Phase 3 status (2026-10-18)
+- Forgot-password email verified by Jeff (arrived). Phase 3 plan: `docs/superpowers/plans/2026-10-18-phase-3-daily-outfits.md`.
