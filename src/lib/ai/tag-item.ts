@@ -77,12 +77,12 @@ export function tagSchema(lists: TagLists): Record<string, unknown> {
       colors: { type: "array", items: { type: "string", enum: names(lists.colors) }, description: "Dominant color first, at most three." },
       pattern: { type: "string", enum: withUnknown(lists.patterns) },
       fabric: { type: "string", enum: withUnknown(lists.fabrics) },
-      fabricConfidence: { type: "number", minimum: 0, maximum: 1 },
+      fabricConfidence: { type: "number", description: "0 to 1." },
       seasons: { type: "array", items: { type: "string", enum: names(lists.seasons) } },
       formality: { type: "string", enum: withUnknown(lists.formalities) },
       brandText: { type: ["string", "null"], description: "Brand if a logo or label is readable, else null." },
       sizeText: { type: ["string", "null"], description: "Size if a label is readable (S, M, 28, 8…), else null." },
-      confidence: { type: "number", minimum: 0, maximum: 1, description: "Overall confidence that category and colors are right." },
+      confidence: { type: "number", description: "0 to 1: overall confidence that category and colors are right." },
     },
   };
 }
