@@ -285,6 +285,8 @@ model Item {
   isFavorite    Boolean       @default(false)
   laundryStatus LaundryStatus @default(clean)
   neverSuggest  Boolean       @default(false)
+  wearCount     Int           @default(0)
+  lastWornAt    DateTime?
   phash         String?
   aiConfidence  Json?
   createdAt     DateTime      @default(now())

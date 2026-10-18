@@ -11,7 +11,7 @@ import type { ItemEdits } from "@/lib/items/service";
 import type { DuplicateHint } from "@/lib/items/duplicates";
 import { shrinkPhoto } from "@/lib/import/client-queue";
 import { attachPhotoAction, confirmEntryAction, mergeEntryAction, saveEditsAction, skipEntryAction } from "./actions";
-import { PickSheet, Row, TextSheet } from "./row-editor";
+import { PickSheet, Row, TextSheet } from "@/components/items/row-editor";
 
 type Props = {
   batchId: string;
