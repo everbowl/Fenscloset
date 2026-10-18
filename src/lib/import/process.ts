@@ -1,0 +1,100 @@
+import { db } from "@/lib/db";
+import { getObject, newKey, NotFoundError, putObject } from "@/lib/storage";
+import { removeBackground, RemoveBgError } from "@/lib/images/remove-bg";
+import { makeThumb, normalizeOriginal, toAiImage } from "@/lib/images/thumb";
+import { phash } from "@/lib/images/phash";
+import { loadTagLists, tagItem, type TagResult } from "@/lib/ai/tag-item";
+import { readLabel } from "@/lib/ai/read-label";
+import { AiError } from "@/lib/ai/claude";
+import type { ImportEntry } from "@/generated/prisma/client";
+
+/** What lands in ImportEntry.aiResult. */
+export type EntryAiResult = { tags: TagResult; warnings: string[]; label?: { brand: string | null; size: string | null } };
+
+export type ProcessOutcome = { status: ImportEntry["status"]; error?: string };
+
+/**
+ * Runs one photo through: normalize → remove background → thumbnail → hash → Claude tags.
+ * A background-removal failure is a warning (the original stays usable); a tagging failure marks
+ * the entry `failed` with a retryable error. Re-running on a `failed` entry starts over.
+ */
+export async function processEntry(entryId: string): Promise<ProcessOutcome> {
+  const entry = await db.importEntry.findUnique({ where: { id: entryId }, include: { batch: true } });
+  if (!entry) return { status: "failed", error: "Entry not found" };
+  if (!["queued", "uploaded", "failed", "processing"].includes(entry.status)) return { status: entry.status };
+  await db.importEntry.update({ where: { id: entryId }, data: { status: "processing", error: null } });
+  const ownerId = entry.batch.personId;
+
+  let original: Buffer;
+  try {
+    original = (await getObject(entry.originalKey)).body;
+  } catch (e) {
+    const msg = e instanceof NotFoundError ? "The photo never finished uploading." : (e as Error).message;
+    await db.importEntry.update({ where: { id: entryId }, data: { status: "failed", error: msg } });
+    return { status: "failed", error: msg };
+  }
+
+  try {
+    const normalized = await normalizeOriginal(original);
+    const warnings: string[] = [];
+
+    let cutout: Buffer | null = null;
+    let cutoutKey: string | null = entry.cutoutKey;
+    try {
+      cutout = await removeBackground(normalized);
+      cutoutKey = newKey("cutouts", ownerId, "image/png");
+      await putObject(cutoutKey, cutout, "image/png");
+    } catch (e) {
+      if (e instanceof RemoveBgError) {
+        warnings.push(`bg_failed:${e.code}`);
+        cutoutKey = null;
+      } else throw e;
+    }
+
+    const source = cutout ?? normalized;
+    const thumb = await makeThumb(source);
+    const thumbKey = newKey("thumbs", ownerId, "image/jpeg");
+    await putObject(thumbKey, thumb, "image/jpeg");
+    const hash = await phash(source);
+
+    const lists = await loadTagLists();
+    const tags = await tagItem({ image: await toAiImage(source), lists });
+    const aiResult: EntryAiResult = { tags, warnings };
+
+    await db.importEntry.update({
+      where: { id: entryId },
+      data: { status: "needs_confirm", cutoutKey, thumbKey, phash: hash, aiResult: JSON.parse(JSON.stringify(aiResult)), error: null },
+    });
+    return { status: "needs_confirm" };
+  } catch (e) {
+    const msg = e instanceof AiError
+      ? (e.code === "no_key" ? "Tagging is not set up yet (missing ANTHROPIC_API_KEY)." : `Tagging failed: ${e.message}`)
+      : `Processing failed: ${(e as Error).message}`;
+    await db.importEntry.update({ where: { id: entryId }, data: { status: "failed", error: msg } });
+    return { status: "failed", error: msg };
+  }
+}
+
+/** Reads a label photo already uploaded for the entry and merges brand/size into its tags. */
+export async function readLabelForEntry(entryId: string, labelKey: string): Promise<EntryAiResult | null> {
+  const entry = await db.importEntry.findUnique({ where: { id: entryId } });
+  if (!entry) return null;
+  const { body } = await getObject(labelKey);
+  const label = await readLabel(await toAiImage(body));
+  const current = (entry.aiResult as EntryAiResult | null) ?? null;
+  const lists = await loadTagLists();
+  const brand = label.brand ? lists.brands.find((b) => b.name.toLowerCase() === label.brand!.toLowerCase()) ?? null : null;
+  const next: EntryAiResult = current
+    ? { ...current, label: { brand: label.brand, size: label.size }, tags: { ...current.tags, brandText: label.brand ?? current.tags.brandText, brandId: brand?.id ?? current.tags.brandId, sizeText: label.size ?? current.tags.sizeText } }
+    : { tags: emptyTags(label.brand, brand?.id ?? null, label.size), warnings: [], label: { brand: label.brand, size: label.size } };
+  await db.importEntry.update({ where: { id: entryId }, data: { labelKey, aiResult: JSON.parse(JSON.stringify(next)) } });
+  return next;
+}
+
+function emptyTags(brandText: string | null, brandId: string | null, sizeText: string | null): TagResult {
+  return {
+    name: "Untitled piece", categoryId: null, subcategoryId: null, colorIds: [], patternId: null, fabricId: null, fabricConfidence: 0,
+    seasonIds: [], formalityId: null, brandText, brandId, sizeText, confidence: 0,
+    raw: { name: "", category: "unknown", subcategory: null, colors: [], pattern: "unknown", fabric: "unknown", fabricConfidence: 0, seasons: [], formality: "unknown", brandText, sizeText, confidence: 0 },
+  };
+}
