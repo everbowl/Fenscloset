@@ -375,6 +375,7 @@ model ImportBatch {
   id        String        @id @default(cuid())
   personId  String
   status    BatchStatus   @default(open)
+  total     Int           @default(0)
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
   person    Person        @relation(fields: [personId], references: [id], onDelete: Cascade)
@@ -392,6 +393,7 @@ model ImportEntry {
   cutoutKey   String?
   thumbKey    String?
   labelKey    String?
+  wornKey     String?
   phash       String?
   aiResult    Json?
   error       String?

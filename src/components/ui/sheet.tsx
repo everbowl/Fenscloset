@@ -6,6 +6,8 @@ import { useEffect, useRef, type ReactNode } from "react";
 /** Bottom sheet on phones, centered on wide screens. Square, ruled, native <dialog>. */
 export function Sheet({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const openRef = useRef(open);
+  openRef.current = open;
 
   useEffect(() => {
     const el = ref.current;
@@ -17,7 +19,8 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
   return (
     <dialog
       ref={ref}
-      onClose={onClose}
+      // The native close event also fires when we close programmatically; only report user dismissals (Esc).
+      onClose={() => { if (openRef.current) onClose(); }}
       onClick={(e) => { if (e.target === ref.current) onClose(); }}
       className="sheet m-0 h-auto max-h-[90dvh] w-full max-w-none self-end justify-self-center bg-paper text-ink sm:max-w-[420px] sm:self-center sm:border sm:border-ink"
     >
