@@ -215,3 +215,8 @@ B) `admin`.
 ## Phase 1 status (2026-10-18)
 
 Screens approved by Jeff (12-screen batch: Add, uploading, ready, Confirm, colour picker, All done, Closet, Family closet, Item detail, row picker, person switcher). Built and tested (56 unit, 20 browser): bucket storage + photo proxy with privacy rules, remove.bg → thumb → hash → Claude tagging bounded to the lists, resumable add-clothes batches, confirm step (design 03) with duplicate merge, closet grid (design 02), item detail, person switcher with the Family closet. Live tagging waits on `ANTHROPIC_API_KEY` and `REMOVE_BG_API_KEY` in Railway. Deviation flagged for Jeff: uploads relay through the app (`PUT /api/uploads/put`) instead of a direct presigned PUT, because Railway bucket CORS is unverified; `S3_DIRECT_UPLOADS=true` switches to direct once CORS is set.
+
+
+## Phase 2 status (2026-10-18)
+
+Built and tested (60 unit, 22 browser): body profile (editable measurement list, sizes by brand, fit notes, full-body photos), style profile (loved/avoid colours, editable style words, never-suggest), favorite brands & stores, privacy grants (body data viewers, shop-for), minor body-photo approval (Mya by Jeff, seeded; parents toggle it on the People page), invite flow verified end-to-end (new person gets closet + empty profile; a minor's body data invisible to a sibling until the owner grants it; minors cannot grant). Undrawn screens built from spec parts; screenshot batch sent for approval.
