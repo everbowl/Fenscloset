@@ -23,7 +23,7 @@ export function Button({
     <button
       type={type}
       className={cn(
-        "inline-flex items-center justify-center gap-2 font-medium transition-colors select-none",
+        "inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors select-none",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-70",
         variants[variant], sizes[size], className,
       )}

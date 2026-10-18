@@ -15,7 +15,7 @@ export default async function PeoplePage() {
   const admins = people.filter((p) => p.role === "admin").map((p) => ({ id: p.id, name: p.name }));
   return (
     <div>
-      <PageHeader title="People" subtitle="Everyone with a closet. Admins can invite, change roles, and remove people." action={<InviteSheet admins={admins} smsReady={smsConfigured()} />} />
+      <PageHeader title="People" subtitle="Invite, set roles, or remove people." action={<InviteSheet admins={admins} smsReady={smsConfigured()} />} />
       <Card className="divide-y divide-border p-0">
         {people.map((p) => (
           <Link key={p.id} href={`/admin/people/${p.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-stone-50">
