@@ -14,7 +14,8 @@ import { shrinkPhoto } from "@/lib/import/client-queue";
 import { monoDate, monoMonth } from "@/lib/dates";
 import { cn } from "@/lib/cn";
 import type { FitDay, FitView } from "@/lib/fits/service";
-import { deleteFitAction, saveFitAction, setFitPhotoAction, setFitTitleAction, setFitViewersAction } from "./actions";
+import { deleteFitAction, rateFitAction, saveFitAction, setFitPhotoAction, setFitTitleAction, setFitViewersAction } from "./actions";
+import { RatingRow } from "./rating-row";
 
 type ClosetPiece = { id: string; name: string; thumbKey: string | null; categoryName: string | null };
 
@@ -122,6 +123,7 @@ export function FitsScreen(p: {
             </div>
             {f.pieces.length > 2 ? <p className="mono text-graphite">{f.pieces.map((x) => x.label).join(" · ")}</p> : null}
             <p className="mono text-graphite" data-testid="visibility">{f.visibility}</p>
+            {f.canEdit && f.date <= p.today ? <RatingRow rating={f.rating} disabled={busy !== null} onRate={(r) => run("rate", () => rateFitAction(f.id, r))} /> : null}
             {f.canEdit ? (
               <div className="grid grid-cols-2 gap-2">
                 <Button className="h-[50px]" disabled={busy !== null} onClick={() => { setPicked(f.pieces.map((x) => x.id)); setPickTitle(f.title); setSheet({ kind: "pick", fitId: f.id }); }} data-testid="save-the-fit">Change pieces</Button>

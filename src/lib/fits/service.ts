@@ -10,9 +10,12 @@ import type { ClosetView, Viewer } from "@/lib/people/visibility";
  */
 
 export type FitDay = { date: string; fitId: string; photoKey: string | null; thumbKey: string | null; ownerName: string };
+export type FitRating = "loved" | "fine" | "never_again";
 export type FitView = {
   id: string; date: string; title: string; ownerId: string; ownerName: string; photoKey: string | null;
   pieces: Piece[]; viewerIds: string[]; fixedViewerIds: string[]; visibility: string; canEdit: boolean;
+  /** "How did it go?" — null until the person answers. */
+  rating: FitRating | null;
 };
 
 async function parentIds(personId: string): Promise<string[]> {
@@ -47,7 +50,7 @@ async function toView(viewer: Viewer, f: NonNullable<Awaited<ReturnType<typeof f
   const order = [f.person.id, ...fixed, ...f.viewers.map((v) => v.personId)].filter((id, i, a) => a.indexOf(id) === i);
   const list = order.map((id) => names.find((n) => n.id === id)?.name.split(" ")[0]).filter(Boolean);
   return {
-    id: f.id, date: f.date, title: f.title, ownerId: f.person.id, ownerName: f.person.name.split(" ")[0], photoKey: f.photoKey,
+    id: f.id, date: f.date, title: f.title, ownerId: f.person.id, ownerName: f.person.name.split(" ")[0], photoKey: f.photoKey, rating: f.rating ?? null,
     pieces: f.items.map((fi) => ({ id: fi.item.id, name: fi.item.name ?? "Untitled piece", label: (fi.item.subcategory?.name ?? fi.item.category?.name ?? "piece").toUpperCase(), thumbKey: fi.item.photos[0]?.bucketKey ?? null, ownerId: fi.item.ownerId })),
     viewerIds: f.viewers.map((v) => v.personId).filter((id) => !fixed.includes(id)),
     fixedViewerIds: fixed,
@@ -76,6 +79,19 @@ async function assertOwnerish(viewer: Viewer, fitId: string) {
   if (!f) throw new OutfitError("That fit is gone.", 404);
   if (!(await canDress(viewer, f.personId))) throw new OutfitError("Only the person (or their parent) can change their fit.", 403);
   return f;
+}
+
+/** HOW DID IT GO? One of loved / fine / never_again; feeds taste memory. The person or a parent answers. */
+export async function rateFit(viewer: Viewer, fitId: string, rating: FitRating | null): Promise<void> {
+  await assertOwnerish(viewer, fitId);
+  await db.fit.update({ where: { id: fitId }, data: { rating } });
+}
+
+/** The most recent fit before `today` (within a week) that has no rating yet, for the Today strip. */
+export async function unratedRecentFit(personId: string, today: string): Promise<{ id: string; date: string; title: string } | null> {
+  const weekAgo = fromDayKey(today); weekAgo.setUTCDate(weekAgo.getUTCDate() - 7);
+  const fit = await db.fit.findFirst({ where: { personId, rating: null, date: { lt: today, gte: weekAgo.toISOString().slice(0, 10) } }, orderBy: { date: "desc" }, select: { id: true, date: true, title: true } });
+  return fit;
 }
 
 /** SAVE THE FIT for any day: the pieces picked from the closet become that day's fit and wear log. */

@@ -21,7 +21,7 @@ export async function canViewKey(viewer: Viewer, key: string): Promise<boolean> 
   if (viewer.status === "removed") return false;
   if (parsed.ownerId === viewer.id) return true;
   if (parsed.kind === "bodies") return canSeeBodyPhotoKey(viewer, parsed.ownerId, key);
-  if (parsed.kind === "checkins") return isParentOfMinor(viewer.id, parsed.ownerId);
+  if (parsed.kind === "checkins" || parsed.kind === "inspo") return isParentOfMinor(viewer.id, parsed.ownerId);
   if (parsed.kind === "fits") return canSeeFitPhotoKey(viewer, parsed.ownerId, key);
   if (parsed.kind === "shop") return canSeeShopKey(viewer, parsed.ownerId, key);
   const owner = await db.person.findUnique({ where: { id: parsed.ownerId }, select: { id: true, role: true, status: true } });

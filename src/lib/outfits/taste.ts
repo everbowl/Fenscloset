@@ -56,17 +56,26 @@ export async function tasteLines(personId: string, now = new Date()): Promise<Ta
     else if (r.kind === "swapped_out" && r.itemId) bump(swappedOut, r.itemId);
     else if (r.kind === "swapped_in" && r.itemId) bump(swappedIn, r.itemId);
   }
-  const ids = [...new Set([...worn.keys(), ...passed.keys(), ...swappedOut.keys(), ...swappedIn.keys()])];
+  // "How did it go?" answers on fits: loved and never-again looks are the strongest signal there is.
+  const rated = await db.fit.findMany({ where: { personId, rating: { in: ["loved", "never_again"] }, createdAt: { gte: since } }, orderBy: { date: "desc" }, select: { rating: true, items: { orderBy: { sortOrder: "asc" }, select: { itemId: true } } } });
+  const ids = [...new Set([...worn.keys(), ...passed.keys(), ...swappedOut.keys(), ...swappedIn.keys(), ...rated.flatMap((f) => f.items.map((i) => i.itemId))])];
   const items = await db.item.findMany({ where: { id: { in: ids }, retiredAt: null }, select: { id: true, name: true } });
   const name = (id: string) => items.find((i) => i.id === id)?.name ?? null;
   const lines: TasteLine[] = [];
+  for (const f of rated.slice(0, 6)) {
+    const names = f.items.map((i) => name(i.itemId)).filter((n): n is string => Boolean(n));
+    if (!names.length) continue;
+    const key = `${f.rating}:${f.items.map((i) => i.itemId).join(",")}`;
+    if (lines.some((l) => l.key === key)) continue;
+    lines.push({ key, itemIds: f.items.map((i) => i.itemId), text: f.rating === "loved" ? `Loved wearing ${names.join(" + ")}` : `Never again: ${names.join(" + ")}` });
+  }
   const top = (m: Map<string, number>, min: number) => [...m.entries()].filter(([k, n]) => n >= min && k.split(",").every((id) => name(id))).sort((a, b) => b[1] - a[1]);
   for (const [id, n] of top(worn, 2).slice(0, 4)) lines.push({ key: `worn:${id}`, itemIds: [id], text: `Reaches for ${name(id)} (worn ${n}× when offered)` });
   for (const [id, n] of top(swappedOut, 2).slice(0, 3)) lines.push({ key: `out:${id}`, itemIds: [id], text: `Tends to swap out ${name(id)} (${n}×)` });
   for (const [id, n] of top(swappedIn, 2).slice(0, 2)) lines.push({ key: `in:${id}`, itemIds: [id], text: `Often swaps in ${name(id)} (${n}×)` });
   for (const [id, n] of top(passed, 3).filter(([id]) => !worn.has(id)).slice(0, 3)) lines.push({ key: `passed:${id}`, itemIds: [id], text: `Passed on looks with ${name(id)} ${n} times, never wore it` });
   for (const [k, n] of top(pairs, 2).slice(0, 3)) { const [a, b] = k.split(","); if (name(a) && name(b)) lines.push({ key: `pair:${k}`, itemIds: [a, b], text: `Wears ${name(a)} with ${name(b)} (${n}×)` }); }
-  return lines.slice(0, MAX_LINES);
+  return lines.slice(0, MAX_LINES + 4);
 }
 
 /** Prompt block, or "" when nothing is learned yet. */
@@ -77,6 +86,11 @@ export async function tasteContext(personId: string, now = new Date()): Promise<
 
 /** Forget everything learned about one piece (or everything, with no itemId). */
 export async function forgetTaste(personId: string, itemId?: string): Promise<void> {
-  if (!itemId) { await db.lookFeedback.deleteMany({ where: { personId } }); return; }
+  if (!itemId) {
+    await db.lookFeedback.deleteMany({ where: { personId } });
+    await db.fit.updateMany({ where: { personId, rating: { not: null } }, data: { rating: null } });
+    return;
+  }
   await db.lookFeedback.deleteMany({ where: { personId, OR: [{ itemId }, { itemIds: { has: itemId } }] } });
+  await db.fit.updateMany({ where: { personId, rating: { not: null }, items: { some: { itemId } } }, data: { rating: null } });
 }

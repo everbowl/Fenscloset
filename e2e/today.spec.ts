@@ -57,10 +57,15 @@ test("morning flow: Jeff gets three looks, checks in, sets the plan, swaps, wear
   await expect(page.getByTestId("visibility")).toContainText("Visible to Jeff only");
   await expect(page.getByTestId("day-with-fit")).toHaveCount(1);
 
+  // how did it go? three taps on the fit panel; the chosen one goes solid
+  await page.getByTestId("rate-loved").click();
+  await expect(page.getByTestId("rate-loved")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("rating-row")).toContainText("It went");
+
   // taste memory section exists on the Style page (one wear is not enough for a learned line yet)
   await page.goto("/profile/style");
   await expect(page.getByTestId("taste-memory")).toBeVisible();
-  await expect(page.getByTestId("taste-memory")).toContainText(/Nothing yet|Reaches for|Passed on/);
+  await expect(page.getByTestId("taste-memory")).toContainText(/Nothing yet|Reaches for|Passed on|Loved wearing/);
   await page.goto("/fits");
 
   // share with Brittney

@@ -13,7 +13,9 @@ import { PickSheet, TextSheet } from "@/components/items/row-editor";
 import { cn } from "@/lib/cn";
 import type { BoardView } from "@/lib/outfits/engine";
 import type { Scale } from "@/lib/checkins/service";
-import { checkInSelfieAction, checkInTapsAction, moreAction, regenerateAction, setLocationAction, setPlanAction, setZipAction, swapAction, wearAction } from "./actions";
+import { checkInSelfieAction, checkInTapsAction, moreAction, rateAction, regenerateAction, setLocationAction, setPlanAction, setZipAction, swapAction, wearAction } from "./actions";
+import { RatingRow } from "../fits/rating-row";
+import { monoDate } from "@/lib/dates";
 
 type Props = {
   personId: string; personName: string; mine: boolean; canDress: boolean; isAdmin: boolean;
@@ -24,6 +26,8 @@ type Props = {
   occasions: { id: string; name: string }[];
   suggestion: { id: string; boards: BoardView[]; wornIndex: number | null } | null;
   enoughClothes: boolean; cleanOutCount: number;
+  /** The most recent fit (last 7 days) with no "how did it go?" answer yet. */
+  unrated: { id: string; date: string; title: string } | null;
 };
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -154,6 +158,13 @@ export function TodayScreen(p: Props) {
           {p.enoughClothes && p.canDress ? <Button variant="secondary" className="mt-4 w-full lg:col-start-2" disabled={busy !== null} onClick={() => run("regen", () => regenerateAction(p.personId))}>{busy === "regen" ? "Thinking…" : "Try again"}</Button> : null}
         </>
       )}
+
+      {p.unrated ? (
+        <div className="mt-[18px] border-t border-ink pt-3 lg:col-start-2" data-testid="yesterday-strip">
+          <p className="mono text-graphite">{monoDate(p.unrated.date)} · {p.unrated.title}</p>
+          <RatingRow compact rating={null} disabled={busy !== null} onRate={(r) => { if (r) run("rate", () => rateAction(p.unrated!.id, r)); }} />
+        </div>
+      ) : null}
 
       <Link href="/today/together" className="mt-[18px] flex items-center justify-between border-y border-ink py-3.5 lg:col-start-2" data-testid="together-link">
         <span className="flex flex-col gap-0.5">

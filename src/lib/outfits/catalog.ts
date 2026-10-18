@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { getRuleNumber, getTimezone } from "@/lib/rules";
 import { dayKey } from "@/lib/dates";
 import { tasteContext } from "@/lib/outfits/taste";
+import { inspirationContext } from "@/lib/profiles/inspiration";
 
 /** A wearable piece as the engine and the boards see it. */
 export type Candidate = {
@@ -87,6 +88,7 @@ export async function styleContext(personId: string): Promise<string> {
     p.avoidColors.length ? `Avoids colors: ${p.avoidColors.map((c) => c.name).join(", ")}` : null,
     p.styleWords.length ? `Style words: ${p.styleWords.map((w) => w.name).join(", ")}` : null,
     p.bodyProfile?.fitNotes ? `Fit notes: ${p.bodyProfile.fitNotes}` : null,
+    await inspirationContext(personId),
     await tasteContext(personId),
   ].filter(Boolean);
   return lines.join("\n");

@@ -93,3 +93,17 @@ test("Jeff fills his body profile and settings; parents edit Mya's; Olivia is in
   await expect(olivia.getByTestId("measure-waist")).toContainText("32 in");
   await ctx.close();
 });
+
+test("inspiration board: add a look, see what it read, remove it", async ({ page }) => {
+  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  await page.goto("/profile/style");
+  await expect(page.getByTestId("inspiration")).toBeVisible();
+  const buffer = Buffer.from(await (await import("sharp")).default({ create: { width: 240, height: 320, channels: 3, background: { r: 190, g: 170, b: 130 } } }).jpeg().toBuffer());
+  await page.getByTestId("inspiration-file").setInputFiles({ name: "look.jpg", mimeType: "image/jpeg", buffer });
+  await expect(page.getByTestId("inspiration-tile")).toHaveCount(1);
+  await expect(page.getByTestId("inspiration")).toContainText("1 saved");
+  await page.getByTestId("inspiration-tile").first().click();
+  await expect(page.getByTestId("inspiration-sheet")).toContainText("camel + black");
+  await page.getByTestId("remove-inspiration").click();
+  await expect(page.getByTestId("inspiration-tile")).toHaveCount(0);
+});

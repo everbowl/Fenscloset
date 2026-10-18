@@ -5,6 +5,7 @@ import { loadTodayContext } from "@/lib/today/context";
 import { canDress, getOrGenerate, getSuggestion, type Suggestion } from "@/lib/outfits/engine";
 import { loadCandidates } from "@/lib/outfits/catalog";
 import { countCleanOut } from "@/lib/outfits/cleanout";
+import { unratedRecentFit } from "@/lib/fits/service";
 import { getScales } from "@/lib/checkins/service";
 import { listEntries } from "@/lib/lists/service";
 import { getConnection, isGoogleConfigured } from "@/lib/plans/google";
@@ -25,6 +26,7 @@ export default async function TodayPage() {
     loadTodayContext(me, personId), canDress(me, personId), loadCandidates(personId), getScales(), listEntries("occasion"), countCleanOut(personId),
     getConnection(personId),
   ]);
+  const unrated = dress ? await unratedRecentFit(personId, ctx.date) : null;
   const enough = cand.usable.length + cand.restingIds.length >= 2;
   let suggestion: Suggestion | null = null;
   try {
@@ -56,6 +58,7 @@ export default async function TodayPage() {
       suggestion={suggestion ? { id: suggestion.id, boards: suggestion.boards, wornIndex: suggestion.wornIndex } : null}
       enoughClothes={enough}
       cleanOutCount={cleanOut}
+      unrated={unrated}
     />
   );
 }

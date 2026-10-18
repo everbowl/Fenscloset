@@ -8,6 +8,8 @@ import {
   setNeverSuggest, setShoppers, updateFavorites, updateStyle, upsertSize,
 } from "@/lib/profiles/service";
 import { forgetTasteFor } from "@/lib/profiles/service";
+import { addInspiration, removeInspiration } from "@/lib/profiles/inspiration";
+import { deleteObject } from "@/lib/storage";
 
 export type Result = { ok: true } | { ok: false; error: string };
 
@@ -49,6 +51,12 @@ export async function updateStyleAction(ownerId: string, patch: { lovedColorIds?
 }
 export async function setNeverSuggestAction(ownerId: string, itemId: string, never: boolean): Promise<Result> {
   const me = await requirePerson(); return run(() => setNeverSuggest(me, ownerId, itemId, never), ["/profile/style", `/closet/${itemId}`]);
+}
+export async function addInspirationAction(ownerId: string, key: string): Promise<Result> {
+  const me = await requirePerson(); return run(() => addInspiration(me, ownerId, key), ["/profile/style"]);
+}
+export async function removeInspirationAction(ownerId: string, id: string): Promise<Result> {
+  const me = await requirePerson(); return run(async () => { const key = await removeInspiration(me, ownerId, id); if (key) await deleteObject(key).catch(() => {}); }, ["/profile/style"]);
 }
 export async function forgetTasteAction(ownerId: string, itemId?: string): Promise<Result> {
   const me = await requirePerson(); return run(() => forgetTasteFor(me, ownerId, itemId), ["/profile/style"]);

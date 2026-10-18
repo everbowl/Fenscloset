@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { geocodeZip, WeatherError } from "@/lib/weather";
 import { loadTodayContext, LOCATION_COOKIE } from "@/lib/today/context";
 import { assertCanDress, generateSuggestion, moreLooks, OutfitError, swapPiece, wearBoard } from "@/lib/outfits/engine";
+import { rateFit, type FitRating } from "@/lib/fits/service";
 import { CheckInError, saveSelfie, saveTaps } from "@/lib/checkins/service";
 import { PlanError, setPlan } from "@/lib/plans";
 import { IMAGE_TYPES } from "@/lib/storage";
@@ -99,4 +100,10 @@ export async function checkInSelfieAction(personId: string, form: FormData): Pro
     const fresh = await loadTodayContext(me, personId);
     await generateSuggestion(personId, fresh.date, fresh);
   });
+}
+
+/** "How did it go?" from the Today strip. */
+export async function rateAction(fitId: string, rating: FitRating): Promise<Result> {
+  const me = await requirePerson();
+  return run(async () => { await rateFit(me, fitId, rating); });
 }

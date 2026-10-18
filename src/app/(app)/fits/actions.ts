@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePerson } from "@/lib/auth/current";
-import { deleteFit, saveFit, setFitPhoto, setFitTitle, setFitViewers } from "@/lib/fits/service";
+import { deleteFit, rateFit, saveFit, setFitPhoto, setFitTitle, setFitViewers, type FitRating } from "@/lib/fits/service";
 import { OutfitError } from "@/lib/outfits/engine";
 
 export type Result = { ok: true; id?: string } | { ok: false; error: string };
@@ -23,6 +23,9 @@ export async function setFitPhotoAction(fitId: string, key: string | null): Prom
 }
 export async function setFitViewersAction(fitId: string, personIds: string[]): Promise<Result> {
   const me = await requirePerson(); return run(() => setFitViewers(me, fitId, personIds));
+}
+export async function rateFitAction(fitId: string, rating: FitRating | null): Promise<Result> {
+  const me = await requirePerson(); return run(() => rateFit(me, fitId, rating));
 }
 export async function deleteFitAction(fitId: string): Promise<Result> {
   const me = await requirePerson(); return run(() => deleteFit(me, fitId));

@@ -65,6 +65,7 @@ model Person {
   checkIns           CheckIn[]
   outfitSuggestions  OutfitSuggestion[]
   lookFeedback       LookFeedback[]
+  inspirationLooks   InspirationLook[]
   wearLogs           WearLog[]
   fits               Fit[]
   fitViews           FitViewer[]
@@ -635,6 +636,25 @@ model OutfitSuggestion {
   @@index([personId, date])
 }
 
+enum FitRating {
+  loved
+  fine
+  never_again
+}
+
+/// Inspiration board: looks a person saved as "this is how I want to look". Claude reads each one into style DNA.
+model InspirationLook {
+  id        String   @id @default(cuid())
+  personId  String
+  /** `inspo/<personId>/…` */
+  bucketKey String   @unique
+  notes     Json
+  createdAt DateTime @default(now())
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([personId, createdAt])
+}
+
 /// Taste memory: what a person actually chose when looks were offered. Feeds every later suggestion.
 enum LookFeedbackKind {
   worn
@@ -681,6 +701,8 @@ model Fit {
   /** `fits/<personId>/…` */
   photoKey           String?  @unique
   outfitSuggestionId String?
+  /** "How did it go?" the day after: feeds taste memory. */
+  rating             FitRating?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   person             Person            @relation(fields: [personId], references: [id], onDelete: Cascade)
