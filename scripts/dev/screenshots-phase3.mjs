@@ -14,7 +14,8 @@ await page.getByLabel("Email").fill("jeff@everbowl.com"); await page.getByLabel(
 await page.getByRole("button", { name: "Sign in" }).click(); await page.waitForURL(/today/);
 await page.goto(base + "/today"); await page.getByTestId("today").waitFor(); await shot("20-today-no-zip");
 await page.getByTestId("enter-zip").click(); await page.getByRole("dialog").getByRole("textbox").fill("92101"); await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
-await page.getByText("68° NOW").waitFor(); await page.getByTestId("edit-plan").click(); await page.getByTestId("plan-Dinner out").click(); await page.getByText("DINNER OUT").waitFor();
+await page.getByTestId("context-line").filter({ hasText: "68° NOW" }).waitFor(); await page.getByTestId("board").first().waitFor();
+await page.getByTestId("edit-plan").click(); await page.getByRole("dialog").waitFor(); await page.getByTestId("plan-Dinner out").click(); await page.getByRole("dialog").waitFor({ state: "hidden" }); await page.getByTestId("context-line").filter({ hasText: "DINNER OUT" }).waitFor({ timeout: 15000 });
 await shot("21-today", true);
 await page.getByTestId("check-in").click(); await shot("22-check-in-sheet"); await page.getByRole("radio", { name: "Medium" }).click(); await page.getByRole("radio", { name: "Great" }).click(); await page.getByTestId("save-check-in").click(); await page.getByRole("dialog").waitFor({ state: "hidden" });
 await page.getByTestId("edit-plan").click(); await shot("23-plan-sheet"); await page.keyboard.press("Escape");
@@ -23,7 +24,7 @@ await page.getByTestId("wear-this").click(); await page.getByRole("link", { name
 await page.goto(base + "/today/together"); await page.getByTestId("together").waitFor(); await page.getByTestId("together-person-Brittney").click(); await page.getByTestId("together-person-Mya").click(); await page.getByTestId("mode-coordinate").click(); await shot("26-together-setup", true);
 await page.getByTestId("dress-us").click(); await page.getByTestId("together-boards").waitFor(); await shot("27-together-boards", true);
 await page.goto(base + "/fits"); await page.getByTestId("fits").waitFor(); await shot("28-fits-worn-today", true);
-await page.getByTestId("share").click(); await shot("29-fits-share-sheet"); await page.getByRole("dialog").getByRole("option", { name: "Brittney" }).click(); await page.getByRole("dialog").getByRole("button", { name: "Done" }).click(); await page.getByText("Brittney only").waitFor();
+await page.getByTestId("share").click(); await shot("29-fits-share-sheet"); await page.getByRole("dialog").getByRole("option", { name: "Brittney" }).click(); await page.getByRole("dialog").getByRole("button", { name: "Done" }).click(); await page.getByTestId("visibility").filter({ hasText: "Brittney only" }).waitFor();
 await page.getByTestId("save-the-fit").click(); await shot("30-fits-pick-pieces"); await page.keyboard.press("Escape");
 await page.goto(base + "/closet/clean-out"); await shot("31-clean-out", true);
 await page.goto(base + "/profile/settings"); await shot("32-settings-calendar", true);
