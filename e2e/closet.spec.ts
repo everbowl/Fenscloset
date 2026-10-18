@@ -45,8 +45,8 @@ test.describe("closet", () => {
     await expect(page.getByTestId("row-closets")).toContainText("Family");
     await page.getByRole("button", { name: /Jeff menu/ }).click();
     await page.getByRole("option", { name: "Family closet" }).click();
+    await expect(page.getByRole("button", { name: /Family menu/ })).toBeVisible(); // the cookie lands before we navigate
     await page.goto("/closet");
-    await expect(page.getByRole("button", { name: /Family menu/ })).toBeVisible();
     await expect(page.getByRole("heading", { name: /Family closet/ })).toBeVisible();
     await expect(page.getByTestId("item-card")).toHaveCount(1);
     await expect(page.getByTestId("item-card")).toContainText("Jeff");
@@ -54,6 +54,7 @@ test.describe("closet", () => {
     // browse Olivia's closet (Q13 A), then come back
     await page.getByRole("button", { name: /Family menu/ }).click();
     await page.getByRole("option", { name: "Olivia" }).click();
+    await expect(page.getByRole("button", { name: /Olivia menu/ })).toBeVisible();
     await page.goto("/closet");
     await expect(page.getByRole("heading", { name: /Olivia/ })).toBeVisible();
     await expect(page.getByText("0 pieces")).toBeVisible();
