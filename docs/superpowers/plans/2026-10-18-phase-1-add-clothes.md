@@ -22,7 +22,7 @@
 2. A remove.bg failure (quota, bad image) must leave the entry retryable with the original photo still usable as the item photo, never a stuck batch (Task 3 test).
 3. Claude returning a color/category that isn't in the lists must map to "unknown" and show the row for the user to pick, never crash or invent a list entry (Task 5 test).
 4. Duplicate detection must not flag two different black tees as the same unless the hash says so; "SAME?" merges photos into the existing item instead of creating a second one (Task 6 test).
-5. Viewing another person's closet (Q13 A) must hide items that person has not shared when they are not in the Family closet… wait: per spec, closets are browsable by family; only body data is private. Test: Olivia sees Mya's closet grid, but a minor's worn photos are shown only to the minor and parents (Task 8 test).
+5. Viewing another person's closet (Q13 A): closets are browsable by family; only body data is private. Test: Olivia sees Mya's closet grid, but a minor's worn photos are shown only to the minor and parents (Task 8 test).
 
 ---
 

@@ -45,6 +45,8 @@ model Person {
   wards          GuardianLink[]       @relation("parentWards")
   closets        Closet[]
   items          Item[]
+  sharedItems    ItemShare[]
+  importBatches  ImportBatch[]
 }
 
 model Session {
@@ -134,6 +136,7 @@ model Color {
   sortOrder  Int      @default(0)
   isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
+  items      Item[]
 }
 
 model Pattern {
@@ -142,6 +145,7 @@ model Pattern {
   sortOrder  Int      @default(0)
   isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
+  items      Item[]
 }
 
 model Fabric {
@@ -150,6 +154,7 @@ model Fabric {
   sortOrder  Int      @default(0)
   isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
+  items      Item[]
 }
 
 model Season {
@@ -158,6 +163,7 @@ model Season {
   sortOrder  Int      @default(0)
   isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
+  items      Item[]
 }
 
 model FormalityLevel {
@@ -166,6 +172,7 @@ model FormalityLevel {
   sortOrder  Int      @default(0)
   isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
+  items      Item[]
 }
 
 model Occasion {
@@ -174,6 +181,7 @@ model Occasion {
   sortOrder  Int      @default(0)
   isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
+  items      Item[]
 }
 
 model Tag {
@@ -182,6 +190,7 @@ model Tag {
   sortOrder  Int      @default(0)
   isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
+  items      Item[]
 }
 
 model Brand {
@@ -190,6 +199,7 @@ model Brand {
   sortOrder  Int      @default(0)
   isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
+  items      Item[]
 }
 
 model Store {
@@ -199,6 +209,7 @@ model Store {
   sortOrder  Int      @default(0)
   isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
+  items      Item[]
 }
 
 enum ClosetKind {
@@ -208,14 +219,14 @@ enum ClosetKind {
 }
 
 model Closet {
-  id         String     @id @default(cuid())
+  id         String       @id @default(cuid())
   name       String
-  kind       ClosetKind @default(custom)
+  kind       ClosetKind   @default(custom)
   ownerId    String?
-  sortOrder  Int        @default(0)
-  isArchived Boolean    @default(false)
-  createdAt  DateTime   @default(now())
-  owner      Person?    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  sortOrder  Int          @default(0)
+  isArchived Boolean      @default(false)
+  createdAt  DateTime     @default(now())
+  owner      Person?      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   items      ItemCloset[]
 
   @@index([ownerId])
@@ -250,21 +261,54 @@ model Rule {
   updatedAt   DateTime @updatedAt
 }
 
-// ---------- Items (Phase 0 stub; expanded in Phase 1) ----------
+// ---------- Items ----------
+
+enum LaundryStatus {
+  clean
+  dirty
+  cleaners
+}
 
 model Item {
-  id            String       @id @default(cuid())
+  id            String        @id @default(cuid())
   ownerId       String
   categoryId    String?
   subcategoryId String?
+  brandId       String?
+  storeId       String?
   name          String?
-  createdAt     DateTime     @default(now())
-  owner         Person       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  category      Category?    @relation(fields: [categoryId], references: [id])
-  subcategory   Subcategory? @relation(fields: [subcategoryId], references: [id])
+  size          String?
+  fitNotes      String?
+  purchasePrice Decimal?      @db.Decimal(10, 2)
+  purchaseDate  DateTime?
+  purchaseUrl   String?
+  isFavorite    Boolean       @default(false)
+  laundryStatus LaundryStatus @default(clean)
+  neverSuggest  Boolean       @default(false)
+  phash         String?
+  aiConfidence  Json?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  owner         Person           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  category      Category?        @relation(fields: [categoryId], references: [id])
+  subcategory   Subcategory?     @relation(fields: [subcategoryId], references: [id])
+  brand         Brand?           @relation(fields: [brandId], references: [id])
+  store         Store?           @relation(fields: [storeId], references: [id])
+  colors        Color[]
+  patterns      Pattern[]
+  fabrics       Fabric[]
+  seasons       Season[]
+  formalities   FormalityLevel[]
+  occasions     Occasion[]
+  tags          Tag[]
+  photos        ItemPhoto[]
   closets       ItemCloset[]
+  shares        ItemShare[]
+  importEntries ImportEntry[]
 
   @@index([ownerId])
+  @@index([ownerId, phash])
 }
 
 model ItemCloset {
@@ -274,4 +318,88 @@ model ItemCloset {
   closet   Closet @relation(fields: [closetId], references: [id], onDelete: Cascade)
 
   @@id([itemId, closetId])
+}
+
+enum PhotoKind {
+  alone
+  worn
+  label
+  cutout
+  thumb
+}
+
+model ItemPhoto {
+  id        String    @id @default(cuid())
+  itemId    String
+  kind      PhotoKind
+  bucketKey String
+  width     Int?
+  height    Int?
+  isPrimary Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  item      Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId])
+}
+
+/**
+ * Item shared with a specific person outside the Family closet.
+ */
+model ItemShare {
+  itemId   String
+  personId String
+  item     Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, personId])
+}
+
+// ---------- Import batches (add-clothes queue) ----------
+
+enum BatchStatus {
+  open
+  done
+}
+
+enum EntryStatus {
+  queued
+  uploaded
+  processing
+  needs_confirm
+  done
+  failed
+  skipped
+}
+
+model ImportBatch {
+  id        String        @id @default(cuid())
+  personId  String
+  status    BatchStatus   @default(open)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  person    Person        @relation(fields: [personId], references: [id], onDelete: Cascade)
+  entries   ImportEntry[]
+
+  @@index([personId, status])
+}
+
+model ImportEntry {
+  id          String      @id @default(cuid())
+  batchId     String
+  order       Int
+  originalKey String
+  status      EntryStatus @default(queued)
+  cutoutKey   String?
+  thumbKey    String?
+  labelKey    String?
+  phash       String?
+  aiResult    Json?
+  error       String?
+  itemId      String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  batch       ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  item        Item?       @relation(fields: [itemId], references: [id], onDelete: SetNull)
+
+  @@index([batchId, status])
 }

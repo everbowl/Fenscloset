@@ -93,6 +93,15 @@ export async function inUseCount(kind: ListKind, id: string): Promise<{ count: n
   switch (kind) {
     case "category": return { count: await db.item.count({ where: { categoryId: id } }), what: "items" };
     case "subcategory": return { count: await db.item.count({ where: { subcategoryId: id } }), what: "items" };
+    case "brand": return { count: await db.item.count({ where: { brandId: id } }), what: "items" };
+    case "store": return { count: await db.item.count({ where: { storeId: id } }), what: "items" };
+    case "color": return { count: await db.item.count({ where: { colors: { some: { id } } } }), what: "items" };
+    case "pattern": return { count: await db.item.count({ where: { patterns: { some: { id } } } }), what: "items" };
+    case "fabric": return { count: await db.item.count({ where: { fabrics: { some: { id } } } }), what: "items" };
+    case "season": return { count: await db.item.count({ where: { seasons: { some: { id } } } }), what: "items" };
+    case "formality": return { count: await db.item.count({ where: { formalities: { some: { id } } } }), what: "items" };
+    case "occasion": return { count: await db.item.count({ where: { occasions: { some: { id } } } }), what: "items" };
+    case "tag": return { count: await db.item.count({ where: { tags: { some: { id } } } }), what: "items" };
     case "closet": return { count: await db.itemCloset.count({ where: { closetId: id } }), what: "items" };
     case "checkInScale": return { count: await db.checkInOption.count({ where: { scaleId: id } }), what: "options" };
     default: return { count: 0, what: "items" };
