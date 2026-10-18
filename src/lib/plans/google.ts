@@ -69,9 +69,31 @@ export async function finishConnect(personId: string, code: string): Promise<voi
   await db.googleCalendarConnection.upsert({ where: { personId }, update: { refreshToken: encrypt(tok.refresh_token), email }, create: { personId, refreshToken: encrypt(tok.refresh_token), email } });
 }
 
-export async function getConnection(personId: string): Promise<{ email: string | null; connectedAt: Date } | null> {
+export async function getConnection(personId: string): Promise<{ email: string | null; connectedAt: Date; calendarIds: string[] } | null> {
   const c = await db.googleCalendarConnection.findUnique({ where: { personId } });
-  return c ? { email: c.email, connectedAt: c.createdAt } : null;
+  return c ? { email: c.email, connectedAt: c.createdAt, calendarIds: c.calendarIds } : null;
+}
+
+export type CalendarChoice = { id: string; name: string; primary: boolean };
+
+/** The person's Google calendars (for the Settings picker). Mock: Primary + Family. */
+export async function listCalendars(personId: string): Promise<CalendarChoice[]> {
+  const conn = await db.googleCalendarConnection.findUnique({ where: { personId } });
+  if (!conn) return [];
+  if (process.env.MOCK_GOOGLE === "true") return [{ id: "primary", name: "mock@example.com", primary: true }, { id: "family@group.calendar.google.com", name: "Family", primary: false }];
+  const token = await accessToken(conn.refreshToken);
+  const res = await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=reader&showHidden=false", { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10000) });
+  if (!res.ok) throw new Error(`Google Calendar: ${res.status}`);
+  const json = (await res.json()) as { items?: { id: string; summary?: string; summaryOverride?: string; primary?: boolean }[] };
+  return (json.items ?? []).map((c) => ({ id: c.primary ? "primary" : c.id, name: c.summaryOverride ?? c.summary ?? c.id, primary: Boolean(c.primary) }));
+}
+
+/** Q18 B: which calendars count. Empty = primary only. */
+export async function setCalendarIds(personId: string, calendarIds: string[]): Promise<void> {
+  const conn = await db.googleCalendarConnection.findUnique({ where: { personId } });
+  if (!conn) throw new Error("Connect Google Calendar first.");
+  await db.googleCalendarConnection.update({ where: { personId }, data: { calendarIds: [...new Set(calendarIds)].slice(0, 20) } });
+  await db.weatherCache.deleteMany({ where: { key: { startsWith: `gcal:${personId}:` } } });
 }
 
 export async function disconnect(personId: string): Promise<void> {
@@ -110,19 +132,23 @@ export async function nextEventToday(personId: string, tz: string, now = new Dat
     return next ?? null;
   }
   const token = await accessToken(conn.refreshToken);
-  const endOfDay = new Date(now); endOfDay.setHours(23, 59, 59, 999);
   const q = new URLSearchParams({ timeMin: now.toISOString(), timeMax: new Date(now.getTime() + 36 * 3600 * 1000).toISOString(), singleEvents: "true", orderBy: "startTime", maxResults: "10", timeZone: tz });
-  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${q}`, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10000) });
-  if (!res.ok) throw new Error(`Google Calendar: ${res.status}`);
-  const json = (await res.json()) as { items?: GEvent[] };
-  const events = (json.items ?? [])
+  const calendarIds = conn.calendarIds.length ? conn.calendarIds : ["primary"];
+  const items: GEvent[] = [];
+  for (const id of calendarIds) {
+    const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(id)}/events?${q}`, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10000) });
+    if (!res.ok) throw new Error(`Google Calendar: ${res.status}`);
+    items.push(...(((await res.json()) as { items?: GEvent[] }).items ?? []));
+  }
+  const events = items
     .filter((e) => e.status !== "cancelled" && !(e.attendees ?? []).some((a) => a.self && a.responseStatus === "declined"))
     .map((e) => {
       const allDay = Boolean(e.start?.date && !e.start?.dateTime);
       const start = e.start?.dateTime ? new Date(e.start.dateTime) : new Date(`${e.start?.date}T00:00:00`);
       return { summary: e.summary ?? "Busy", start, allDay };
     })
-    .filter((e) => dayKey(e.start, tz) === day || (e.allDay && e.start.toISOString().slice(0, 10) === day));
+    .filter((e) => dayKey(e.start, tz) === day || (e.allDay && e.start.toISOString().slice(0, 10) === day))
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
   await db.weatherCache.upsert({ where: { key: cacheKey }, update: { payload: events.map((e) => ({ ...e, start: e.start.toISOString() })), fetchedAt: new Date() }, create: { key: cacheKey, payload: events.map((e) => ({ ...e, start: e.start.toISOString() })) } });
   return events.find((e) => e.allDay || e.start >= now) ?? null;
 }

@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
 import { seed } from "../../prisma/seed";
 import { getPlan, planLine, setPlan } from "@/lib/plans";
-import { connectUrl, disconnect, finishConnect, getConnection, isGoogleConfigured, personFromState } from "@/lib/plans/google";
+import { connectUrl, disconnect, finishConnect, getConnection, isGoogleConfigured, listCalendars, personFromState, setCalendarIds } from "@/lib/plans/google";
 import { decrypt, encrypt, sign, verify } from "@/lib/crypto";
 
 describe("plans & Google Calendar", () => {
@@ -29,6 +29,10 @@ describe("plans & Google Calendar", () => {
     expect(personFromState("forged.sig")).toBeNull();
     await finishConnect(jeff.id, "code");
     expect((await getConnection(jeff.id))?.email).toBe("mock@example.com");
+    expect((await listCalendars(jeff.id)).map((c) => c.name)).toEqual(["mock@example.com", "Family"]);
+    await setCalendarIds(jeff.id, ["primary", "family@group.calendar.google.com"]);
+    expect((await getConnection(jeff.id))?.calendarIds).toHaveLength(2);
+    expect(await listCalendars(olivia.id)).toEqual([]);
     const cal = await getPlan(jeff.id, "2026-10-18", tz, new Date("2026-10-18T12:00:00"));
     expect(cal).toMatchObject({ source: "calendar", label: "Dinner" });
     expect(planLine(cal, tz)).toMatch(/^DINNER \d{1,2}:\d{2} [AP]M$/);

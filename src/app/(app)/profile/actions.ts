@@ -62,6 +62,10 @@ export async function disconnectCalendarAction(): Promise<Result> {
   const me = await requirePerson();
   return run(async () => { const { disconnect } = await import("@/lib/plans/google"); await disconnect(me.id); });
 }
+export async function setCalendarIdsAction(ids: string[]): Promise<Result> {
+  const me = await requirePerson();
+  return run(async () => { const { setCalendarIds } = await import("@/lib/plans/google"); await setCalendarIds(me.id, ids); });
+}
 export async function setSavedZipAction(zip: string): Promise<Result> {
   const me = await requirePerson();
   const z = zip.trim();
