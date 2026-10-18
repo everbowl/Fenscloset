@@ -30,11 +30,14 @@ test("morning flow: Jeff gets three looks, checks in, sets the plan, swaps, wear
   await page.getByRole("radio", { name: "Great" }).click();
   await page.getByTestId("save-check-in").click();
   await expect(page.getByRole("dialog")).toBeHidden();
+  await expect(page.getByTestId("refreshing")).toBeHidden({ timeout: 20_000 });
+  await expect(page.getByTestId("why")).toContainText("Weather");
 
   // plan from the editable occasion list
   await page.getByTestId("edit-plan").click();
   await page.getByTestId("plan-Dinner out").click();
   await expect(page.getByTestId("context-line")).toContainText("DINNER OUT");
+  await expect(page.getByTestId("refreshing")).toBeHidden({ timeout: 20_000 });
 
   // swap one piece on the first look
   await page.getByTestId("swap").click();
@@ -42,6 +45,15 @@ test("morning flow: Jeff gets three looks, checks in, sets the plan, swaps, wear
   await firstPiece.click();
   await expect(page.getByRole("dialog")).toBeHidden();
   await expect(page.getByTestId("reason")).toContainText("Mock swap");
+
+  // take a piece off the look: no empty boxes, the board reshapes to what is left
+  const piecesBefore = (await page.getByTestId("piece-list").first().innerText()).split("·").length;
+  await page.getByTestId("swap").click();
+  await page.getByRole("dialog").locator("[data-testid^=remove-]").first().click();
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await expect(page.getByTestId("reason")).toContainText("Mock: without");
+  expect((await page.getByTestId("piece-list").first().innerText()).split("·").length).toBe(piecesBefore - 1);
+  await expect(page.getByTestId("board").first()).toHaveAttribute("data-pieces", String(piecesBefore - 1));
 
   // more looks → 6
   await page.getByTestId("more-looks").click();

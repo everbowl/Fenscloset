@@ -4,7 +4,7 @@ import { resetDb } from "../helpers";
 import { seed } from "../../prisma/seed";
 import { personalClosetId } from "@/lib/items/service";
 import { loadCandidates } from "@/lib/outfits/catalog";
-import { generateSuggestion, getOrGenerate, moreLooks, swapPiece, wearBoard, type DayContext } from "@/lib/outfits/engine";
+import { generateSuggestion, getOrGenerate, moreLooks, removePiece, swapPiece, wearBoard, type DayContext } from "@/lib/outfits/engine";
 import { cleanOutDecision, listCleanOut } from "@/lib/outfits/cleanout";
 import { createTogether, togetherPeople } from "@/lib/outfits/together";
 
@@ -66,6 +66,26 @@ describe("outfit engine", () => {
     expect((await loadCandidates(jeff.id)).usable.map((c) => c.id)).toContain(tee.id);
     const more = await moreLooks(jeff.id, DAY, ctx);
     expect(more.boards).toHaveLength(6);
+  });
+
+  it("REMOVE takes a piece off a look (never below two), rewrites the reason, and keeps the why bullets", async () => {
+    const jeff = await by("Jeff");
+    await addItem(jeff.id, "White tee", "Tops"); await addItem(jeff.id, "Dark jeans", "Bottoms"); await addItem(jeff.id, "Sneakers", "Shoes"); await addItem(jeff.id, "Linen blazer", "Outerwear");
+    const s = await generateSuggestion(jeff.id, DAY, ctx);
+    expect(s.boards[0].why?.weather.length).toBeGreaterThan(0);
+    const before = s.boards[0].itemIds;
+    expect(before.length).toBeGreaterThanOrEqual(3);
+    const after = await removePiece(jeff.id, DAY, 0, before[0], ctx);
+    expect(after.boards[0].itemIds).toEqual(before.slice(1));
+    expect(after.boards[0].reason).toContain("Mock: without");
+    expect(after.boards[0].why).toBeTruthy();
+    expect(after.boards[1].itemIds).toEqual(s.boards[1].itemIds);
+    await expect(removePiece(jeff.id, DAY, 0, "nope", ctx)).rejects.toMatchObject({ status: 400 });
+    let ids = after.boards[0].itemIds;
+    while (ids.length > 2) ids = (await removePiece(jeff.id, DAY, 0, ids[0], ctx)).boards[0].itemIds;
+    await expect(removePiece(jeff.id, DAY, 0, ids[0], ctx)).rejects.toThrow(/at least two/);
+    const fb = await db.lookFeedback.findMany({ where: { personId: jeff.id, kind: "swapped_out" } });
+    expect(fb.length).toBeGreaterThanOrEqual(1);
   });
 
   it("falls back to resting pieces when the closet is small, and says so", async () => {

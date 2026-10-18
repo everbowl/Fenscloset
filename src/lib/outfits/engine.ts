@@ -26,7 +26,9 @@ export class OutfitError extends Error {
 }
 
 export type Piece = { id: string; name: string; label: string; thumbKey: string | null; ownerId: string };
-export type Board = { itemIds: string[]; reason: string };
+/** Why a look works, in plain lines the Today screen lists under the one-sentence reason. */
+export type Why = { weather: string[]; dressCode: string; color: string; taste: string };
+export type Board = { itemIds: string[]; reason: string; why?: Why };
 export type BoardView = Board & { pieces: Piece[]; index: number; wornFitId: string | null };
 
 export type Inputs = {
@@ -42,14 +44,37 @@ export type Suggestion = { id: string; date: string; inputs: Inputs; boards: Boa
 const SYSTEM = `You are a personal stylist for one family's private closet app. You only ever pick from the numbered pieces you are given; never invent pieces.
 Build complete, wearable outfits: a top and a bottom (or a dress), shoes, and up to two layers/accessories when they help. 3 to 6 pieces each.
 Match the weather and the plan. Use the style profile and check-in (tan, hair, skin) to steer colors and effort. Prefer favorites and pieces not worn in a while; vary the three looks.
-Write one short reason per look (max 20 words) in a warm editorial voice, naming the weather or plan when it matters. No emoji.`;
+For each look write:
+- reason: ONE plain sentence (max 18 words) saying what the look is and why it suits today. Plain prose, no flourish, no emoji.
+- why.weather: 2 or 3 short lines that quote the numbers (now, tonight, high, low, rain chance) and say what they rule in or out: sleeves, layers, fabric weight, shoes.
+- why.dressCode: one line on the plan or setting and how dressed-up the look is.
+- why.color: one line on why these colors work together.
+- why.taste: one line tying the look to the person's style profile, taste memory or check-in; empty string if nothing applies.`;
+
+const WHY_SCHEMA = {
+  type: "object",
+  properties: {
+    weather: { type: "array", items: { type: "string" }, description: "2 or 3 short lines with the numbers and what they rule in or out." },
+    dressCode: { type: "string" },
+    color: { type: "string" },
+    taste: { type: "string", description: "Empty string when nothing applies." },
+  },
+  required: ["weather", "dressCode", "color", "taste"], additionalProperties: false,
+} as const;
+
+function cleanWhy(w: Partial<Why> | undefined): Why {
+  return {
+    weather: (w?.weather ?? []).map((x) => String(x).trim()).filter(Boolean).slice(0, 3),
+    dressCode: String(w?.dressCode ?? "").trim(), color: String(w?.color ?? "").trim(), taste: String(w?.taste ?? "").trim(),
+  };
+}
 
 const SCHEMA = {
   type: "object",
   properties: {
     outfits: {
       type: "array", description: "Exactly the number of looks asked for.",
-      items: { type: "object", properties: { codes: { type: "array", items: { type: "string" }, description: "2 to 6 piece codes like #3, hero first." }, reason: { type: "string" } }, required: ["codes", "reason"], additionalProperties: false },
+      items: { type: "object", properties: { codes: { type: "array", items: { type: "string" }, description: "2 to 6 piece codes like #3, hero first." }, reason: { type: "string" }, why: WHY_SCHEMA }, required: ["codes", "reason", "why"], additionalProperties: false },
     },
   },
   required: ["outfits"], additionalProperties: false,
@@ -57,7 +82,7 @@ const SCHEMA = {
 
 function contextLines(inputs: Inputs): string {
   return [
-    inputs.weather ? `Weather: ${weatherLine(inputs.weather)}, ${inputs.weather.condition}, high ${inputs.weather.highF}°, low ${inputs.weather.lowF}°` : "Weather: unknown",
+    inputs.weather ? `Weather: ${weatherLine(inputs.weather)}, ${inputs.weather.condition}, now ${inputs.weather.nowF}°, tonight ${inputs.weather.tonightF}°, high ${inputs.weather.highF}°, low ${inputs.weather.lowF}°, rain chance ${inputs.weather.rainChance}%` : "Weather: unknown (no zip or location yet)",
     inputs.plan.label ? `Plan: ${inputs.plan.label}` : "Plan: nothing special (everyday)",
     inputs.checkIn.length ? `Check-in: ${inputs.checkIn.map((c) => `${c.scale} ${c.option}`).join(", ")}` : null,
   ].filter(Boolean).join("\n");
@@ -72,16 +97,20 @@ function mockLooks(cands: Candidate[], count: number, offset: number): Board[] {
   for (let i = offset; i < offset + count; i++) {
     const ids = cats.map((k) => byCat.get(k)![i % byCat.get(k)!.length].id).slice(0, 5);
     if (ids.length < 2) break;
-    boards.push({ itemIds: ids, reason: `Mock look ${i + 1}: easy pieces for the day.` });
+    boards.push({ itemIds: ids, reason: `Mock look ${i + 1}: easy pieces for the day.`, why: mockWhy() });
   }
   return boards;
+}
+
+function mockWhy(): Why {
+  return { weather: ["Mock weather: 72° now, 60° tonight, no rain.", "Short sleeves now, a layer for the evening."], dressCode: "Everyday, nothing special.", color: "Neutrals that sit easily together.", taste: "" };
 }
 
 const DRAFT_EXTRA = 2;
 
 const RANK_SYSTEM = `You are a personal stylist judging outfit candidates by LOOKING at the clothes. For each look you get its pieces' photos, labelled "Look N".
 Keep the looks that work best together in real life: colors and patterns that sit well side by side, matching formality, a clear silhouette. Drop a look when two pieces clash, the formality is mixed up, or it is a duller copy of another look.
-Return exactly the number asked for, best first, with a fresh one-sentence reason (max 20 words, warm editorial voice, naming the weather or plan when it matters). No emoji.`;
+Return exactly the number asked for, best first, each with a fresh reason: ONE plain sentence (max 18 words) saying what the look is and why it suits today. Plain prose, no flourish, no emoji.`;
 
 const RANK_SCHEMA = {
   type: "object",
@@ -116,7 +145,7 @@ export async function rankVisually(boards: Board[], cands: Candidate[], inputs: 
     const kept: Board[] = [];
     for (const k of out.keep) {
       const b = boards[k.look - 1];
-      if (b && !kept.includes(b)) kept.push({ itemIds: b.itemIds, reason: k.reason.trim() || b.reason });
+      if (b && !kept.includes(b)) kept.push({ itemIds: b.itemIds, reason: k.reason.trim() || b.reason, why: b.why });
       if (kept.length === count) break;
     }
     for (const b of boards) { if (kept.length >= count) break; if (!kept.some((k) => k.itemIds === b.itemIds)) kept.push(b); }
@@ -146,11 +175,11 @@ export async function composeLooks(opts: { cands: Candidate[]; inputs: Inputs; s
     `Pieces:\n${catalog}`,
     `Return ${draft} looks.`,
   ].filter(Boolean).join("\n\n");
-  const out = await structured<{ outfits: { codes: string[]; reason: string }[] }>({ system: SYSTEM, prompt, schema: SCHEMA, effort: "medium", maxTokens: 1800 });
+  const out = await structured<{ outfits: { codes: string[]; reason: string; why?: Partial<Why> }[] }>({ system: SYSTEM, prompt, schema: SCHEMA, effort: "medium", maxTokens: 3200 });
   const boards: Board[] = [];
   for (const o of out.outfits) {
     const ids = [...new Set(o.codes.map((code) => codes.get(code.trim())?.id).filter((x): x is string => Boolean(x)))];
-    if (ids.length >= 2) boards.push({ itemIds: ids, reason: o.reason.trim() });
+    if (ids.length >= 2) boards.push({ itemIds: ids, reason: o.reason.trim(), why: cleanWhy(o.why) });
   }
   if (opts.visual === false) return boards.slice(0, count);
   return rankVisually(boards.slice(0, draft), cands, inputs, count, opts.style);
@@ -246,7 +275,7 @@ export async function swapPiece(personId: string, date: string, index: number, i
   if (!sameCat.length) throw new OutfitError("Nothing else clean in that category today.");
   const keep = board.itemIds.filter((id) => id !== itemId);
   const keepCands = cand.usable.filter((c) => keep.includes(c.id));
-  let replacement: Candidate; let reason: string;
+  let replacement: Candidate; let reason: string; let why: Why = board.why ?? mockWhy();
   if (isMockAi()) {
     replacement = sameCat[0]; reason = `Mock swap: ${replacement.name} instead.`;
   } else {
@@ -256,11 +285,42 @@ export async function swapPiece(personId: string, date: string, index: number, i
       `The person keeps: ${keepCands.map((c) => c.name).join(", ") || "nothing yet"}.`,
       `Pick ONE replacement from these pieces (same category as the one they are swapping out) and write a short reason for the whole look:\n${[...codes.entries()].map(([code, c]) => describe(c, code, now)).join("\n")}`,
     ].join("\n\n");
-    const out = await structured<{ code: string; reason: string }>({ system: SYSTEM, prompt, schema: { type: "object", properties: { code: { type: "string" }, reason: { type: "string" } }, required: ["code", "reason"], additionalProperties: false }, effort: "low", maxTokens: 300 });
-    replacement = codes.get(out.code.trim()) ?? sameCat[0]; reason = out.reason.trim();
+    const out = await structured<{ code: string; reason: string; why?: Partial<Why> }>({ system: SYSTEM, prompt, schema: { type: "object", properties: { code: { type: "string" }, reason: { type: "string" }, why: WHY_SCHEMA }, required: ["code", "reason", "why"], additionalProperties: false }, effort: "low", maxTokens: 700 });
+    replacement = codes.get(out.code.trim()) ?? sameCat[0]; reason = out.reason.trim(); why = cleanWhy(out.why);
   }
   await recordSwap(personId, date, itemId, replacement.id, board.itemIds);
-  const next = boards.map((b, i) => (i === index ? { itemIds: b.itemIds.map((id) => (id === itemId ? replacement.id : id)), reason } : b));
+  const next = boards.map((b, i) => (i === index ? { itemIds: b.itemIds.map((id) => (id === itemId ? replacement.id : id)), reason, why } : b));
+  const updated = await db.outfitSuggestion.update({ where: { id: row.id }, data: { outfits: next as object[] } });
+  return view(updated);
+}
+
+/** REMOVE a piece from board `index` (a look keeps at least two pieces). The reason is rewritten for what is left. */
+export async function removePiece(personId: string, date: string, index: number, itemId: string, ctx: DayContext): Promise<Suggestion> {
+  const row = await db.outfitSuggestion.findFirst({ where: { personId, date, togetherSessionId: null }, orderBy: { createdAt: "desc" } });
+  if (!row) throw new OutfitError("No looks yet today.");
+  const boards = row.outfits as Board[];
+  const board = boards[index];
+  if (!board || !board.itemIds.includes(itemId)) throw new OutfitError("That piece isn't on this look.");
+  if (board.itemIds.length <= 2) throw new OutfitError("A look needs at least two pieces. Swap it instead.");
+  const keep = board.itemIds.filter((id) => id !== itemId);
+  const now = ctx.now ?? new Date();
+  const cand = await loadCandidates(personId, now, { noRepeatDays: 0 });
+  const keepCands = cand.usable.filter((c) => keep.includes(c.id));
+  const gone = cand.usable.find((c) => c.id === itemId);
+  let reason: string; let why: Why = board.why ?? mockWhy();
+  if (isMockAi()) {
+    reason = `Mock: without ${gone?.name ?? "that piece"}.`;
+  } else {
+    const prompt = [
+      contextLines(inputsFrom(ctx, cand)),
+      `The person took ${gone?.name ?? "a piece"} off this look on purpose. The look is now: ${keepCands.map((c, i) => describe(c, `#${i + 1}`, now)).join("; ")}.`,
+      "Write the reason and why for the look as it is now. Do not suggest adding anything back.",
+    ].join("\n\n");
+    const out = await structured<{ reason: string; why?: Partial<Why> }>({ system: SYSTEM, prompt, schema: { type: "object", properties: { reason: { type: "string" }, why: WHY_SCHEMA }, required: ["reason", "why"], additionalProperties: false }, effort: "low", maxTokens: 600 });
+    reason = out.reason.trim() || board.reason; why = cleanWhy(out.why);
+  }
+  await recordSwap(personId, date, itemId, null, board.itemIds);
+  const next = boards.map((b, i) => (i === index ? { itemIds: keep, reason, why } : b));
   const updated = await db.outfitSuggestion.update({ where: { id: row.id }, data: { outfits: next as object[] } });
   return view(updated);
 }

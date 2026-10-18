@@ -30,10 +30,11 @@ export async function recordPassed(personId: string, date: string, boards: Board
   if (fresh.length) await db.lookFeedback.createMany({ data: fresh.map((b) => ({ personId, date, kind: "passed" as const, itemIds: b.itemIds })) });
 }
 
-export async function recordSwap(personId: string, date: string, outId: string, inId: string, itemIds: string[]): Promise<void> {
+/** A swap (out → in) or a plain removal (in = null): both say the person did not want `outId` in this look. */
+export async function recordSwap(personId: string, date: string, outId: string, inId: string | null, itemIds: string[]): Promise<void> {
   await db.lookFeedback.createMany({ data: [
     { personId, date, kind: "swapped_out", itemIds, itemId: outId },
-    { personId, date, kind: "swapped_in", itemIds, itemId: inId },
+    ...(inId ? [{ personId, date, kind: "swapped_in" as const, itemIds, itemId: inId }] : []),
   ] });
 }
 

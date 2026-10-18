@@ -6,7 +6,7 @@ import { requirePerson } from "@/lib/auth/current";
 import { db } from "@/lib/db";
 import { geocodeZip, WeatherError } from "@/lib/weather";
 import { loadTodayContext, LOCATION_COOKIE } from "@/lib/today/context";
-import { assertCanDress, generateSuggestion, moreLooks, OutfitError, swapPiece, wearBoard } from "@/lib/outfits/engine";
+import { assertCanDress, generateSuggestion, moreLooks, OutfitError, removePiece, swapPiece, wearBoard } from "@/lib/outfits/engine";
 import { rateFit, type FitRating } from "@/lib/fits/service";
 import { tryOnLook, TryOnError, type TryOnView } from "@/lib/tryon";
 import { CheckInError, saveSelfie, saveTaps } from "@/lib/checkins/service";
@@ -56,7 +56,12 @@ export async function wearAction(personId: string, suggestionId: string, index: 
 
 export async function swapAction(personId: string, index: number, itemId: string): Promise<Result> {
   const me = await requirePerson();
-  return run(async () => { await assertCanDress(me, personId); await swapPiece(personId, (await loadTodayContext(me, personId)).date, index, itemId, await loadTodayContext(me, personId)); });
+  return run(async () => { await assertCanDress(me, personId); const ctx = await loadTodayContext(me, personId); await swapPiece(personId, ctx.date, index, itemId, ctx); });
+}
+
+export async function removeAction(personId: string, index: number, itemId: string): Promise<Result> {
+  const me = await requirePerson();
+  return run(async () => { await assertCanDress(me, personId); const ctx = await loadTodayContext(me, personId); await removePiece(personId, ctx.date, index, itemId, ctx); });
 }
 
 export async function moreAction(personId: string): Promise<Result> {
@@ -70,13 +75,12 @@ export async function regenerateAction(personId: string): Promise<Result> {
   return run(async () => { await assertCanDress(me, personId); const ctx = await loadTodayContext(me, personId); await generateSuggestion(personId, ctx.date, ctx); });
 }
 
+/** Plan and check-in save at once and return; the screen then asks for fresh looks separately (regenerateAction), so nothing waits on Claude. */
 export async function setPlanAction(personId: string, pick: { occasionId: string } | { text: string } | null): Promise<Result> {
   const me = await requirePerson();
   return run(async () => {
     const ctx = await loadTodayContext(me, personId);
     await setPlan(me, personId, ctx.date, pick);
-    const fresh = await loadTodayContext(me, personId);
-    await generateSuggestion(personId, fresh.date, fresh);
   });
 }
 
@@ -85,8 +89,6 @@ export async function checkInTapsAction(personId: string, answers: { scaleId: st
   return run(async () => {
     const ctx = await loadTodayContext(me, personId);
     await saveTaps(me, personId, ctx.date, answers);
-    const fresh = await loadTodayContext(me, personId);
-    await generateSuggestion(personId, fresh.date, fresh);
   });
 }
 
@@ -98,8 +100,6 @@ export async function checkInSelfieAction(personId: string, form: FormData): Pro
     if (file.size > 12 * 1024 * 1024) throw new CheckInError("That photo is too large.");
     const ctx = await loadTodayContext(me, personId);
     await saveSelfie(me, personId, ctx.date, { data: Buffer.from(await file.arrayBuffer()), contentType: file.type as "image/jpeg" });
-    const fresh = await loadTodayContext(me, personId);
-    await generateSuggestion(personId, fresh.date, fresh);
   });
 }
 

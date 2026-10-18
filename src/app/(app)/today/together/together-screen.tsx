@@ -100,7 +100,7 @@ export function TogetherScreen({ meId, people, canDressIds, occasions, isAdmin, 
                 })}
               </div>
               <p className="mono mt-3 text-graphite">{b.pieces.map((x) => x.label).join(" · ")}</p>
-              <p className="serif mt-1 text-[21px] italic leading-[1.3]">{b.board.reason}</p>
+              <p className="mt-1 text-[16px] leading-snug">{b.board.reason}</p>
               {canDressIds.includes(b.personId) ? (
                 b.wornFitId ? <Link href="/fits" className="mono mt-3 flex h-[46px] items-center justify-center border border-ink text-[11px] uppercase tracking-[0.14em]">Wearing this · see Fits</Link>
                 : <Button className="mt-3 w-full" disabled={busy !== null} onClick={() => run(`wear-${b.personId}`, () => wearTogetherAction(b.personId, b.suggestionId, session.occasionLabel ?? "Together"))} data-testid={`wear-${b.personName}`}>{busy === `wear-${b.personId}` ? "Saving…" : `Wear this · ${b.personName}`}</Button>
