@@ -5,11 +5,9 @@ export const dynamic = "force-dynamic";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-paper sm:border-x sm:border-line">
       <DevModeBanner />
-      <main className="safe-top safe-bottom flex flex-1 flex-col justify-center px-5 py-10">
-        <div className="mx-auto w-full max-w-sm">{children}</div>
-      </main>
+      {children}
     </div>
   );
 }

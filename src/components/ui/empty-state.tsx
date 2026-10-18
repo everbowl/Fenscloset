@@ -1,12 +1,13 @@
 import type { ReactNode } from "react";
 
-export function EmptyState({ icon, title, body, action }: { icon?: ReactNode; title: string; body?: string; action?: ReactNode }) {
+/** Bone block with a mono line, the way the mockups show an empty slot. */
+export function EmptyState({ icon, title, body, action, className }: { icon?: ReactNode; title: string; body?: string; action?: ReactNode; className?: string }) {
   return (
-    <div className="flex flex-col items-center rounded-2xl border border-dashed border-border px-6 py-12 text-center">
-      {icon ? <div className="mb-3 text-stone-400">{icon}</div> : null}
-      <p className="font-medium">{title}</p>
-      {body ? <p className="mt-1 max-w-xs text-sm text-muted">{body}</p> : null}
-      {action ? <div className="mt-4">{action}</div> : null}
+    <div className={`flex flex-col items-center justify-center gap-3 bg-bone px-6 py-14 text-center ${className ?? ""}`}>
+      {icon ? <div className="text-ink">{icon}</div> : null}
+      <p className="mono mono-11">{title}</p>
+      {body ? <p className="max-w-xs text-[13px] leading-snug text-graphite">{body}</p> : null}
+      {action ? <div className="mt-2">{action}</div> : null}
     </div>
   );
 }

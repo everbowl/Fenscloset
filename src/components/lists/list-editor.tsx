@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, ArchiveRestore, ArrowDown, ArrowUp, Check, Pencil, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowDown, ArrowUp, Pencil, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
@@ -78,28 +78,28 @@ export function ListEditor({ kind, entries: initial, parentId }: { kind: ListKin
     <div className="space-y-4">
       {error ? <Banner tone="danger">{error}</Banner> : null}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted">{active.length} {active.length === 1 ? def.singular : def.label.toLowerCase()}</p>
+        <p className="mono mono-11 text-graphite">{active.length} {active.length === 1 ? def.singular : def.label.toLowerCase()}</p>
         <InlineAdd kind={kind} parentId={parentId} variant="primary" size="sm" onCreated={(e) => { setEntries((l) => [...l, e]); router.refresh(); }} />
       </div>
 
-      <Card className="divide-y divide-border p-0">
-        {active.length === 0 ? <p className="px-4 py-6 text-center text-sm text-muted">Nothing here yet. Add the first one.</p> : null}
+      <Card className="divide-y divide-line border-x-0 border-b-0 border-t border-ink p-0">
+        {active.length === 0 ? <p className="mono py-6 text-center text-graphite">Nothing here yet · add the first one</p> : null}
         {active.map((entry, i) => (
-          <div key={entry.id} className={cn("flex items-center gap-2 px-3 py-2", pending && "opacity-70")}>
-            {entry.hex ? <span className="size-6 shrink-0 rounded-full border border-border" style={{ background: entry.hex }} aria-hidden /> : null}
+          <div key={entry.id} className={cn("flex items-center gap-2 py-1", pending && "opacity-70")}>
+            {entry.hex ? <span className="size-6 shrink-0 border border-line" style={{ background: entry.hex }} aria-hidden /> : null}
             <button type="button" onClick={() => setEditing(entry)} className="flex min-w-0 flex-1 items-center gap-2 py-2 text-left">
               <span className="truncate text-[15px]">{entry.name}</span>
-              {entry.closetKind && entry.closetKind !== "custom" ? <span className="rounded-md bg-stone-100 px-1.5 py-0.5 text-[11px] uppercase tracking-wide text-muted">{entry.closetKind}</span> : null}
-              {entry.url ? <span className="truncate text-xs text-muted">{entry.url.replace(/^https?:\/\//, "")}</span> : null}
-              <Pencil className="ml-auto size-4 shrink-0 text-stone-400" aria-hidden />
+              {entry.closetKind && entry.closetKind !== "custom" ? <span className="mono text-graphite">{entry.closetKind}</span> : null}
+              {entry.url ? <span className="mono truncate normal-case text-graphite">{entry.url.replace(/^https?:\/\//, "")}</span> : null}
+              <Pencil className="ml-auto size-3.5 shrink-0 text-graphite" strokeWidth={1.6} aria-hidden />
             </button>
             <div className="flex shrink-0 items-center">
-              <IconBtn label="Move up" disabled={i === 0} onClick={() => move(entry, -1)}><ArrowUp className="size-4" /></IconBtn>
-              <IconBtn label="Move down" disabled={i === active.length - 1} onClick={() => move(entry, 1)}><ArrowDown className="size-4" /></IconBtn>
+              <IconBtn label="Move up" disabled={i === 0} onClick={() => move(entry, -1)}><ArrowUp className="size-4" strokeWidth={1.6} /></IconBtn>
+              <IconBtn label="Move down" disabled={i === active.length - 1} onClick={() => move(entry, 1)}><ArrowDown className="size-4" strokeWidth={1.6} /></IconBtn>
               {!protectedCloset(entry) ? (
                 <>
-                  <IconBtn label="Archive" onClick={() => toggleArchive(entry)}><Archive className="size-4" /></IconBtn>
-                  <IconBtn label="Delete" onClick={() => setConfirmDelete(entry)} danger><Trash2 className="size-4" /></IconBtn>
+                  <IconBtn label="Archive" onClick={() => toggleArchive(entry)}><Archive className="size-4" strokeWidth={1.6} /></IconBtn>
+                  <IconBtn label="Delete" onClick={() => setConfirmDelete(entry)} danger><Trash2 className="size-4" strokeWidth={1.6} /></IconBtn>
                 </>
               ) : null}
             </div>
@@ -109,13 +109,13 @@ export function ListEditor({ kind, entries: initial, parentId }: { kind: ListKin
 
       {archived.length > 0 ? (
         <details className="group">
-          <summary className="cursor-pointer select-none text-sm font-medium text-muted">Archived ({archived.length})</summary>
-          <Card className="mt-2 divide-y divide-border p-0">
+          <summary className="mono mono-11 cursor-pointer select-none text-graphite">Archived ({archived.length})</summary>
+          <Card className="mt-2 divide-y divide-line border-x-0 border-b-0 border-t border-ink p-0">
             {archived.map((entry) => (
-              <div key={entry.id} className="flex items-center gap-2 px-3 py-2 text-muted">
+              <div key={entry.id} className="flex items-center gap-2 py-1 text-graphite">
                 <span className="flex-1 truncate py-2 text-[15px] line-through">{entry.name}</span>
                 <IconBtn label="Restore" onClick={() => toggleArchive(entry)}><ArchiveRestore className="size-4" /></IconBtn>
-                <IconBtn label="Delete" onClick={() => setConfirmDelete(entry)} danger><Trash2 className="size-4" /></IconBtn>
+                <IconBtn label="Delete" onClick={() => setConfirmDelete(entry)} danger><Trash2 className="size-4" strokeWidth={1.6} /></IconBtn>
               </div>
             ))}
           </Card>
@@ -127,10 +127,10 @@ export function ListEditor({ kind, entries: initial, parentId }: { kind: ListKin
       </Sheet>
 
       <Sheet open={!!confirmDelete} onClose={() => setConfirmDelete(null)} title={`Delete “${confirmDelete?.name}”?`}>
-        <p className="text-sm text-muted">This can&apos;t be undone. If anything still uses it, the app will stop you and suggest archiving instead.</p>
+        <p className="text-[14px] leading-snug text-graphite">This can&apos;t be undone. If anything still uses it, the app will stop you and suggest archiving instead.</p>
         <div className="mt-5 flex gap-2">
-          <Button variant="secondary" className="flex-1" onClick={() => setConfirmDelete(null)}><X className="size-4" /> Keep</Button>
-          <Button variant="danger" className="flex-1" onClick={doDelete} disabled={pending}><Trash2 className="size-4" /> Delete</Button>
+          <Button variant="secondary" className="flex-1" onClick={() => setConfirmDelete(null)}>Keep</Button>
+          <Button variant="danger" className="flex-1" onClick={doDelete} disabled={pending}><Trash2 className="size-4" strokeWidth={1.6} /> Delete</Button>
         </div>
       </Sheet>
     </div>
@@ -140,7 +140,7 @@ export function ListEditor({ kind, entries: initial, parentId }: { kind: ListKin
 function IconBtn({ label, onClick, disabled, danger, children }: { label: string; onClick: () => void; disabled?: boolean; danger?: boolean; children: React.ReactNode }) {
   return (
     <button type="button" aria-label={label} title={label} onClick={onClick} disabled={disabled}
-      className={cn("flex size-10 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-100 disabled:opacity-30", danger && "hover:bg-red-50 hover:text-danger")}>
+      className={cn("flex size-10 items-center justify-center text-graphite hover:text-ink disabled:opacity-30", danger && "hover:text-danger")}>
       {children}
     </button>
   );
@@ -153,11 +153,11 @@ function EditForm({ entry, kind, onSave, pending }: { entry: ListEntry; kind: Li
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSave({ name, ...extra }); }} className="space-y-4">
       <div className="space-y-1.5">
-        <label htmlFor="edit-name" className="block text-sm font-medium">Name</label>
+        <label htmlFor="edit-name" className="mono tracking-[0.14em] text-graphite">Name</label>
         <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} autoFocus required maxLength={60} />
       </div>
       <EntryExtraFields fields={def.extraFields} values={extra} onChange={(p) => setExtra((x) => ({ ...x, ...p }))} />
-      <Button type="submit" className="w-full" disabled={pending}><Check className="size-4" /> Save</Button>
+      <Button type="submit" className="w-full" disabled={pending}>Save</Button>
     </form>
   );
 }

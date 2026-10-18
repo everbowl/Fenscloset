@@ -56,7 +56,7 @@ test("admin invites a new member; she accepts, lands in her closet, and cannot o
   await sheet.getByRole("textbox", { name: "Email" }).fill("sue@example.com");
   await sheet.getByRole("button", { name: "Create invite" }).click();
   await expect(page.getByText("Invite created")).toBeVisible();
-  const url = (await page.locator(".font-mono").textContent())!.trim();
+  const url = (await page.getByTestId("invite-url").textContent())!.trim();
   expect(url).toContain("/invite/");
 
   const ctx = await browser.newContext();
@@ -67,7 +67,7 @@ test("admin invites a new member; she accepts, lands in her closet, and cannot o
   await sue.getByLabel("Type it again").fill("grandma-rules-1");
   await sue.getByRole("button", { name: "Open my closet" }).click();
   await expect(sue).toHaveURL(/\/today$/);
-  await expect(sue.getByRole("heading", { name: "Hi Grandma" })).toBeVisible();
+  await expect(sue.getByRole("heading", { name: /look/ })).toBeVisible();
 
   await sue.goto("/admin/people");
   await expect(sue.getByRole("heading", { name: "Admins only" })).toBeVisible();

@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
-import { Card } from "@/components/ui/card";
 import { LIST_DEFS, LIST_KINDS } from "@/lib/lists/registry";
 import { countAll } from "@/lib/lists/service";
 
@@ -11,22 +9,23 @@ export default async function ListsOverviewPage() {
   const counts = await countAll();
   return (
     <div>
-      <PageHeader title="Lists" subtitle="Everything the app uses to describe clothes. Edit, add, reorder, or delete any of it." />
-      <Card className="divide-y divide-border p-0">
+      <PageHeader title="Lists" aside={`${LIST_KINDS.length} lists`} />
+      <p className="mb-2 text-[14px] leading-snug text-graphite">Everything the app uses to describe clothes. Edit, add, reorder, archive, or delete any of it.</p>
+      <div className="border-t border-ink">
         {LIST_KINDS.map((kind) => {
           const def = LIST_DEFS[kind];
           return (
-            <Link key={kind} href={`/admin/lists/${kind}`} className="flex items-center gap-3 px-4 py-3 hover:bg-stone-50">
+            <Link key={kind} href={`/admin/lists/${kind}`} className="flex items-center gap-3 border-b border-line py-3">
               <div className="min-w-0 flex-1">
                 <p className="text-[15px] font-medium">{def.label}</p>
-                <p className="truncate text-sm text-muted">{def.description}</p>
+                <p className="truncate text-[13px] text-graphite">{def.description}</p>
               </div>
-              <span className="text-sm text-muted">{counts[kind]}</span>
-              <ChevronRight className="size-4 text-stone-400" />
+              <span className="mono mono-11 text-graphite">{counts[kind]}</span>
+              <span className="mono text-graphite">→</span>
             </Link>
           );
         })}
-      </Card>
+      </div>
     </div>
   );
 }

@@ -9,7 +9,7 @@ test("signed-out visitors are sent to login, which shows Forgot password and the
   await page.goto("/today");
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole("link", { name: "Forgot password?" })).toBeVisible();
-  await expect(page.getByRole("alert").filter({ hasText: "DEV password 0535 is active" })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: /dev mode/i })).toBeVisible();
 });
 
 test("Jeff logs in with 0535 once, is forced to change it, then 0535 is dead", async ({ page }) => {
@@ -34,8 +34,8 @@ test("Jeff logs in with 0535 once, is forced to change it, then 0535 is dead", a
   await page.getByLabel("Type it again").fill("closet-rocks-2026");
   await page.getByRole("button", { name: "Save new password" }).click();
   await expect(page).toHaveURL(/\/today$/);
-  await expect(page.getByRole("heading", { name: "Hi Jeff" })).toBeVisible();
-  await expect(page.getByRole("alert").filter({ hasText: "DEV password" })).toHaveCount(0); // DEV banner gone
+  await expect(page.getByRole("heading", { name: /look/ })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: /dev mode/i })).toHaveCount(0); // DEV strip gone
 
   await page.goto("/profile");
   await page.getByRole("button", { name: "Log out" }).click();

@@ -19,7 +19,7 @@ export function EntryExtraFields({ fields, values, onChange }: {
                 type="color"
                 value={values.hex ?? "#888888"}
                 onChange={(e) => onChange({ hex: e.target.value })}
-                className="size-11 cursor-pointer rounded-xl border border-border bg-surface p-1"
+                className="size-9 cursor-pointer border border-line bg-paper p-0.5"
               />
               <Input value={values.hex ?? ""} onChange={(e) => onChange({ hex: e.target.value })} placeholder="#RRGGBB" className="font-mono" />
             </div>

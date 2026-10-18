@@ -1,5 +1,6 @@
 import { LoginForm } from "./login-form";
 import { redirectIfSignedIn } from "./actions";
+import { AuthHero } from "@/components/auth-hero";
 
 export const metadata = { title: "Sign in" };
 
@@ -7,12 +8,15 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   await redirectIfSignedIn();
   const { next } = await searchParams;
   return (
-    <div>
-      <div className="mb-8 text-center">
-        <h1 className="text-3xl font-semibold tracking-tight">Fen&apos;s Closet</h1>
-        <p className="mt-1 text-sm text-muted">Sign in to your closet.</p>
-      </div>
-      <LoginForm next={next} />
-    </div>
+    <>
+      <AuthHero tall />
+      <main className="safe-bottom flex flex-1 flex-col gap-[22px] px-6 pb-7 pt-[30px]">
+        <div className="flex flex-col gap-1">
+          <h1 className="serif text-[38px]">Welcome <em>home</em></h1>
+          <p className="mono mono-11 text-graphite">The Fenster family wardrobe</p>
+        </div>
+        <LoginForm next={next} />
+      </main>
+    </>
   );
 }

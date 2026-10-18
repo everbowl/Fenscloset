@@ -43,7 +43,7 @@ export function InlineAdd({ kind, parentId, onCreated, label, variant = "ghost",
   return (
     <>
       <Button type="button" variant={variant} size={size} onClick={() => setOpen(true)}>
-        <Plus className="size-4" /> {label ?? `Add ${def.singular}`}
+        <Plus className="size-3.5" strokeWidth={1.8} /> {label ?? `Add ${def.singular}`}
       </Button>
       <Sheet open={open} onClose={() => setOpen(false)} title={`New ${def.singular}`}>
         <form onSubmit={submit} className="space-y-4">

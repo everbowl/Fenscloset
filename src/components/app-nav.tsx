@@ -2,49 +2,38 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sun, Shirt, Plus, ShoppingBag, UserRound } from "lucide-react";
 import { cn } from "@/lib/cn";
 
+/* Five-slot bar from the mockups: TODAY · CLOSET · [+] · SHOP · FITS. 76px, black top rule, mono 10px. */
 const tabs = [
-  { href: "/today", label: "Today", icon: Sun },
-  { href: "/closet", label: "Closet", icon: Shirt },
-  { href: "/add", label: "Add", icon: Plus, primary: true },
-  { href: "/shop", label: "Shop", icon: ShoppingBag },
-  { href: "/profile", label: "Profile", icon: UserRound },
+  { href: "/today", label: "Today" },
+  { href: "/closet", label: "Closet" },
+  { href: "/add", label: "Add clothes", plus: true },
+  { href: "/shop", label: "Shop" },
+  { href: "/fits", label: "Fits" },
 ];
 
 export function AppNav() {
   const pathname = usePathname();
   return (
-    <nav aria-label="Main" className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 backdrop-blur md:inset-y-0 md:left-0 md:right-auto md:w-56 md:border-r md:border-t-0">
-      <div className="md:px-4 md:pt-6">
-        <p className="hidden px-2 pb-4 text-lg font-semibold tracking-tight md:block">Fen&apos;s Closet</p>
-        <ul className="grid grid-cols-5 md:flex md:flex-col md:gap-1">
-          {tabs.map(({ href, label, icon: Icon, primary }) => {
-            const active = pathname === href || pathname.startsWith(href + "/");
+    <nav aria-label="Main" className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-ink bg-paper">
+      <div className="mx-auto grid h-[66px] max-w-[480px] grid-cols-5 items-center px-2">
+        {tabs.map(({ href, label, plus }) => {
+          const active = pathname === href || pathname.startsWith(href + "/");
+          if (plus) {
             return (
-              <li key={href}>
-                <Link
-                  href={href}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "flex h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium md:h-11 md:flex-row md:justify-start md:gap-3 md:rounded-xl md:px-3 md:text-sm",
-                    active ? "text-accent md:bg-amber-50" : "text-muted hover:text-foreground md:hover:bg-stone-100",
-                  )}
-                >
-                  {primary ? (
-                    <span className="flex size-9 items-center justify-center rounded-full bg-accent text-accent-foreground shadow md:size-6">
-                      <Icon className="size-5 md:size-4" />
-                    </span>
-                  ) : (
-                    <Icon className="size-6 md:size-5" />
-                  )}
-                  <span>{label}</span>
-                </Link>
-              </li>
+              <Link key={href} href={href} aria-label={label} className={cn("flex size-[46px] items-center justify-center justify-self-center bg-ink text-paper", active && "ring-2 ring-ink ring-offset-2")}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><path d="M12 4v16M4 12h16" /></svg>
+              </Link>
             );
-          })}
-        </ul>
+          }
+          return (
+            <Link key={href} href={href} aria-current={active ? "page" : undefined}
+              className={cn("mono justify-self-center px-1 py-3.5", active ? "border-b-[1.5px] border-ink text-ink" : "text-graphite")}>
+              {label}
+            </Link>
+          );
+        })}
       </div>
     </nav>
   );
