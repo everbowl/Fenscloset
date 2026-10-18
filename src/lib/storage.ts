@@ -20,7 +20,7 @@ export const IMAGE_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image
 const EXT_TYPES: Record<string, string> = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" };
 export const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 
-const KEY_RE = /^(originals|cutouts|thumbs|labels|worn|avatars|bodies)\/([a-z0-9]{10,40})\/([a-z0-9]{10,40})\.(jpg|png|webp)$/;
+const KEY_RE = new RegExp(`^(${PHOTO_KINDS.join("|")})/([a-z0-9]{10,40})/([a-z0-9]{10,40})\\.(jpg|png|webp)$`);
 
 export type ParsedKey = { kind: PhotoKeyKind; ownerId: string; file: string; ext: string; contentType: string };
 

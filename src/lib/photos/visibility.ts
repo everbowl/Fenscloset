@@ -13,6 +13,7 @@ export type Viewer = { id: string; role: Role; status?: string };
  *   (closets are browsable across the family), except a minor's worn photos,
  *   which stay with the minor and their parents;
  * - nothing else: unconfirmed imports and avatars/worn shots of minors stay private.
+ * Phase 3: `checkins/` selfies are the owner's (and a minor's parents') alone; `fits/` photos follow the fit's tagged viewers.
  */
 export async function canViewKey(viewer: Viewer, key: string): Promise<boolean> {
   const parsed = parseKey(key);
@@ -20,6 +21,8 @@ export async function canViewKey(viewer: Viewer, key: string): Promise<boolean> 
   if (viewer.status === "removed") return false;
   if (parsed.ownerId === viewer.id) return true;
   if (parsed.kind === "bodies") return canSeeBodyPhotoKey(viewer, parsed.ownerId, key);
+  if (parsed.kind === "checkins") return isParentOfMinor(viewer.id, parsed.ownerId);
+  if (parsed.kind === "fits") return canSeeFitPhotoKey(viewer, parsed.ownerId, key);
   const owner = await db.person.findUnique({ where: { id: parsed.ownerId }, select: { id: true, role: true, status: true } });
   if (!owner || owner.status === "removed") return false;
   if (owner.role === "minor") {
@@ -46,4 +49,16 @@ export async function canSeeBodyPhotoKey(viewer: Viewer, ownerId: string, key: s
     return Boolean(await db.guardianLink.findUnique({ where: { minorId_parentId: { minorId: ownerId, parentId: viewer.id } } }));
   }
   return canSeeBodyData(viewer, ownerId);
+}
+
+async function isParentOfMinor(viewerId: string, minorId: string): Promise<boolean> {
+  return Boolean(await db.guardianLink.findUnique({ where: { minorId_parentId: { minorId, parentId: viewerId } } }));
+}
+
+/** A fit photo is seen by the owner, the people tagged on the fit, and a minor owner's parents. */
+export async function canSeeFitPhotoKey(viewer: Viewer, ownerId: string, key: string): Promise<boolean> {
+  if (viewer.id === ownerId) return true;
+  if (await isParentOfMinor(viewer.id, ownerId)) return true;
+  const fit = await db.fit.findUnique({ where: { photoKey: key }, select: { viewers: { where: { personId: viewer.id }, select: { personId: true } } } });
+  return Boolean(fit && fit.viewers.length);
 }

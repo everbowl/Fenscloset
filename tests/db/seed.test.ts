@@ -25,7 +25,7 @@ describe("seed", () => {
     expect(first.people).toBe(4);
     expect(first.closets).toBe(5); // 4 personal + Family
     expect(first.scales).toBe(3);
-    expect(first.rules).toBe(2);
+    expect(first.rules).toBe(3);
 
     const mya = await db.person.findFirstOrThrow({ where: { name: "Mya" }, include: { guardians: true } });
     expect(mya.role).toBe("minor");

@@ -70,6 +70,7 @@ model Person {
   togetherPeople     TogetherPerson[]
   togetherCreated    TogetherSession[]
   googleCalendar     GoogleCalendarConnection?
+  dayPlans           DayPlan[]
 }
 
 model Session {
@@ -209,6 +210,7 @@ model Occasion {
   items      Item[]
   fits       Fit[]
   togetherSessions TogetherSession[]
+  dayPlans   DayPlan[]
 }
 
 model Tag {
@@ -702,4 +704,17 @@ model WeatherCache {
   key       String   @id
   payload   Json
   fetchedAt DateTime @default(now())
+}
+
+/** The plan a person picked for a day (overrides the calendar): an occasion from the list, or free text. */
+model DayPlan {
+  personId   String
+  date       String
+  occasionId String?
+  text       String?
+  updatedAt  DateTime  @updatedAt
+  person     Person    @relation(fields: [personId], references: [id], onDelete: Cascade)
+  occasion   Occasion? @relation(fields: [occasionId], references: [id], onDelete: SetNull)
+
+  @@id([personId, date])
 }
