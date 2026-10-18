@@ -35,6 +35,7 @@
     "@types/react-dom": "^19",
     "dotenv": "^18.0.8",
     "prisma": "7.10.1",
+    "server-only": "^0.0.1",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5",
