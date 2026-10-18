@@ -43,8 +43,8 @@ const SCHEMA = {
   type: "object",
   properties: {
     outfits: {
-      type: "array", minItems: 1, maxItems: 3,
-      items: { type: "object", properties: { codes: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 6 }, reason: { type: "string" } }, required: ["codes", "reason"], additionalProperties: false },
+      type: "array", description: "Exactly the number of looks asked for.",
+      items: { type: "object", properties: { codes: { type: "array", items: { type: "string" }, description: "2 to 6 piece codes like #3, hero first." }, reason: { type: "string" } }, required: ["codes", "reason"], additionalProperties: false },
     },
   },
   required: ["outfits"], additionalProperties: false,

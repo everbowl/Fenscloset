@@ -67,7 +67,7 @@ async function composeTogether(per: { id: string; name: string; cand: { usable: 
     ...sections,
     "Return exactly one look per person using only that person's own codes.",
   ].join("\n\n");
-  const schema = { type: "object", properties: { looks: { type: "array", items: { type: "object", properties: { person: { type: "string", enum: per.map((p) => p.name) }, codes: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 6 }, reason: { type: "string" } }, required: ["person", "codes", "reason"], additionalProperties: false } } }, required: ["looks"], additionalProperties: false };
+  const schema = { type: "object", properties: { looks: { type: "array", items: { type: "object", properties: { person: { type: "string", enum: per.map((p) => p.name) }, codes: { type: "array", items: { type: "string" }, description: "2 to 6 of this person's codes." }, reason: { type: "string" } }, required: ["person", "codes", "reason"], additionalProperties: false } } }, required: ["looks"], additionalProperties: false };
   const out = await structured<{ looks: { person: string; codes: string[]; reason: string }[] }>({
     system: "You are a personal stylist dressing a family together. Use only the numbered pieces given, each person's own codes only. One short warm reason per person (max 20 words). No emoji.",
     prompt, schema, effort: "medium", maxTokens: 1500,

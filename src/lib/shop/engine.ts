@@ -45,7 +45,7 @@ async function readCandidate(lists: TagLists, input: { image?: { data: string; m
     type: "object",
     properties: {
       name: { type: "string" }, category: { type: "string", enum: [...cats, "unknown"] },
-      colors: { type: "array", items: { type: "string", enum: lists.colors.map((c) => c.name) }, maxItems: 3 },
+      colors: { type: "array", items: { type: "string", enum: lists.colors.map((c) => c.name) }, description: "At most three, dominant first." },
       fabric: { type: "string", enum: [...lists.fabrics.map((f) => f.name), "unknown"] },
       formality: { type: "string", enum: [...lists.formalities.map((f) => f.name), "unknown"] },
       brandText: { type: ["string", "null"] }, sizeText: { type: ["string", "null"] },

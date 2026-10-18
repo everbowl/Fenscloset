@@ -74,7 +74,7 @@ export function tagSchema(lists: TagLists): Record<string, unknown> {
       name: { type: "string", description: "Short item name a person would use, e.g. 'Black ribbed tank', 'Levi's 501 jeans'. 2–6 words." },
       category: { type: "string", enum: withUnknown(lists.categories) },
       subcategory: { type: ["string", "null"], enum: [...lists.categories.flatMap((c) => names(c.subcategories)), null], description: "Must belong to the chosen category." },
-      colors: { type: "array", items: { type: "string", enum: names(lists.colors) }, maxItems: 3, description: "Dominant color first." },
+      colors: { type: "array", items: { type: "string", enum: names(lists.colors) }, description: "Dominant color first, at most three." },
       pattern: { type: "string", enum: withUnknown(lists.patterns) },
       fabric: { type: "string", enum: withUnknown(lists.fabrics) },
       fabricConfidence: { type: "number", minimum: 0, maximum: 1 },
