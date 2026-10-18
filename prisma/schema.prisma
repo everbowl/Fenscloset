@@ -1,0 +1,277 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- People & access ----------
+
+enum Role {
+  admin
+  member
+  minor
+}
+
+enum PersonStatus {
+  active
+  invited
+  removed
+}
+
+model Person {
+  id                 String       @id @default(cuid())
+  name               String
+  email              String?      @unique
+  phone              String?
+  role               Role         @default(member)
+  birthdate          DateTime?
+  avatarKey          String?
+  savedZip           String?
+  passwordHash       String?
+  mustChangePassword Boolean      @default(false)
+  devPasswordActive  Boolean      @default(false)
+  devPasswordUsedAt  DateTime?
+  status             PersonStatus @default(invited)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  sessions       Session[]
+  resetTokens    PasswordResetToken[]
+  invitesCreated InviteToken[]
+  guardians      GuardianLink[]       @relation("minorGuardians")
+  wards          GuardianLink[]       @relation("parentWards")
+  closets        Closet[]
+  items          Item[]
+}
+
+model Session {
+  id              String   @id @default(cuid())
+  personId        String
+  tokenHash       String   @unique
+  expiresAt       DateTime
+  userAgent       String?
+  usedDevPassword Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  lastSeenAt      DateTime @default(now())
+
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([personId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  personId  String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+}
+
+model InviteToken {
+  id               String    @id @default(cuid())
+  tokenHash        String    @unique
+  name             String
+  email            String?
+  phone            String?
+  role             Role      @default(member)
+  guardianIds      String[]  @default([])
+  createdById      String
+  expiresAt        DateTime
+  acceptedAt       DateTime?
+  acceptedPersonId String?
+  createdAt        DateTime  @default(now())
+
+  createdBy Person @relation(fields: [createdById], references: [id], onDelete: Cascade)
+}
+
+model GuardianLink {
+  minorId  String
+  parentId String
+
+  minor  Person @relation("minorGuardians", fields: [minorId], references: [id], onDelete: Cascade)
+  parent Person @relation("parentWards", fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@id([minorId, parentId])
+}
+
+// ---------- Editable lists ----------
+
+model Category {
+  id            String        @id @default(cuid())
+  name          String
+  sortOrder     Int           @default(0)
+  isArchived    Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  subcategories Subcategory[]
+  items         Item[]
+
+  @@unique([name])
+}
+
+model Subcategory {
+  id         String   @id @default(cuid())
+  name       String
+  categoryId String
+  sortOrder  Int      @default(0)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  items      Item[]
+
+  @@unique([categoryId, name])
+}
+
+model Color {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  hex        String
+  sortOrder  Int      @default(0)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model Pattern {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  sortOrder  Int      @default(0)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model Fabric {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  sortOrder  Int      @default(0)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model Season {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  sortOrder  Int      @default(0)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model FormalityLevel {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  sortOrder  Int      @default(0)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model Occasion {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  sortOrder  Int      @default(0)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model Tag {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  sortOrder  Int      @default(0)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model Brand {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  sortOrder  Int      @default(0)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model Store {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  url        String?
+  sortOrder  Int      @default(0)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+enum ClosetKind {
+  personal
+  family
+  custom
+}
+
+model Closet {
+  id         String     @id @default(cuid())
+  name       String
+  kind       ClosetKind @default(custom)
+  ownerId    String?
+  sortOrder  Int        @default(0)
+  isArchived Boolean    @default(false)
+  createdAt  DateTime   @default(now())
+  owner      Person?    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  items      ItemCloset[]
+
+  @@index([ownerId])
+}
+
+model CheckInScale {
+  id         String          @id @default(cuid())
+  name       String          @unique
+  sortOrder  Int             @default(0)
+  isArchived Boolean         @default(false)
+  createdAt  DateTime        @default(now())
+  options    CheckInOption[]
+}
+
+model CheckInOption {
+  id         String       @id @default(cuid())
+  name       String
+  scaleId    String
+  sortOrder  Int          @default(0)
+  isArchived Boolean      @default(false)
+  createdAt  DateTime     @default(now())
+  scale      CheckInScale @relation(fields: [scaleId], references: [id], onDelete: Cascade)
+
+  @@unique([scaleId, name])
+}
+
+model Rule {
+  key         String   @id
+  value       String
+  label       String
+  description String
+  updatedAt   DateTime @updatedAt
+}
+
+// ---------- Items (Phase 0 stub; expanded in Phase 1) ----------
+
+model Item {
+  id            String       @id @default(cuid())
+  ownerId       String
+  categoryId    String?
+  subcategoryId String?
+  name          String?
+  createdAt     DateTime     @default(now())
+  owner         Person       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  category      Category?    @relation(fields: [categoryId], references: [id])
+  subcategory   Subcategory? @relation(fields: [subcategoryId], references: [id])
+  closets       ItemCloset[]
+
+  @@index([ownerId])
+}
+
+model ItemCloset {
+  itemId   String
+  closetId String
+  item     Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  closet   Closet @relation(fields: [closetId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, closetId])
+}
