@@ -5,8 +5,8 @@ import type { ExtraField } from "@/lib/lists/registry";
 /** Extra inputs (swatch, website) for kinds that have them. Shared by the editor and InlineAdd. */
 export function EntryExtraFields({ fields, values, onChange }: {
   fields: ExtraField[];
-  values: { hex?: string; url?: string | null };
-  onChange: (patch: { hex?: string; url?: string }) => void;
+  values: { hex?: string; url?: string | null; unit?: string };
+  onChange: (patch: { hex?: string; url?: string; unit?: string }) => void;
 }) {
   return (
     <>
@@ -23,6 +23,10 @@ export function EntryExtraFields({ fields, values, onChange }: {
               />
               <Input value={values.hex ?? ""} onChange={(e) => onChange({ hex: e.target.value })} placeholder="#RRGGBB" className="font-mono" />
             </div>
+          </Field>
+        ) : f.type === "text" ? (
+          <Field key={f.name} label={f.label} htmlFor={`field-${f.name}`}>
+            <Input id={`field-${f.name}`} value={values.unit ?? ""} onChange={(e) => onChange({ unit: e.target.value })} placeholder={f.placeholder} maxLength={12} />
           </Field>
         ) : (
           <Field key={f.name} label={f.label} htmlFor={`field-${f.name}`}>

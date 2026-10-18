@@ -9,12 +9,13 @@ export type ListEntry = {
   parentId?: string | null;
   hex?: string;
   url?: string | null;
+  unit?: string;
   /** closets only */
   closetKind?: "personal" | "family" | "custom";
   ownerId?: string | null;
 };
 
-export type EntryInput = { name: string; parentId?: string | null; hex?: string; url?: string | null };
+export type EntryInput = { name: string; parentId?: string | null; hex?: string; url?: string | null; unit?: string };
 
 export class InUseError extends Error {
   constructor(public readonly count: number, public readonly what: string) {
@@ -60,6 +61,7 @@ function toEntry(kind: ListKind, row: AnyRow): ListEntry {
     parentId: def.parent ? (row[def.parent.field] as string) : undefined,
     hex: typeof row.hex === "string" ? row.hex : undefined,
     url: kind === "store" ? ((row.url as string | null) ?? null) : undefined,
+    unit: kind === "measurementKind" ? ((row.unit as string) ?? "") : undefined,
     closetKind: kind === "closet" ? (row.kind as ListEntry["closetKind"]) : undefined,
     ownerId: kind === "closet" ? ((row.ownerId as string | null) ?? null) : undefined,
   };
@@ -81,6 +83,7 @@ function extraData(kind: ListKind, input: EntryInput, forCreate: boolean): AnyRo
       data.hex = hex.toUpperCase();
     }
   }
+  if (kind === "measurementKind" && input.unit !== undefined) data.unit = (input.unit ?? "").trim().slice(0, 12);
   if (kind === "store" && input.url !== undefined) {
     const url = (input.url ?? "").trim();
     data.url = url ? (url.startsWith("http") ? url : `https://${url}`) : null;
@@ -102,6 +105,8 @@ export async function inUseCount(kind: ListKind, id: string): Promise<{ count: n
     case "formality": return { count: await db.item.count({ where: { formalities: { some: { id } } } }), what: "items" };
     case "occasion": return { count: await db.item.count({ where: { occasions: { some: { id } } } }), what: "items" };
     case "tag": return { count: await db.item.count({ where: { tags: { some: { id } } } }), what: "items" };
+    case "measurementKind": return { count: await db.bodyMeasurement.count({ where: { kindId: id } }), what: "profiles" };
+    case "styleWord": return { count: await db.person.count({ where: { styleWords: { some: { id } } } }), what: "profiles" };
     case "closet": return { count: await db.itemCloset.count({ where: { closetId: id } }), what: "items" };
     case "checkInScale": return { count: await db.checkInOption.count({ where: { scaleId: id } }), what: "options" };
     default: return { count: 0, what: "items" };

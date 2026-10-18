@@ -3,8 +3,8 @@ import { db } from "../src/lib/db";
 import { hashPassword } from "../src/lib/auth/password";
 import { isDevMode } from "../src/lib/auth/dev-mode";
 import {
-  BRANDS, CATEGORIES, CHECK_IN_SCALES, COLORS, DEV_PASSWORD, FABRICS, FORMALITY, OCCASIONS,
-  PATTERNS, PEOPLE, RULES, SEASONS, STORES, TAGS,
+  BODY_IMAGE_APPROVALS, BRANDS, CATEGORIES, CHECK_IN_SCALES, COLORS, DEV_PASSWORD, FABRICS, FORMALITY, MEASUREMENT_KINDS, OCCASIONS,
+  PATTERNS, PEOPLE, RULES, SEASONS, STORES, STYLE_WORDS, TAGS,
 } from "./seed-data";
 
 type SimpleDelegate = {
@@ -98,6 +98,13 @@ export async function seed() {
   await seedSimple(db.tag, TAGS);
   await seedSimple(db.brand, BRANDS);
   await seedSimple(db.store, STORES);
+  await seedSimple(db.styleWord, STYLE_WORDS);
+  for (const [i, m] of MEASUREMENT_KINDS.entries()) {
+    await db.measurementKind.upsert({ where: { name: m.name }, update: {}, create: { name: m.name, unit: m.unit, sortOrder: i } });
+  }
+  for (const a of BODY_IMAGE_APPROVALS) {
+    if (ids[a.minor] && ids[a.by]) await db.minorBodyImageApproval.upsert({ where: { minorId: ids[a.minor] }, update: {}, create: { minorId: ids[a.minor], approvedById: ids[a.by] } });
+  }
 
   let si = 0;
   for (const [name, options] of Object.entries(CHECK_IN_SCALES)) {

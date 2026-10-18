@@ -4,11 +4,11 @@
  */
 export const LIST_KINDS = [
   "category", "subcategory", "color", "pattern", "fabric", "season", "formality", "occasion",
-  "tag", "brand", "store", "closet", "checkInScale", "checkInOption",
+  "tag", "brand", "store", "closet", "checkInScale", "checkInOption", "measurementKind", "styleWord",
 ] as const;
 export type ListKind = (typeof LIST_KINDS)[number];
 
-export type ExtraField = { name: "hex" | "url"; label: string; type: "color" | "url"; required?: boolean };
+export type ExtraField = { name: "hex" | "url" | "unit"; label: string; type: "color" | "url" | "text"; required?: boolean; placeholder?: string };
 
 export type ListKindDef = {
   kind: ListKind;
@@ -17,7 +17,7 @@ export type ListKindDef = {
   /** Singular label for buttons ("+ Add brand"). */
   singular: string;
   /** Prisma delegate name on the client. */
-  delegate: "category" | "subcategory" | "color" | "pattern" | "fabric" | "season" | "formalityLevel" | "occasion" | "tag" | "brand" | "store" | "closet" | "checkInScale" | "checkInOption";
+  delegate: "category" | "subcategory" | "color" | "pattern" | "fabric" | "season" | "formalityLevel" | "occasion" | "tag" | "brand" | "store" | "closet" | "checkInScale" | "checkInOption" | "measurementKind" | "styleWord";
   extraFields: ExtraField[];
   /** For nested lists: which kind owns entries and which column stores the parent id. */
   parent?: { kind: ListKind; field: "categoryId" | "scaleId"; label: string };
@@ -38,6 +38,8 @@ export const LIST_DEFS: Record<ListKind, ListKindDef> = {
   store: { kind: "store", label: "Stores", singular: "store", delegate: "store", extraFields: [{ name: "url", label: "Website", type: "url" }], description: "Where things get bought. Each person picks favorites in their profile." },
   closet: { kind: "closet", label: "Closets", singular: "closet", delegate: "closet", extraFields: [], description: "Personal closets, the Family closet, and any extra closets you want (e.g. Storage)." },
   checkInScale: { kind: "checkInScale", label: "Check-in scales", singular: "scale", delegate: "checkInScale", extraFields: [], description: "The daily check-in questions: tan, hair, skin." },
+  measurementKind: { kind: "measurementKind", label: "Body measurements", singular: "measurement", delegate: "measurementKind", extraFields: [{ name: "unit", label: "Unit", type: "text", placeholder: "in · lb · US" }], description: "What a body profile records: height, waist, shoe size… Each person fills in their own numbers." },
+  styleWord: { kind: "styleWord", label: "Style words", singular: "style word", delegate: "styleWord", extraFields: [], description: "Words people pick to describe their style: minimal, classic, streetwear…" },
   checkInOption: { kind: "checkInOption", label: "Check-in options", singular: "option", delegate: "checkInOption", extraFields: [], parent: { kind: "checkInScale", field: "scaleId", label: "Scale" }, description: "The answers available for each check-in scale." },
 };
 

@@ -11,8 +11,9 @@ import type { PersonSummary } from "@/lib/people/service";
 import type { Role } from "@/generated/prisma/client";
 import { removePersonAction, setGuardiansAction, setRoleAction, updatePersonAction } from "../actions";
 import { InviteSheet } from "../invite-sheet";
+import { setMinorBodyImageApprovalAction } from "@/app/(app)/profile/actions";
 
-export function PersonEditor({ person, admins, smsReady, isSelf }: { person: PersonSummary; admins: { id: string; name: string }[]; smsReady: boolean; isSelf: boolean }) {
+export function PersonEditor({ person, admins, smsReady, isSelf, bodyPhotos }: { person: PersonSummary; admins: { id: string; name: string }[]; smsReady: boolean; isSelf: boolean; bodyPhotos: { allowed: boolean; approvedBy: string | null; isParent: boolean } | null }) {
   const [name, setName] = useState(person.name);
   const [email, setEmail] = useState(person.email ?? "");
   const [phone, setPhone] = useState(person.phone ?? "");
@@ -68,6 +69,20 @@ export function PersonEditor({ person, admins, smsReady, isSelf }: { person: Per
           </fieldset>
         ) : null}
       </Card>
+
+      {role === "minor" && bodyPhotos ? (
+        <Card className="space-y-3 border-x-0 border-b-0 border-t border-ink px-0 pt-4">
+          <h2 className="mono text-graphite">Body photos</h2>
+          <p className="text-[14px] leading-snug text-graphite">
+            {bodyPhotos.allowed ? `Allowed · approved by ${bodyPhotos.approvedBy ?? "a parent"}. Seen only by ${name.split(" ")[0]} and parents.` : `Off. ${name.split(" ")[0]} can't add full-body photos until a parent approves.`}
+          </p>
+          {bodyPhotos.isParent ? (
+            <Button variant="secondary" disabled={pending} data-testid="toggle-body-photos" onClick={() => run(() => setMinorBodyImageApprovalAction(person.id, !bodyPhotos.allowed), bodyPhotos.allowed ? "Body photos turned off and removed." : "Body photos approved.")}>
+              {bodyPhotos.allowed ? "Turn off body photos" : "Approve body photos"}
+            </Button>
+          ) : <p className="mono text-graphite">Only a parent of {name.split(" ")[0]} can change this</p>}
+        </Card>
+      ) : null}
 
       <Card className="space-y-3 border-x-0 border-b-0 border-t border-ink px-0 pt-4">
         <h2 className="mono text-graphite">Login</h2>

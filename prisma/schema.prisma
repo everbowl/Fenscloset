@@ -38,15 +38,30 @@ model Person {
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
-  sessions       Session[]
-  resetTokens    PasswordResetToken[]
-  invitesCreated InviteToken[]
-  guardians      GuardianLink[]       @relation("minorGuardians")
-  wards          GuardianLink[]       @relation("parentWards")
-  closets        Closet[]
-  items          Item[]
-  sharedItems    ItemShare[]
-  importBatches  ImportBatch[]
+  sessions           Session[]
+  resetTokens        PasswordResetToken[]
+  invitesCreated     InviteToken[]
+  guardians          GuardianLink[]           @relation("minorGuardians")
+  wards              GuardianLink[]           @relation("parentWards")
+  closets            Closet[]
+  items              Item[]
+  sharedItems        ItemShare[]
+  importBatches      ImportBatch[]
+  bodyProfile        BodyProfile?
+  measurements       BodyMeasurement[]
+  sizesByBrand       BodySizeByBrand[]
+  bodyPhotos         BodyPhoto[]
+  lovedColors        Color[]                  @relation("lovedColors")
+  avoidColors        Color[]                  @relation("avoidColors")
+  styleWords         StyleWord[]
+  favoriteBrands     Brand[]                  @relation("favoriteBrands")
+  favoriteStores     Store[]                  @relation("favoriteStores")
+  bodyGrantsGiven    BodyDataGrant[]          @relation("bodyGrantOwner")
+  bodyGrantsReceived BodyDataGrant[]          @relation("bodyGrantViewer")
+  shopGrantsGiven    ShopForGrant[]           @relation("shopGrantOwner")
+  shopGrantsReceived ShopForGrant[]           @relation("shopGrantShopper")
+  bodyImageApproval  MinorBodyImageApproval?  @relation("approvalMinor")
+  approvalsGiven     MinorBodyImageApproval[] @relation("approvalParent")
 }
 
 model Session {
@@ -137,6 +152,8 @@ model Color {
   isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
   items      Item[]
+  lovedBy    Person[] @relation("lovedColors")
+  avoidedBy  Person[] @relation("avoidColors")
 }
 
 model Pattern {
@@ -194,12 +211,14 @@ model Tag {
 }
 
 model Brand {
-  id         String   @id @default(cuid())
-  name       String   @unique
-  sortOrder  Int      @default(0)
-  isArchived Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  id         String            @id @default(cuid())
+  name       String            @unique
+  sortOrder  Int               @default(0)
+  isArchived Boolean           @default(false)
+  createdAt  DateTime          @default(now())
   items      Item[]
+  favoredBy  Person[]          @relation("favoriteBrands")
+  sizes      BodySizeByBrand[]
 }
 
 model Store {
@@ -210,6 +229,7 @@ model Store {
   isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
   items      Item[]
+  favoredBy  Person[] @relation("favoriteStores")
 }
 
 enum ClosetKind {
@@ -406,4 +426,107 @@ model ImportEntry {
   item        Item?       @relation(fields: [itemId], references: [id], onDelete: SetNull)
 
   @@index([batchId, status])
+}
+
+// ---------- Profiles & privacy (Phase 2) ----------
+
+/**
+ * Editable list: what a body profile measures (Height, Waist, Shoe size…).
+ */
+model MeasurementKind {
+  id           String            @id @default(cuid())
+  name         String            @unique
+  unit         String            @default("")
+  sortOrder    Int               @default(0)
+  isArchived   Boolean           @default(false)
+  createdAt    DateTime          @default(now())
+  measurements BodyMeasurement[]
+}
+
+/**
+ * Editable list: style words a person picks for their style profile.
+ */
+model StyleWord {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  sortOrder  Int      @default(0)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  people     Person[]
+}
+
+model BodyProfile {
+  personId  String   @id
+  fitNotes  String?
+  updatedAt DateTime @updatedAt
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+}
+
+model BodyMeasurement {
+  personId  String
+  kindId    String
+  value     String
+  updatedAt DateTime        @updatedAt
+  person    Person          @relation(fields: [personId], references: [id], onDelete: Cascade)
+  kind      MeasurementKind @relation(fields: [kindId], references: [id], onDelete: Cascade)
+
+  @@id([personId, kindId])
+}
+
+model BodySizeByBrand {
+  id         String   @id @default(cuid())
+  personId   String
+  brandId    String
+  categoryId String?
+  size       String
+  updatedAt  DateTime @updatedAt
+  person     Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  brand      Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@index([personId])
+}
+
+model BodyPhoto {
+  id        String   @id @default(cuid())
+  personId  String
+  bucketKey String   @unique
+  takenAt   DateTime @default(now())
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([personId])
+}
+
+/**
+ * Owner lets a viewer see their body profile.
+ */
+model BodyDataGrant {
+  ownerId  String
+  viewerId String
+  owner    Person @relation("bodyGrantOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  viewer   Person @relation("bodyGrantViewer", fields: [viewerId], references: [id], onDelete: Cascade)
+
+  @@id([ownerId, viewerId])
+}
+
+/**
+ * Owner lets a shopper shop on their behalf. Parents are implicit shoppers for minors.
+ */
+model ShopForGrant {
+  ownerId   String
+  shopperId String
+  owner     Person @relation("shopGrantOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  shopper   Person @relation("shopGrantShopper", fields: [shopperId], references: [id], onDelete: Cascade)
+
+  @@id([ownerId, shopperId])
+}
+
+/**
+ * A parent admin approved body photos for a minor.
+ */
+model MinorBodyImageApproval {
+  minorId      String   @id
+  approvedById String
+  approvedAt   DateTime @default(now())
+  minor        Person   @relation("approvalMinor", fields: [minorId], references: [id], onDelete: Cascade)
+  approvedBy   Person   @relation("approvalParent", fields: [approvedById], references: [id], onDelete: Cascade)
 }

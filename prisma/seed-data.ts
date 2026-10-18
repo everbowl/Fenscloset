@@ -46,6 +46,15 @@ export const TAGS = ["Favorite", "Comfy", "Statement", "Basics", "Needs repair",
 export const BRANDS = ["Lululemon", "Nike", "Adidas", "Levi's", "Zara", "H&M", "Aritzia", "Free People", "Madewell", "J.Crew", "Abercrombie & Fitch", "Gap", "Old Navy", "Target", "Amazon", "Uniqlo", "Reformation", "Skims", "Alo", "Vuori", "Brandy Melville", "Urban Outfitters", "Anthropologie", "Nordstrom", "Steve Madden", "Birkenstock", "Converse", "New Balance", "Coach", "Kate Spade"];
 export const STORES = ["Nordstrom", "Target", "Amazon", "Zara", "Aritzia", "Lululemon", "Urban Outfitters", "Free People", "Madewell", "Abercrombie & Fitch", "Revolve", "Shein", "ASOS", "Nike", "Sephora"];
 
+export const MEASUREMENT_KINDS: { name: string; unit: string }[] = [
+  { name: "Height", unit: "in" }, { name: "Weight", unit: "lb" }, { name: "Chest / bust", unit: "in" }, { name: "Waist", unit: "in" },
+  { name: "Hips", unit: "in" }, { name: "Inseam", unit: "in" }, { name: "Shoulders", unit: "in" }, { name: "Sleeve", unit: "in" },
+  { name: "Neck", unit: "in" }, { name: "Shoe size", unit: "US" },
+];
+export const STYLE_WORDS = ["Minimal", "Classic", "Streetwear", "Preppy", "Boho", "Edgy", "Sporty", "Romantic", "Vintage", "Glam", "Comfy", "Polished"];
+/** Body photos approved for a minor by a parent admin (spec: Mya, approved by Jeff). */
+export const BODY_IMAGE_APPROVALS: { minor: string; by: string }[] = [{ minor: "mya", by: "jeff" }];
+
 export const CHECK_IN_SCALES: Record<string, string[]> = {
   Tan: ["None", "Light", "Medium", "Deep"],
   Hair: ["Great", "Fine", "Bad hair day"],

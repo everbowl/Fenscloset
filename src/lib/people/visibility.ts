@@ -39,3 +39,38 @@ export async function canSeeWornPhoto(viewer: Viewer, owner: Viewer): Promise<bo
 export function canEditItem(viewer: Viewer, ownerId: string): boolean {
   return viewer.id === ownerId || viewer.role === "admin";
 }
+
+// ---------- Body data, shopping, body photos (Phase 2) ----------
+
+async function isParentOf(viewerId: string, ownerId: string): Promise<boolean> {
+  return Boolean(await db.guardianLink.findUnique({ where: { minorId_parentId: { minorId: ownerId, parentId: viewerId } } }));
+}
+
+/** Body profile (measurements, sizes, fit notes, body photos): owner, parents of a minor, or an explicit grant. Admins get nothing automatically. */
+export async function canSeeBodyData(viewer: Viewer, ownerId: string): Promise<boolean> {
+  if (viewer.id === ownerId) return true;
+  if (await isParentOf(viewer.id, ownerId)) return true;
+  return Boolean(await db.bodyDataGrant.findUnique({ where: { ownerId_viewerId: { ownerId, viewerId: viewer.id } } }));
+}
+
+/** Shop on someone's behalf: owner, parents of a minor, or an explicit grant. */
+export async function canShopFor(viewer: Viewer, ownerId: string): Promise<boolean> {
+  if (viewer.id === ownerId) return true;
+  if (await isParentOf(viewer.id, ownerId)) return true;
+  return Boolean(await db.shopForGrant.findUnique({ where: { ownerId_shopperId: { ownerId, shopperId: viewer.id } } }));
+}
+
+/** Minors may keep body photos only while a parent approval is on record. Adults always may. */
+export async function bodyPhotosAllowed(ownerId: string): Promise<{ allowed: boolean; approvedBy?: string; approvedAt?: Date }> {
+  const owner = await db.person.findUnique({ where: { id: ownerId }, select: { role: true } });
+  if (!owner) return { allowed: false };
+  if (owner.role !== "minor") return { allowed: true };
+  const a = await db.minorBodyImageApproval.findUnique({ where: { minorId: ownerId }, include: { approvedBy: { select: { name: true } } } });
+  return a ? { allowed: true, approvedBy: a.approvedBy.name.split(" ")[0], approvedAt: a.approvedAt } : { allowed: false };
+}
+
+/** A minor's body data never leaves the family: no grants, no shoppers beyond parents. */
+export async function canGrantBodyAccess(ownerId: string): Promise<boolean> {
+  const owner = await db.person.findUnique({ where: { id: ownerId }, select: { role: true } });
+  return owner?.role !== "minor";
+}

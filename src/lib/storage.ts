@@ -14,13 +14,13 @@ import path from "node:path";
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-export const PHOTO_KINDS = ["originals", "cutouts", "thumbs", "labels", "worn", "avatars"] as const;
+export const PHOTO_KINDS = ["originals", "cutouts", "thumbs", "labels", "worn", "avatars", "bodies"] as const;
 export type PhotoKeyKind = (typeof PHOTO_KINDS)[number];
 export const IMAGE_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 const EXT_TYPES: Record<string, string> = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" };
 export const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 
-const KEY_RE = /^(originals|cutouts|thumbs|labels|worn|avatars)\/([a-z0-9]{10,40})\/([a-z0-9]{10,40})\.(jpg|png|webp)$/;
+const KEY_RE = /^(originals|cutouts|thumbs|labels|worn|avatars|bodies)\/([a-z0-9]{10,40})\/([a-z0-9]{10,40})\.(jpg|png|webp)$/;
 
 export type ParsedKey = { kind: PhotoKeyKind; ownerId: string; file: string; ext: string; contentType: string };
 

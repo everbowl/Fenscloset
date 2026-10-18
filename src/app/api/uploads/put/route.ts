@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentPerson } from "@/lib/auth/current";
+import { db } from "@/lib/db";
 import { MAX_UPLOAD_BYTES, parseKey, putObject, verifyUploadToken } from "@/lib/storage";
 
 /** Relay for signed uploads: PUT body → bucket. Same-origin, session + signed token, owner-only key. */
@@ -12,7 +13,8 @@ export async function PUT(req: Request) {
   const sig = url.searchParams.get("sig") ?? "";
   const contentType = (req.headers.get("content-type") ?? "").split(";")[0].trim();
   const parsed = parseKey(key);
-  if (!parsed || parsed.ownerId !== person.id || !verifyUploadToken(key, contentType, exp, sig)) {
+  const ownsKey = Boolean(parsed) && (parsed!.ownerId === person.id || Boolean(await db.guardianLink.findUnique({ where: { minorId_parentId: { minorId: parsed!.ownerId, parentId: person.id } } })));
+  if (!parsed || !ownsKey || !verifyUploadToken(key, contentType, exp, sig)) {
     return NextResponse.json({ error: "That upload link is not valid any more." }, { status: 403 });
   }
   const bytes = Buffer.from(await req.arrayBuffer());

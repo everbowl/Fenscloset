@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { parseKey } from "@/lib/storage";
+import { canSeeBodyData } from "@/lib/people/visibility";
 import type { Role } from "@/generated/prisma/client";
 
 export type Viewer = { id: string; role: Role; status?: string };
@@ -18,6 +19,7 @@ export async function canViewKey(viewer: Viewer, key: string): Promise<boolean> 
   if (!parsed) return false;
   if (viewer.status === "removed") return false;
   if (parsed.ownerId === viewer.id) return true;
+  if (parsed.kind === "bodies") return canSeeBodyData(viewer, parsed.ownerId);
   const owner = await db.person.findUnique({ where: { id: parsed.ownerId }, select: { id: true, role: true, status: true } });
   if (!owner || owner.status === "removed") return false;
   if (owner.role === "minor") {
