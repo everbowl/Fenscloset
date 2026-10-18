@@ -95,7 +95,7 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
     <div className="-mt-5 lg:mt-0 lg:grid lg:grid-cols-[440px_minmax(0,1fr)] lg:gap-x-12 lg:gap-y-0">
       <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={onPhoto} data-testid="item-photo" />
       <div className="relative -mx-5 h-[380px] bg-bone lg:mx-0 lg:h-[560px] lg:self-start lg:[grid-row:1/span_80]">
-        {photo ? <img src={`/api/photo/${photo.key}`} alt={it.name} className="size-full object-cover" style={{ objectPosition: "center 30%" }} /> : null}
+        {photo ? <img src={`/api/photo/${photo.key}`} alt={it.name} className="size-full object-contain" /> : null}
         <Link href="/closet" aria-label="Back to closet" className="absolute left-2 top-2 flex size-11 items-center justify-center bg-paper text-ink">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden><path d="M15 5l-7 7 7 7" /></svg>
         </Link>
@@ -105,7 +105,7 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
         <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 pt-1.5 [scrollbar-width:none] lg:mx-0 lg:px-0 lg:pt-0">
           {it.photos.map((p, i) => (
             <button key={p.id} type="button" onClick={() => setPhotoIdx(i)} aria-label={`${KIND_WORD[p.kind]} photo`} aria-pressed={i === photoIdx} className={`h-[62px] w-[48px] shrink-0 overflow-hidden bg-bone ${i === photoIdx ? "outline outline-2 -outline-offset-2 outline-ink" : ""}`}>
-              <img src={`/api/photo/${p.key}`} alt="" className="size-full object-cover" />
+              <img src={`/api/photo/${p.key}`} alt="" className="size-full object-contain" />
             </button>
           ))}
         </div>
