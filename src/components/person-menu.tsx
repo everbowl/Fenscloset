@@ -47,6 +47,7 @@ export function PersonMenu({ views, current, isAdmin, logout, setView }: {
           <p className="mono pb-2 text-graphite">You</p>
           <Row href="/profile" label="Profile" />
           <Row href="/change-password" label="Change password" />
+          <Row href="/help" label="Help · how to use it" />
           {isAdmin ? (
             <>
               <p className="mono pt-5 pb-2 text-graphite">Admin</p>
