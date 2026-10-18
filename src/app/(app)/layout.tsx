@@ -13,7 +13,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-dvh bg-paper">
       <ServiceWorkerRegistrar />
-      {isAdmin(person) ? <DevModeBanner /> : null}
+      <DevModeBanner />
       <AppHeader left={<PersonMenu name={person.name} isAdmin={isAdmin(person)} logout={logoutAction} />} />
       <main className="mx-auto w-full max-w-[480px] px-5 pb-28 pt-5">{children}</main>
       <AppNav />

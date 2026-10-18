@@ -28,7 +28,7 @@ export default function FitsPage() {
         {cells.map((d, i) => {
           const today = d === now.getDate();
           return (
-            <div key={i} className={`relative h-12 ${today ? "border border-ink" : ""}`}>
+            <div key={i} className={`relative h-[46px] ${today ? "border border-ink" : ""}`}>
               {d ? <span className={`mono mono-11 absolute left-1 top-1 ${today ? "bg-ink px-1 text-paper" : ""}`}>{d}</span> : null}
             </div>
           );

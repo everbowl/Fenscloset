@@ -17,7 +17,7 @@ export function RuleForm({ rule }: { rule: RuleRow }) {
         <Input id={`rule-${rule.key}`} name="value" type="number" inputMode="numeric" min={0} max={3650} defaultValue={rule.value} className="max-w-24" />
         <Button type="submit" variant="secondary" disabled={pending}>{pending ? "Saving…" : state.saved === rule.key ? "Saved" : "Save"}</Button>
       </div>
-      {state.error ? <p className="mono normal-case text-[11px] text-danger" role="alert">{state.error}</p> : null}
+      {state.error ? <p className="mono text-ink" role="alert">— {state.error}</p> : null}
     </form>
   );
 }

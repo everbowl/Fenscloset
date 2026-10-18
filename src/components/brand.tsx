@@ -19,7 +19,7 @@ export function Wordmark({ className, withMark = false, size = "sm" }: { classNa
   return (
     <span className={cn("inline-flex items-center gap-3", className)}>
       {withMark ? <Mark className={size === "md" ? "h-[22px] w-[14px]" : "h-[18px] w-[11px]"} /> : null}
-      <span className={cn("wordmark", size === "md" ? "text-[15px] tracking-[0.2em]" : "text-[12px]")}>Fen&rsquo;s Closet</span>
+      <span className={cn("wordmark", size === "md" ? "text-[15px] tracking-[0.2em] -mr-[0.2em]" : "text-[12px] -mr-[0.18em]")}>Fen&rsquo;s Closet</span>
     </span>
   );
 }

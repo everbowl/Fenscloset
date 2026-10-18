@@ -31,6 +31,7 @@
   --radius: 0px;
 }
 
+html { color-scheme: light; }
 html, body {
   height: 100%;
   background: var(--paper);

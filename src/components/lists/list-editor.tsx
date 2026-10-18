@@ -140,7 +140,7 @@ export function ListEditor({ kind, entries: initial, parentId }: { kind: ListKin
 function IconBtn({ label, onClick, disabled, danger, children }: { label: string; onClick: () => void; disabled?: boolean; danger?: boolean; children: React.ReactNode }) {
   return (
     <button type="button" aria-label={label} title={label} onClick={onClick} disabled={disabled}
-      className={cn("flex size-10 items-center justify-center text-graphite hover:text-ink disabled:opacity-30", danger && "hover:text-danger")}>
+      className={cn("flex size-10 items-center justify-center text-graphite hover:text-ink disabled:opacity-30", danger && "hover:text-ink")}>
       {children}
     </button>
   );

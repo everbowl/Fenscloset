@@ -80,8 +80,8 @@ export function PersonEditor({ person, admins, smsReady, isSelf }: { person: Per
       </Card>
 
       {!isSelf ? (
-        <Card className="space-y-3 border-x-0 border-b-0 border-t border-danger px-0 pt-4">
-          <h2 className="mono text-danger">Remove {person.name}</h2>
+        <Card className="space-y-3 border-x-0 border-b-0 border-t border-ink px-0 pt-4">
+          <h2 className="mono text-graphite">Remove {person.name}</h2>
           <p className="text-[14px] leading-snug text-graphite">They lose access right away. You choose what happens to their clothes.</p>
           <Button variant="danger" onClick={() => setConfirmRemove(true)}>Remove person</Button>
         </Card>

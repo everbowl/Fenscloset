@@ -17,7 +17,7 @@ export function AppNav() {
   const pathname = usePathname();
   return (
     <nav aria-label="Main" className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-ink bg-paper">
-      <div className="mx-auto grid h-[66px] max-w-[480px] grid-cols-5 items-center px-2">
+      <div className="mx-auto grid h-[76px] max-w-[480px] grid-cols-5 items-center px-2 pb-[10px]">
         {tabs.map(({ href, label, plus }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           if (plus) {
