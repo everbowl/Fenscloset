@@ -61,7 +61,7 @@ function PhotoPicks({ picks, chosen, onPick }: { picks: Product[]; chosen: strin
         <button key={p.url} type="button" onClick={() => onPick(p.imageUrl!)} aria-pressed={p.imageUrl === chosen} className={`w-[110px] shrink-0 snap-start text-left ${p.imageUrl === chosen ? "outline outline-2 outline-ink" : ""}`} data-testid="photo-pick">
           <div className="h-[140px] overflow-hidden bg-bone"><img src={p.imageUrl!} alt="" referrerPolicy="no-referrer" loading="lazy" className="size-full object-cover" /></div>
           <p className="mt-1 line-clamp-2 text-[12px] leading-snug">{p.title}</p>
-          <p className="mono mt-0.5 text-graphite">{[p.priceText, p.storeName].filter(Boolean).join(" · ")}</p>
+          <p className="mono mt-0.5 text-graphite">{[p.query === "exact" ? "Exact item" : null, p.priceText, p.storeName].filter(Boolean).join(" · ")}</p>
         </button>
       ))}
     </div>
@@ -221,7 +221,7 @@ function ReceiptTab() {
                 <div className="h-[72px] w-[56px] shrink-0 overflow-hidden bg-bone">{l.pick?.imageUrl ? <img src={l.pick.imageUrl} alt="" referrerPolicy="no-referrer" className="size-full object-cover" /> : null}</div>
                 <div className="min-w-0 flex-1">
                   <p className="text-[15px] font-medium leading-snug">{l.name}</p>
-                  <p className="mono mt-1 text-graphite">{[l.color, l.size, l.quantity > 1 ? `×${l.quantity}` : null, l.priceText].filter(Boolean).join(" · ")}</p>
+                  <p className="mono mt-1 text-graphite">{[l.color, l.size, l.quantity > 1 ? `×${l.quantity}` : null, l.priceText, l.pick?.query === "exact" ? "Exact item at the store" : l.pick ? "Closest match" : null].filter(Boolean).join(" · ")}</p>
                   <div className="mt-1.5 flex gap-4">
                     {l.picks.length ? <button type="button" onClick={() => setOpenPicks(openPicks === i ? null : i)} className="mono py-1" data-testid="pick-another">{l.pick ? "Pick another" : "Pick a photo"}</button> : <span className="mono text-graphite">No photo found · take one later</span>}
                     {l.pick ? <button type="button" onClick={() => update(i, { pick: null })} className="mono py-1 text-graphite">Skip this one</button> : null}

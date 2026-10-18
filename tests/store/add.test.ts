@@ -103,7 +103,14 @@ describe("add from a store", () => {
     expect(receipt.orderDate).toBe("2026-10-12");
     expect(receipt.lines).toHaveLength(2);
     const lines = await matchReceipt(receipt);
-    expect(lines[0].picks.length).toBeGreaterThan(0);
+    // line 1 has its link on the receipt: the exact item, with the store's photo for its color, comes first
+    expect(lines[0].picks[0].query).toBe("exact");
+    expect(lines[0].picks[0].url).toBe("https://mock.example/products/linen-blazer");
+    expect(lines[0].picks[0].imageUrl).toBe("https://mock.example/blazer.jpg"); // Oatmeal
+    // line 2 has no link: the store's page is found by search, then the shopping alternatives follow
+    expect(lines[1].picks[0].query).toBe("exact");
+    expect(lines[1].picks[0].imageUrl).toBe("https://mock.example/blazer-black.jpg"); // Black
+    expect(lines[1].picks.length).toBeGreaterThan(1);
     expect(lines[1].quantity).toBe(2);
     const r = await createStoreEntries(jeffId, { product: { url: lines[1].picks[0].url, name: lines[1].name, brandText: null, storeName: receipt.storeName!, priceText: lines[1].priceText }, imageUrl: lines[1].picks[0].imageUrl, color: lines[1].color, size: lines[1].size, quantity: lines[1].quantity, purchaseDate: receipt.orderDate });
     await drainQueue();

@@ -101,3 +101,26 @@ export async function searchProducts(queries: string[], prefs: ProductPrefs, fet
   }
   return rankProducts(merged, prefs).slice(0, MAX_PRODUCTS);
 }
+
+export type WebHit = { title: string; link: string };
+
+/** Google web search through Serper: used to find a product's own page at its store. Mock returns the mock store page. */
+export async function searchWeb(query: string, fetchImpl: typeof fetch = fetch): Promise<WebHit[]> {
+  const q = query.replace(/\s+/g, " ").trim();
+  if (!q || !isProductSearchConfigured()) return [];
+  if (process.env.MOCK_SERPER === "true") return [{ title: "Linen Blazer | Mock Store", link: "https://mock.example/products/linen-blazer" }];
+  const key = `web:q:${createHash("sha1").update(q.toLowerCase()).digest("hex")}`;
+  const hit = await db.weatherCache.findUnique({ where: { key } });
+  if (hit && Date.now() - hit.fetchedAt.getTime() < CACHE_HOURS * 3600 * 1000) return hit.payload as WebHit[];
+  try {
+    const res = await fetchImpl("https://google.serper.dev/search", {
+      method: "POST", headers: { "X-API-KEY": process.env.SERPER_API_KEY ?? "", "Content-Type": "application/json" },
+      body: JSON.stringify({ q, gl: "us", hl: "en", num: 10 }), signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return [];
+    const json = (await res.json()) as { organic?: { title?: string; link?: string }[] };
+    const rows = (json.organic ?? []).filter((r) => typeof r.link === "string" && /^https:\/\//.test(r.link)).map((r) => ({ title: r.title ?? "", link: r.link! }));
+    await db.weatherCache.upsert({ where: { key }, update: { payload: rows, fetchedAt: new Date() }, create: { key, payload: rows } });
+    return rows;
+  } catch (e) { console.error("web search failed", q, e); return []; }
+}
