@@ -5,8 +5,8 @@
 ## Done means
 1. **Visual ranking** ✔ — text pass drafts count+2 looks, vision pass sees the cutouts and keeps the best (`rankVisually`).
 2. **Taste memory** ✔ — WEAR THIS / passes / swaps recorded (`LookFeedback`), 90-day digest in every prompt, FORGET on the Style page.
-3. **"How did it go?"** — a fit gets one of LOVED IT · FINE · NEVER AGAIN the day after. Fits panel shows the three taps; Today shows a one-line strip for yesterday's unrated fit. Loved and never-again lines join the taste digest.
-4. **Inspiration board** — on the Style page: upload screenshots of looks you like (Instagram, Pinterest, a magazine). Claude reads each into style DNA (summary, silhouettes, color pairings, formality, pieces, words). Tiles with a sheet showing what it read, REMOVE per tile. The digest joins the style context. Photos live under `inspo/`, visible to the owner and a minor's parents only. Nothing leaves the house except the image to Claude.
+3. **"How did it go?"** ✔ built 18 Oct, approved (G) — a fit gets one of LOVED IT · FINE · NEVER AGAIN the day after. Fits panel shows the three taps; Today shows a one-line strip for yesterday's unrated fit. Loved and never-again lines join the taste digest.
+4. **Inspiration board** ✔ built 18 Oct, approved (G) — on the Style page: upload screenshots of looks you like (Instagram, Pinterest, a magazine). Claude reads each into style DNA (summary, silhouettes, color pairings, formality, pieces, words). Tiles with a sheet showing what it read, REMOVE per tile. The digest joins the style context. Photos live under `inspo/`, visible to the owner and a minor's parents only. Nothing leaves the house except the image to Claude.
 5. **Virtual try-on** — adults only, opt-in per person in Settings, never minors. Provider decision pending (Q25): A Google Vertex AI Virtual Try-On (strongest data terms, Jeff already has Google Cloud; service account in Railway) vs B FASHN.ai (one API key, fastest to wire). Built behind a provider interface with a mock so the UI, privacy gate and tests exist before the key does.
 6. **Style rules** (editable list per person, admins can edit) — queued after 3–5.
 
