@@ -17,7 +17,8 @@
 - B2. The verdict is one of FITS / RISKY / PASS with a one-line reason, plus a size suggestion when the brand is in the person's sizes-by-brand list.
 - B3. "Similar owned" uses the same tags-plus-colors match as the duplicate check, loosened (same category, shared color or fabric), top 4 shown.
 - B4. Pairings: 3 boards built from the target person's usable closet with the candidate piece pinned as hero, same engine as Today.
-- B5. "You might like": at most 3 picks, only when the verdict is PASS or when the closet lacks a pairing category; each pick is a search link on a favorite store (`<store url>/search?q=…`) rather than a scraped product, so nothing is invented.
+- B5. "You might like": at most 3 picks, only when the verdict is PASS or when the closet lacks a pairing category; each pick is a search link on a favorite store (`<store url>/search?q=…`) rather than a scraped product, so nothing is invented. (Kept as the fallback when no product search key is set.)
+- B5b (added 18 Oct on Jeff's ask): real products. The verdict carries 1–3 shopping queries; Google Shopping via Serper returns title, price, store, picture, link; favorite stores then favorite brands first; interleaved across queries; deduped; 12 max; cached 24h. Shop shows a sideways-scrolling product row with BUY → and JUDGE IT (runs the verdict on that product). Queries never include sizes or measurements (they leave the house).
 - B6. Lookups are kept (ShoppingLookup) and listed on the Shop screen as "Recent", newest first, with a remove action.
 
 ## Tasks

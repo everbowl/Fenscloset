@@ -1,5 +1,7 @@
 import { db } from "@/lib/db";
-import { isMockAi, structured } from "@/lib/ai/claude";
+import { AiError, isMockAi, structured } from "@/lib/ai/claude";
+import { getObject } from "@/lib/storage";
+import { toAiImage } from "@/lib/images/thumb";
 import { describe, loadCandidates, styleContext, type Candidate } from "@/lib/outfits/catalog";
 import { weatherLine, type Weather } from "@/lib/weather";
 import type { Plan } from "@/lib/plans";
@@ -9,8 +11,10 @@ import type { Prisma } from "@/generated/prisma/client";
 import { fromDayKey } from "@/lib/dates";
 
 /**
- * Three looks for one person and one day, from their own closet. Text-only prompt (tags, not photos; see plan A1).
- * Boards are stored on OutfitSuggestion.outfits so a reload shows the same three.
+ * Three looks for one person and one day, from their own closet. A text-only pass (tags, not photos; plan A1)
+ * drafts a few more looks than needed, then a vision pass looks at the actual cutouts and keeps the best ones
+ * (clashing colors or patterns, mismatched formality, or a dull mix get dropped). Boards are stored on
+ * OutfitSuggestion.outfits so a reload shows the same three.
  */
 
 export class OutfitError extends Error {
@@ -72,13 +76,64 @@ function mockLooks(cands: Candidate[], count: number, offset: number): Board[] {
   return boards;
 }
 
-/** Ask Claude for `count` looks from `cands`, skipping any combination already in `exclude`. */
-export async function composeLooks(opts: { cands: Candidate[]; inputs: Inputs; style: string; count: number; excludeBoards?: Board[]; extra?: string; now?: Date }): Promise<Board[]> {
+const DRAFT_EXTRA = 2;
+
+const RANK_SYSTEM = `You are a personal stylist judging outfit candidates by LOOKING at the clothes. For each look you get its pieces' photos, labelled "Look N".
+Keep the looks that work best together in real life: colors and patterns that sit well side by side, matching formality, a clear silhouette. Drop a look when two pieces clash, the formality is mixed up, or it is a duller copy of another look.
+Return exactly the number asked for, best first, with a fresh one-sentence reason (max 20 words, warm editorial voice, naming the weather or plan when it matters). No emoji.`;
+
+const RANK_SCHEMA = {
+  type: "object",
+  properties: { keep: { type: "array", description: "Exactly the number of looks asked for, best first.", items: { type: "object", properties: { look: { type: "integer", description: "The look number as labelled." }, reason: { type: "string" } }, required: ["look", "reason"], additionalProperties: false } } },
+  required: ["keep"], additionalProperties: false,
+} as const;
+
+/**
+ * Vision pass: Claude sees the cutout photos of every drafted look and keeps the best `count`.
+ * Falls back to the text order when photos are missing or the call fails, so a look always comes back.
+ */
+export async function rankVisually(boards: Board[], cands: Candidate[], inputs: Inputs, count: number, style: string): Promise<Board[]> {
+  if (boards.length <= count) return boards;
+  const byId = new Map(cands.map((c) => [c.id, c]));
+  const ids = [...new Set(boards.flatMap((b) => b.itemIds))];
+  const thumbs = new Map<string, { data: string; mediaType: "image/jpeg" }>();
+  await Promise.all(ids.map(async (id) => {
+    const key = byId.get(id)?.thumbKey;
+    if (!key) return;
+    try { thumbs.set(id, await toAiImage((await getObject(key)).body)); } catch { /* no photo: judged by its tags */ }
+  }));
+  if (thumbs.size < Math.ceil(ids.length / 2)) return boards.slice(0, count);
+  const images = boards.flatMap((b, i) => b.itemIds.flatMap((id) => { const t = thumbs.get(id); const c = byId.get(id); return t && c ? [{ label: `Look ${i + 1}: ${c.name} (${[c.category, c.subcategory].filter(Boolean).join("/") || "piece"})`, ...t }] : []; }));
+  const prompt = [
+    contextLines(inputs),
+    style ? `Style profile:\n${style}` : null,
+    boards.map((b, i) => `Look ${i + 1}: ${b.itemIds.map((id) => byId.get(id)?.name ?? "?").join(" + ")} — draft reason: ${b.reason}`).join("\n"),
+    `Keep the best ${count}.`,
+  ].filter(Boolean).join("\n\n");
+  try {
+    const out = await structured<{ keep: { look: number; reason: string }[] }>({ system: RANK_SYSTEM, prompt, images, schema: RANK_SCHEMA, effort: "medium", maxTokens: 800 });
+    const kept: Board[] = [];
+    for (const k of out.keep) {
+      const b = boards[k.look - 1];
+      if (b && !kept.includes(b)) kept.push({ itemIds: b.itemIds, reason: k.reason.trim() || b.reason });
+      if (kept.length === count) break;
+    }
+    for (const b of boards) { if (kept.length >= count) break; if (!kept.some((k) => k.itemIds === b.itemIds)) kept.push(b); }
+    return kept.slice(0, count);
+  } catch (e) {
+    if (e instanceof AiError) { console.error("visual ranking skipped:", e.message); return boards.slice(0, count); }
+    throw e;
+  }
+}
+
+/** Ask Claude for `count` looks from `cands`, skipping any combination already in `exclude`. Drafts a couple extra, then the vision pass keeps the best. */
+export async function composeLooks(opts: { cands: Candidate[]; inputs: Inputs; style: string; count: number; excludeBoards?: Board[]; extra?: string; now?: Date; visual?: boolean }): Promise<Board[]> {
   const { cands, inputs, count } = opts;
   if (cands.length < 2) return [];
   const codes = new Map<string, Candidate>();
   cands.forEach((c, i) => codes.set(`#${i + 1}`, c));
   if (isMockAi()) return mockLooks(cands, count, opts.excludeBoards?.length ?? 0);
+  const draft = opts.visual === false ? count : count + DRAFT_EXTRA;
   const catalog = [...codes.entries()].map(([code, c]) => describe(c, code, opts.now)).join("\n");
   const shown = (opts.excludeBoards ?? []).map((b) => b.itemIds.map((id) => [...codes.entries()].find(([, c]) => c.id === id)?.[0]).filter(Boolean).join(" + "));
   const prompt = [
@@ -88,15 +143,16 @@ export async function composeLooks(opts: { cands: Candidate[]; inputs: Inputs; s
     opts.extra ?? null,
     shown.length ? `Already shown, do not repeat these combinations: ${shown.join(" | ")}` : null,
     `Pieces:\n${catalog}`,
-    `Return ${count} looks.`,
+    `Return ${draft} looks.`,
   ].filter(Boolean).join("\n\n");
-  const out = await structured<{ outfits: { codes: string[]; reason: string }[] }>({ system: SYSTEM, prompt, schema: SCHEMA, effort: "medium", maxTokens: 1200 });
+  const out = await structured<{ outfits: { codes: string[]; reason: string }[] }>({ system: SYSTEM, prompt, schema: SCHEMA, effort: "medium", maxTokens: 1800 });
   const boards: Board[] = [];
   for (const o of out.outfits) {
     const ids = [...new Set(o.codes.map((code) => codes.get(code.trim())?.id).filter((x): x is string => Boolean(x)))];
     if (ids.length >= 2) boards.push({ itemIds: ids, reason: o.reason.trim() });
   }
-  return boards.slice(0, count);
+  if (opts.visual === false) return boards.slice(0, count);
+  return rankVisually(boards.slice(0, draft), cands, inputs, count, opts.style);
 }
 
 function toPiece(c: Candidate): Piece {

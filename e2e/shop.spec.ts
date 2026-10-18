@@ -5,7 +5,7 @@ import { E2E_DB, JEFF_PASSWORD, loginAs, resetAndSeed } from "./helpers";
 test.describe.configure({ mode: "serial" });
 test.beforeAll(() => {
   resetAndSeed({ jeffReady: true });
-  execSync("npx tsx e2e/seed-closets.ts Jeff Mya", { stdio: "ignore", env: { ...process.env, DATABASE_URL: E2E_DB, MOCK_S3: "true" } });
+  execSync("npx tsx e2e/seed-closets.ts Jeff", { stdio: "ignore", env: { ...process.env, DATABASE_URL: E2E_DB, MOCK_S3: "true" } });
 });
 
 test("link lookup for me, photo lookup for Mya as a parent, recent list and remove", async ({ page }) => {
@@ -28,6 +28,17 @@ test("link lookup for me, photo lookup for Mya as a parent, recent list and remo
   await page.getByTestId("upload-screenshot").click();
   await page.getByTestId("shop-file").setInputFiles({ name: "shot.jpg", mimeType: "image/jpeg", buffer: Buffer.from(await (await import("sharp")).default({ create: { width: 200, height: 260, channels: 3, background: { r: 40, g: 40, b: 40 } } }).jpeg().toBuffer()) });
   await expect(page.getByTestId("shop-result")).toContainText("For Mya");
+  // Mya's closet is empty, so Bottoms are missing: a scrollable row of real products (mocked) from several stores
+  await expect(page.getByTestId("products")).toContainText("Bottoms to go with it");
+  expect(await page.getByTestId("product").count()).toBeGreaterThan(3);
+  await expect(page.getByTestId("product").first()).toContainText("$");
+  // JUDGE IT runs the verdict on that product's link
+  await page.getByTestId("judge-product").first().click();
+  await expect(page.getByTestId("shop-result")).toContainText("Linen Blazer");
+  await page.getByTestId("remove-lookup").click();
+  // the screenshot lookup for Mya is what's left, so it is shown; removing it too empties the screen
+  await expect(page.getByTestId("shop-result")).toContainText("For Mya");
+  await expect(page.getByTestId("shop-result")).not.toContainText("Linen Blazer");
   await page.getByTestId("remove-lookup").click();
   await expect(page.getByTestId("shop-empty")).toBeVisible();
 });

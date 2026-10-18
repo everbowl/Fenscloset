@@ -19,7 +19,7 @@ async function addItem(ownerId: string, name: string, category: string, color?: 
 
 describe("shop", () => {
   beforeEach(async () => {
-    await resetDb(); process.env.MOCK_S3 = "true"; process.env.MOCK_AI = "true"; process.env.MOCK_FETCH = "true";
+    await resetDb(); process.env.MOCK_S3 = "true"; process.env.MOCK_AI = "true"; process.env.MOCK_FETCH = "true"; process.env.MOCK_SERPER = "true";
     process.env.MOCK_S3_DIR = await mkdtemp(path.join(os.tmpdir(), "fc-shop-")); await seed();
   });
   const by = (name: string) => db.person.findFirstOrThrow({ where: { name } });
@@ -45,6 +45,7 @@ describe("shop", () => {
     expect(v.pairings[0].pieces[0].id).toBe("candidate");
     expect(v.pairings[0].pieces[0].thumbKey).toMatch(/^shop\//);
     expect(v.recommendations).toEqual([]); // FITS and nothing missing
+    expect(v.products).toEqual([]);
     expect(await canViewKey(jeff, v.imageKey!)).toBe(true);
     expect(await canViewKey(olivia, v.imageKey!)).toBe(false);
     // PASS when two similar pieces are owned → recommendations appear (favorite store search links)
@@ -58,6 +59,11 @@ describe("shop", () => {
     expect(v2.similar.map((s) => s.name).sort()).toEqual(["Blazer one", "Blazer two"]);
     expect(v2.recommendations.length).toBeGreaterThan(0);
     expect(v2.recommendations[0].url).toMatch(/^https:\/\//);
+    // PASS → real products for the alternative query, favorite store first
+    expect(v2.verdict.shoppingQueries.length).toBeGreaterThan(0);
+    expect(v2.products.length).toBeGreaterThan(0);
+    expect(v2.products[0]).toMatchObject({ storeName: "Nordstrom", url: expect.stringMatching(/^https:\/\//) });
+    expect((await getLookup(jeff, v2.id))!.products.length).toBe(v2.products.length);
     // permissions: Olivia cannot shop for Mya; Jeff (parent) can, and body data is used for Mya; Brittney shopping for Jeff gets no body data
     await expect(lookup(olivia, mya.id, { source: "link", url: "https://mock.example/p/1" })).rejects.toMatchObject({ status: 403 });
     const img = await sharp({ create: { width: 300, height: 400, channels: 3, background: { r: 20, g: 20, b: 20 } } }).jpeg().toBuffer();
@@ -66,6 +72,7 @@ describe("shop", () => {
     await db.bodyMeasurement.create({ data: { personId: mya.id, kindId: kinds[0].id, value: "60" } });
     const forMya = await lookup(jeff, mya.id, { source: "photo", data: img, contentType: "image/jpeg" });
     expect(forMya.verdict.usedBodyData).toBe(true);
+    expect(forMya.products).toEqual([]); // she owns bottoms: nothing missing
     expect(forMya.forName).toBe("Mya");
     expect(await canViewKey(mya, forMya.imageKey!)).toBe(true);
     expect(await canViewKey(brittney, forMya.imageKey!)).toBe(true);

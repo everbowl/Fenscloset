@@ -24,6 +24,8 @@ export type StructuredRequest = {
   system: string;
   prompt: string;
   image?: { data: string; mediaType: "image/jpeg" | "image/png" | "image/webp" };
+  /** Several labelled pictures (e.g. the pieces of each look); each label is sent as text right before its image. */
+  images?: { label: string; data: string; mediaType: "image/jpeg" | "image/png" | "image/webp" }[];
   schema: Record<string, unknown>;
   effort?: "low" | "medium" | "high";
   maxTokens?: number;
@@ -33,6 +35,10 @@ export type StructuredRequest = {
 export async function structured<T>(req: StructuredRequest): Promise<T> {
   const content: Anthropic.Beta.BetaContentBlockParam[] = [];
   if (req.image) content.push({ type: "image", source: { type: "base64", media_type: req.image.mediaType, data: req.image.data } });
+  for (const im of req.images ?? []) {
+    content.push({ type: "text", text: im.label });
+    content.push({ type: "image", source: { type: "base64", media_type: im.mediaType, data: im.data } });
+  }
   content.push({ type: "text", text: req.prompt });
   let res: Anthropic.Beta.BetaMessage;
   try {

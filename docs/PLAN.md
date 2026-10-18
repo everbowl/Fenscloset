@@ -88,7 +88,7 @@ Every "list" below is a real table with `id, name, sortOrder, isArchived, create
 - `OutfitSuggestion` — personId, date, inputs JSON (weather, occasion, check-in), outfits JSON (3 boards + reasons), togetherSessionId
 - `TogetherSession` — mode (`coordinate`|`match`|`contrast`), personIds[], occasion
 - `WearLog` — personId, itemId, wornOn, outfitSuggestionId?
-- `ShoppingLookup` — personId, forPersonId, source (`link`|`screenshot`|`photo`), input, verdict JSON, similarItemIds[], pairings JSON, recommendations JSON
+- `ShoppingLookup` — personId, forPersonId, source (`link`|`screenshot`|`photo`), input, verdict JSON (incl. shoppingQueries), similarItemIds[], pairings JSON, recommendations JSON (store search links, fallback), products JSON (real products with picture, price, store via Google Shopping / Serper)
 
 ---
 
@@ -108,7 +108,7 @@ Every "list" below is a real table with `id, name, sortOrder, isArchived, create
 12. **Profile → Style** — loved/avoid colors, style words, never-suggest items.
 13. **Profile → Brands & Stores** — personal favorites list.
 14. **Profile → Settings** — saved zip, Google Calendar connect/disconnect, password, shop-for-me permissions.
-15. **Shop** — paste link / upload screenshot / take photo; "shopping for: [me ▾ / Mya / …]"; fit verdict, "you already own similar", 3+ pairing boards, occasional "you might like" with buy links.
+15. **Shop** — paste link / upload screenshot / take photo; "shopping for: [me ▾ / Mya / …]"; fit verdict, "you already own similar", 3+ pairing boards, and (when a category is missing or the call is PASS) a sideways-scrolling row of real products from several stores with picture, price, BUY and JUDGE IT (Google Shopping via Serper; store search links when no key).
 16. **Clean-out** — items not worn in X months (X editable here), quick actions.
 17. **Admin → People** — add/invite, set role, link minors to parents, remove (with "delete items or move to Family" prompt).
 18. **Admin → Lists** — every taxonomy editable here AND inline wherever it appears (e.g., "+ Add category" inside the confirm card).
@@ -227,6 +227,8 @@ Built and tested (60 unit, 22 browser): body profile (editable measurement list,
 - Built and tested (72 unit, 26 browser): weather (Open-Meteo, zip or phone location, household time zone rule), plan (occasion list / free text / Google Calendar read-only, connect in Settings once `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` exist), check-in (taps or selfie read by Claude, selfie private), three looks per day from the person's own closet (text-only prompt, plan A1) with WEAR THIS / SWAP ONE PIECE / MORE LOOKS, Together mode (coordinate / match / contrast, one look per person, minors only with parents), Fits calendar (photo of the night, share, visibility line, save a fit for any past day, remove), wear log + wear counts + no-repeat window (today's wears excluded), laundry/never-suggest/retired skipped, clean-out (keep 3 months / donate / sell), wear history on item detail. Phase 3 screens, desktop layout (D) and Shop screens (E) approved by Jeff (2026-10-18). Google OAuth client in Railway.
 
 ## Phase 4 status (2026-10-18)
+- 2026-10-18 (later): Jeff's Shop links verified in production (Vuori). Jeff asked for real products instead of search links → `src/lib/shop/products.ts`: Claude writes 1–3 shopping queries in the verdict (never sizes or measurements), Google Shopping via Serper (`SERPER_API_KEY` in Railway, `MOCK_SERPER` in tests), favorite stores then favorite brands first, interleaved across queries, deduped, capped at 12, cached a day; product row on the Shop screen with BUY → and JUDGE IT. Without a key the old search links show. Decision Q20 A (Serper).
+- 2026-10-18 (later): outfit engine now drafts count+2 looks by text, then a vision pass (`rankVisually`, cutout thumbnails as images) keeps the best `count` with fresh reasons; falls back to text order if photos are missing or the call fails. Applies to Today, More looks, Together and Shop pairings. Decision Q21 A (build now).
 - Built and tested (74 unit, 28 browser): Shop screen with shopping-for switcher (self, minors, grants), link lookups (store page title/image/price/brand via Open Graph and JSON-LD, mock in tests), screenshot and dressing-room photo lookups, Claude verdict FITS / RISKY / PASS with size note when body data is permitted, "you already own similar", three pairing boards with the new piece pinned first, "you might like" store search links from favorite stores (only on PASS or a missing category), recent list with remove. Screens pending Jeff approval; Jeff still to run the real-store test (3 links, 1 screenshot, 1 dressing-room photo).
 - Google Calendar connected and verified by Jeff (2026-10-18); OAuth client in Railway env; redirects built from APP_URL.
 - 2026-10-18: production AI calls failed with `output_config.format.schema: For 'array' type, property 'maxItems' is not supported`; every schema now states array limits in descriptions only. Affected until the fix: tagging (Phase 1), looks (Phase 3), Shop (Phase 4).

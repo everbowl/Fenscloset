@@ -7,6 +7,7 @@ import { canSeeBodyData, canShopFor, type Viewer } from "@/lib/people/visibility
 import { loadCandidates, styleContext, type Candidate } from "@/lib/outfits/catalog";
 import { composeLooks, type Board, type Piece } from "@/lib/outfits/engine";
 import { fetchImage, PageError, readProductPage } from "@/lib/shop/page";
+import { searchProducts, type Product } from "@/lib/shop/products";
 import type { ShopSource } from "@/generated/prisma/client";
 
 /**
@@ -22,7 +23,8 @@ export class ShopError extends Error {
 }
 
 export type CandidateRead = { name: string; categoryId: string | null; categoryName: string | null; colorIds: string[]; colorNames: string[]; fabricName: string | null; formalityName: string | null; brandText: string | null; sizeText: string | null };
-export type Verdict = { call: "FITS" | "RISKY" | "PASS"; reason: string; sizeNote: string | null; missingCategory: string | null; usedBodyData: boolean };
+/** shoppingQueries: 1–3 Google Shopping searches for the missing category (or a better alternative on PASS); empty otherwise. */
+export type Verdict = { call: "FITS" | "RISKY" | "PASS"; reason: string; sizeNote: string | null; missingCategory: string | null; shoppingQueries: string[]; usedBodyData: boolean };
 export type Recommendation = { label: string; storeName: string; url: string };
 export type SimilarItem = { id: string; name: string; thumbKey: string | null };
 
@@ -30,6 +32,8 @@ export type LookupView = {
   id: string; source: ShopSource; createdAt: Date; shopperId: string; forPersonId: string; forName: string;
   inputUrl: string | null; imageKey: string | null; title: string | null; priceText: string | null; brandText: string | null;
   read: CandidateRead; verdict: Verdict; similar: SimilarItem[]; pairings: (Board & { pieces: Piece[] })[]; recommendations: Recommendation[];
+  /** Real products (picture, price, store) for the missing category or a better alternative; empty when nothing is needed or search is not set up. */
+  products: Product[];
 };
 
 const CANDIDATE_ID = "candidate";
@@ -93,13 +97,16 @@ async function decide(read: CandidateRead, style: string, body: { text: string; 
   for (const c of closet) counts.set(c.category ?? "?", (counts.get(c.category ?? "?") ?? 0) + 1);
   if (isMockAi()) {
     const call = similar.length >= 2 ? "PASS" : counts.get("Bottoms") ? "FITS" : "RISKY";
-    return { call, reason: call === "PASS" ? "You already own two like it." : call === "FITS" ? "Mock: it pairs with the jeans you wear most." : "Mock: nothing in the closet to wear it with yet.", sizeNote: body.used ? "Mock: size M by your Everlane size." : null, missingCategory: counts.get("Bottoms") ? null : "Bottoms", usedBodyData: body.used };
+    const missingCategory = counts.get("Bottoms") ? null : "Bottoms";
+    const shoppingQueries = missingCategory ? ["men's slim dark wash jeans", "men's tapered chino pants"] : call === "PASS" ? ["men's navy unstructured blazer"] : [];
+    return { call, reason: call === "PASS" ? "You already own two like it." : call === "FITS" ? "Mock: it pairs with the jeans you wear most." : "Mock: nothing in the closet to wear it with yet.", sizeNote: body.used ? "Mock: size M by your Everlane size." : null, missingCategory, shoppingQueries, usedBodyData: body.used };
   }
-  const schema = { type: "object", properties: { call: { type: "string", enum: ["FITS", "RISKY", "PASS"] }, reason: { type: "string" }, sizeNote: { type: ["string", "null"] }, missingCategory: { anyOf: [{ type: "string", enum: [...new Set([...closet.map((c) => c.category).filter((x): x is string => Boolean(x)), "Tops", "Bottoms", "Shoes", "Outerwear", "Dresses"])] }, { type: "null" }] } }, required: ["call", "reason", "sizeNote", "missingCategory"], additionalProperties: false };
+  const schema = { type: "object", properties: { call: { type: "string", enum: ["FITS", "RISKY", "PASS"] }, reason: { type: "string" }, sizeNote: { type: ["string", "null"] }, missingCategory: { anyOf: [{ type: "string", enum: [...new Set([...closet.map((c) => c.category).filter((x): x is string => Boolean(x)), "Tops", "Bottoms", "Shoes", "Outerwear", "Dresses"])] }, { type: "null" }] }, shoppingQueries: { type: "array", items: { type: "string" }, description: "1 to 3 Google Shopping searches, only when missingCategory is set (things to wear with it) or the call is PASS (a better alternative); otherwise empty. Specific and buyable: who it is for, fit, color, material, e.g. \"men's black tapered chino pants\". Never sizes or measurements." } }, required: ["call", "reason", "sizeNote", "missingCategory", "shoppingQueries"], additionalProperties: false };
   const out = await structured<Verdict>({
     system: `You are a candid personal shopper for one family's private closet app. Judge ONE candidate piece for ONE person.
 FITS = buy it: it suits their style, fills a gap or pairs with what they own. RISKY = maybe: fit or style doubts, say why. PASS = skip: duplicates what they own or clashes with their style.
-Reason: one sentence, max 22 words, warm and specific. sizeNote: a size suggestion only when sizes-by-brand or measurements support it, else null. missingCategory: the category they'd need to wear it (e.g. Bottoms) or null.`,
+Reason: one sentence, max 22 words, warm and specific. sizeNote: a size suggestion only when sizes-by-brand or measurements support it, else null. missingCategory: the category they'd need to wear it (e.g. Bottoms) or null.
+shoppingQueries: when missingCategory is set, 1–3 shopping searches for pieces in that category that go with the candidate and the style profile; when the call is PASS, 1–2 searches for a better alternative; otherwise an empty list. Favorite brands may appear in a query. Never put sizes or measurements in a query.`,
     prompt: [
       `Candidate: ${read.name}; category ${read.categoryName ?? "unknown"}; colors ${read.colorNames.join(", ") || "unknown"}; fabric ${read.fabricName ?? "unknown"}; formality ${read.formalityName ?? "unknown"}; brand ${read.brandText ?? "unknown"}${priceText ? `; price ${priceText}` : ""}.`,
       style ? `Style profile:\n${style}` : "Style profile: none set.",
@@ -109,7 +116,14 @@ Reason: one sentence, max 22 words, warm and specific. sizeNote: a size suggesti
     ].join("\n\n"),
     schema, effort: "medium", maxTokens: 400,
   });
-  return { ...out, usedBodyData: body.used };
+  return { ...out, shoppingQueries: (out.shoppingQueries ?? []).slice(0, 3), usedBodyData: body.used };
+}
+
+/** Plan B5b: real products for the verdict's shopping queries, favorite stores and brands first. */
+async function findProducts(forPersonId: string, verdict: Verdict): Promise<Product[]> {
+  if (!verdict.shoppingQueries.length) return [];
+  const person = await db.person.findUniqueOrThrow({ where: { id: forPersonId }, select: { favoriteStores: { where: { isArchived: false }, select: { name: true } }, favoriteBrands: { where: { isArchived: false }, select: { name: true } } } });
+  return searchProducts(verdict.shoppingQueries, { favoriteStores: person.favoriteStores.map((s) => s.name), favoriteBrands: person.favoriteBrands.map((b) => b.name) });
 }
 
 /** Plan B4: three looks with the candidate pinned as hero. */
@@ -178,11 +192,11 @@ export async function lookup(viewer: Viewer, forPersonId: string, input: Input):
   const read = await readCandidate(lists, { image: ai, title, description, brandText });
   const [style, body, closet, similar] = await Promise.all([styleContext(forPersonId), bodyContext(viewer, forPersonId, read.brandText), loadCandidates(forPersonId, new Date(), { noRepeatDays: 0 }), similarOwned(forPersonId, read)]);
   const verdict = await decide(read, style, body, closet.usable, similar, priceText);
-  const [boards, recommendations] = await Promise.all([pairings(forPersonId, read, imageKey, closet.usable, style), recommend(forPersonId, read, verdict)]);
+  const [boards, recommendations, products] = await Promise.all([pairings(forPersonId, read, imageKey, closet.usable, style), recommend(forPersonId, read, verdict), findProducts(forPersonId, verdict)]);
   const row = await db.shoppingLookup.create({
     data: {
       shopperId: viewer.id, forPersonId, source: input.source, inputUrl, imageKey, title: read.name, priceText, brandText: read.brandText,
-      verdict: { ...verdict, read } as object, similarItemIds: similar.map((s) => s.id), pairings: boards.map((b) => ({ itemIds: b.itemIds, reason: b.reason })) as object[], recommendations: recommendations as object[],
+      verdict: { ...verdict, read } as object, similarItemIds: similar.map((s) => s.id), pairings: boards.map((b) => ({ itemIds: b.itemIds, reason: b.reason })) as object[], recommendations: recommendations as object[], products: products as object[],
     },
   });
   return (await getLookup(viewer, row.id))!;
@@ -201,7 +215,8 @@ export async function getLookup(viewer: Viewer, id: string): Promise<LookupView 
     const it = items.find((x) => x.id === id);
     return it ? { id: it.id, name: it.name ?? "Untitled piece", label: (it.subcategory?.name ?? it.category?.name ?? "piece").toUpperCase(), thumbKey: it.photos[0]?.bucketKey ?? null, ownerId: it.ownerId } : null;
   };
-  const { read, ...verdict } = v;
+  const { read, ...rest } = v;
+  const verdict: Verdict = { ...rest, shoppingQueries: rest.shoppingQueries ?? [] };
   return {
     id: row.id, source: row.source, createdAt: row.createdAt, shopperId: row.shopperId, forPersonId: row.forPersonId, forName: row.forPerson.name.split(" ")[0],
     inputUrl: row.inputUrl, imageKey: row.imageKey, title: row.title, priceText: row.priceText, brandText: row.brandText,
@@ -209,6 +224,7 @@ export async function getLookup(viewer: Viewer, id: string): Promise<LookupView 
     similar: row.similarItemIds.map((id) => items.find((x) => x.id === id)).filter(Boolean).map((it) => ({ id: it!.id, name: it!.name ?? "Untitled piece", thumbKey: it!.photos[0]?.bucketKey ?? null })),
     pairings: boards.map((b) => ({ ...b, pieces: b.itemIds.map(piece).filter((p): p is Piece => Boolean(p)) })),
     recommendations: row.recommendations as Recommendation[],
+    products: (row.products as Product[] | null) ?? [],
   };
 }
 

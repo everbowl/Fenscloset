@@ -100,7 +100,30 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent }: { me
               ))}
             </div>
           ) : <p className="mono mt-6 text-graphite">Nothing in {selected.forName === "me" ? "your" : `${selected.forName}’s`} closet to pair it with yet.</p>}
-          {selected.recommendations.length ? (
+          {selected.products.length ? (
+            <div className="mt-6" data-testid="products">
+              <div className="flex items-end justify-between border-b border-ink pb-2">
+                <p className="mono text-graphite">{selected.verdict.missingCategory ? `${selected.verdict.missingCategory} to go with it` : "Instead of this"}</p>
+                <p className="mono text-graphite">{selected.products.length} from {new Set(selected.products.map((p) => p.storeName)).size} stores</p>
+              </div>
+              <div className="-mx-5 mt-3 flex snap-x gap-2.5 overflow-x-auto px-5 pb-2 lg:mx-0 lg:px-0" data-testid="product-row">
+                {selected.products.map((p) => (
+                  <div key={p.url} className="w-[150px] shrink-0 snap-start" data-testid="product">
+                    <a href={p.url} target="_blank" rel="noreferrer" className="block h-[190px] overflow-hidden bg-bone" aria-label={p.title}>
+                      {p.imageUrl ? <img src={p.imageUrl} alt="" referrerPolicy="no-referrer" loading="lazy" className="size-full object-cover" /> : null}
+                    </a>
+                    <p className="mt-2 line-clamp-2 text-[13px] font-medium leading-snug">{p.title}</p>
+                    <p className="mono mt-1 text-graphite">{[p.priceText, p.storeName].filter(Boolean).join(" · ")}</p>
+                    <div className="mt-1.5 flex items-center justify-between">
+                      <a href={p.url} target="_blank" rel="noreferrer" className="mono py-2 text-ink">Buy →</a>
+                      <button type="button" disabled={thinking} onClick={() => run("link", () => lookupLinkAction(forPersonId, p.url))} className="mono py-2 text-ink" data-testid="judge-product">Judge it</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {selected.recommendations.length && !selected.products.length ? (
             <div className="mt-6" data-testid="picks">
               <p className="mono border-b border-ink pb-2 text-graphite">You might like</p>
               {selected.recommendations.map((r, i) => (

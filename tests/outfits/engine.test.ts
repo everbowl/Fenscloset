@@ -108,3 +108,16 @@ describe("outfit engine", () => {
     expect(fitId).toBeTruthy();
   });
 });
+
+describe("visual ranking", () => {
+  beforeEach(async () => { await resetDb(); process.env.MOCK_AI = "true"; await seed(); });
+
+  it("keeps the text order when there are no photos to judge, and never returns more than asked", async () => {
+    const { rankVisually } = await import("@/lib/outfits/engine");
+    const jeff = await db.person.findFirstOrThrow({ where: { name: "Jeff" } });
+    const cands = (await loadCandidates(jeff.id)).usable;
+    const boards = [{ itemIds: ["a", "b"], reason: "one" }, { itemIds: ["c", "d"], reason: "two" }, { itemIds: ["e", "f"], reason: "three" }];
+    expect(await rankVisually(boards, cands, { weather: null, plan: { label: null, source: "none" }, checkIn: [], restingIds: [], noRepeatDays: 0 }, 2, "")).toEqual(boards.slice(0, 2));
+    expect(await rankVisually(boards.slice(0, 2), cands, { weather: null, plan: { label: null, source: "none" }, checkIn: [], restingIds: [], noRepeatDays: 0 }, 3, "")).toEqual(boards.slice(0, 2));
+  });
+});
