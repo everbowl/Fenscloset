@@ -64,6 +64,7 @@ export const CHECK_IN_SCALES: Record<string, string[]> = {
 export const RULES = [
   { key: "noRepeatDays", value: "14", label: "No-repeat window (days)", description: "Don't suggest an outfit piece that was worn within this many days." },
   { key: "notWornMonths", value: "6", label: "Not-worn alert (months)", description: "Flag items that haven't been worn in this many months for a closet clean-out." },
+  { key: "timezone", value: "America/Los_Angeles", label: "Household time zone", description: "Decides when 'today' starts for check-ins, looks and the Fits calendar." },
 ];
 
 export const DEV_PASSWORD = "0535";

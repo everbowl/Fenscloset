@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 /** Wipe every table so each test file starts clean. Order handles FKs via CASCADE. */
 export async function resetDb() {
   const tables = [
+    "CheckInAnswer", "CheckIn", "FitViewer", "FitItem", "WearLog", "Fit", "OutfitSuggestion", "TogetherPerson", "TogetherSession", "GoogleCalendarConnection", "WeatherCache",
     "BodyMeasurement", "BodySizeByBrand", "BodyPhoto", "BodyProfile", "BodyDataGrant", "ShopForGrant", "MinorBodyImageApproval", "MeasurementKind", "StyleWord",
     "ImportEntry", "ImportBatch", "ItemPhoto", "ItemShare", "ItemCloset", "Item", "Session", "PasswordResetToken", "InviteToken", "GuardianLink",
     "Closet", "Subcategory", "Category", "Color", "Pattern", "Fabric", "Season",
