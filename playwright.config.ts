@@ -22,7 +22,7 @@ export default defineConfig({
   webServer: {
     command: `npm run build >/dev/null 2>&1 && npx next start -p ${PORT}`,
     url: `http://localhost:${PORT}/api/health`,
-    reuseExistingServer: true,
+    reuseExistingServer: false,
     timeout: 240_000,
     env: { ...process.env, DATABASE_URL: "postgresql://postgres@localhost:5433/fenscloset_e2e", DEV_MODE: "true", SESSION_SECRET: "e2e", APP_URL: `http://localhost:${PORT}` },
   },
