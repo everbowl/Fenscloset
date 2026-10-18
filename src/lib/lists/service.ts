@@ -163,7 +163,10 @@ export async function deleteEntry(kind: ListKind, id: string): Promise<void> {
 
 /** Persists a new order. Ids not mentioned keep their relative order after the mentioned ones. */
 export async function reorderEntries(kind: ListKind, orderedIds: string[]): Promise<void> {
-  await db.$transaction(orderedIds.map((id, i) => delegateFor(kind).update({ where: { id }, data: { sortOrder: i } }) as unknown as Parameters<typeof db.$transaction>[0][number]));
+  const d = delegateFor(kind);
+  await db.$transaction(async () => {
+    for (const [i, id] of orderedIds.entries()) await d.update({ where: { id }, data: { sortOrder: i } });
+  });
 }
 
 /** Counts per kind for the admin overview. */
