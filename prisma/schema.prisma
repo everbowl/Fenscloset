@@ -236,6 +236,8 @@ model Tag {
 model Brand {
   id         String            @id @default(cuid())
   name       String            @unique
+  /// The brand's store page, filled in once by anyone in the family; new pieces of the brand get it as their link.
+  url        String?
   sortOrder  Int               @default(0)
   isArchived Boolean           @default(false)
   createdAt  DateTime          @default(now())

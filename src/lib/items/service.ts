@@ -76,6 +76,7 @@ export async function createItemFromEntry(personId: string, entryId: string, edi
   const connect = (ids: string[]) => ({ connect: ids.map((id) => ({ id })) });
   const meta = (entry.storeMeta as StoreMeta | null) ?? null;
   const storeId = meta?.storeName ? await storeIdByName(meta.storeName) : null;
+  const brandUrl = !meta?.url && tags.brandId ? (await db.brand.findUnique({ where: { id: tags.brandId }, select: { url: true } }))?.url ?? null : null;
   const item = await db.$transaction(async (tx) => {
     const made = await tx.item.create({
       data: {
@@ -86,7 +87,7 @@ export async function createItemFromEntry(personId: string, entryId: string, edi
         brandId: tags.brandId,
         size: tags.sizeText,
         phash: entry.phash,
-        ...(meta ? { storeId, purchaseUrl: meta.url?.slice(0, 500) ?? null, purchasePrice: priceNumber(meta.priceText), purchaseDate: meta.purchaseDate ? new Date(`${meta.purchaseDate}T12:00:00Z`) : null, storePhoto: true } : {}),
+        ...(meta ? { storeId, purchaseUrl: meta.url?.slice(0, 500) ?? null, purchasePrice: priceNumber(meta.priceText), purchaseDate: meta.purchaseDate ? new Date(`${meta.purchaseDate}T12:00:00Z`) : null, storePhoto: true } : { purchaseUrl: brandUrl }),
         aiConfidence: JSON.parse(JSON.stringify({ confidence: tags.confidence, fabricConfidence: tags.fabricConfidence, warnings: ai.warnings })),
         colors: connect(tags.colorIds),
         patterns: connect(tags.patternId ? [tags.patternId] : []),

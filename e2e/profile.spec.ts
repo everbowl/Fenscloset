@@ -107,3 +107,39 @@ test("inspiration board: add a look, see what it read, remove it", async ({ page
   await page.getByTestId("remove-inspiration").click();
   await expect(page.getByTestId("inspiration-tile")).toHaveCount(0);
 });
+
+test("my brands & sizes: add Lululemon with size and link, then one tap on the confirm card fills brand and size", async ({ page }) => {
+  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  await page.goto("/profile/brands");
+  await expect(page.getByTestId("my-brands")).toContainText("None yet");
+  await page.getByTestId("add-my-brand").click();
+  await page.getByRole("dialog").getByRole("option", { name: "Lululemon" }).click();
+  await page.getByTestId("my-brand-size").fill("L");
+  await page.getByTestId("my-brand-url").fill("shop.lululemon.com");
+  await page.getByTestId("save-my-brand").click();
+  await expect(page.getByTestId("my-brands")).toContainText("Lululemon");
+  await expect(page.getByTestId("my-brands")).toContainText("Size L · shop.lululemon.com");
+
+  // a fresh photo → confirm card offers "Lululemon · L" as one tap, and asks for more photos
+  const buffer = Buffer.from(await (await import("sharp")).default({ create: { width: 800, height: 1100, channels: 3, background: { r: 20, g: 20, b: 20 } } }).jpeg().toBuffer());
+  await page.goto("/add");
+  await page.getByTestId("pick-photos").setInputFiles({ name: "tee.jpg", mimeType: "image/jpeg", buffer });
+  const confirmLink = page.getByRole("link", { name: /Confirm 1 ready/ });
+  await expect(confirmLink).toBeVisible({ timeout: 30_000 });
+  await confirmLink.click();
+  await expect(page.getByTestId("ask-more-photos")).toContainText("More photos of this piece?");
+  await page.getByTestId("more-no").click();
+  await expect(page.getByTestId("ask-more-photos")).toHaveCount(0);
+  await expect(page.getByTestId("my-brand-pills")).toContainText("Lululemon · L");
+  await page.getByTestId("my-brand-pills").getByRole("button", { name: "Lululemon · L" }).click();
+  await expect(page.getByTestId("row-brand")).toContainText("Lululemon · L");
+  await expect(page.getByTestId("my-brand-pills")).toHaveCount(0);
+  await page.getByTestId("confirm-next").click();
+  await expect(page.getByRole("heading", { name: /All done/ })).toBeVisible();
+
+  // the new piece carries the brand's store link; "Added · another?" strip is on the item after its own photo
+  await page.goto("/closet");
+  await page.getByTestId("item-card").first().click();
+  await expect(page.getByRole("button", { name: /^Brand · Size/ })).toContainText("Lululemon · L");
+  await expect(page.getByRole("button", { name: /^Link/ })).toContainText("shop.lululemon.com");
+});

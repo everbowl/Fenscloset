@@ -1,4 +1,5 @@
 import { isSmoothConfigured } from "@/lib/images/smooth";
+import { listMyBrands } from "@/lib/profiles/brands";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePerson, isAdmin } from "@/lib/auth/current";
@@ -52,7 +53,7 @@ export default async function ConfirmPage({ params, searchParams }: { params: Pr
 
   const entry = await db.importEntry.findUniqueOrThrow({ where: { id: entryId } });
   const ai = (entry.aiResult as EntryAiResult | null) ?? { tags: emptyTags(), warnings: [] };
-  const lists = await loadTagLists();
+  const [lists, myBrands] = await Promise.all([loadTagLists(), listMyBrands(person.id)]);
   const duplicate = await findLikelyDuplicate(person.id, { phash: entry.phash, categoryId: ai.tags.categoryId, colorIds: ai.tags.colorIds, brandId: ai.tags.brandId });
   const position = summary.position;
 
@@ -62,6 +63,7 @@ export default async function ConfirmPage({ params, searchParams }: { params: Pr
       batchId={batchId}
       entry={{ id: entry.id, photoKey: entry.cutoutKey ?? entry.originalKey, labelKey: entry.labelKey, wornKey: entry.wornKey, backKey: entry.backKey, smoothKey: entry.smoothKey, warnings: ai.warnings }}
       canSmooth={isSmoothConfigured()}
+      myBrands={myBrands}
       tags={ai.tags}
       lists={lists}
       counter={`${pad(position)} / ${pad(summary.total)}`}

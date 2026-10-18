@@ -54,6 +54,7 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
   const photoRef = useRef<HTMLInputElement>(null);
   const [photoKind, setPhotoKind] = useState<"alone" | "worn" | "label" | "back">("alone");
   const [uploading, setUploading] = useState(false);
+  const [justAdded, setJustAdded] = useState(false);
 
   const name = (xs: { id: string; name: string }[], id: string | null) => xs.find((x) => x.id === id)?.name ?? null;
   const names = (xs: { id: string; name: string }[], ids: string[]) => ids.map((id) => name(xs, id)).filter(Boolean).join(", ");
@@ -83,6 +84,7 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
       if (!put.ok) throw new Error("Upload failed.");
       const r = await addItemPhotoAction(it.id, photoKind, signed.key);
       if (!r.ok) throw new Error(r.error);
+      setJustAdded(true);
       router.refresh();
     } catch (err) { setError((err as Error).message); } finally { setUploading(false); }
   }
@@ -117,6 +119,13 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
       </div>
       <p className="mono mt-2 text-graphite">{[!it.mine ? it.ownerName : null, category?.name, it.status, it.isFavorite ? "Favorite" : null].filter(Boolean).join(" · ")}</p>
 
+      {justAdded ? (
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-y border-line py-2" data-testid="ask-more-photos">
+          <span className="mono tracking-[0.1em]">Added · another?</span>
+          {([["back", "Back"], ["label", "Label"], ["worn", "Worn"], ["alone", "Photo"]] as const).map(([k, l]) => <button key={k} type="button" onClick={() => { setPhotoKind(k); photoRef.current?.click(); }} className="mono py-1.5">{l}</button>)}
+          <button type="button" onClick={() => setJustAdded(false)} className="mono py-1.5 text-graphite">Done</button>
+        </div>
+      ) : null}
       {canEdit && it.photoNudge && !it.retired ? (
         <div className="mt-3 flex items-center justify-between border-y border-ink py-2.5" data-testid="photo-nudge">
           <span className="mono tracking-[0.1em]">{it.photoNudge === "first" ? "Worn once · add a photo of your own?" : `Worn ${it.wearCount}× · time for a fresh photo?`}</span>

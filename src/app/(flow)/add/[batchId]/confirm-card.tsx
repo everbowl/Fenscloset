@@ -17,6 +17,8 @@ type Props = {
   batchId: string;
   entry: { id: string; photoKey: string; labelKey: string | null; wornKey: string | null; backKey: string | null; smoothKey: string | null; warnings: string[] };
   canSmooth: boolean;
+  /** From Profile → Brands: one tap fills brand, size and (at save) the store link. */
+  myBrands: { brandId: string; name: string; size: string | null; url: string | null }[];
   tags: TagResult;
   lists: TagLists;
   counter: string;
@@ -37,7 +39,8 @@ function Title({ name }: { name: string }) {
 const nameOf = (xs: Named[], id: string | null) => xs.find((x) => x.id === id)?.name ?? null;
 
 /** Design 03: one tap per item when the tags are right. */
-export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists, counter, progress, duplicate, canEditLists, readyCount, canSmooth }: Props) {
+export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists, counter, progress, duplicate, canEditLists, readyCount, canSmooth, myBrands }: Props) {
+  const [askMore, setAskMore] = useState(true);
   const router = useRouter();
   const [tags, setTags] = useState(initial);
   const [lists, setLists] = useState(initialLists);
@@ -192,6 +195,28 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
       ) : null}
 
       {bgFailed ? <p className="mono mx-5 mt-3 text-graphite">Background could not be removed · the original photo is used</p> : null}
+
+      {askMore && !backKey && !labelKey && !wornKey ? (
+        <div className="mx-5 mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-y border-line py-2" data-testid="ask-more-photos">
+          <span className="mono tracking-[0.1em]">More photos of this piece?</span>
+          <button type="button" onClick={() => backRef.current?.click()} className="mono py-1.5" data-testid="more-back">Back</button>
+          <button type="button" onClick={() => labelRef.current?.click()} className="mono py-1.5" data-testid="more-label">Label</button>
+          <button type="button" onClick={() => wornRef.current?.click()} className="mono py-1.5" data-testid="more-worn">Worn</button>
+          <button type="button" onClick={() => setAskMore(false)} className="mono py-1.5 text-graphite" data-testid="more-no">No</button>
+        </div>
+      ) : null}
+
+      {myBrands.length > 0 && !tags.brandId ? (
+        <div className="mx-5 mt-3" data-testid="my-brand-pills">
+          <p className="mono text-graphite">Your brands</p>
+          <div className="-mx-5 mt-1.5 flex gap-1.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none]">
+            {myBrands.map((b) => (
+              <button key={b.brandId} type="button" onClick={() => edit({ brandId: b.brandId, brandText: b.name, ...(b.size ? { sizeText: b.size } : {}) })} className="mono mono-11 h-8 shrink-0 border border-ink px-3" data-testid={`my-brand-${b.brandId}`}>{b.name}{b.size ? ` · ${b.size}` : ""}</button>
+            ))}
+            <button type="button" onClick={() => setSheet("brand")} className="mono mono-11 h-8 shrink-0 px-2 text-graphite">Other…</button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex flex-col px-5">
         <Row label="Category" value={categoryValue} muted={!category} onClick={() => setSheet("category")} testId="row-category" />
