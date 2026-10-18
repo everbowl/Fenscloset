@@ -32,6 +32,7 @@ export async function listClosetItems(view: ClosetView, opts: { categoryId?: str
   const items = await db.item.findMany({
     where: {
       ...(view.kind === "family" ? { closets: { some: { closet: { kind: "family" } } } } : { ownerId: view.personId }),
+      retiredAt: null,
       ...(opts.categoryId ? { categoryId: opts.categoryId } : {}),
       ...(q ? { OR: [{ name: { contains: q, mode: "insensitive" } }, { brand: { name: { contains: q, mode: "insensitive" } } }] } : {}),
     },
@@ -45,7 +46,7 @@ export async function listClosetItems(view: ClosetView, opts: { categoryId?: str
 }
 
 export async function countClosetItems(view: ClosetView): Promise<number> {
-  return db.item.count({ where: view.kind === "family" ? { closets: { some: { closet: { kind: "family" } } } } : { ownerId: view.personId } });
+  return db.item.count({ where: { retiredAt: null, ...(view.kind === "family" ? { closets: { some: { closet: { kind: "family" } } } } : { ownerId: view.personId }) } });
 }
 
 export async function getItemDetail(itemId: string) {

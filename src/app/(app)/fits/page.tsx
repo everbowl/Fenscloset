@@ -1,44 +1,41 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { PageHeader } from "@/components/ui/page-header";
+import { cookies } from "next/headers";
+import { requirePerson } from "@/lib/auth/current";
+import { db } from "@/lib/db";
+import { resolveView, VIEW_COOKIE } from "@/lib/people/visibility";
+import { dayKey, isValidDayKey } from "@/lib/dates";
+import { getTimezone } from "@/lib/rules";
+import { getDay, listMonth } from "@/lib/fits/service";
+import { canDress } from "@/lib/outfits/engine";
+import { listClosetItems } from "@/lib/items/query";
+import { FitsScreen } from "./fits-screen";
 
 export const metadata = { title: "Fits" };
+export const dynamic = "force-dynamic";
 
-/** Month grid from the Fits mockup. Wear history fills the cells in Phase 3. */
-export default function FitsPage() {
-  const now = new Date();
-  const year = now.getFullYear(), month = now.getMonth();
-  const first = new Date(year, month, 1).getDay();
-  const days = new Date(year, month + 1, 0).getDate();
-  const cells: Array<number | null> = [...Array(first).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)];
-  while (cells.length % 7) cells.push(null);
-  const label = now.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+/** Screen 05: month grid of worn looks, selected-day panel with the photo of the night, pieces, visibility and actions. */
+export default async function FitsPage({ searchParams }: { searchParams: Promise<{ m?: string; d?: string }> }) {
+  const me = await requirePerson();
+  const { m, d } = await searchParams;
+  const view = await resolveView(me, (await cookies()).get(VIEW_COOKIE)?.value);
+  const today = dayKey(new Date(), await getTimezone());
+  const selected = d && isValidDayKey(d) ? d : today;
+  const [y, mo] = (m && /^\d{4}-\d{2}$/.test(m) ? m : selected.slice(0, 7)).split("-").map(Number);
+  const personId = view.kind === "person" ? view.personId : me.id;
+  const [days, fits, dress, people] = await Promise.all([
+    listMonth(me, view, y, mo - 1), getDay(me, view, selected), canDress(me, personId),
+    db.person.findMany({ where: { status: { not: "removed" } }, orderBy: { createdAt: "asc" }, select: { id: true, name: true } }),
+  ]);
+  const closet = dress && selected <= today ? await listClosetItems({ kind: "person", personId, name: "" }) : [];
+  const owner = view.kind === "person" ? await db.person.findUniqueOrThrow({ where: { id: view.personId }, select: { name: true } }) : null;
   return (
-    <div>
-      <PageHeader title="Fits" aside={
-        <span className="flex items-center gap-0.5 text-ink">
-          <button type="button" aria-label="Previous month" className="flex size-9 items-center justify-center" disabled><ChevronLeft className="size-3" strokeWidth={2} /></button>
-          {label}
-          <button type="button" aria-label="Next month" className="flex size-9 items-center justify-center" disabled><ChevronRight className="size-3" strokeWidth={2} /></button>
-        </span>
-      } />
-      <div className="mono grid grid-cols-7 border-b border-ink pb-2 text-graphite">
-        {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => <div key={i}>{d}</div>)}
-      </div>
-      <div className="grid grid-cols-7 gap-0.5 pt-1">
-        {cells.map((d, i) => {
-          const today = d === now.getDate();
-          return (
-            <div key={i} className={`relative h-[46px] ${today ? "border border-ink" : ""}`}>
-              {d ? <span className={`mono mono-11 absolute left-1 top-1 ${today ? "bg-ink px-1 text-paper" : ""}`}>{d}</span> : null}
-            </div>
-          );
-        })}
-      </div>
-      <div className="mt-[18px] border-t border-ink pt-4">
-        <p className="mono text-graphite">Your fits</p>
-        <p className="serif mt-1 text-[30px]">Nothing <em>yet</em></p>
-        <p className="mt-2 text-[14px] leading-snug text-graphite">Every look you wear lands on this calendar from Phase 3, with a photo from the night if you want one.</p>
-      </div>
-    </div>
+    <FitsScreen
+      year={y} month0={mo - 1} today={today} selected={selected}
+      days={days} fits={fits}
+      scope={view.kind === "family" ? "family" : "person"}
+      personId={personId} personName={owner ? owner.name.split(" ")[0] : me.name.split(" ")[0]}
+      canDress={dress}
+      people={people.filter((p) => p.id !== personId).map((p) => ({ id: p.id, name: p.name.split(" ")[0] }))}
+      closet={closet.map((c) => ({ id: c.id, name: c.name, thumbKey: c.thumbKey, categoryName: c.categoryName }))}
+    />
   );
 }

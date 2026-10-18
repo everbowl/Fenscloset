@@ -58,6 +58,10 @@ export async function setBodyViewersAction(viewerIds: string[]): Promise<Result>
 export async function setShoppersAction(shopperIds: string[]): Promise<Result> {
   const me = await requirePerson(); return run(() => setShoppers(me, me.id, shopperIds));
 }
+export async function disconnectCalendarAction(): Promise<Result> {
+  const me = await requirePerson();
+  return run(async () => { const { disconnect } = await import("@/lib/plans/google"); await disconnect(me.id); });
+}
 export async function setSavedZipAction(zip: string): Promise<Result> {
   const me = await requirePerson();
   const z = zip.trim();

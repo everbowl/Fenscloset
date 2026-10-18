@@ -3,6 +3,7 @@ import { requirePerson } from "@/lib/auth/current";
 import { getItemDetail, loadItemLists, statusWord } from "@/lib/items/query";
 import { canEditItem, canSeeWornPhoto } from "@/lib/people/visibility";
 import { ItemEditor } from "./item-editor";
+import { wearHistory } from "@/lib/fits/service";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ export default async function ItemPage({ params }: { params: Promise<{ itemId: s
   const { itemId } = await params;
   const item = await getItemDetail(itemId);
   if (!item) notFound();
-  const [lists, seeWorn] = await Promise.all([loadItemLists(person.id), canSeeWornPhoto(person, item.owner)]);
+  const [lists, seeWorn, history] = await Promise.all([loadItemLists(person.id), canSeeWornPhoto(person, item.owner), wearHistory(item.id)]);
   const photos = item.photos.filter((p) => p.kind !== "thumb" && (p.kind !== "worn" || seeWorn));
   return (
     <ItemEditor
@@ -33,6 +34,9 @@ export default async function ItemPage({ params }: { params: Promise<{ itemId: s
         closetIds: item.closets.map((c) => c.closetId).filter((id) => lists.closets.some((c) => c.id === id)),
         sharedWithIds: item.shares.map((s) => s.personId),
         photos: photos.map((p) => ({ id: p.id, kind: p.kind, key: p.bucketKey, isPrimary: p.isPrimary })),
+        lastWornAt: item.lastWornAt?.toISOString() ?? null,
+        wearHistory: history.map((h) => ({ wornOn: h.wornOn, title: h.title })),
+        retired: item.retiredAt ? { reason: item.retiredReason ?? "donate", at: item.retiredAt.toISOString() } : null,
       }}
       lists={lists}
       canEdit={canEditItem(person, item.ownerId)}

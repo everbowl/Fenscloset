@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
-import { getRuleNumber } from "@/lib/rules";
+import { getRuleNumber, getTimezone } from "@/lib/rules";
+import { dayKey } from "@/lib/dates";
 
 /** A wearable piece as the engine and the boards see it. */
 export type Candidate = {
@@ -46,6 +47,9 @@ export async function loadCandidates(personId: string, now = new Date(), opts: {
     select, orderBy: { createdAt: "asc" },
   });
   const cutoff = now.getTime() - noRepeatDays * 24 * 3600 * 1000;
+  // Pieces worn earlier today are not "resting": you are wearing them, and Together / More looks may still use them.
+  const tz = await getTimezone();
+  const today = dayKey(now, tz);
   const all = items.map<Candidate>((it) => ({
     id: it.id, name: it.name ?? "Untitled piece", ownerId: it.ownerId,
     category: it.category?.name ?? null, subcategory: it.subcategory?.name ?? null,
@@ -53,7 +57,7 @@ export async function loadCandidates(personId: string, now = new Date(), opts: {
     seasons: it.seasons.map((s) => s.name), formality: it.formalities[0]?.name ?? null, occasions: it.occasions.map((o) => o.name),
     brand: it.brand?.name ?? null, isFavorite: it.isFavorite, wearCount: it.wearCount, lastWornAt: it.lastWornAt, thumbKey: it.photos[0]?.bucketKey ?? null,
   }));
-  const resting = all.filter((c) => c.lastWornAt && c.lastWornAt.getTime() > cutoff);
+  const resting = all.filter((c) => c.lastWornAt && c.lastWornAt.getTime() > cutoff && dayKey(c.lastWornAt, tz) !== today);
   return { usable: all.filter((c) => !resting.includes(c)), restingIds: resting.map((c) => c.id), noRepeatDays };
 }
 

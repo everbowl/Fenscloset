@@ -13,6 +13,8 @@ import type { ItemLists } from "@/lib/items/query";
 import type { ItemDetailEdits } from "@/lib/items/service";
 import type { LaundryStatus, PhotoKind } from "@/generated/prisma/client";
 import { addItemPhotoAction, cycleLaundryAction, deleteItemAction, removeItemPhotoAction, updateItemAction } from "./actions";
+import { unretireAction } from "../clean-out/actions";
+import { monoDate } from "@/lib/dates";
 
 export type ItemView = {
   id: string; name: string; ownerId: string; ownerName: string; mine: boolean; status: string; laundryStatus: LaundryStatus;
@@ -22,6 +24,9 @@ export type ItemView = {
   size: string | null; purchasePrice: string | null; purchaseDate: string | null; purchaseUrl: string | null; fitNotes: string | null;
   closetIds: string[]; sharedWithIds: string[];
   photos: { id: string; kind: PhotoKind; key: string; isPrimary: boolean }[];
+  lastWornAt: string | null;
+  wearHistory: { wornOn: string; title: string | null }[];
+  retired: { reason: string; at: string } | null;
 };
 
 type SheetKind = "category" | "subcategory" | "color" | "pattern" | "fabric" | "season" | "formality" | "occasion" | "tag" | "brand" | "store" | "size" | "price" | "date" | "url" | "notes" | "closets" | "share" | "rename" | "photo" | "delete" | null;
@@ -110,7 +115,13 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
       </div>
       <p className="mono mt-2 text-graphite">{[!it.mine ? it.ownerName : null, category?.name, it.status, it.isFavorite ? "Favorite" : null].filter(Boolean).join(" · ")}</p>
 
-      {canEdit ? (
+      {it.retired ? (
+        <div className="mt-3 flex items-center justify-between border-y border-ink py-2.5" data-testid="retired-strip">
+          <span className="mono tracking-[0.1em]">Retired · {it.retired.reason === "sell" ? "to sell" : "to donate"}</span>
+          {canEdit ? <button type="button" disabled={pending} onClick={() => start(async () => { const r = await unretireAction(it.id); if (!r.ok) setError(r.error); else { setIt((x) => ({ ...x, retired: null })); router.refresh(); } })} className="mono py-2 tracking-[0.1em]">Bring it back</button> : null}
+        </div>
+      ) : null}
+      {canEdit && !it.retired ? (
         <div className="mt-3 flex items-center justify-between border-y border-ink py-2.5">
           <span className="mono tracking-[0.1em]">Laundry · {LAUNDRY_WORD[it.laundryStatus]}</span>
           <button type="button" onClick={laundry} disabled={pending} data-testid="laundry-cycle" className="mono py-2 tracking-[0.1em]">
@@ -133,6 +144,17 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
         <Row label="Price · Date" value={[price, it.purchaseDate].filter(Boolean).join(" · ") || "Not set"} muted={!price && !it.purchaseDate} onClick={() => open("price")} />
         <Row label="Link" value={it.purchaseUrl ?? "Not set"} muted={!it.purchaseUrl} onClick={() => open("url")} />
         <Row label="Fit notes" value={it.fitNotes ?? "None"} muted={!it.fitNotes} onClick={() => open("notes")} />
+        <div className="flex min-h-[42px] items-center border-b border-line" data-testid="row-worn">
+          <span className="mono w-[120px] shrink-0 text-graphite">Worn</span>
+          <span className="flex-1 text-[14px]">{it.wearHistory.length ? `${it.wearCount}× · last ${monoDate(it.wearHistory[0].wornOn)}` : "Not yet"}</span>
+        </div>
+        {it.wearHistory.slice(0, 5).map((w) => (
+          <Link key={w.wornOn} href={`/fits?d=${w.wornOn}`} className="flex h-[42px] items-center border-b border-line">
+            <span className="mono w-[120px] shrink-0 text-graphite">{monoDate(w.wornOn)}</span>
+            <span className="flex-1 truncate text-[14px]">{w.title ?? "Worn"}</span>
+            <span className="mono text-graphite">Fits →</span>
+          </Link>
+        ))}
         <Row label="Closets" value={["Personal", ...it.closetIds.map((id) => name(lists.closets, id))].filter(Boolean).join(", ")} onClick={() => open("closets")} testId="row-closets" />
         <Row label="Shared with" value={names(lists.people, it.sharedWithIds) || "Nobody extra"} muted={!it.sharedWithIds.length} onClick={() => open("share")} />
         {canEdit ? (

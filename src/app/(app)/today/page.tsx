@@ -1,38 +1,61 @@
-import { requirePerson } from "@/lib/auth/current";
-import { PageHeader } from "@/components/ui/page-header";
-import { Button } from "@/components/ui/button";
+import { cookies } from "next/headers";
+import { requirePerson, isAdmin } from "@/lib/auth/current";
+import { resolveView, VIEW_COOKIE } from "@/lib/people/visibility";
+import { loadTodayContext } from "@/lib/today/context";
+import { canDress, getOrGenerate, getSuggestion, type Suggestion } from "@/lib/outfits/engine";
+import { loadCandidates } from "@/lib/outfits/catalog";
+import { countCleanOut } from "@/lib/outfits/cleanout";
+import { getScales } from "@/lib/checkins/service";
+import { listEntries } from "@/lib/lists/service";
+import { getConnection, isGoogleConfigured } from "@/lib/plans/google";
+import { monoDate } from "@/lib/dates";
+import { weatherLine } from "@/lib/weather";
+import { planLine } from "@/lib/plans";
+import { TodayScreen } from "./today-screen";
 
 export const metadata = { title: "Today" };
+export const dynamic = "force-dynamic";
 
-function titleFor(date: Date) {
-  const h = date.getHours();
-  return h >= 16 ? { title: "Tonight’s", accent: "look" } : { title: "Today’s", accent: "look" };
-}
-
+/** Screen 04. Looks belong to the person in the switcher (Family → yourself); only they or a parent can wear/swap. */
 export default async function TodayPage() {
-  await requirePerson();
-  const now = new Date();
-  const t = titleFor(now);
-  const eyebrow = now.toLocaleDateString("en-US", { weekday: "short", day: "2-digit", month: "short" }).replace(",", "");
+  const me = await requirePerson();
+  const view = await resolveView(me, (await cookies()).get(VIEW_COOKIE)?.value);
+  const personId = view.kind === "person" ? view.personId : me.id;
+  const [ctx, dress, cand, scales, occasions, cleanOut, calendar] = await Promise.all([
+    loadTodayContext(me, personId), canDress(me, personId), loadCandidates(personId), getScales(), listEntries("occasion"), countCleanOut(personId),
+    getConnection(personId),
+  ]);
+  const enough = cand.usable.length + cand.restingIds.length >= 2;
+  let suggestion: Suggestion | null = null;
+  try {
+    suggestion = enough ? (dress ? await getOrGenerate(personId, ctx.date, ctx) : await getSuggestion(personId, ctx.date)) : null;
+  } catch (e) {
+    console.error("looks", e);
+  }
+  const person = personId === me.id ? me : await (await import("@/lib/db")).db.person.findUniqueOrThrow({ where: { id: personId } });
+  const context = [monoDate(ctx.date), ctx.weather ? weatherLine(ctx.weather) : null, planLine(ctx.plan, ctx.tz)].filter(Boolean).join(" · ");
   return (
-    <div>
-      <PageHeader eyebrow={`${eyebrow} · weather and plans arrive in phase 3`} title={t.title} accent={t.accent} aside="00 / 03" />
-      <div className="grid grid-cols-2 grid-rows-[196px_196px] gap-1.5">
-        <div className="row-span-2 bg-bone" />
-        <div className="bg-bone" />
-        <div className="grid grid-cols-2 gap-1.5"><div className="bg-bone" /><div className="bg-bone" /></div>
-      </div>
-      <div className="mt-3.5 flex flex-col gap-1">
-        <p className="mono text-graphite">No looks yet</p>
-        <p className="serif text-[21px] italic leading-[1.3]">Add clothes with the + button and your first three looks will appear here.</p>
-      </div>
-      <div className="mt-4 flex flex-col gap-2">
-        <Button size="lg" className="w-full tracking-[0.18em]" disabled>Wear this</Button>
-        <div className="grid grid-cols-2 gap-2">
-          <Button variant="secondary" disabled>Swap one piece</Button>
-          <Button variant="secondary" disabled>More looks</Button>
-        </div>
-      </div>
-    </div>
+    <TodayScreen
+      personId={personId}
+      personName={person.name.split(" ")[0]}
+      mine={personId === me.id}
+      canDress={dress}
+      isAdmin={isAdmin(me)}
+      date={ctx.date}
+      evening={ctx.hour >= 16}
+      contextLine={context}
+      weather={ctx.weather ? { condition: ctx.weather.condition, source: ctx.weather.source } : null}
+      weatherNote={ctx.weatherNote}
+      savedZip={ctx.savedZip}
+      plan={{ source: ctx.plan.source, label: ctx.plan.label, occasionId: ctx.plan.occasionId }}
+      calendarConnected={Boolean(calendar)}
+      calendarConfigured={isGoogleConfigured()}
+      checkIn={ctx.checkIn ? { source: ctx.checkIn.source, answers: ctx.checkIn.answers.map((a) => ({ scaleId: a.scaleId, optionId: a.optionId })) } : null}
+      scales={scales}
+      occasions={occasions.map((o) => ({ id: o.id, name: o.name }))}
+      suggestion={suggestion ? { id: suggestion.id, boards: suggestion.boards, wornIndex: suggestion.wornIndex } : null}
+      enoughClothes={enough}
+      cleanOutCount={cleanOut}
+    />
   );
 }

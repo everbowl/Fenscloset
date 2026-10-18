@@ -62,14 +62,16 @@ describe("outfit engine", () => {
 
     // replacing the day's fit also un-sets lastWornAt on the pieces that came off it
     expect((await db.item.findUniqueOrThrow({ where: { id: sneakers.id } })).lastWornAt).toBeNull();
+    // worn today is not "resting": the pieces you have on may still be suggested today
+    expect((await loadCandidates(jeff.id)).usable.map((c) => c.id)).toContain(tee.id);
     const more = await moreLooks(jeff.id, DAY, ctx);
     expect(more.boards).toHaveLength(6);
   });
 
   it("falls back to resting pieces when the closet is small, and says so", async () => {
     const jeff = await by("Jeff");
-    await addItem(jeff.id, "Tee", "Tops", { lastWornAt: new Date() });
-    await addItem(jeff.id, "Jeans", "Bottoms", { lastWornAt: new Date() });
+    await addItem(jeff.id, "Tee", "Tops", { lastWornAt: new Date(Date.now() - 86400000) });
+    await addItem(jeff.id, "Jeans", "Bottoms", { lastWornAt: new Date(Date.now() - 86400000) });
     const s = await generateSuggestion(jeff.id, DAY, ctx);
     expect(s.boards.length).toBeGreaterThan(0);
     expect(s.boards[0].reason).toContain("Repeats a recent piece");
