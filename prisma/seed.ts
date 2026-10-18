@@ -24,6 +24,11 @@ async function seedSimple(delegate: SimpleDelegate, names: string[]) {
  */
 export async function seed() {
   const devMode = isDevMode();
+  // Rules are keyed settings, not admin-owned list rows: a new rule must appear after a deploy, so they are
+  // always upserted (values an admin changed are kept; only label/description refresh).
+  for (const r of RULES) {
+    await db.rule.upsert({ where: { key: r.key }, update: { label: r.label, description: r.description }, create: r });
+  }
   if ((await db.person.count()) > 0 && process.env.SEED_FORCE !== "true") {
     console.log("Seed skipped: database already has people.");
     return;
@@ -118,9 +123,6 @@ export async function seed() {
     }
   }
 
-  for (const r of RULES) {
-    await db.rule.upsert({ where: { key: r.key }, update: { label: r.label, description: r.description }, create: r });
-  }
 }
 
 // Run directly: `npm run db:seed`
