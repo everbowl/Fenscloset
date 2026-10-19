@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRef, useState, type ReactNode } from "react";
 import { PageHeader } from "@/components/ui/page-header";
-import { Button } from "@/components/ui/button";
+import { Button, LIFT } from "@/components/ui/button";
 import { Banner } from "@/components/ui/banner";
 import { useImportQueue } from "@/components/import-queue-provider";
 
@@ -58,8 +58,8 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
           {inputs}
           <PageHeader title="Add" accent="clothes" />
           <p className="mono text-graphite">How are you adding?</p>
-          <div className="mt-4 flex flex-col gap-2.5" data-testid="add-doors">
-            <button type="button" onClick={() => setDoor("photo")} className="flex min-h-[72px] w-full items-center justify-between bg-ink px-5 text-left text-paper" data-testid="door-photo">
+          <div className="mt-4 flex flex-col gap-4" data-testid="add-doors">
+            <button type="button" onClick={() => setDoor("photo")} className={`flex min-h-[72px] w-full items-center justify-between bg-ink px-5 text-left text-paper ${LIFT}`} data-testid="door-photo">
               <span><span className="mono block text-[12px] uppercase tracking-[0.16em]">From photos</span><span className="mono mt-1 block text-[11px] text-paper/70">Hanger or flat-lay shots · one piece each</span></span>
               <CameraIcon />
             </button>

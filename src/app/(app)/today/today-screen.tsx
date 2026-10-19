@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { HeaderAction } from "@/components/header-action";
 import { PageHeader } from "@/components/ui/page-header";
-import { Button } from "@/components/ui/button";
+import { Button, LIFT } from "@/components/ui/button";
 import { Banner } from "@/components/ui/banner";
 import { Sheet } from "@/components/ui/sheet";
 import { PickSheet, TextSheet } from "@/components/items/row-editor";
@@ -157,7 +157,7 @@ export function TodayScreen(p: Props) {
           {p.canDress ? (
             <div className="mt-4 flex flex-col gap-2 lg:col-start-2">
               {worn ? (
-                <Link href="/fits" className="mono flex h-[54px] items-center justify-center bg-ink text-[12px] uppercase tracking-[0.16em] text-paper">Wearing this · see Fits</Link>
+                <Link href="/fits" className={`mono flex h-[58px] items-center justify-center bg-ink text-[12px] uppercase tracking-[0.16em] text-paper ${LIFT}`}>Wearing this · see Fits →</Link>
               ) : (
                 <Button size="lg" className="w-full" disabled={busy !== null} onClick={() => run("wear", () => wearAction(p.personId, p.suggestion!.id, index))} data-testid="wear-this">{busy === "wear" ? "Saving…" : "Wear this"}</Button>
               )}

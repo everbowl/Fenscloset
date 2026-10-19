@@ -1,0 +1,23 @@
+/** Dev-only: primary buttons with the lift + shelf (Q1 A+B): Today, Add doors, confirm card. */
+import { chromium, devices } from "@playwright/test";
+import { execSync } from "node:child_process";
+import sharp from "sharp";
+const out = process.argv[2];
+const env = { ...process.env, DATABASE_URL: "postgresql://postgres@localhost:5433/fenscloset_e2e", DEV_MODE: "true", SEED_FORCE: "true", MOCK_S3: "true" };
+execSync(`psql -h localhost -p 5433 -U postgres -d fenscloset_e2e -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'`, { stdio: "ignore" });
+execSync("npx prisma migrate deploy && npx tsx prisma/seed.ts && npx tsx e2e/set-password.ts jeff@everbowl.com closet-rocks-2026 && npx tsx e2e/seed-items.ts", { stdio: "ignore", env });
+const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || undefined });
+const base = "http://localhost:3100";
+const ctx = await browser.newContext({ ...devices["iPhone 15"] });
+const page = await ctx.newPage();
+await page.goto(base + "/login");
+await page.getByLabel("Email").fill("jeff@everbowl.com"); await page.getByLabel("Password").fill("closet-rocks-2026");
+await page.getByRole("button", { name: "Sign in" }).click(); await page.waitForURL(/today/);
+await page.getByTestId("enter-zip").click(); await page.getByRole("dialog").getByRole("textbox").fill("92101"); await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+await page.getByTestId("wear-this").waitFor(); await page.getByTestId("wear-this").scrollIntoViewIfNeeded(); await page.waitForTimeout(400); await page.screenshot({ path: `${out}/137-today-lifted.png` });
+await page.goto(base + "/add"); await page.getByTestId("add-doors").waitFor(); await page.waitForTimeout(300); await page.screenshot({ path: `${out}/138-add-doors-lifted.png` });
+const tee = await sharp({ create: { width: 800, height: 1100, channels: 3, background: { r: 24, g: 28, b: 40 } } }).jpeg().toBuffer();
+await page.getByTestId("pick-photos").setInputFiles({ name: "tee.jpg", mimeType: "image/jpeg", buffer: tee });
+await page.getByRole("link", { name: /Confirm 1 ready/ }).waitFor({ timeout: 30000 }); await page.getByRole("link", { name: /Confirm 1 ready/ }).click();
+await page.getByTestId("confirm-next").waitFor(); await page.waitForTimeout(400); await page.screenshot({ path: `${out}/139-confirm-lifted.png`, fullPage: true });
+await browser.close();

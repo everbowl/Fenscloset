@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { Sheet } from "@/components/ui/sheet";
+import { LIFT } from "@/components/ui/button";
 import { Banner } from "@/components/ui/banner";
 import type { Named, TagLists, TagResult } from "@/lib/ai/tag-item";
 import type { ItemEdits } from "@/lib/items/service";
@@ -245,7 +246,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
       {labelKey || wornKey || backKey ? <p className="mono px-5 pt-3 text-graphite" data-testid="photo-status">{[backKey ? "Back photo added" : null, labelKey ? "Label photo added" : null, wornKey ? "Worn photo added" : null].filter(Boolean).join(" · ")}</p> : null}
 
       <div className="mt-auto flex gap-2.5 px-5 pb-[26px] pt-5">
-        <button type="button" onClick={confirm} disabled={pending || Boolean(uploading)} data-testid="confirm-next" className="h-[54px] flex-1 bg-ink font-mono text-[12px] uppercase tracking-[0.16em] text-paper disabled:opacity-60">
+        <button type="button" onClick={confirm} disabled={pending || Boolean(uploading)} data-testid="confirm-next" className={`h-[58px] flex-1 bg-ink font-mono text-[12px] uppercase tracking-[0.16em] text-paper disabled:opacity-60 ${LIFT}`}>
           {pending ? "Saving…" : readyCount > 1 ? "Looks right · Next" : "Looks right · Done"}
         </button>
         <button type="button" onClick={() => setSheet("camera")} aria-label="Add a label or worn photo" className="flex size-[54px] items-center justify-center border border-ink bg-paper text-ink">
@@ -290,7 +291,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
               <div className="h-[72px] w-[60px] overflow-hidden bg-bone">{duplicate.thumbKey ? <img src={`/api/photo/${duplicate.thumbKey}`} alt="" className="size-full object-cover" /> : null}</div>
               <p className="text-[15px] leading-snug">You own <strong>{duplicate.name ?? "a piece like this"}</strong>. Is this another one of the same?</p>
             </div>
-            <button type="button" onClick={mirror} className="mono flex h-[54px] w-full items-center justify-center bg-ink text-[12px] uppercase tracking-[0.16em] text-paper" data-testid="like-mirror">Yes · same piece, new color or size</button>
+            <button type="button" onClick={mirror} className={`mono flex h-[54px] w-full items-center justify-center bg-ink text-[12px] uppercase tracking-[0.16em] text-paper ${LIFT}`} data-testid="like-mirror">Yes · same piece, new color or size</button>
             <button type="button" onClick={() => { dismissLike(); merge(); }} className="mono flex h-[46px] w-full items-center justify-center border border-ink text-[12px] uppercase tracking-[0.16em]" data-testid="like-merge">It&apos;s this exact one · add the photo to it</button>
             <button type="button" onClick={dismissLike} className="mono flex h-[46px] w-full items-center justify-center text-graphite" data-testid="like-new">No · a new piece</button>
           </div>
