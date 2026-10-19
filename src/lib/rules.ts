@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { OFF_WORDS, ON_WORDS, ruleKind } from "@/lib/rules-kind";
 
 export type RuleRow = { key: string; value: string; label: string; description: string };
 
@@ -23,12 +24,38 @@ export async function accentColor(): Promise<string> {
   return /^#[0-9a-f]{6}$/i.test(v) ? v : "#FF5A00";
 }
 
+/** An on/off rule ("on" / "off" in the row; a few other spellings are read kindly). */
+export async function getRuleFlag(key: string, fallback: boolean): Promise<boolean> {
+  const v = (await getRuleText(key, "")).toLowerCase();
+  if (ON_WORDS.includes(v)) return true;
+  if (OFF_WORDS.includes(v)) return false;
+  return fallback;
+}
+
+/** Tidy and Smooth (Google's image editor on garment photos): off unless an admin turns the rule on (Jeff, 19 Oct 2026: "not very good, remove for now"). */
+export async function photoRetouchOn(): Promise<boolean> {
+  return getRuleFlag("photoRetouch", false);
+}
+
+export { ruleKind };
+
 export async function setRule(key: string, value: string): Promise<RuleRow> {
   const existing = await db.rule.findUnique({ where: { key } });
   if (!existing) throw new Error("Unknown rule");
-  if (key === "timezone") {
+  const kind = ruleKind(existing);
+  if (kind === "text") {
     try { new Intl.DateTimeFormat("en-US", { timeZone: value.trim() }); } catch { throw new Error("Enter a time zone like America/Los_Angeles."); }
     return db.rule.update({ where: { key }, data: { value: value.trim() } });
+  }
+  if (kind === "onoff") {
+    const v = value.trim().toLowerCase();
+    if (!ON_WORDS.includes(v) && !OFF_WORDS.includes(v)) throw new Error("Choose on or off.");
+    return db.rule.update({ where: { key }, data: { value: ON_WORDS.includes(v) ? "on" : "off" } });
+  }
+  if (kind === "color") {
+    const v = value.trim().toUpperCase();
+    if (!/^#[0-9A-F]{6}$/.test(v)) throw new Error("Enter a color like #FF5A00.");
+    return db.rule.update({ where: { key }, data: { value: v } });
   }
   const n = Number(value);
   if (!Number.isInteger(n) || n < 0 || n > 3650) throw new Error("Enter a whole number between 0 and 3650.");

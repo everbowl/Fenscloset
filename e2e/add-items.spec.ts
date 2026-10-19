@@ -25,6 +25,11 @@ test.describe("add clothes", () => {
 
   test("pick three photos, confirm with one tap each, reload mid-batch keeps the counter, all done", async ({ page }) => {
     await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+    // Tidy and Smooth are off unless an admin turns the rule on (Jeff, 19 Oct 2026); this flow tests them, so: on
+    await page.goto("/admin/rules");
+    await page.getByLabel("AI photo retouch (Tidy and Smooth)").selectOption("on");
+    await page.getByTestId("rule-photoRetouch").getByRole("button", { name: "Save" }).click();
+    await expect(page.getByTestId("rule-photoRetouch").getByRole("button", { name: "Saved" })).toBeVisible();
     await page.goto("/add");
     // three doors first: photos, a store link, a receipt
     await expect(page.getByTestId("add-doors")).toBeVisible();

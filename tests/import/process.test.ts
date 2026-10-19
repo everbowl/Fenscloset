@@ -105,8 +105,13 @@ describe("import processing", () => {
     expect(none.duplicate).toBeNull();
   });
 
-  it("auto-tidy parks a clean product picture on the card; the confirm keeps it as the cutout unless it was undone", async () => {
+  it("auto-tidy (only with the retouch rule on) parks a clean product picture on the card; the confirm keeps it as the cutout unless it was undone", async () => {
     delete process.env.AUTO_TIDY; process.env.MOCK_SMOOTH = "true";
+    // off by default (Jeff, 19 Oct 2026): nothing parked
+    const off = await entryWithPhoto();
+    await processEntry(off.id);
+    expect((await db.importEntry.findUniqueOrThrow({ where: { id: off.id } })).smoothKey).toBeNull();
+    await db.rule.update({ where: { key: "photoRetouch" }, data: { value: "on" } });
     const e = await entryWithPhoto();
     await processEntry(e.id);
     const done = await db.importEntry.findUniqueOrThrow({ where: { id: e.id } });

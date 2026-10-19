@@ -1,4 +1,5 @@
 import { isSmoothConfigured } from "@/lib/images/smooth";
+import { photoRetouchOn } from "@/lib/rules";
 import { listMyBrands } from "@/lib/profiles/brands";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -63,7 +64,7 @@ export default async function ConfirmPage({ params, searchParams }: { params: Pr
       key={entry.id}
       batchId={batchId}
       entry={{ id: entry.id, photoKey: entry.cutoutKey ?? entry.originalKey, labelKey: entry.labelKey, wornKey: entry.wornKey, backKey: entry.backKey, smoothKey: entry.smoothKey, retailKeys: entry.retailKeys, warnings: ai.warnings }}
-      canSmooth={isSmoothConfigured()}
+      canSmooth={isSmoothConfigured() && (await photoRetouchOn())}
       myBrands={myBrands}
       tags={ai.tags}
       lists={lists}

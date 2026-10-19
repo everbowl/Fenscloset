@@ -97,6 +97,7 @@ export const RULES = [
   { key: "notWornMonths", value: "6", label: "Not-worn alert (months)", description: "Flag items that haven't been worn in this many months for a closet clean-out." },
   { key: "timezone", value: "America/Los_Angeles", label: "Household time zone", description: "Decides when 'today' starts for check-ins, looks and the Fits calendar." },
   { key: "accentColor", value: "#FF5A00", label: "Button color (hex)", description: "The color of the main buttons. Everything else stays black and white. Jeff, 19 Oct 2026: real orange." },
+  { key: "photoRetouch", value: "off", label: "AI photo retouch (Tidy and Smooth)", description: "On: a new photo gets an automatic Tidy on upload and the confirm card offers Tidy and Smooth wrinkles. Off: photos stay as taken. Jeff, 19 Oct 2026: off for now, the results weren't good." },
   // Likely sizes from height and weight (adults only; a starting point, shown on the Body page and offered when recording a size in a brand).
   { key: "sizeBandXsMaxLb", value: "125", label: "Likely size · XS up to (lb)", description: "Weight at or under this reads as XS for tops, outerwear and dresses." },
   { key: "sizeBandSMaxLb", value: "150", label: "Likely size · S up to (lb)", description: "Weight at or under this reads as S." },
