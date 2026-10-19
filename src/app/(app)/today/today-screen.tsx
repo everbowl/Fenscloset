@@ -21,7 +21,7 @@ import { monoDate } from "@/lib/dates";
 type Props = {
   personId: string; personName: string; mine: boolean; canDress: boolean; isAdmin: boolean;
   date: string; evening: boolean; contextLine: string;
-  weather: { condition: string; source: string } | null; weatherNote: "none" | "failed" | null; savedZip: string | null;
+  weather: { condition: string; source: string; nowF: number; tonightF: number; highF: number; lowF: number; rainChance: number } | null; weatherNote: "none" | "failed" | null; savedZip: string | null;
   plan: { source: string; label: string | null; occasionId: string | null }; calendarConnected: boolean; calendarConfigured: boolean;
   checkIn: { source: "taps" | "selfie"; answers: { scaleId: string; optionId: string }[] } | null; scales: Scale[];
   occasions: { id: string; name: string }[];
@@ -129,6 +129,16 @@ export function TodayScreen(p: Props) {
       />
       </div>
 
+      {p.weather ? (
+        <button type="button" onClick={() => p.canDress && setSheet("zip")} className="mb-4 flex w-full items-stretch border border-ink text-left lg:col-start-2" data-testid="weather-block">
+          <span className="flex items-baseline gap-1 border-r border-ink px-4 py-2.5"><span className="serif text-[40px] leading-none">{p.weather.nowF}°</span><span className="mono">now</span></span>
+          <span className="flex flex-1 flex-col justify-center gap-0.5 px-4 py-2">
+            <span className="text-[16px] font-medium">{p.weather.condition} · {p.weather.tonightF}° tonight</span>
+            <span className="mono">High {p.weather.highF}° · Low {p.weather.lowF}°{p.weather.rainChance >= 20 ? ` · Rain ${p.weather.rainChance}%` : " · No rain"}</span>
+          </span>
+          {p.canDress ? <span className="mono flex items-center px-3 text-ink">{p.savedZip ?? "Zip"} ›</span> : null}
+        </button>
+      ) : null}
       {p.weatherNote && p.canDress ? (
         <div className="mb-4 flex items-center justify-between border-y border-ink py-2.5 lg:col-start-2">
           <span className="mono">{p.weatherNote === "failed" ? "Weather is unavailable right now" : "Where are you today?"}</span>
@@ -147,9 +157,29 @@ export function TodayScreen(p: Props) {
             </div>
             {busy === "regen" ? <div className="absolute inset-0 flex items-center justify-center bg-paper/70" data-testid="refreshing"><span className="mono mono-11 bg-paper px-3 py-2">Building fresh looks…</span></div> : null}
           </div>
+          {p.canDress && (p.tryOn === "ready" || p.mannequin) ? (
+            <div className="mt-4 lg:col-start-1 lg:row-start-7" data-testid="mirror">
+              <button type="button" disabled={busy !== null} onClick={() => { if (tryOn && tryOn.itemIds.join() === [...(board?.itemIds ?? [])].sort().join()) { setSheet("tryon"); return; } setBusy("tryon"); setError(undefined); start(async () => { const r = p.tryOn === "ready" ? await tryOnAction(p.personId, p.suggestion!.id, index) : await mannequinAction(p.personId, p.suggestion!.id, index); setBusy(null); if (!r.ok) setError(r.error); else if (r.tryOn) { setTryOn(r.tryOn); setSheet("tryon"); } }); }}
+                className="flex w-full items-center gap-5 border border-ink p-3 text-left disabled:opacity-60" data-testid={p.tryOn === "ready" ? "try-on" : "see-on-mannequin"}>
+                <span className="relative h-[150px] w-[100px] shrink-0 overflow-hidden rounded-t-[60px] border-2 border-ink bg-paper">
+                  {tryOn ? <img src={`/api/photo/${tryOn.key}`} alt="" className="size-full object-cover" /> : <MirrorGlyph />}
+                </span>
+                <span className="flex flex-col gap-1">
+                  <span className="mono text-[13px] uppercase tracking-[0.18em] text-ink">{busy === "tryon" ? "Dressing…" : "Look in the mirror"}</span>
+                  <span className="text-[15px] leading-snug">{p.tryOn === "ready" ? "This look on you." : `This look on a mannequin${p.mine ? "" : ` for ${p.personName}`}.`}</span>
+                  <span className="mono text-ink">Tap to see it →</span>
+                </span>
+              </button>
+              {p.tryOn === "off" ? (
+                <Link href="/profile/settings" className="mono mt-2 flex h-[42px] items-center justify-between border-b border-ink text-ink" data-testid="try-on-off"><span>Want the mirror to show you? Turn on try-on</span><span>→</span></Link>
+              ) : p.tryOn === "no_photo" ? (
+                <Link href="/profile/body" className="mono mt-2 flex h-[42px] items-center justify-between border-b border-ink text-ink" data-testid="try-on-photo"><span>Want the mirror to show you? Add a body photo</span><span>→</span></Link>
+              ) : null}
+            </div>
+          ) : null}
           {board ? (
             <div className="mt-3.5 flex flex-col gap-2 lg:col-start-2 lg:mt-0">
-              <p className="mono text-graphite" data-testid="piece-list">{board.pieces.map((x) => x.label).join(" · ")}</p>
+              <p className="mono text-ink" data-testid="piece-list">{board.pieces.map((x) => x.label).join(" · ")}</p>
               <p className="text-[17px] leading-snug" data-testid="reason">{board.reason}</p>
               {board.why ? <WhyList why={board.why} /> : null}
             </div>
@@ -165,22 +195,12 @@ export function TodayScreen(p: Props) {
                 <Button variant="secondary" disabled={busy !== null || worn} onClick={() => setSheet("swap")} data-testid="swap">Change a piece</Button>
                 <Button variant="secondary" disabled={busy !== null} onClick={() => { const next = boards.length; run("more", () => moreAction(p.personId), () => setIndex(next)); }} data-testid="more-looks">{busy === "more" ? "Thinking…" : "More looks"}</Button>
               </div>
-              {p.tryOn === "ready" ? (
-                <Button variant="secondary" disabled={busy !== null} onClick={() => { setBusy("tryon"); setError(undefined); start(async () => { const r = await tryOnAction(p.personId, p.suggestion!.id, index); setBusy(null); if (!r.ok) setError(r.error); else if (r.tryOn) { setTryOn(r.tryOn); setSheet("tryon"); } }); }} data-testid="try-on">{busy === "tryon" ? "Dressing you…" : "See it on"}</Button>
-              ) : p.mannequin ? (
-                <Button variant="secondary" disabled={busy !== null} onClick={() => { setBusy("tryon"); setError(undefined); start(async () => { const r = await mannequinAction(p.personId, p.suggestion!.id, index); setBusy(null); if (!r.ok) setError(r.error); else if (r.tryOn) { setTryOn(r.tryOn); setSheet("tryon"); } }); }} data-testid="see-on-mannequin">{busy === "tryon" ? "Dressing the mannequin…" : "See it on"}</Button>
-              ) : null}
-              {p.tryOn === "off" ? (
-                <Link href="/profile/settings" className="mono flex h-[38px] items-center justify-center text-graphite" data-testid="try-on-off">Want it on you? Turn on try-on in Settings</Link>
-              ) : p.tryOn === "no_photo" ? (
-                <Link href="/profile/body" className="mono flex h-[38px] items-center justify-center text-graphite" data-testid="try-on-photo">Want it on you? Add a body photo first</Link>
-              ) : null}
             </div>
           ) : null}
         </>
       ) : (
         <>
-          <div className="grid grid-cols-2 grid-rows-[196px_196px] gap-1.5 lg:col-start-1 lg:row-start-1 lg:row-span-6 lg:grid-rows-[300px_300px]">
+          <div className="grid grid-cols-2 grid-rows-[196px_196px] gap-1.5 lg:col-start-1 lg:row-start-1 lg:row-span-6 lg:grid-rows-[200px_200px]">
             <div className="row-span-2 bg-bone" /><div className="bg-bone" />
             <div className="grid grid-cols-2 gap-1.5"><div className="bg-bone" /><div className="bg-bone" /></div>
           </div>
@@ -201,19 +221,19 @@ export function TodayScreen(p: Props) {
         </div>
       ) : null}
 
-      <Link href="/today/together" className="mt-[18px] flex items-center justify-between border-y border-ink py-3.5 lg:col-start-2" data-testid="together-link">
+      <Link href="/today/together" className="mt-[18px] flex items-center justify-between border border-ink px-4 py-3.5 hover:bg-bone lg:col-start-2" data-testid="together-link">
         <span className="flex flex-col gap-0.5">
           <span className="serif text-[22px]">Going out <em>together?</em></span>
-          <span className="mono text-graphite">Coordinate · Match · Contrast</span>
+          <span className="mono text-ink">Dress two or more people · Coordinate, Match or Contrast</span>
         </span>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden><path d="M4 12h16M14 6l6 6-6 6" /></svg>
       </Link>
 
       {p.cleanOutCount > 0 && p.canDress ? (
-        <Link href="/closet/clean-out" className="mt-3 flex items-center justify-between border-b border-ink py-3.5 lg:col-start-2" data-testid="clean-out-link">
+        <Link href="/closet/clean-out" className="mt-3 flex items-center justify-between border border-ink px-4 py-3.5 hover:bg-bone lg:col-start-2" data-testid="clean-out-link">
           <span className="flex flex-col gap-0.5">
             <span className="serif text-[22px]">Time for a <em>clean-out?</em></span>
-            <span className="mono text-graphite">{p.cleanOutCount} {p.cleanOutCount === 1 ? "piece" : "pieces"} not worn in a while</span>
+            <span className="mono text-ink">{p.cleanOutCount} {p.cleanOutCount === 1 ? "piece" : "pieces"} not worn in a while</span>
           </span>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden><path d="M4 12h16M14 6l6 6-6 6" /></svg>
         </Link>
@@ -253,12 +273,12 @@ export function TodayScreen(p: Props) {
       </Sheet>
 
       {/* See it on: the look on your own body photo (yours alone), or on the shared mannequin (no body in it). */}
-      <Sheet open={sheet === "tryon"} onClose={() => setSheet(null)} title={tryOn?.mannequin ? "On a mannequin" : "On you"}>
+      <Sheet open={sheet === "tryon"} onClose={() => setSheet(null)} title="In the mirror">
         {tryOn ? (
           <div className="flex flex-col gap-3" data-testid="try-on-sheet">
             <div className="h-[460px] overflow-hidden bg-bone"><img src={`/api/photo/${tryOn.key}`} alt={tryOn.mannequin ? "This look on a mannequin" : "You wearing this look"} className="size-full object-contain" /></div>
             <p className="mono text-graphite">{board?.pieces.map((x) => x.label).join(" · ")}</p>
-            <p className="mono text-graphite">{tryOn.mannequin ? `No body photo used${p.mine ? "" : ` · ${p.personName}’s look`}` : "Only you can see this picture"}{tryOn.cached ? " · saved from before" : ""}</p>
+            <p className="mono text-ink">{tryOn.mannequin ? `On a mannequin · No body photo used${p.mine ? "" : ` · ${p.personName}’s look`}` : "On you · Only you can see this picture"}{tryOn.cached ? " · saved from before" : ""}</p>
           </div>
         ) : null}
       </Sheet>
@@ -270,8 +290,8 @@ export function TodayScreen(p: Props) {
 
 function Tile({ piece, className }: { piece?: BoardView["pieces"][number]; className?: string }) {
   return (
-    <div className={cn("overflow-hidden bg-bone", className)}>
-      {piece?.thumbKey ? <img src={`/api/photo/${piece.thumbKey}`} alt={piece.name} className="size-full object-contain" /> : piece ? <div className="flex size-full items-end p-2"><span className="mono text-graphite">{piece.name}</span></div> : null}
+    <div className={cn("overflow-hidden bg-paper", className)}>
+      {piece?.thumbKey ? <img src={`/api/photo/${piece.thumbKey}`} alt={piece.name} className="size-full object-contain" /> : piece ? <div className="flex size-full items-center justify-center border border-dashed border-ink p-3 text-center"><span className="mono text-ink">{piece.name}<br /><span className="text-graphite">No photo yet</span></span></div> : null}
     </div>
   );
 }
@@ -287,13 +307,13 @@ function Board({ board, index, active }: { board: BoardView; index: number; acti
   return (
     <div className="w-full shrink-0 snap-center px-5 lg:px-0" aria-hidden={!active} data-testid="board" data-index={index} data-pieces={n}>
       {n <= 1 ? (
-        <Tile piece={hero} className="h-[400px] lg:h-[608px]" />
+        <Tile piece={hero} className="h-[400px] lg:h-[406px]" />
       ) : n === 2 ? (
-        <div className="grid grid-rows-[196px_196px] gap-1.5 lg:grid-rows-[300px_300px]"><Tile piece={hero} /><Tile piece={two} /></div>
+        <div className="grid grid-rows-[196px_196px] gap-1.5 lg:grid-rows-[200px_200px]"><Tile piece={hero} /><Tile piece={two} /></div>
       ) : n === 3 ? (
-        <div className="grid grid-cols-2 grid-rows-[196px_196px] gap-1.5 lg:grid-rows-[300px_300px]"><Tile piece={hero} className="row-span-2" /><Tile piece={two} /><Tile piece={three} /></div>
+        <div className="grid grid-cols-2 grid-rows-[196px_196px] gap-1.5 lg:grid-rows-[200px_200px]"><Tile piece={hero} className="row-span-2" /><Tile piece={two} /><Tile piece={three} /></div>
       ) : (
-        <div className="grid grid-cols-2 grid-rows-[196px_196px] gap-1.5 lg:grid-rows-[300px_300px]">
+        <div className="grid grid-cols-2 grid-rows-[196px_196px] gap-1.5 lg:grid-rows-[200px_200px]">
           <Tile piece={hero} className="row-span-2" />
           <Tile piece={two} />
           <div className="grid grid-cols-2 gap-1.5"><Tile piece={three} /><Tile piece={four} /></div>
@@ -378,5 +398,17 @@ function PlanPicker({ occasions, selected, isAdmin, busy, onPick, onText, onClea
       {onClear ? <Button variant="secondary" className="mt-2 w-full" disabled={busy} onClick={onClear}>Back to my calendar</Button> : null}
       <PickSheet open={pick} onClose={() => setPick(false)} title="Occasions" kind="occasion" options={occasions} selected={selected ? [selected] : []} canAdd onChange={(ids) => { if (ids[0]) onPick(ids[0]); }} />
     </div>
+  );
+}
+
+/** A simple mirror: an arched frame with a glint, for the empty mirror before the first look. */
+function MirrorGlyph() {
+  return (
+    <svg viewBox="0 0 100 150" className="size-full" aria-hidden>
+      <path d="M22 140 C22 60 30 22 50 22 C70 22 78 60 78 140" fill="none" stroke="#1A1A1A" strokeWidth="1.5" />
+      <path d="M36 60 L52 40" stroke="#1A1A1A" strokeWidth="2" strokeLinecap="round" />
+      <path d="M40 76 L62 50" stroke="#1A1A1A" strokeWidth="1.2" strokeLinecap="round" />
+      <text x="50" y="128" textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="9" fill="#1A1A1A" letterSpacing="1.5">YOU</text>
+    </svg>
   );
 }

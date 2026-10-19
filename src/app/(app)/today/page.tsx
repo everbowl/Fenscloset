@@ -48,7 +48,7 @@ export default async function TodayPage() {
       date={ctx.date}
       evening={ctx.hour >= 16}
       contextLine={context}
-      weather={ctx.weather ? { condition: ctx.weather.condition, source: ctx.weather.source } : null}
+      weather={ctx.weather ? { condition: ctx.weather.condition, source: ctx.weather.source, nowF: ctx.weather.nowF, tonightF: ctx.weather.tonightF, highF: ctx.weather.highF, lowF: ctx.weather.lowF, rainChance: ctx.weather.rainChance } : null}
       weatherNote={ctx.weatherNote}
       savedZip={ctx.savedZip}
       plan={{ source: ctx.plan.source, label: ctx.plan.label, occasionId: ctx.plan.occasionId }}
