@@ -20,7 +20,7 @@ import { monoDate } from "@/lib/dates";
 
 type Props = {
   personId: string; personName: string; mine: boolean; canDress: boolean; isAdmin: boolean;
-  date: string; evening: boolean; contextLine: string;
+  date: string; evening: boolean; contextLine: string; dateLabel: string;
   weather: { condition: string; source: string; nowF: number; tonightF: number; highF: number; lowF: number; rainChance: number } | null; weatherNote: "none" | "failed" | null; savedZip: string | null;
   plan: { source: string; label: string | null; occasionId: string | null }; calendarConnected: boolean; calendarConfigured: boolean;
   checkIn: { source: "taps" | "selfie"; answers: { scaleId: string; optionId: string }[] } | null; scales: Scale[];
@@ -120,7 +120,7 @@ export function TodayScreen(p: Props) {
       <PageHeader
         eyebrow={
           <div className="flex items-start justify-between gap-3">
-            <span data-testid="context-line">{p.mine ? p.contextLine : `${p.personName.toUpperCase()} · ${p.contextLine}`}</span>
+            <span className="text-ink" data-testid="context-line">{p.mine ? p.contextLine : `${p.personName.toUpperCase()} · ${p.contextLine}`}</span>
             {p.canDress ? <button type="button" onClick={() => setSheet("plan")} className="mono shrink-0 text-ink" data-testid="edit-plan">Edit</button> : null}
           </div>
         }
@@ -131,7 +131,10 @@ export function TodayScreen(p: Props) {
 
       {p.weather ? (
         <button type="button" onClick={() => p.canDress && setSheet("zip")} className="mb-4 flex w-full items-stretch border border-ink text-left lg:col-start-2" data-testid="weather-block">
-          <span className="flex items-baseline gap-1 border-r border-ink px-4 py-2.5"><span className="serif text-[40px] leading-none">{p.weather.nowF}°</span><span className="mono">now</span></span>
+          <span className="flex flex-col gap-1 border-r border-ink px-4 py-2.5">
+            <span className="mono text-ink" data-testid="weather-date">{p.dateLabel}</span>
+            <span className="flex items-baseline gap-1"><span className="serif text-[40px] leading-none">{p.weather.nowF}°</span><span className="mono">now</span></span>
+          </span>
           <span className="flex flex-1 flex-col justify-center gap-0.5 px-4 py-2">
             <span className="text-[16px] font-medium">{p.weather.condition} · {p.weather.tonightF}° tonight</span>
             <span className="mono">High {p.weather.highF}° · Low {p.weather.lowF}°{p.weather.rainChance >= 20 ? ` · Rain ${p.weather.rainChance}%` : " · No rain"}</span>

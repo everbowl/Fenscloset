@@ -13,12 +13,16 @@ import type { DuplicateHint } from "@/lib/items/duplicates";
 import { shrinkPhoto } from "@/lib/import/client-queue";
 import { attachPhotoAction, confirmEntryAction, keepSmoothAction, mergeEntryAction, mirrorEntryAction, rotateEntryAction, saveEditsAction, skipEntryAction, smoothEntryAction } from "./actions";
 import { PickSheet, Row, TextSheet } from "@/components/items/row-editor";
+import { BrandSearch } from "@/components/items/brand-search";
+import { MatchSheet } from "@/components/items/match-sheet";
+import { matchEntryAction } from "@/lib/brands/actions";
+import type { Product } from "@/lib/shop/products";
 import type { MyBrand } from "@/lib/profiles/brands";
 import { sizeFor } from "@/lib/profiles/size-options";
 
 type Props = {
   batchId: string;
-  entry: { id: string; photoKey: string; labelKey: string | null; wornKey: string | null; backKey: string | null; smoothKey: string | null; warnings: string[] };
+  entry: { id: string; photoKey: string; labelKey: string | null; wornKey: string | null; backKey: string | null; smoothKey: string | null; retailKeys: string[]; warnings: string[] };
   canSmooth: boolean;
   /** From Profile → Brands: one tap fills brand, size and (at save) the store link. */
   myBrands: MyBrand[];
@@ -31,7 +35,7 @@ type Props = {
   readyCount: number;
 };
 
-type SheetKind = "category" | "subcategory" | "color" | "fabric" | "season" | "formality" | "brand" | "size" | "rename" | "camera" | null;
+type SheetKind = "category" | "subcategory" | "color" | "fabric" | "season" | "formality" | "brand" | "size" | "rename" | "camera" | "match" | null;
 
 function Title({ name }: { name: string }) {
   const words = name.trim().split(" ");
@@ -70,8 +74,21 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
   const [smoothKey, setSmoothKey] = useState(entry.smoothKey);
   const [smoothing, setSmoothing] = useState(false);
   const [showBefore, setShowBefore] = useState(false);
-  const [side, setSide] = useState<"front" | "back">("front");
-  const shownKey = side === "back" && backKey ? backKey : smoothKey && !showBefore ? smoothKey : photoKey;
+  const [side, setSide] = useState<"front" | "back" | "store">("front");
+  const [retailKeys, setRetailKeys] = useState<string[]>(entry.retailKeys);
+  const [matched, setMatched] = useState<{ store: string; priceText: string | null } | null>(null);
+  const [matching, setMatching] = useState(false);
+  const shownKey = side === "store" && retailKeys[0] ? retailKeys[0] : side === "back" && backKey ? backKey : smoothKey && !showBefore ? smoothKey : photoKey;
+  function pickMatch(pick: Product) {
+    setMatching(true); setError(undefined);
+    start(async () => {
+      const r = await matchEntryAction(entry.id, pick, nameOf(lists.brands, tags.brandId) ?? tags.brandText);
+      setMatching(false);
+      if (!r.ok) { setError(r.error); return; }
+      setTags(r.value.tags); setRetailKeys(r.value.retailKeys); setMatched({ store: r.value.store, priceText: r.value.priceText }); setSheet(null);
+      if (r.value.retailKeys.length) setSide("store");
+    });
+  }
 
   const [rotating, setRotating] = useState(false);
   function rotate() {
@@ -182,12 +199,13 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
         <div className="absolute inset-x-0 bottom-0 h-[3px] bg-black/[0.12]"><div className="h-[3px] bg-ink" style={{ width: `${progress}%` }} /></div>
       </div>
 
-      <div className="flex min-h-[44px] items-center justify-between px-5 pt-2" data-testid="photo-tools">
-          <div className="flex gap-1.5">
-            {backKey ? (
+      <div className="flex min-h-[44px] flex-wrap items-center justify-between gap-2 px-5 pt-2" data-testid="photo-tools">
+          <div className="flex flex-wrap gap-1.5">
+            {backKey || retailKeys.length ? (
               <>
                 <button type="button" onClick={() => setSide("front")} aria-pressed={side === "front"} className={`mono mono-11 h-9 px-3 ${side === "front" ? "bg-ink text-paper" : "border border-ink"}`} data-testid="photo-front">Front</button>
-                <button type="button" onClick={() => setSide("back")} aria-pressed={side === "back"} className={`mono mono-11 h-9 px-3 ${side === "back" ? "bg-ink text-paper" : "border border-ink"}`} data-testid="photo-back">Back</button>
+                {backKey ? <button type="button" onClick={() => setSide("back")} aria-pressed={side === "back"} className={`mono mono-11 h-9 px-3 ${side === "back" ? "bg-ink text-paper" : "border border-ink"}`} data-testid="photo-back">Back</button> : null}
+                {retailKeys.length ? <button type="button" onClick={() => setSide("store")} aria-pressed={side === "store"} className={`mono mono-11 h-9 px-3 ${side === "store" ? "bg-ink text-paper" : "border border-ink"}`} data-testid="photo-store">Store</button> : null}
               </>
             ) : null}
           </div>
@@ -196,7 +214,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
           ) : null}
           {canSmooth && side === "front" ? (
             smoothKey ? (
-              <div className="flex gap-1.5">
+              <div className="flex flex-wrap justify-end gap-1.5">
                 <button type="button" onPointerDown={() => setShowBefore(true)} onPointerUp={() => setShowBefore(false)} onPointerLeave={() => setShowBefore(false)} onClick={() => setShowBefore((v) => !v)} className="mono mono-11 h-9 border border-ink px-3" data-testid="smooth-before">Before</button>
                 <button type="button" onClick={() => decideSmooth(false)} disabled={pending} className="mono mono-11 h-9 border border-ink px-3" data-testid="smooth-undo">Undo</button>
                 <button type="button" onClick={() => smooth("more")} disabled={smoothing || pending} className="mono mono-11 h-9 border border-ink px-3 disabled:opacity-60" data-testid="smooth-more">{smoothing ? "Smoothing…" : "Smooth more"}</button>
@@ -250,6 +268,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
         <Row label="Season" value={seasonValue} onClick={() => setSheet("season")} />
         <Row label="Dress code" value={formalityValue} muted={!tags.formalityId} onClick={() => setSheet("formality")} />
         <Row label="Brand · Size" value={brandValue} muted={!brandName && !tags.sizeText} onClick={() => setSheet("brand")} testId="row-brand" />
+      {brandName ? <Row label="Find it online" value={matched ? `${matched.store}${matched.priceText ? ` · ${matched.priceText}` : ""} · store photos added` : `Match the style at ${brandName} · details + store photos`} muted={!matched} onClick={() => setSheet("match")} testId="match-style" /> : null}
       </div>
 
       {error ? <div className="px-5 pt-3"><Banner tone="danger" title={error} /></div> : null}
@@ -286,6 +305,8 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
         </div>
       </Sheet>
       <TextSheet open={sheet === "size"} onClose={() => setSheet("brand")} title="Size" label="Size" value={tags.sizeText ?? ""} placeholder="M · 28 · 8 · EU 38" onSave={(v) => edit({ sizeText: v })} />
+      <MatchSheet open={sheet === "match"} onClose={() => setSheet(null)} busy={matching || pending} onPick={pickMatch}
+        probe={{ brand: brandName ?? "", name: tags.name, category: nameOf(lists.categories, tags.categoryId), color: tags.colorIds[0] ? nameOf(lists.colors, tags.colorIds[0]) : null }} />
       <TextSheet open={sheet === "rename"} onClose={() => setSheet(null)} title="Rename" label="Name" value={tags.name} onSave={(v) => edit({ name: v })} />
       <Sheet open={sheet === "camera"} onClose={() => setSheet(null)} title="Add a photo">
         <div className="flex flex-col">
@@ -322,8 +343,7 @@ function BrandRows({ lists, tags, canAdd, onBrand, onSize, onScan, onAdded }: {
       <Row label="Brand" value={brandName ?? "Pick a brand"} muted={!brandName} onClick={() => setPicking(true)} />
       <Row label="Size" value={tags.sizeText ?? "Add a size"} muted={!tags.sizeText} onClick={onSize} />
       <button type="button" onClick={onScan} className="mono mt-4 flex h-[46px] items-center justify-center border border-ink">Scan the label</button>
-      <PickSheet open={picking} onClose={() => setPicking(false)} title="Brand" kind="brand" options={lists.brands} selected={tags.brandId ? [tags.brandId] : []} canAdd={canAdd}
-        onChange={(ids) => onBrand(ids[0] ?? null, ids[0] ? (lists.brands.find((b) => b.id === ids[0])?.name ?? null) : null)} onAdded={onAdded} />
+      <BrandSearch open={picking} onClose={() => setPicking(false)} brands={lists.brands} selectedId={tags.brandId} onPick={(b) => onBrand(b.id, b.name)} onAdded={onAdded} />
     </>
   );
 }

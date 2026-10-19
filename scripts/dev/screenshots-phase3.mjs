@@ -14,7 +14,7 @@ await page.getByLabel("Email").fill("jeff@everbowl.com"); await page.getByLabel(
 await page.getByRole("button", { name: "Sign in" }).click(); await page.waitForURL(/today/);
 await page.goto(base + "/today"); await page.getByTestId("today").waitFor(); await shot("20-today-no-zip");
 await page.getByTestId("enter-zip").click(); await page.getByRole("dialog").getByRole("textbox").fill("92101"); await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
-await page.getByTestId("context-line").filter({ hasText: "68° NOW" }).waitFor(); await page.getByTestId("board").first().waitFor();
+await page.getByTestId("weather-block").filter({ hasText: "68°" }).waitFor(); await page.getByTestId("board").first().waitFor();
 await page.getByTestId("edit-plan").click(); await page.getByRole("dialog").waitFor(); await page.getByTestId("plan-Dinner out").click(); await page.getByRole("dialog").waitFor({ state: "hidden" }); await page.getByTestId("context-line").filter({ hasText: "DINNER OUT" }).waitFor({ timeout: 15000 });
 await shot("21-today", true);
 await page.getByTestId("check-in").click(); await shot("22-check-in-sheet"); await page.getByRole("radio", { name: "Medium" }).click(); await page.getByRole("radio", { name: "Great" }).click(); await page.getByTestId("save-check-in").click(); await page.getByRole("dialog").waitFor({ state: "hidden" });

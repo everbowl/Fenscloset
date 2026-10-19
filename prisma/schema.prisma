@@ -404,6 +404,8 @@ enum PhotoKind {
   cutout
   thumb
   back
+  /// A store's product photo found by the style match: shown behind the person's own photos, never the main one when a real photo exists.
+  retail
 }
 
 model ItemPhoto {
@@ -474,6 +476,8 @@ model ImportEntry {
   wornKey     String?
   backKey     String?
   smoothKey   String?
+  /// Store product photos from the style match on the card, copied onto the item as `retail` photos.
+  retailKeys  String[]    @default([])
   /// Set when the piece came from a store link or a receipt: name, brand, price, url, store, color, size, purchaseDate.
   storeMeta   Json?
   phash       String?

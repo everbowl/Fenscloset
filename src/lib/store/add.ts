@@ -50,6 +50,10 @@ export type StoreMeta = {
   color: string | null;
   size: string | null;
   purchaseDate: string | null;
+  /** Set by the style match on a photo the person took: the store's facts, but the person's photo stays the photo of record. */
+  matched?: boolean;
+  fitNotes?: string | null;
+  matchTitle?: string | null;
 };
 
 export class StoreAddError extends Error {

@@ -61,7 +61,7 @@ export default async function ConfirmPage({ params, searchParams }: { params: Pr
     <ConfirmCard
       key={entry.id}
       batchId={batchId}
-      entry={{ id: entry.id, photoKey: entry.cutoutKey ?? entry.originalKey, labelKey: entry.labelKey, wornKey: entry.wornKey, backKey: entry.backKey, smoothKey: entry.smoothKey, warnings: ai.warnings }}
+      entry={{ id: entry.id, photoKey: entry.cutoutKey ?? entry.originalKey, labelKey: entry.labelKey, wornKey: entry.wornKey, backKey: entry.backKey, smoothKey: entry.smoothKey, retailKeys: entry.retailKeys, warnings: ai.warnings }}
       canSmooth={isSmoothConfigured()}
       myBrands={myBrands}
       tags={ai.tags}

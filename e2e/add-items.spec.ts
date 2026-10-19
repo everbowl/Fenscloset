@@ -55,6 +55,18 @@ test.describe("add clothes", () => {
     await expect(page.getByTestId("row-color")).toContainText("Black");
     await expect(page.getByTestId("row-brand")).toContainText("Scan the label");
 
+    // brand as you type: a national brand joins the family's list; then match the style at the store
+    await page.getByTestId("row-brand").click();
+    await page.getByRole("dialog").getByText("Pick a brand").click();
+    await page.getByTestId("brand-search").fill("nik");
+    await page.getByRole("dialog").getByRole("option", { name: /^Nike/ }).click(); // seeded brand; a catalog brand not yet in the list shows as brand-national-<name>
+    await expect(page.getByTestId("row-brand")).toContainText("Nike");
+    await page.getByTestId("match-style").click();
+    await page.getByTestId("match-0").click();
+    await expect(page.getByTestId("photo-store")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId("match-style")).toContainText("store photos added");
+    await page.getByTestId("photo-front").click();
+
     // rename, then one tap
     await page.getByRole("button", { name: "Rename" }).click();
     const dialog = page.getByRole("dialog");

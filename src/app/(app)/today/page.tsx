@@ -12,7 +12,6 @@ import { getScales } from "@/lib/checkins/service";
 import { listEntries } from "@/lib/lists/service";
 import { getConnection, isGoogleConfigured } from "@/lib/plans/google";
 import { monoDate } from "@/lib/dates";
-import { weatherLine } from "@/lib/weather";
 import { planLine } from "@/lib/plans";
 import { TodayScreen } from "./today-screen";
 
@@ -37,7 +36,7 @@ export default async function TodayPage() {
     console.error("looks", e);
   }
   const person = personId === me.id ? me : await (await import("@/lib/db")).db.person.findUniqueOrThrow({ where: { id: personId } });
-  const context = [monoDate(ctx.date), ctx.weather ? weatherLine(ctx.weather) : null, planLine(ctx.plan, ctx.tz)].filter(Boolean).join(" · ");
+  const context = planLine(ctx.plan, ctx.tz) ?? "NO PLANS · EVERYDAY";
   return (
     <TodayScreen
       personId={personId}
@@ -48,6 +47,7 @@ export default async function TodayPage() {
       date={ctx.date}
       evening={ctx.hour >= 16}
       contextLine={context}
+      dateLabel={monoDate(ctx.date)}
       weather={ctx.weather ? { condition: ctx.weather.condition, source: ctx.weather.source, nowF: ctx.weather.nowF, tonightF: ctx.weather.tonightF, highF: ctx.weather.highF, lowF: ctx.weather.lowF, rainChance: ctx.weather.rainChance } : null}
       weatherNote={ctx.weatherNote}
       savedZip={ctx.savedZip}

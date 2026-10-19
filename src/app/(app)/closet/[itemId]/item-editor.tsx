@@ -8,6 +8,10 @@ import { Sheet } from "@/components/ui/sheet";
 import { Banner } from "@/components/ui/banner";
 import { Button } from "@/components/ui/button";
 import { PickSheet, Row, TextSheet } from "@/components/items/row-editor";
+import { BrandSearch } from "@/components/items/brand-search";
+import { MatchSheet } from "@/components/items/match-sheet";
+import { matchItemAction } from "@/lib/brands/actions";
+import type { Product } from "@/lib/shop/products";
 import { shrinkPhoto } from "@/lib/import/client-queue";
 import type { ItemLists } from "@/lib/items/query";
 import type { ItemDetailEdits } from "@/lib/items/service";
@@ -31,10 +35,10 @@ export type ItemView = {
   photoNudge: "first" | "refresh" | null;
 };
 
-type SheetKind = "category" | "subcategory" | "color" | "pattern" | "fabric" | "season" | "formality" | "occasion" | "tag" | "brand" | "store" | "size" | "price" | "date" | "url" | "notes" | "closets" | "share" | "rename" | "photo" | "delete" | null;
+type SheetKind = "category" | "subcategory" | "color" | "pattern" | "fabric" | "season" | "formality" | "occasion" | "tag" | "brand" | "match" | "store" | "size" | "price" | "date" | "url" | "notes" | "closets" | "share" | "rename" | "photo" | "delete" | null;
 
 const LAUNDRY_WORD: Record<LaundryStatus, string> = { clean: "Clean", dirty: "Laundry", cleaners: "At cleaners" };
-const KIND_WORD: Record<PhotoKind, string> = { alone: "Photo", worn: "Worn", label: "Label", cutout: "Cutout", thumb: "Thumb", back: "Back" };
+const KIND_WORD: Record<PhotoKind, string> = { alone: "Photo", worn: "Worn", label: "Label", cutout: "Cutout", thumb: "Thumb", back: "Back", retail: "Store" };
 
 function Title({ name }: { name: string }) {
   const words = name.trim().split(" ");
@@ -54,6 +58,19 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
   const photoRef = useRef<HTMLInputElement>(null);
   const [photoKind, setPhotoKind] = useState<"alone" | "worn" | "label" | "back">("alone");
   const [uploading, setUploading] = useState(false);
+  const [matching, setMatching] = useState(false);
+  function pickMatch(pick: Product) {
+    setMatching(true); setError(undefined);
+    start(async () => {
+      const r = await matchItemAction(it.id, pick, name(lists.brands, it.brandId));
+      setMatching(false);
+      if (!r.ok) { setError(r.error); return; }
+      const v = r.value;
+      setIt((x) => ({ ...x, brandId: v.brandId, fitNotes: x.fitNotes ?? v.fitNotes, photos: [...x.photos.filter((p) => p.kind !== "retail"), ...v.photos.map((ph) => ({ id: ph.id, kind: "retail" as const, key: ph.key, isPrimary: false }))] }));
+      if (!lists.brands.some((b) => b.id === v.brandId)) setLists((l) => ({ ...l, brands: [...l.brands, { id: v.brandId, name: v.brandName }] }));
+      setSheet(null); router.refresh();
+    });
+  }
   const [justAdded, setJustAdded] = useState(false);
 
   const name = (xs: { id: string; name: string }[], id: string | null) => xs.find((x) => x.id === id)?.name ?? null;
@@ -104,7 +121,7 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
         <Link href="/closet" aria-label="Back to closet" className="absolute left-2 top-2 flex size-11 items-center justify-center bg-paper text-ink">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden><path d="M15 5l-7 7 7 7" /></svg>
         </Link>
-        {photo?.kind === "worn" || photo?.kind === "back" ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">{KIND_WORD[photo.kind]}</span> : it.storePhoto && photo?.isPrimary ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">Store photo</span> : null}
+        {photo?.kind === "retail" ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">Store photo</span> : photo?.kind === "worn" || photo?.kind === "back" ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">{KIND_WORD[photo.kind]}</span> : it.storePhoto && photo?.isPrimary ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">Store photo</span> : null}
       </div>
       {it.photos.length > 1 ? (
         <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 pt-1.5 [scrollbar-width:none] lg:mx-0 lg:px-0 lg:pt-0">
@@ -219,6 +236,7 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
       <Sheet open={sheet === "brand"} onClose={() => setSheet(null)} title="Brand · Size">
         <div className="flex flex-col">
           <BrandPick lists={lists} brandId={it.brandId} canAdd={canEditLists} onChange={(id) => save({ brandId: id }, { brandId: id })} onAdded={(e) => setLists((l) => ({ ...l, brands: [...l.brands, e] }))} />
+          {brandName ? <Row label="Find it online" value={it.photos.some((p) => p.kind === "retail") ? "Store photos added · match again" : `Match the style at ${brandName} · details + store photos`} muted={!it.photos.some((p) => p.kind === "retail")} onClick={() => setSheet("match")} testId="match-style" /> : null}
           <Row label="Size" value={it.size ?? "Add a size"} muted={!it.size} onClick={() => setSheet("size")} />
           <button type="button" onClick={() => { setPhotoKind("label"); photoRef.current?.click(); }} className="mono mt-4 flex h-[46px] items-center justify-center border border-ink">Add a label photo</button>
         </div>
@@ -227,6 +245,8 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
       <PickSheet open={sheet === "closets"} onClose={() => setSheet(null)} title="Closets" kind="closet" options={lists.closets.map((c) => ({ id: c.id, name: c.kind === "family" ? `${c.name} (everyone)` : c.name }))} selected={it.closetIds} multi canAdd={canEditLists} onChange={(ids) => save({ closetIds: ids }, { closetIds: ids })} onAdded={(e) => setLists((l) => ({ ...l, closets: [...l.closets, { ...e, kind: "custom" }] }))} />
       <PickSheet open={sheet === "share"} onClose={() => setSheet(null)} title="Share with" kind="tag" options={lists.people} selected={it.sharedWithIds} multi canAdd={false} onChange={(ids) => save({ sharedWithIds: ids }, { sharedWithIds: ids })} />
       <TextSheet open={sheet === "size"} onClose={() => setSheet("brand")} title="Size" label="Size" value={it.size ?? ""} placeholder="M · 28 · 8 · EU 38" onSave={(v) => save({ sizeText: v }, { size: v.trim() || null })} />
+      <MatchSheet open={sheet === "match"} onClose={() => setSheet("brand")} busy={matching || pending} onPick={pickMatch}
+        probe={{ brand: brandName ?? "", name: it.name, category: category?.name ?? null, color: it.colorIds[0] ? name(lists.colors, it.colorIds[0]) : null }} />
       <TextSheet open={sheet === "rename"} onClose={() => setSheet(null)} title="Rename" label="Name" value={it.name} onSave={(v) => save({ name: v }, { name: v.trim() || it.name })} />
       <TextSheet open={sheet === "price"} onClose={() => setSheet(null)} title="Price" label="Price" value={it.purchasePrice ?? ""} placeholder="48.50" onSave={(v) => { save({ purchasePrice: v }, { purchasePrice: v.replace(/[$,\s]/g, "") || null }); setSheet("date"); }} />
       <TextSheet open={sheet === "date"} onClose={() => setSheet(null)} title="Bought on" label="Date (YYYY-MM-DD)" value={it.purchaseDate ?? ""} placeholder="2026-10-18" onSave={(v) => save({ purchaseDate: v }, { purchaseDate: v.trim() || null })} />
@@ -259,7 +279,7 @@ function BrandPick({ lists, brandId, canAdd, onChange, onAdded }: { lists: ItemL
   return (
     <>
       <Row label="Brand" value={brand ?? "Pick a brand"} muted={!brand} onClick={() => setOpen(true)} />
-      <PickSheet open={open} onClose={() => setOpen(false)} title="Brand" kind="brand" options={lists.brands} selected={brandId ? [brandId] : []} canAdd={canAdd} onChange={(ids) => onChange(ids[0] ?? null)} onAdded={onAdded} />
+      <BrandSearch open={open} onClose={() => setOpen(false)} brands={lists.brands} selectedId={brandId} onPick={(b) => onChange(b.id)} onAdded={onAdded} />
     </>
   );
 }

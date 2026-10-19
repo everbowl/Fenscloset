@@ -18,7 +18,9 @@ test("morning flow: Jeff gets three looks, checks in, sets the plan, swaps, wear
   await page.getByTestId("enter-zip").click();
   await page.getByRole("dialog").getByRole("textbox").fill("92101");
   await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
-  await expect(page.getByTestId("context-line")).toContainText("68° NOW → 61° TONIGHT");
+  await expect(page.getByTestId("weather-block")).toContainText("68°");
+  await expect(page.getByTestId("weather-block")).toContainText("61° tonight");
+  await expect(page.getByTestId("weather-date")).toHaveText(/\w{3} \d{1,2} \w{3}/);
   await expect(page.getByText("Weather by Open-Meteo")).toBeVisible();
   await expect(page.getByTestId("board")).toHaveCount(3);
   await expect(page.getByTestId("piece-list")).toContainText("TOPS");
