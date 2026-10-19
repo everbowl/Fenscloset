@@ -26,6 +26,6 @@ await page.getByTestId("match-style").click(); await page.getByTestId("match-0")
 await page.getByTestId("match-0").click(); await page.getByTestId("photo-store").waitFor({ timeout: 20000 }); await page.waitForTimeout(400);
 await page.screenshot({ path: `${out}/143-store-photo-behind.png` });
 await page.getByTestId("confirm-next").click(); await page.getByRole("heading", { name: /All done/ }).waitFor();
-await page.goto(base + "/closet"); await page.getByTestId("item-card").first().click(); await page.getByTestId("item-photo").waitFor(); await page.waitForTimeout(400);
+await page.goto(base + "/closet"); await page.getByTestId("item-card").first().click(); await page.getByTestId("rotate-photo").waitFor(); await page.waitForTimeout(400);
 await page.screenshot({ path: `${out}/144-item-with-store-photos.png`, fullPage: true });
 await browser.close();
