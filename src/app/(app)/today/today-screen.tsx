@@ -11,7 +11,7 @@ import { Banner } from "@/components/ui/banner";
 import { Sheet } from "@/components/ui/sheet";
 import { PickSheet, TextSheet } from "@/components/items/row-editor";
 import { cn } from "@/lib/cn";
-import type { BoardView } from "@/lib/outfits/engine";
+import type { BoardView, Piece } from "@/lib/outfits/engine";
 import type { Scale } from "@/lib/checkins/service";
 import type { TryOnState, TryOnView } from "@/lib/tryon";
 import { checkInSelfieAction, checkInTapsAction, mannequinAction, moreAction, rateAction, regenerateAction, removeAction, setLocationAction, setPlanAction, setZipAction, swapAction, tryOnAction, wearAction } from "./actions";
@@ -33,6 +33,8 @@ type Props = {
   tryOn: TryOnState;
   /** SEE IT ON falls back to the shared mannequin (no body photo needed; minors and parents too) when the person's own try-on is not ready. */
   mannequin: boolean;
+  /** A back body photo exists: the mirror can show the look from behind. */
+  backPhoto: boolean;
 };
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -281,7 +283,14 @@ export function TodayScreen(p: Props) {
           <div className="flex flex-col gap-3" data-testid="try-on-sheet">
             <div className="h-[460px] overflow-hidden bg-bone"><img src={`/api/photo/${tryOn.key}`} alt={tryOn.mannequin ? "This look on a mannequin" : "You wearing this look"} className="size-full object-contain" /></div>
             <p className="mono text-graphite">{board?.pieces.map((x) => x.label).join(" · ")}</p>
-            <p className="mono text-ink">{tryOn.mannequin ? `On a mannequin · No body photo used${p.mine ? "" : ` · ${p.personName}’s look`}` : "On you · Only you can see this picture"}{tryOn.cached ? " · saved from before" : ""}</p>
+            <p className="mono text-ink">{tryOn.mannequin ? `On a mannequin · No body photo used${p.mine ? "" : ` · ${p.personName}’s look`}` : `On you${tryOn.view === "back" ? " · from behind" : ""} · Only you can see this picture`}{tryOn.cached ? " · saved from before" : ""}</p>
+            {!tryOn.mannequin && p.backPhoto ? (
+              <div className="flex gap-1.5">
+                {(["front", "back"] as const).map((v) => (
+                  <button key={v} type="button" disabled={busy !== null} aria-pressed={(tryOn.view ?? "front") === v} onClick={() => { if ((tryOn.view ?? "front") === v) return; setBusy("tryon"); setError(undefined); start(async () => { const r = await tryOnAction(p.personId, p.suggestion!.id, index, v); setBusy(null); if (!r.ok) setError(r.error); else if (r.tryOn) setTryOn(r.tryOn); }); }} className={`mono mono-11 h-9 px-4 ${(tryOn.view ?? "front") === v ? "bg-ink text-paper" : "border border-ink"}`} data-testid={`mirror-${v}`}>{v === "front" ? "Front" : busy === "tryon" ? "Turning…" : "From behind"}</button>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
       </Sheet>
@@ -304,22 +313,35 @@ function Tile({ piece, className }: { piece?: BoardView["pieces"][number]; class
  * three put the hero on the left with two on the right; four or more use the 2×2 with the hero tall.
  * Pieces past the fourth live in the piece list.
  */
+/** Where a piece sits in the stack: what you wear on top first, shoes last; anything else (bags, hats, jewelry) in a small row under. */
+const STACK: Record<string, number> = { Outerwear: 0, Tops: 1, Activewear: 1, Dresses: 1, Swimwear: 1, Sleepwear: 1, Bottoms: 2, Shoes: 3 };
+function slotOf(p: Piece): number { return p.category && p.category in STACK ? STACK[p.category] : 4; }
+/** Width and height of each slot as a share of the board, so the top sits over the bottom with the shoes under, like an outfit laid out on a bed. */
+const SLOT = [
+  { w: "w-[74%]", h: "h-[210px] lg:h-[176px]", mt: "" },           // outerwear
+  { w: "w-[70%]", h: "h-[200px] lg:h-[168px]", mt: "-mt-10 lg:-mt-8" },  // top / dress
+  { w: "w-[62%]", h: "h-[200px] lg:h-[168px]", mt: "-mt-7 lg:-mt-6" },   // bottom
+  { w: "w-[40%]", h: "h-[104px] lg:h-[88px]", mt: "-mt-4 lg:-mt-3" },    // shoes
+];
+
+/**
+ * The board lays the look out as an outfit (Jeff, 19 Oct 2026): the top over the bottom, shoes
+ * under, each centered and slightly overlapping, white behind, no boxes. Accessories sit in a small
+ * row at the end. One piece alone fills the board.
+ */
 function Board({ board, index, active }: { board: BoardView; index: number; active: boolean }) {
-  const [hero, two, three, four] = board.pieces;
   const n = board.pieces.length;
+  const sorted = [...board.pieces].sort((a, b) => slotOf(a) - slotOf(b));
+  const stacked = sorted.filter((p) => slotOf(p) < 4);
+  const extras = sorted.filter((p) => slotOf(p) === 4);
   return (
     <div className="w-full shrink-0 snap-center px-5 lg:px-0" aria-hidden={!active} data-testid="board" data-index={index} data-pieces={n}>
       {n <= 1 ? (
-        <Tile piece={hero} className="h-[400px] lg:h-[406px]" />
-      ) : n === 2 ? (
-        <div className="grid grid-rows-[196px_196px] gap-1.5 lg:grid-rows-[200px_200px]"><Tile piece={hero} /><Tile piece={two} /></div>
-      ) : n === 3 ? (
-        <div className="grid grid-cols-2 grid-rows-[196px_196px] gap-1.5 lg:grid-rows-[200px_200px]"><Tile piece={hero} className="row-span-2" /><Tile piece={two} /><Tile piece={three} /></div>
+        <Tile piece={board.pieces[0]} className="h-[400px] lg:h-[406px]" />
       ) : (
-        <div className="grid grid-cols-2 grid-rows-[196px_196px] gap-1.5 lg:grid-rows-[200px_200px]">
-          <Tile piece={hero} className="row-span-2" />
-          <Tile piece={two} />
-          <div className="grid grid-cols-2 gap-1.5"><Tile piece={three} /><Tile piece={four} /></div>
+        <div className="flex flex-col items-center" data-testid="outfit-stack">
+          {stacked.map((p, i) => { const sl = SLOT[slotOf(p)]; return <Tile key={p.id} piece={p} className={`${sl.w} ${sl.h} ${i === 0 ? "" : sl.mt}`} />; })}
+          {extras.length ? <div className="mt-2 flex w-full justify-center gap-2">{extras.map((p) => <Tile key={p.id} piece={p} className="h-[88px] w-[28%] lg:h-[72px]" />)}</div> : null}
         </div>
       )}
     </div>

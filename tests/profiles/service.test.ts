@@ -74,7 +74,8 @@ describe("profiles & privacy", () => {
     const locked = newKey("bodies", jeff.id, "image/jpeg"); const open = newKey("bodies", jeff.id, "image/jpeg");
     await putObject(locked, Buffer.from("u"), "image/jpeg"); await putObject(open, Buffer.from("s"), "image/jpeg");
     await addBodyPhoto(jeff, jeff.id, locked, { onlyMe: true });
-    await addBodyPhoto(jeff, jeff.id, open);
+    await addBodyPhoto(jeff, jeff.id, open, { view: "back" });
+    expect((await getBodyProfile(jeff, jeff.id))!.photos.map((p) => p.view).sort()).toEqual(["back", "front"]);
     expect((await getBodyProfile(jeff, jeff.id))!.photos.map((p) => p.onlyMe).sort()).toEqual([false, true]);
     expect((await getBodyProfile(olivia, jeff.id))!.photos.map((p) => p.key)).toEqual([open]);
     expect((await getBodyProfile(brittney, jeff.id))!.photos.map((p) => p.key)).toEqual([open]);

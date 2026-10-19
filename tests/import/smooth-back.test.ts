@@ -6,7 +6,7 @@ import sharp from "sharp";
 import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
 import { seed } from "../../prisma/seed";
-import { newKey, objectExists, putObject } from "@/lib/storage";
+import { getObject, newKey, objectExists, putObject } from "@/lib/storage";
 import { getOrCreateOpenBatch, registerEntry } from "@/lib/import/service";
 import { drainQueue } from "@/lib/import/queue";
 import { attachEntryPhoto, createItemFromEntry, saveEntryEdits } from "@/lib/items/service";
@@ -26,7 +26,7 @@ describe("smooth wrinkles + back photo", () => {
   beforeEach(async () => {
     await resetDb();
     process.env.DEV_MODE = "true"; process.env.MOCK_AI = "true"; process.env.MOCK_S3 = "true"; process.env.MOCK_SMOOTH = "true";
-    delete process.env.MOCK_REMOVE_BG_FAIL;
+    delete process.env.MOCK_REMOVE_BG_FAIL; process.env.AUTO_TIDY = "false";
     process.env.MOCK_S3_DIR = await mkdtemp(path.join(os.tmpdir(), "fc-smooth-"));
     await seed();
     jeffId = (await db.person.findUniqueOrThrow({ where: { email: "jeff@everbowl.com" } })).id;
@@ -150,5 +150,17 @@ describe("smooth wrinkles + back photo", () => {
     const photos = await db.itemPhoto.findMany({ where: { itemId: item.id } });
     expect(photos.find((p) => p.kind === "back")?.bucketKey).toBe(backKey);
     expect(photos.find((p) => p.kind === "back")?.isPrimary).toBe(false);
+  });
+
+  it("TIDY parks a clean product picture (a cutout stays a cutout) and replaces a parked smooth", async () => {
+    const e = await readyEntry();
+    const { smoothKey } = await smoothEntry(jeffId, e.id);
+    const tidy = await smoothEntry(jeffId, e.id, "tidy");
+    expect(tidy.smoothKey).not.toBe(smoothKey);
+    expect(tidy.smoothKey).toMatch(/\.png$/);
+    expect(await objectExists(smoothKey)).toBe(false);
+    const meta = await sharp((await getObject(tidy.smoothKey)).body).metadata();
+    expect(meta.format).toBe("png"); // the mock background removal gives an RGB PNG; the real one has alpha
+    expect((await keepSmooth(jeffId, e.id, true)).photoKey).toBe(tidy.smoothKey);
   });
 });

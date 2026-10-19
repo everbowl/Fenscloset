@@ -19,7 +19,8 @@ export class TryOnError extends Error {
 }
 
 export type TryOnState = "ready" | "off" | "minor" | "no_photo" | "unconfigured" | "not_you";
-export type TryOnView = { id: string; key: string; itemIds: string[]; createdAt: string; cached: boolean; /** On the shared mannequin, not the person (src/lib/tryon/mannequin.ts). */ mannequin?: boolean };
+export type BodyViewSide = "front" | "back";
+export type TryOnView = { id: string; key: string; itemIds: string[]; createdAt: string; cached: boolean; /** Which body photo was dressed. */ view?: BodyViewSide; /** On the shared mannequin, not the person (src/lib/tryon/mannequin.ts). */ mannequin?: boolean };
 
 export const MAX_GARMENTS = 3;
 /** Garment order that reads best on a body: outer layer last. */
@@ -65,13 +66,14 @@ export async function mockTryOn(person: Buffer, garments: Buffer[]): Promise<Buf
 }
 
 /** Garment image for an item: the cutout when there is one, else the main photo. */
-export async function garmentImages(itemIds: string[]): Promise<{ id: string; buf: Buffer }[]> {
+export async function garmentImages(itemIds: string[], back = false): Promise<{ id: string; buf: Buffer }[]> {
   const items = await db.item.findMany({ where: { id: { in: itemIds } }, select: { id: true, category: { select: { name: true } }, photos: { select: { kind: true, bucketKey: true, isPrimary: true } } } });
   const sorted = items.sort((a, b) => ORDER.indexOf(a.category?.name ?? "") - ORDER.indexOf(b.category?.name ?? ""));
   const out: { id: string; buf: Buffer }[] = [];
   for (const it of sorted) {
     if (it.category?.name && !ORDER.includes(it.category.name)) continue; // accessories, bags, hats: the model can't place them
-    const key = it.photos.find((p) => p.kind === "cutout")?.bucketKey ?? it.photos.find((p) => p.isPrimary)?.bucketKey ?? it.photos[0]?.bucketKey;
+    // From behind, a piece's own back photo is the better garment picture when it has one.
+    const key = (back ? it.photos.find((p) => p.kind === "back")?.bucketKey : undefined) ?? it.photos.find((p) => p.kind === "cutout")?.bucketKey ?? it.photos.find((p) => p.isPrimary)?.bucketKey ?? it.photos[0]?.bucketKey;
     if (!key) continue;
     try { out.push({ id: it.id, buf: (await getObject(key)).body }); } catch { /* missing file: skip the piece */ }
     if (out.length === MAX_GARMENTS) break;
@@ -80,14 +82,18 @@ export async function garmentImages(itemIds: string[]): Promise<{ id: string; bu
 }
 
 /** The look on the person. `source` is "today" or "shop" for the record. */
-export async function tryOnLook(viewer: Viewer, personId: string, itemIds: string[], source: string, extraGarment?: Buffer): Promise<TryOnView> {
+export async function tryOnLook(viewer: Viewer, personId: string, itemIds: string[], source: string, extraGarment?: Buffer, view: BodyViewSide = "front"): Promise<TryOnView> {
   await assertReady(viewer, personId);
-  const photo = await db.bodyPhoto.findFirstOrThrow({ where: { personId }, orderBy: { takenAt: "desc" } });
+  // Front: the front photo, else the newest photo of any view. Back: only a back photo will do.
+  const photo = view === "back"
+    ? await db.bodyPhoto.findFirst({ where: { personId, view: "back" }, orderBy: { takenAt: "desc" } })
+    : (await db.bodyPhoto.findFirst({ where: { personId, view: "front" }, orderBy: { takenAt: "desc" } })) ?? (await db.bodyPhoto.findFirst({ where: { personId }, orderBy: { takenAt: "desc" } }));
+  if (!photo) throw new TryOnError(view === "back" ? "Add a back photo on your Body page to see the look from behind." : "Add a full-body photo on your Body page first.");
   const ids = [...new Set(itemIds)];
   const cacheIds = extraGarment ? [...ids, `extra:${source}`] : ids;
   const hit = await db.tryOn.findFirst({ where: { personId, bodyPhotoKey: photo.bucketKey, itemIds: { equals: [...cacheIds].sort() } }, orderBy: { createdAt: "desc" } });
-  if (hit) return { id: hit.id, key: hit.bucketKey, itemIds: hit.itemIds, createdAt: hit.createdAt.toISOString(), cached: true };
-  const garments = [...(extraGarment ? [{ id: "extra", buf: extraGarment }] : []), ...(await garmentImages(ids))].slice(0, MAX_GARMENTS);
+  if (hit) return { id: hit.id, key: hit.bucketKey, itemIds: hit.itemIds, createdAt: hit.createdAt.toISOString(), cached: true, view };
+  const garments = [...(extraGarment ? [{ id: "extra", buf: extraGarment }] : []), ...(await garmentImages(ids, view === "back"))].slice(0, MAX_GARMENTS);
   if (!garments.length) throw new TryOnError("None of these pieces has a photo the try-on can use.");
   let person: Buffer = await sharp((await getObject(photo.bucketKey)).body).rotate().resize(1024, 1024, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
   if (process.env.MOCK_TRYON === "true") {
@@ -106,7 +112,12 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
   const key = newKey("tryon", personId, "image/jpeg");
   await putObject(key, person, "image/jpeg");
   const row = await db.tryOn.create({ data: { personId, bucketKey: key, itemIds: [...cacheIds].sort(), bodyPhotoKey: photo.bucketKey, source } });
-  return { id: row.id, key, itemIds: row.itemIds, createdAt: row.createdAt.toISOString(), cached: false };
+  return { id: row.id, key, itemIds: row.itemIds, createdAt: row.createdAt.toISOString(), cached: false, view };
+}
+
+/** Does this person have a back photo (so the mirror can offer the view from behind)? */
+export async function hasBackPhoto(personId: string): Promise<boolean> {
+  return Boolean(await db.bodyPhoto.findFirst({ where: { personId, view: "back" }, select: { id: true } }));
 }
 
 export async function listTryOns(personId: string, take = 12): Promise<TryOnView[]> {

@@ -6,7 +6,7 @@ import { canDress, getOrGenerate, getSuggestion, type Suggestion } from "@/lib/o
 import { loadCandidates } from "@/lib/outfits/catalog";
 import { countCleanOut } from "@/lib/outfits/cleanout";
 import { unratedRecentFit } from "@/lib/fits/service";
-import { tryOnState } from "@/lib/tryon";
+import { tryOnState, hasBackPhoto } from "@/lib/tryon";
 import { isMannequinConfigured } from "@/lib/tryon/mannequin";
 import { getScales } from "@/lib/checkins/service";
 import { listEntries } from "@/lib/lists/service";
@@ -63,6 +63,7 @@ export default async function TodayPage() {
       unrated={unrated}
       tryOn={tryOn}
       mannequin={dress && tryOn !== "ready" && isMannequinConfigured()}
+      backPhoto={tryOn === "ready" && (await hasBackPhoto(personId))}
     />
   );
 }

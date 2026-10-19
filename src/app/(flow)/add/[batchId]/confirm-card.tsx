@@ -73,6 +73,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
   const [photoKey, setPhotoKey] = useState(entry.photoKey);
   const [smoothKey, setSmoothKey] = useState(entry.smoothKey);
   const [smoothing, setSmoothing] = useState(false);
+  const [smoothWord, setSmoothWord] = useState(entry.warnings.includes("auto_tidied") && entry.smoothKey ? "Tidied" : "Smoothed");
   const [showBefore, setShowBefore] = useState(false);
   const [side, setSide] = useState<"front" | "back" | "store">("front");
   const [retailKeys, setRetailKeys] = useState<string[]>(entry.retailKeys);
@@ -100,7 +101,8 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
       setPhotoKey(r.value.photoKey); setSmoothKey(r.value.smoothKey);
     });
   }
-  function smooth(strength: "normal" | "more" = "normal") {
+  function smooth(strength: "normal" | "more" | "tidy" = "normal") {
+    setSmoothWord(strength === "tidy" ? "Tidied" : "Smoothed");
     setError(undefined); setSmoothing(true); setSide("front"); setShowBefore(false);
     start(async () => {
       const r = await smoothEntryAction(entry.id, strength);
@@ -195,7 +197,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
       <div className="relative mx-5 h-[400px] bg-bone">
         <img src={`/api/photo/${shownKey}`} alt="" className="size-full object-contain" data-testid="confirm-photo" />
         {smoothing ? <span className="mono mono-11 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-paper px-3 py-2">Smoothing…</span> : null}
-        {smoothKey && side === "front" ? <span className="mono mono-11 absolute left-2 top-2 bg-paper px-2.5 py-1.5">{showBefore ? "Before" : "Smoothed"}</span> : null}
+        {smoothKey && side === "front" ? <span className="mono mono-11 absolute left-2 top-2 bg-paper px-2.5 py-1.5">{showBefore ? "Before" : smoothWord}</span> : null}
         <div className="absolute inset-x-0 bottom-0 h-[3px] bg-black/[0.12]"><div className="h-[3px] bg-ink" style={{ width: `${progress}%` }} /></div>
       </div>
 
@@ -221,7 +223,10 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
                 <button type="button" onClick={() => decideSmooth(true)} disabled={pending} className="mono mono-11 h-9 bg-ink px-3 text-paper" data-testid="smooth-keep">Keep</button>
               </div>
             ) : (
-              <button type="button" onClick={() => smooth()} disabled={smoothing || pending} className="mono mono-11 h-9 border border-ink px-3 disabled:opacity-60" data-testid="smooth">{smoothing ? "Smoothing…" : "Smooth wrinkles"}</button>
+              <div className="flex flex-wrap justify-end gap-1.5">
+                <button type="button" onClick={() => smooth("tidy")} disabled={smoothing || pending} className="mono mono-11 h-9 border border-ink px-3 disabled:opacity-60" data-testid="tidy" title="A clean, flat, square-on product picture">{smoothing ? "Working…" : "Tidy"}</button>
+                <button type="button" onClick={() => smooth()} disabled={smoothing || pending} className="mono mono-11 h-9 border border-ink px-3 disabled:opacity-60" data-testid="smooth">{smoothing ? "Smoothing…" : "Smooth wrinkles"}</button>
+              </div>
             )
           ) : null}
         </div>

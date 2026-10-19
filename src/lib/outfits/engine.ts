@@ -25,7 +25,7 @@ export class OutfitError extends Error {
   }
 }
 
-export type Piece = { id: string; name: string; label: string; thumbKey: string | null; ownerId: string };
+export type Piece = { id: string; name: string; label: string; thumbKey: string | null; ownerId: string; /** Category name, so the board can stack top over bottom over shoes. */ category?: string | null };
 /** Why a look works, in plain lines the Today screen lists under the one-sentence reason. */
 export type Why = { weather: string[]; dressCode: string; color: string; taste: string };
 export type Board = { itemIds: string[]; reason: string; why?: Why };
@@ -192,7 +192,7 @@ function toPiece(c: Candidate): Piece {
 async function piecesFor(boards: Board[]): Promise<Map<string, Piece>> {
   const ids = [...new Set(boards.flatMap((b) => b.itemIds))];
   const items = await db.item.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, ownerId: true, category: { select: { name: true } }, subcategory: { select: { name: true } }, photos: { where: { kind: "thumb" }, take: 1, select: { bucketKey: true } } } });
-  return new Map(items.map((it) => [it.id, { id: it.id, name: it.name ?? "Untitled piece", label: (it.subcategory?.name ?? it.category?.name ?? "piece").toUpperCase(), thumbKey: it.photos[0]?.bucketKey ?? null, ownerId: it.ownerId }]));
+  return new Map(items.map((it) => [it.id, { id: it.id, name: it.name ?? "Untitled piece", label: (it.subcategory?.name ?? it.category?.name ?? "piece").toUpperCase(), thumbKey: it.photos[0]?.bucketKey ?? null, ownerId: it.ownerId, category: it.category?.name ?? null }]));
 }
 
 async function view(row: { id: string; date: string; inputs: Prisma.JsonValue; outfits: Prisma.JsonValue }): Promise<Suggestion> {

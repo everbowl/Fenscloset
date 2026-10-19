@@ -5,6 +5,7 @@ import { fitCutout, makeThumb, normalizeOriginal, toAiImage } from "@/lib/images
 import { phash } from "@/lib/images/phash";
 import { loadTagLists, rotationFor, tagItem, type TagResult } from "@/lib/ai/tag-item";
 import { rotateImage } from "@/lib/images/rotate";
+import { isSmoothConfigured, tidyGarment } from "@/lib/images/smooth";
 import { readLabel } from "@/lib/ai/read-label";
 import { AiError } from "@/lib/ai/claude";
 import type { ImportEntry } from "@/generated/prisma/client";
@@ -79,11 +80,28 @@ export async function processEntry(entryId: string): Promise<ProcessOutcome> {
     await putObject(thumbKey, thumb, "image/jpeg");
     const hash = await phash(source);
     const duplicate = await confirmedDuplicate(ownerId, { phash: hash, categoryId: tags.categoryId, colorIds: tags.colorIds, brandId: tags.brandId }, source);
+
+    // Auto-tidy (Jeff, 19 Oct 2026): a clean, flat, square-on product picture is parked like SMOOTH; the card
+    // shows Before/Undo/Keep and the confirm keeps it unless it was undone. AUTO_TIDY=false turns it off.
+    let smoothKey: string | null = entry.smoothKey;
+    if (cutout && isSmoothConfigured() && process.env.AUTO_TIDY !== "false") {
+      try {
+        const out = await tidyGarment(cutout);
+        const data = out.contentType === "image/png" ? await fitCutout(out.data) : out.data;
+        if (smoothKey) await deleteObject(smoothKey).catch(() => undefined);
+        smoothKey = newKey("cutouts", ownerId, out.contentType);
+        await putObject(smoothKey, data, out.contentType);
+        warnings.push("auto_tidied");
+      } catch (e) {
+        warnings.push("tidy_failed");
+        console.error("auto-tidy failed", e);
+      }
+    }
     const aiResult: EntryAiResult = { tags, warnings, duplicate };
 
     await db.importEntry.update({
       where: { id: entryId },
-      data: { status: "needs_confirm", cutoutKey, thumbKey, phash: hash, aiResult: JSON.parse(JSON.stringify(aiResult)), error: null },
+      data: { status: "needs_confirm", cutoutKey, thumbKey, smoothKey, phash: hash, aiResult: JSON.parse(JSON.stringify(aiResult)), error: null },
     });
     return { status: "needs_confirm" };
   } catch (e) {

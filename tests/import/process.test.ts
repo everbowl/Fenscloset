@@ -11,6 +11,7 @@ import { processEntry, type EntryAiResult } from "@/lib/import/process";
 import { getObject } from "@/lib/storage";
 import { rotateEntry } from "@/lib/import/rotate-entry";
 import { createItemFromEntry } from "@/lib/items/service";
+import { keepSmooth } from "@/lib/import/smooth-entry";
 
 async function photo() {
   return sharp({ create: { width: 900, height: 1200, channels: 3, background: { r: 30, g: 30, b: 30 } } }).jpeg().toBuffer();
@@ -21,7 +22,7 @@ describe("import processing", () => {
   beforeEach(async () => {
     await resetDb();
     process.env.DEV_MODE = "true"; process.env.MOCK_AI = "true"; process.env.MOCK_S3 = "true";
-    delete process.env.MOCK_REMOVE_BG_FAIL; delete process.env.MOCK_ORIENTATION;
+    delete process.env.MOCK_REMOVE_BG_FAIL; delete process.env.MOCK_ORIENTATION; process.env.AUTO_TIDY = "false";
     process.env.MOCK_S3_DIR = await mkdtemp(path.join(os.tmpdir(), "fc-import-"));
     await seed();
     jeffId = (await db.person.findUniqueOrThrow({ where: { email: "jeff@everbowl.com" } })).id;
@@ -102,6 +103,26 @@ describe("import processing", () => {
     await processEntry(other.id);
     const none = (await db.importEntry.findUniqueOrThrow({ where: { id: other.id } })).aiResult as EntryAiResult;
     expect(none.duplicate).toBeNull();
+  });
+
+  it("auto-tidy parks a clean product picture on the card; the confirm keeps it as the cutout unless it was undone", async () => {
+    delete process.env.AUTO_TIDY; process.env.MOCK_SMOOTH = "true";
+    const e = await entryWithPhoto();
+    await processEntry(e.id);
+    const done = await db.importEntry.findUniqueOrThrow({ where: { id: e.id } });
+    expect(done.smoothKey).toMatch(/^cutouts\/.*\.png$/);
+    expect((done.aiResult as EntryAiResult).warnings).toEqual(["auto_tidied"]);
+    expect(await objectExists(done.smoothKey!)).toBe(true);
+    const kept = await keepSmooth(jeffId, e.id, true);
+    expect(kept.photoKey).toBe(done.smoothKey);
+    const item = await createItemFromEntry(jeffId, e.id);
+    const photos = await db.itemPhoto.findMany({ where: { itemId: item.id } });
+    expect(photos.find((p) => p.kind === "cutout")?.bucketKey).toBe(done.smoothKey);
+    // turned off: nothing parked
+    process.env.AUTO_TIDY = "false";
+    const plain = await entryWithPhoto();
+    await processEntry(plain.id);
+    expect((await db.importEntry.findUniqueOrThrow({ where: { id: plain.id } })).smoothKey).toBeNull();
   });
 
   it("keeps the original usable when remove.bg fails, and says why", async () => {

@@ -17,7 +17,8 @@ import type { CategorySizes } from "@/lib/profiles/sizes";
 import { formatMeasurement, likelyFor, measurementOptions, type LikelySizes } from "@/lib/profiles/size-options";
 import { addBodyPhotoAction, removeBodyPhotoAction, removeSizeAction, setBodyPhotoPrivacyAction, setFitNotesAction, setMeasurementAction, upsertSizeAction } from "../actions";
 
-type Body = Omit<BodyProfileView, "photos"> & { photos: { id: string; key: string; takenAt: string; onlyMe: boolean }[] };
+type BodyView = "front" | "side" | "back";
+type Body = Omit<BodyProfileView, "photos"> & { photos: { id: string; key: string; takenAt: string; onlyMe: boolean; view: BodyView }[] };
 
 /**
  * Body profile (screen 11, undrawn): measurements from the editable list, sizes by brand, fit notes,
@@ -36,6 +37,7 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, brands, categor
   const [photoSheet, setPhotoSheet] = useState<string | null>(null);
   const [askPrivacy, setAskPrivacy] = useState(false);
   const [nextOnlyMe, setNextOnlyMe] = useState(false);
+  const [nextView, setNextView] = useState<BodyView>("front");
   const [error, setError] = useState<string>();
   const [uploading, setUploading] = useState(false);
   const [pending, start] = useTransition();
@@ -58,7 +60,7 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, brands, categor
       if (!signRes.ok) throw new Error(signed.error || "Upload failed.");
       const put = await fetch(signed.url, { method: "PUT", headers: signed.headers, body: blob });
       if (!put.ok) throw new Error("Upload failed.");
-      const r = await addBodyPhotoAction(ownerId, signed.key, nextOnlyMe);
+      const r = await addBodyPhotoAction(ownerId, signed.key, nextOnlyMe, nextView);
       if (!r.ok) throw new Error(r.error);
       router.refresh();
     } catch (err) { setError((err as Error).message); } finally { setUploading(false); }
@@ -110,19 +112,26 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, brands, categor
         ) : (
           <>
             {isMinor && body.photosApprovedBy ? <p className="mono py-2 text-graphite">Approved by {body.photosApprovedBy} · seen by {ownerFirst} and parents only</p> : null}
-            <div className="grid grid-cols-3 gap-1.5 pt-2">
-              {body.photos.map((p) => (
-                <button key={p.id} type="button" onClick={() => canEdit && setPhotoSheet(p.id)} className="relative h-[150px] overflow-hidden bg-bone" data-testid={p.onlyMe ? "body-photo-locked" : "body-photo-shared"}>
-                  <img src={`/api/photo/${p.key}`} alt="Full-body photo" className="size-full object-cover" />
-                  {p.onlyMe ? <span className="mono absolute left-1.5 top-1.5 bg-paper px-1.5 py-1">Only me</span> : null}
-                </button>
-              ))}
-              {canEdit ? (
-                <button type="button" onClick={() => setAskPrivacy(true)} disabled={uploading} className="flex h-[150px] flex-col items-center justify-center gap-2 bg-bone" data-testid="add-body-photo">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden><path d="M3 8h4l2-3h6l2 3h4v12H3z" /><circle cx="12" cy="13.5" r="3.5" /></svg>
-                  <span className="mono">{uploading ? "Saving…" : "Add photo"}</span>
-                </button>
-              ) : null}
+            <p className="mono py-2 normal-case text-graphite">Front is what the mirror uses. Back shows how a piece fits from behind. Swimwear or fitted clothes give the truest shape.</p>
+            <div className="grid grid-cols-3 gap-1.5 pt-1">
+              {(["front", "side", "back"] as const).map((v) => {
+                const p = body.photos.find((x) => x.view === v); // newest first from the server
+                const word = v === "front" ? "Front" : v === "side" ? "Side" : "Back";
+                return p ? (
+                  <button key={v} type="button" onClick={() => canEdit && setPhotoSheet(p.id)} className="relative h-[150px] overflow-hidden bg-bone" data-testid={p.onlyMe ? "body-photo-locked" : "body-photo-shared"} data-view={v}>
+                    <img src={`/api/photo/${p.key}`} alt={`${word} full-body photo`} className="size-full object-cover" />
+                    <span className="mono absolute bottom-1.5 left-1.5 bg-paper px-1.5 py-1">{word}</span>
+                    {p.onlyMe ? <span className="mono absolute left-1.5 top-1.5 bg-paper px-1.5 py-1">Only me</span> : null}
+                  </button>
+                ) : canEdit ? (
+                  <button key={v} type="button" onClick={() => { setNextView(v); setAskPrivacy(true); }} disabled={uploading} className="flex h-[150px] flex-col items-center justify-center gap-2 border border-dashed border-ink bg-paper" data-testid={`add-body-photo-${v}`}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden><path d="M3 8h4l2-3h6l2 3h4v12H3z" /><circle cx="12" cy="13.5" r="3.5" /></svg>
+                    <span className="mono">{uploading && nextView === v ? "Saving…" : `Add ${word.toLowerCase()}`}</span>
+                  </button>
+                ) : (
+                  <div key={v} className="flex h-[150px] items-center justify-center bg-bone"><span className="mono text-graphite">No {word.toLowerCase()}</span></div>
+                );
+              })}
             </div>
             {body.photos.length === 0 && !canEdit ? <p className="mono py-3 text-graphite">No photos yet</p> : null}
           </>

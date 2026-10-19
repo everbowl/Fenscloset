@@ -36,4 +36,18 @@ test("try-on: off by default, opt in, needs a body photo, then a picture of the 
   await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId("try-on-sheet")).toContainText("Only you can see this picture");
   await expect(page.getByTestId("try-on-sheet").locator("img")).toHaveAttribute("src", /\/api\/photo\/tryon\//);
+  await expect(page.getByTestId("mirror-back")).toHaveCount(0); // no back photo yet
+  await page.keyboard.press("Escape");
+
+  // a back photo: the mirror can show the look from behind
+  await page.goto("/profile/body");
+  await page.getByTestId("add-body-photo-back").click();
+  await page.getByTestId("photo-shared").click();
+  await page.getByTestId("body-photo").setInputFiles({ name: "back.jpg", mimeType: "image/jpeg", buffer });
+  await expect(page.locator("[data-testid^=body-photo-][data-view=back]")).toBeVisible();
+  await page.goto("/today");
+  await page.getByTestId("try-on").click();
+  await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId("mirror-back").click();
+  await expect(page.getByTestId("try-on-sheet")).toContainText("from behind", { timeout: 20_000 });
 });

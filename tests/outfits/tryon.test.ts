@@ -9,7 +9,7 @@ import { seed } from "../../prisma/seed";
 import { personalClosetId } from "@/lib/items/service";
 import { newKey, putObject } from "@/lib/storage";
 import { canViewKey } from "@/lib/photos/visibility";
-import { listTryOns, setTryOnEnabled, tryOnLook, tryOnState } from "@/lib/tryon";
+import { hasBackPhoto, listTryOns, setTryOnEnabled, tryOnLook, tryOnState } from "@/lib/tryon";
 import { getPrivacy } from "@/lib/profiles/service";
 
 const jpeg = (r = 120) => sharp({ create: { width: 300, height: 400, channels: 3, background: { r, g: 110, b: 100 } } }).jpeg().toBuffer();
@@ -53,5 +53,26 @@ describe("virtual try-on", () => {
     await expect(tryOnLook(brittney, jeff.id, [top.id], "today")).rejects.toMatchObject({ status: 403 });
     await setTryOnEnabled(jeff, jeff.id, false);
     await expect(tryOnLook(jeff, jeff.id, [top.id], "today")).rejects.toThrow(/Settings/);
+  });
+
+  it("from behind: needs a back body photo; the back view is its own picture, cached apart from the front", async () => {
+    const jeff = await by("Jeff");
+    await setTryOnEnabled(jeff, jeff.id, true);
+    const front = newKey("bodies", jeff.id, "image/jpeg"); await putObject(front, await jpeg(), "image/jpeg");
+    await db.bodyPhoto.create({ data: { personId: jeff.id, bucketKey: front, view: "front" } });
+    const cat = (n: string) => db.category.findFirstOrThrow({ where: { name: n } });
+    const shoeKey = newKey("originals", jeff.id, "image/jpeg"); await putObject(shoeKey, await jpeg(60), "image/jpeg");
+    const shoes = await db.item.create({ data: { ownerId: jeff.id, name: "Sneakers", categoryId: (await cat("Shoes")).id, photos: { create: [{ kind: "alone", bucketKey: shoeKey, isPrimary: true }] } } });
+    expect(await hasBackPhoto(jeff.id)).toBe(false);
+    await expect(tryOnLook(jeff, jeff.id, [shoes.id], "today", undefined, "back")).rejects.toThrow(/back photo/);
+    const back = newKey("bodies", jeff.id, "image/jpeg"); await putObject(back, await jpeg(90), "image/jpeg");
+    await db.bodyPhoto.create({ data: { personId: jeff.id, bucketKey: back, view: "back" } });
+    expect(await hasBackPhoto(jeff.id)).toBe(true);
+    const f = await tryOnLook(jeff, jeff.id, [shoes.id], "today");
+    const b = await tryOnLook(jeff, jeff.id, [shoes.id], "today", undefined, "back");
+    expect(f.view).toBe("front");
+    expect(b.view).toBe("back");
+    expect(b.key).not.toBe(f.key);
+    expect((await tryOnLook(jeff, jeff.id, [shoes.id], "today", undefined, "back")).id).toBe(b.id); // cached per body photo
   });
 });

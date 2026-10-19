@@ -111,13 +111,13 @@ export async function rateAction(fitId: string, rating: FitRating): Promise<Resu
 }
 
 /** TRY IT ON: the chosen board on the person's own body photo. */
-export async function tryOnAction(personId: string, suggestionId: string, index: number): Promise<Result & { tryOn?: TryOnView }> {
+export async function tryOnAction(personId: string, suggestionId: string, index: number, view: "front" | "back" = "front"): Promise<Result & { tryOn?: TryOnView }> {
   const me = await requirePerson();
   try {
     const row = await db.outfitSuggestion.findFirst({ where: { id: suggestionId, personId } });
     const board = (row?.outfits as { itemIds: string[] }[] | undefined)?.[index];
     if (!board) return { ok: false, error: "That look isn’t here anymore." };
-    const tryOn = await tryOnLook(me, personId, board.itemIds, "today");
+    const tryOn = await tryOnLook(me, personId, board.itemIds, "today", undefined, view);
     return { ok: true, tryOn };
   } catch (e) {
     if (e instanceof TryOnError || e instanceof OutfitError) return { ok: false, error: e.message };

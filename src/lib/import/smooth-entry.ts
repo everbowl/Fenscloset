@@ -19,7 +19,7 @@ async function owned(personId: string, entryId: string) {
 export async function smoothEntry(personId: string, entryId: string, strength: SmoothStrength = "normal"): Promise<{ smoothKey: string }> {
   const entry = await owned(personId, entryId);
   if (entry.smoothKey && strength === "normal") return { smoothKey: entry.smoothKey };
-  if (entry.smoothKey) { await deleteObject(entry.smoothKey).catch(() => undefined); } // "Smooth more" replaces the parked copy
+  if (entry.smoothKey) { await deleteObject(entry.smoothKey).catch(() => undefined); } // "Smooth more" / "Tidy" replace the parked copy
   const source = entry.cutoutKey ?? entry.originalKey;
   const { body } = await getObject(source);
   const out = await smoothGarment(body, fetch, strength);

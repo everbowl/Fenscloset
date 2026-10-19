@@ -22,6 +22,7 @@ function fail(e: unknown): { ok: false; error: string } {
 export async function confirmEntryAction(batchId: string, entryId: string, edits: ItemEdits): Promise<ActionResult<{ itemId: string }>> {
   const person = await requirePerson();
   try {
+    await keepSmooth(person.id, entryId, true); // a parked tidy/smooth copy still on the card is kept
     const item = await createItemFromEntry(person.id, entryId, edits);
     revalidatePath(`/add/${batchId}`); revalidatePath("/closet");
     return { ok: true, value: { itemId: item.id } };
@@ -40,7 +41,7 @@ export async function mirrorEntryAction(entryId: string, itemId: string): Promis
 
 export async function mergeEntryAction(batchId: string, entryId: string, itemId: string): Promise<ActionResult> {
   const person = await requirePerson();
-  try { await mergeIntoItem(person.id, entryId, itemId); revalidatePath(`/add/${batchId}`); revalidatePath("/closet"); return { ok: true, value: undefined }; } catch (e) { return fail(e); }
+  try { await keepSmooth(person.id, entryId, true); await mergeIntoItem(person.id, entryId, itemId); revalidatePath(`/add/${batchId}`); revalidatePath("/closet"); return { ok: true, value: undefined }; } catch (e) { return fail(e); }
 }
 
 export async function saveEditsAction(entryId: string, edits: ItemEdits): Promise<ActionResult<TagResult>> {
@@ -69,7 +70,7 @@ export async function attachPhotoAction(entryId: string, kind: "label" | "worn" 
 }
 
 /** SMOOTH: a wrinkle-free copy, parked until KEEP or UNDO. */
-export async function smoothEntryAction(entryId: string, strength: "normal" | "more" = "normal"): Promise<ActionResult<{ smoothKey: string }>> {
+export async function smoothEntryAction(entryId: string, strength: "normal" | "more" | "tidy" = "normal"): Promise<ActionResult<{ smoothKey: string }>> {
   const person = await requirePerson();
   try { return { ok: true, value: await smoothEntry(person.id, entryId, strength) }; } catch (e) { return fail(e); }
 }

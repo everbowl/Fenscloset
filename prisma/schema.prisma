@@ -550,10 +550,18 @@ model BodySizeByBrand {
   @@index([personId])
 }
 
+/// Which way the person faces in a body photo: front for the mirror, side for shape, back for how a piece fits from behind.
+enum BodyView {
+  front
+  side
+  back
+}
+
 model BodyPhoto {
   id        String   @id @default(cuid())
   personId  String
   bucketKey String   @unique
+  view      BodyView @default(front)
   /** Locked to the owner: nobody else sees it, the AI may still use it to dress the owner. */
   onlyMe    Boolean  @default(false)
   takenAt   DateTime @default(now())

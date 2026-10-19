@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import { removeBackground } from "@/lib/images/remove-bg";
 import { accessToken } from "@/lib/tryon/google";
 
 /**
@@ -62,9 +63,33 @@ async function googleSmooth(jpeg: Buffer, fetchImpl: typeof fetch): Promise<Buff
  * changing. A cutout (PNG with transparency) keeps its exact silhouette; a plain photo comes back as
  * a JPEG.
  */
-export type SmoothStrength = "normal" | "more";
+export type SmoothStrength = "normal" | "more" | "tidy";
+
+/**
+ * TIDY (Jeff, 19 Oct 2026, Q9): a clean product picture of the piece, the way a store would show it.
+ * Allowed to change: wrinkles, folds, how it lies, the camera angle and perspective, the background.
+ * Never allowed to change: color, fade, wash, seams, stitching, print, lettering, cut, proportions, length.
+ */
+const TIDY_PROMPT = "Turn this photo of a garment into a clean product photo: the same garment laid perfectly flat and straight, facing the camera square-on with no perspective, every wrinkle, fold and crease smoothed out, centered on a plain pure-white background with nothing else in frame. Keep the garment exactly as it is: identical color, fade and wash, print, graphic, lettering, logo, seams, stitching, pockets, buttons, cut, proportions and length. Do not add, remove, restyle or recolor anything. Return only the photo.";
+
+/** The clean product picture: Gemini re-lays the piece, then the background is removed again so the cutout stays a cutout. */
+export async function tidyGarment(input: Buffer, fetchImpl: typeof fetch = fetch): Promise<{ data: Buffer; contentType: "image/png" | "image/jpeg" }> {
+  const meta = await sharp(input).rotate().metadata();
+  if (!meta.width || !meta.height) throw new SmoothError("That photo could not be read.");
+  const flat = await sharp(input).rotate().flatten({ background: "#ffffff" }).resize(1024, 1024, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 92 }).toBuffer();
+  const edited = process.env.MOCK_SMOOTH === "true" ? await sharp(flat).blur(1).jpeg().toBuffer() : await googleImage([{ data: flat, mimeType: "image/jpeg" }], TIDY_PROMPT, fetchImpl);
+  const cutout = Boolean(meta.hasAlpha) || meta.format === "png"; // a cutout (PNG) stays a cutout
+  if (!cutout) return { data: await sharp(edited).jpeg({ quality: 90 }).toBuffer(), contentType: "image/jpeg" };
+  try {
+    return { data: await removeBackground(await sharp(edited).jpeg({ quality: 92 }).toBuffer()), contentType: "image/png" };
+  } catch {
+    // no background removal available: keep the white product shot as a JPEG
+    return { data: await sharp(edited).jpeg({ quality: 90 }).toBuffer(), contentType: "image/jpeg" };
+  }
+}
 
 export async function smoothGarment(input: Buffer, fetchImpl: typeof fetch = fetch, strength: SmoothStrength = "normal"): Promise<{ data: Buffer; contentType: "image/png" | "image/jpeg" }> {
+  if (strength === "tidy") return tidyGarment(input, fetchImpl);
   const src = sharp(input).rotate();
   const meta = await src.metadata();
   const hasAlpha = Boolean(meta.hasAlpha);

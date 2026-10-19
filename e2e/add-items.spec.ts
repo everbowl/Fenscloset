@@ -80,6 +80,12 @@ test.describe("add clothes", () => {
     await expect(page.getByTestId("rotate")).toHaveText(/Rotate/, { timeout: 20_000 });
     await expect(page.getByTestId("confirm-photo")).not.toHaveAttribute("src", unturned!);
 
+    // auto-tidy parked a clean product picture: Before/Undo/Keep are up; undo it to test smooth by hand
+    await expect(page.getByTestId("smooth-keep")).toBeVisible();
+    await expect(page.getByText("Tidied")).toBeVisible();
+    await page.getByTestId("smooth-undo").click();
+    await expect(page.getByTestId("smooth")).toBeVisible();
+
     // smooth wrinkles: parked until KEEP; the rename survives the back-photo re-read
     const before = await page.getByTestId("confirm-photo").getAttribute("src");
     await page.getByTestId("smooth").click();
