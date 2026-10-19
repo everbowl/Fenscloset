@@ -16,7 +16,7 @@ import type { Scale } from "@/lib/checkins/service";
 import type { TryOnState } from "@/lib/tryon";
 import { MirrorGlyph, MirrorSheet } from "@/components/mirror/mirror-sheet";
 import { useMirror } from "@/components/mirror/use-mirror";
-import { checkInSelfieAction, checkInTapsAction, moreAction, rateAction, regenerateAction, removeAction, setLocationAction, setPlanAction, setZipAction, swapAction, wearAction } from "./actions";
+import { checkInSelfieAction, checkInTapsAction, looksStatusAction, moreAction, rateAction, regenerateAction, removeAction, setLocationAction, setPlanAction, setZipAction, swapAction, wearAction, type LooksResult } from "./actions";
 import { RatingRow } from "../fits/rating-row";
 import { monoDate } from "@/lib/dates";
 
@@ -28,6 +28,8 @@ type Props = {
   checkIn: { source: "taps" | "selfie"; answers: { scaleId: string; optionId: string }[] } | null; scales: Scale[];
   occasions: { id: string; name: string }[];
   suggestion: { id: string; boards: BoardView[]; wornIndex: number | null } | null;
+  /** No looks for today yet: the screen asks for them in the background as soon as it opens. */
+  needsLooks: boolean;
   enoughClothes: boolean; cleanOutCount: number;
   /** The most recent fit (last 7 days) with no "how did it go?" answer yet. */
   unrated: { id: string; date: string; title: string } | null;
@@ -66,6 +68,39 @@ export function TodayScreen(p: Props) {
       router.refresh();
     });
   }
+
+  // Looks are built in the background and polled (20 to 40 seconds of Claude); the screen stays usable and a phone
+  // that gives up on a long request has nothing to give up on.
+  const poll = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (poll.current) clearTimeout(poll.current); }, []);
+  function looksDone(r: LooksResult, after?: () => void) {
+    if (!r.ok) { setBusy(null); setError(r.error); router.refresh(); return; }
+    if (r.pending) {
+      const { jobId } = r.pending;
+      poll.current = setTimeout(async () => {
+        let next: LooksResult;
+        try { next = await looksStatusAction(jobId); } catch { next = r; } // a dropped poll (phone asleep): ask again
+        looksDone(next, after);
+      }, 2000);
+      return;
+    }
+    setBusy(null); after?.(); router.refresh();
+  }
+  function buildLooks(label: string, fn: () => Promise<LooksResult>, after?: () => void) {
+    setError(undefined); setBusy(label);
+    start(async () => {
+      let r: LooksResult;
+      try { r = await fn(); } catch { r = { ok: false, error: "Couldn’t build the looks. Try again." }; }
+      looksDone(r, after);
+    });
+  }
+  /** No looks for today yet: ask for them the moment the screen opens. */
+  const asked = useRef(false);
+  useEffect(() => {
+    if (!p.needsLooks || asked.current) return;
+    asked.current = true;
+    buildLooks("regen", () => regenerateAction(p.personId));
+  }, [p.needsLooks]); // eslint-disable-line react-hooks/exhaustive-deps
   /** Save a check-in or plan (quick), close the sheet, then ask for fresh looks while the screen stays usable. */
   function saveThenRefresh(fn: () => Promise<{ ok: boolean; error?: string }>) {
     setSheet(null); setError(undefined); setBusy("regen");
@@ -73,11 +108,9 @@ export function TodayScreen(p: Props) {
       const saved = await fn();
       if (!saved.ok) { setBusy(null); setError(saved.error); router.refresh(); return; }
       router.refresh();
-      const r = await regenerateAction(p.personId);
-      setBusy(null);
-      if (!r.ok) setError(r.error);
-      setIndex(0);
-      router.refresh();
+      let r: LooksResult;
+      try { r = await regenerateAction(p.personId); } catch { r = { ok: false, error: "Couldn’t build the looks. Try again." }; }
+      looksDone(r, () => setIndex(0));
     });
   }
 
@@ -205,7 +238,7 @@ export function TodayScreen(p: Props) {
               )}
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="secondary" disabled={busy !== null || worn} onClick={() => setSheet("swap")} data-testid="swap">Change a piece</Button>
-                <Button variant="secondary" disabled={busy !== null} onClick={() => { const next = boards.length; run("more", () => moreAction(p.personId), () => setIndex(next)); }} data-testid="more-looks">{busy === "more" ? "Thinking…" : "More looks"}</Button>
+                <Button variant="secondary" disabled={busy !== null} onClick={() => { const next = boards.length; buildLooks("more", () => moreAction(p.personId), () => setIndex(next)); }} data-testid="more-looks">{busy === "more" ? "Thinking…" : "More looks"}</Button>
               </div>
             </div>
           ) : null}
@@ -217,12 +250,13 @@ export function TodayScreen(p: Props) {
             <div className="grid grid-cols-2 gap-1.5"><div className="bg-bone" /><div className="bg-bone" /></div>
           </div>
           <div className="mt-3.5 flex flex-col gap-1 lg:col-start-2 lg:mt-0">
-            <p className="mono text-graphite">No looks yet</p>
+            <p className="mono text-graphite">{busy === "regen" ? "Building" : "No looks yet"}</p>
             <p className="serif text-[21px] italic leading-[1.3]">
-              {p.enoughClothes ? (p.canDress ? "Something went wrong building today’s looks." : `${p.personName} hasn’t opened Today yet.`) : p.mine ? "Add clothes with the + button and your first three looks will appear here." : `${p.personName}’s closet needs a few more pieces first.`}
+              {busy === "regen" ? "Three looks for today are on their way. About half a minute." : p.enoughClothes ? (p.canDress ? "Something went wrong building today’s looks." : `${p.personName} hasn’t opened Today yet.`) : p.mine ? "Add clothes with the + button and your first three looks will appear here." : `${p.personName}’s closet needs a few more pieces first.`}
             </p>
+            {busy === "regen" ? <p className="mono text-graphite" data-testid="refreshing">Building today’s looks…</p> : null}
           </div>
-          {p.enoughClothes && p.canDress ? <Button variant="secondary" className="mt-4 w-full lg:col-start-2" disabled={busy !== null} onClick={() => run("regen", () => regenerateAction(p.personId))}>{busy === "regen" ? "Thinking…" : "Try again"}</Button> : null}
+          {p.enoughClothes && p.canDress && busy !== "regen" ? <Button variant="secondary" className="mt-4 w-full lg:col-start-2" disabled={busy !== null} onClick={() => buildLooks("regen", () => regenerateAction(p.personId))}>Try again</Button> : null}
         </>
       )}
 

@@ -5,12 +5,12 @@ import { db } from "@/lib/db";
 import { OutfitError } from "@/lib/outfits/engine";
 import { tryOnLook, TryOnError, type TryOnView } from "@/lib/tryon";
 import { mannequinLook } from "@/lib/tryon/mannequin";
-import { dressingStatus, settled, startDressing, type DressingStatus } from "@/lib/tryon/jobs";
+import { jobStatus, settled, startJob, type JobStatus } from "@/lib/jobs";
 import type { StylingChoice } from "@/lib/tryon/features";
 
 /**
  * The mirror, from any screen: Today (a board of the day's suggestion) or the closet (pieces the person
- * picked, or one piece from its page). Dressing runs in the background (src/lib/tryon/jobs.ts): the first
+ * picked, or one piece from its page). Dressing runs in the background (src/lib/jobs.ts): the first
  * call answers with the picture when it is quick, else with a job to poll.
  */
 
@@ -40,8 +40,8 @@ function failed(e: unknown): MirrorResult {
   return { ok: false, error: "The mirror didn’t come back. Try again." };
 }
 
-function answer(status: DressingStatus, jobId: string): MirrorResult {
-  if (status.state === "done") return { ok: true, tryOn: status.tryOn };
+function answer(status: JobStatus<TryOnView>, jobId: string): MirrorResult {
+  if (status.state === "done") return { ok: true, tryOn: status.result };
   if (status.state === "failed") return failed(status.error);
   return { ok: true, pending: { jobId, step: status.step, startedAt: status.startedAt } };
 }
@@ -69,7 +69,7 @@ export async function dressAction(req: MirrorRequest): Promise<MirrorResult> {
     const view = req.view === "back" ? "back" : "front";
     const on = req.on === "mannequin" ? "mannequin" : "me";
     const key = [me.id, req.personId, on, view, [...ids].sort().join(","), JSON.stringify(req.pick ?? null), req.fresh ? "fresh" : ""].join("|");
-    const job = startDressing(key, me.id, (step) =>
+    const job = startJob<TryOnView>(key, me.id, (step) =>
       on === "mannequin"
         ? mannequinLook(me, req.personId, ids, req.look.kind, undefined, undefined, req.pick, [], Boolean(req.fresh), { step })
         : tryOnLook(me, req.personId, ids, req.look.kind, undefined, view, req.pick, [], Boolean(req.fresh), { step }));
@@ -82,7 +82,7 @@ export async function dressAction(req: MirrorRequest): Promise<MirrorResult> {
 /** Where a dressing stands: still running (with its step), done (the picture), or failed (why). */
 export async function dressingStatusAction(jobId: string): Promise<MirrorResult> {
   const me = await requirePerson();
-  const status = dressingStatus(jobId, me.id);
+  const status = jobStatus<TryOnView>(jobId, me.id);
   if (!status) return { ok: false, error: "That dressing is gone. Try again." };
   return answer(status, jobId);
 }

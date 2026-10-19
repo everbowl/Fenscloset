@@ -11,8 +11,26 @@ import { rateFit, type FitRating } from "@/lib/fits/service";
 import { CheckInError, saveSelfie, saveTaps } from "@/lib/checkins/service";
 import { PlanError, setPlan } from "@/lib/plans";
 import { IMAGE_TYPES } from "@/lib/storage";
+import { jobStatus, settled, startJob, type JobStatus } from "@/lib/jobs";
 
 export type Result = { ok: true } | { ok: false; error: string };
+/** Building looks: done, or a job to poll with looksStatusAction. */
+export type LooksResult = { ok: true; pending?: { jobId: string } } | { ok: false; error: string };
+
+/** How long a looks call waits before handing back a job to poll. */
+const QUICK_MS = 1500;
+
+function looksFailed(e: unknown): LooksResult {
+  if (e instanceof OutfitError || e instanceof WeatherError) return { ok: false, error: e.message };
+  console.error("looks", e);
+  return { ok: false, error: "Couldn’t build the looks. Try again." };
+}
+
+function looksAnswer(status: JobStatus<void>, jobId: string): LooksResult {
+  if (status.state === "done") { revalidatePath("/today"); return { ok: true }; }
+  if (status.state === "failed") return looksFailed(status.error);
+  return { ok: true, pending: { jobId } };
+}
 
 async function run(fn: () => Promise<unknown>): Promise<Result> {
   try {
@@ -63,15 +81,39 @@ export async function removeAction(personId: string, index: number, itemId: stri
   return run(async () => { await assertCanDress(me, personId); const ctx = await loadTodayContext(me, personId); await removePiece(personId, ctx.date, index, itemId, ctx); });
 }
 
-export async function moreAction(personId: string): Promise<Result> {
+/**
+ * Looks are built in the background (src/lib/jobs.ts): Claude takes 20 to 40 seconds, and a page or a request
+ * that waits that long is what a phone gives up on (Jeff, 19 Oct 2026, midnight: the first Today of the new
+ * day built its looks inside the page load; his phone showed the offline page). The screen polls
+ * looksStatusAction and refreshes when the looks are there.
+ */
+export async function moreAction(personId: string): Promise<LooksResult> {
   const me = await requirePerson();
-  return run(async () => { await assertCanDress(me, personId); const ctx = await loadTodayContext(me, personId); await moreLooks(personId, ctx.date, ctx); });
+  try {
+    await assertCanDress(me, personId);
+    const ctx = await loadTodayContext(me, personId);
+    const job = startJob<void>(`more|${personId}|${ctx.date}`, me.id, async () => { await moreLooks(personId, ctx.date, ctx); });
+    return looksAnswer(await settled(job, QUICK_MS), job.id);
+  } catch (e) { return looksFailed(e); }
 }
 
-/** New inputs (plan, check-in, weather) → fresh looks. */
-export async function regenerateAction(personId: string): Promise<Result> {
+/** The day's looks (first open of the day), or fresh ones after new inputs (plan, check-in, weather). */
+export async function regenerateAction(personId: string): Promise<LooksResult> {
   const me = await requirePerson();
-  return run(async () => { await assertCanDress(me, personId); const ctx = await loadTodayContext(me, personId); await generateSuggestion(personId, ctx.date, ctx); });
+  try {
+    await assertCanDress(me, personId);
+    const ctx = await loadTodayContext(me, personId);
+    const job = startJob<void>(`looks|${personId}|${ctx.date}`, me.id, async () => { await generateSuggestion(personId, ctx.date, ctx); });
+    return looksAnswer(await settled(job, QUICK_MS), job.id);
+  } catch (e) { return looksFailed(e); }
+}
+
+/** Where a looks job stands; done means the page can refresh. */
+export async function looksStatusAction(jobId: string): Promise<LooksResult> {
+  const me = await requirePerson();
+  const status = jobStatus<void>(jobId, me.id);
+  if (!status) return { ok: false, error: "That build is gone. Try again." };
+  return looksAnswer(status, jobId);
 }
 
 /** Plan and check-in save at once and return; the screen then asks for fresh looks separately (regenerateAction), so nothing waits on Claude. */

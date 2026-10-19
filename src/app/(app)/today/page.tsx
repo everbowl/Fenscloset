@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { requirePerson, isAdmin } from "@/lib/auth/current";
 import { resolveView, VIEW_COOKIE } from "@/lib/people/visibility";
 import { loadTodayContext } from "@/lib/today/context";
-import { canDress, getOrGenerate, getSuggestion, type Suggestion } from "@/lib/outfits/engine";
+import { canDress, getSuggestion, type Suggestion } from "@/lib/outfits/engine";
 import { loadCandidates } from "@/lib/outfits/catalog";
 import { countCleanOut } from "@/lib/outfits/cleanout";
 import { unratedRecentFit } from "@/lib/fits/service";
@@ -29,12 +29,15 @@ export default async function TodayPage() {
   ]);
   const [unrated, tryOn] = await Promise.all([dress ? unratedRecentFit(personId, ctx.date) : null, tryOnState(me, personId)]);
   const enough = cand.usable.length + cand.restingIds.length >= 2;
+  // The page never builds looks itself (Claude takes 20 to 40 seconds and a phone gives up on a load that long):
+  // it shows what exists, and the screen asks for the day's looks in the background when there are none yet.
   let suggestion: Suggestion | null = null;
   try {
-    suggestion = enough ? (dress ? await getOrGenerate(personId, ctx.date, ctx) : await getSuggestion(personId, ctx.date)) : null;
+    suggestion = enough ? await getSuggestion(personId, ctx.date) : null;
   } catch (e) {
     console.error("looks", e);
   }
+  const needsLooks = enough && dress && !suggestion;
   const person = personId === me.id ? me : await (await import("@/lib/db")).db.person.findUniqueOrThrow({ where: { id: personId } });
   const context = planLine(ctx.plan, ctx.tz) ?? "NO PLANS · EVERYDAY";
   return (
@@ -58,6 +61,7 @@ export default async function TodayPage() {
       scales={scales}
       occasions={occasions.map((o) => ({ id: o.id, name: o.name }))}
       suggestion={suggestion ? { id: suggestion.id, boards: suggestion.boards, wornIndex: suggestion.wornIndex } : null}
+      needsLooks={needsLooks}
       enoughClothes={enough}
       cleanOutCount={cleanOut}
       unrated={unrated}
