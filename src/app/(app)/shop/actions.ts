@@ -6,6 +6,7 @@ import { deleteLookup, lookup, ShopError } from "@/lib/shop/engine";
 import { getObject, IMAGE_TYPES } from "@/lib/storage";
 import { getLookup } from "@/lib/shop/engine";
 import { tryOnLook, tryOnState, TryOnError, type TryOnView } from "@/lib/tryon";
+import { featuresOf } from "@/lib/tryon/features";
 import { isMannequinConfigured, mannequinLook } from "@/lib/tryon/mannequin";
 
 export type Result = { ok: true; id?: string } | { ok: false; error: string };
@@ -47,9 +48,10 @@ export async function tryOnLookupAction(lookupId: string): Promise<Result & { tr
     const others = v.pairings[0]?.itemIds.filter((id) => id !== "candidate") ?? [];
     const garment = (await getObject(v.imageKey)).body;
     const own = (await tryOnState(me, v.forPersonId)) === "ready";
-    const tryOn = own ? await tryOnLook(me, v.forPersonId, others.slice(0, 2), `shop:${lookupId}`, garment)
-      : isMannequinConfigured() ? await mannequinLook(me, v.forPersonId, others.slice(0, 2), `shop:${lookupId}`, garment)
-      : await tryOnLook(me, v.forPersonId, others.slice(0, 2), `shop:${lookupId}`, garment); // throws with the reason
+    const extra = [...featuresOf({ category: v.read.categoryName })]; // the candidate is not an item: its category says whether it is a top, a bottom, an outer layer
+    const tryOn = own ? await tryOnLook(me, v.forPersonId, others.slice(0, 2), `shop:${lookupId}`, garment, "front", undefined, extra)
+      : isMannequinConfigured() ? await mannequinLook(me, v.forPersonId, others.slice(0, 2), `shop:${lookupId}`, garment, undefined, undefined, extra)
+      : await tryOnLook(me, v.forPersonId, others.slice(0, 2), `shop:${lookupId}`, garment, "front", undefined, extra); // throws with the reason
     return { ok: true, tryOn };
   } catch (e) {
     if (e instanceof TryOnError || e instanceof ShopError) return { ok: false, error: e.message };

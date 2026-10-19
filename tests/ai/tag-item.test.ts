@@ -22,9 +22,10 @@ describe("tagging constrained to the lists", () => {
     const raw: RawTags = {
       name: "  Chartreuse blazer ", category: "Outerwear", subcategory: "Not a real sub", colors: ["Chartreuse", "black", "Black"],
       pattern: "unknown", fabric: "Kevlar", fabricConfidence: 0.2, seasons: ["Fall", "Monsoon"], formality: "Business",
-      brandText: "nike", sizeText: " M ", confidence: 1.7,
+      brandText: "nike", sizeText: " M ", confidence: 1.7, features: ["hood", "bogus", "hood", "button_front"],
     };
     const t = mapTags(raw, lists);
+    expect(t.features).toEqual(["hood", "button_front"]); // only the known vocabulary, once each
     expect(t.name).toBe("Chartreuse blazer");
     expect(t.categoryId).toBe(lists.categories.find((c) => c.name === "Outerwear")!.id);
     expect(t.subcategoryId).toBeNull();

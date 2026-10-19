@@ -5,7 +5,7 @@ import { BRAND_CATALOG } from "../src/lib/brands/catalog";
 import { isDevMode } from "../src/lib/auth/dev-mode";
 import {
   BODY_IMAGE_APPROVALS, BRANDS, CATEGORIES, CHECK_IN_SCALES, COLORS, DEV_PASSWORD, FABRICS, FORMALITY, MEASUREMENT_KINDS, OCCASIONS,
-  PATTERNS, PEOPLE, RULES, SEASONS, SIZE_OPTIONS, STORES, STYLE_WORDS, TAGS, PHOTO_TIPS } from "./seed-data";
+  PATTERNS, PEOPLE, RULES, SEASONS, SIZE_OPTIONS, STORES, STYLE_WORDS, TAGS, PHOTO_TIPS, MIRROR_POSES, WEAR_GROUPS } from "./seed-data";
 
 type SimpleDelegate = {
   upsert: (args: { where: { name: string }; update: object; create: { name: string; sortOrder: number } }) => Promise<unknown>;
@@ -125,8 +125,9 @@ export async function seed() {
     }
   }
 
-  // A fresh database gets the sets that only live as sets (the brand catalog), then every set is marked applied.
+  // A fresh database gets the sets that only live as sets (the brand catalog, the mirror's styling lists), then every set is marked applied.
   await SEED_SETS["brands-catalog-v1"]();
+  await SEED_SETS["mirror-styling-v1"]();
   for (const name of Object.keys(SEED_SETS)) await db.seedSet.upsert({ where: { name }, update: {}, create: { name } });
 }
 
@@ -143,6 +144,15 @@ async function seedSizeOptions() {
 async function seedMeasurementKinds() {
   for (const [i, m] of MEASUREMENT_KINDS.entries()) {
     await db.measurementKind.upsert({ where: { name: m.name }, update: { sortOrder: i }, create: { name: m.name, unit: m.unit, sortOrder: i } });
+  }
+}
+
+/** The mirror's poses and "how clothes show" groups (first entry = default). Existing rows keep whatever an admin made of them. */
+async function seedMirrorStyling() {
+  for (const [i, p] of MIRROR_POSES.entries()) await db.mirrorPose.upsert({ where: { name: p.name }, update: {}, create: { name: p.name, prompt: p.prompt, sortOrder: i } });
+  for (const [gi, g] of WEAR_GROUPS.entries()) {
+    const group = await db.wearGroup.upsert({ where: { name: g.name }, update: {}, create: { name: g.name, needs: g.needs, sortOrder: gi } });
+    for (const [oi, o] of g.options.entries()) await db.wearOption.upsert({ where: { groupId_name: { groupId: group.id, name: o.name } }, update: {}, create: { groupId: group.id, name: o.name, prompt: o.prompt, sortOrder: oi } });
   }
 }
 
@@ -175,6 +185,8 @@ const SEED_SETS: Record<string, () => Promise<void>> = {
       have.add(b.name.toLowerCase());
     }
   },
+  // The mirror's styling chips (Jeff, 19 Oct 2026): poses and "how clothes show", untucked first.
+  "mirror-styling-v1": seedMirrorStyling,
   // Shoes: plain numbers become "M 10 / W 11.5" (Jeff, 19 Oct 2026); only untouched numeric options are swapped.
   "shoe-sizes-v2": async () => {
     const shoes = await db.category.findUnique({ where: { name: "Shoes" } });

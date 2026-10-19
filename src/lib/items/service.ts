@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { isFeatureKey } from "@/lib/tryon/features";
 import { priceNumber, storeIdByName, type StoreMeta } from "@/lib/store/add";
 import { finishBatchIfDone } from "@/lib/import/service";
 import type { EntryAiResult } from "@/lib/import/process";
@@ -89,6 +90,7 @@ export async function createItemFromEntry(personId: string, entryId: string, edi
         phash: entry.phash,
         ...(meta ? { storeId, purchaseUrl: meta.url?.slice(0, 500) ?? null, purchasePrice: priceNumber(meta.priceText), purchaseDate: meta.purchaseDate ? new Date(`${meta.purchaseDate}T12:00:00Z`) : null, storePhoto: !meta.matched, fitNotes: meta.fitNotes?.slice(0, 500) ?? null } : { purchaseUrl: brandUrl }),
         aiConfidence: JSON.parse(JSON.stringify({ confidence: tags.confidence, fabricConfidence: tags.fabricConfidence, warnings: ai.warnings })),
+        features: (tags.features ?? []).filter(isFeatureKey),
         colors: connect(tags.colorIds),
         patterns: connect(tags.patternId ? [tags.patternId] : []),
         fabrics: connect(tags.fabricId ? [tags.fabricId] : []),
@@ -167,7 +169,7 @@ export async function attachEntryPhoto(personId: string, entryId: string, kind: 
 export function emptyTags(): TagResult {
   return {
     name: "Untitled piece", categoryId: null, subcategoryId: null, colorIds: [], patternId: null, fabricId: null, fabricConfidence: 0,
-    seasonIds: [], formalityId: null, brandText: null, brandId: null, sizeText: null, confidence: 0,
+    seasonIds: [], formalityId: null, brandText: null, brandId: null, sizeText: null, confidence: 0, features: [],
     raw: { name: "", category: "unknown", subcategory: null, colors: [], pattern: "unknown", fabric: "unknown", fabricConfidence: 0, seasons: [], formality: "unknown", brandText: null, sizeText: null, confidence: 0 },
   };
 }
@@ -188,6 +190,8 @@ export type ItemDetailEdits = ItemEdits & {
   purchaseDate?: string | null;
   purchaseUrl?: string | null;
   fitNotes?: string | null;
+  /** How the piece is made (src/lib/tryon/styling.ts FEATURE_KEYS); drives the mirror's styling chips. */
+  features?: string[];
   laundryStatus?: LaundryStatus;
   isFavorite?: boolean;
   neverSuggest?: boolean;
@@ -215,6 +219,7 @@ export async function updateItem(viewer: { id: string; role: string }, itemId: s
   if (e.storeId !== undefined) data.storeId = e.storeId;
   if (e.sizeText !== undefined) data.size = e.sizeText?.trim().slice(0, 20) || null;
   if (e.fitNotes !== undefined) data.fitNotes = e.fitNotes?.trim().slice(0, 500) || null;
+  if (e.features !== undefined) data.features = [...new Set(e.features.filter(isFeatureKey))];
   if (e.purchaseUrl !== undefined) data.purchaseUrl = e.purchaseUrl?.trim().slice(0, 500) || null;
   if (e.purchasePrice !== undefined) {
     const raw = (e.purchasePrice ?? "").replace(/[$,\s]/g, "");
@@ -288,6 +293,19 @@ export function photoNudge(it: { storePhoto: boolean; wearCount: number; photoNu
 export async function answerPhotoNudge(viewer: { id: string; role: string }, itemId: string): Promise<void> {
   const item = await ownedItem(viewer, itemId);
   await db.item.update({ where: { id: itemId }, data: { photoNudgedAt: item.wearCount } });
+}
+
+/** "Use in the mirror": this photo dresses the person from now on, whatever the app would have picked. Tap again to let the app choose. */
+export async function setMirrorPhoto(viewer: { id: string; role: string }, photoId: string): Promise<{ photoId: string | null }> {
+  const photo = await db.itemPhoto.findUnique({ where: { id: photoId } });
+  if (!photo) throw new ItemError("That photo is gone.", 404);
+  await ownedItem(viewer, photo.itemId);
+  const on = !photo.forMirror;
+  await db.$transaction([
+    db.itemPhoto.updateMany({ where: { itemId: photo.itemId }, data: { forMirror: false } }),
+    ...(on ? [db.itemPhoto.update({ where: { id: photoId }, data: { forMirror: true } })] : []),
+  ]);
+  return { photoId: on ? photoId : null };
 }
 
 export async function removeItemPhoto(viewer: { id: string; role: string }, photoId: string): Promise<void> {

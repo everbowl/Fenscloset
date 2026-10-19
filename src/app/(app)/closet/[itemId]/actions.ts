@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePerson } from "@/lib/auth/current";
-import { addItemPhoto, answerPhotoNudge, cycleLaundry, deleteItem, ItemError, removeItemPhoto, rotateItemPhoto, updateItem, type ItemDetailEdits } from "@/lib/items/service";
+import { addItemPhoto, answerPhotoNudge, cycleLaundry, deleteItem, ItemError, removeItemPhoto, rotateItemPhoto, setMirrorPhoto, updateItem, type ItemDetailEdits } from "@/lib/items/service";
 import type { LaundryStatus } from "@/generated/prisma/client";
 
 export type Result<T = undefined> = { ok: true; value: T } | { ok: false; error: string };
@@ -37,6 +37,12 @@ export async function notNowPhotoAction(itemId: string): Promise<Result> {
 export async function removeItemPhotoAction(itemId: string, photoId: string): Promise<Result> {
   const person = await requirePerson();
   try { await removeItemPhoto(person, photoId); bust(itemId); return { ok: true, value: undefined }; } catch (e) { return fail(e); }
+}
+
+/** "Use in the mirror" on a photo (toggle). */
+export async function mirrorPhotoAction(itemId: string, photoId: string): Promise<Result<{ photoId: string | null }>> {
+  const person = await requirePerson();
+  try { const v = await setMirrorPhoto(person, photoId); bust(itemId); return { ok: true, value: v }; } catch (e) { return fail(e); }
 }
 
 export async function rotateItemPhotoAction(itemId: string, photoId: string): Promise<Result<{ photoId: string; key: string }>> {

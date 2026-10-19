@@ -2,11 +2,13 @@ import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import type { ExtraField } from "@/lib/lists/registry";
 
-/** Extra inputs (swatch, website) for kinds that have them. Shared by the editor and InlineAdd. */
+export type ExtraValues = { hex?: string; url?: string | null; unit?: string; photoTip?: string | null; prompt?: string; needs?: string };
+
+/** Extra inputs (swatch, website, a note for the artist) for kinds that have them. Shared by the editor and InlineAdd. */
 export function EntryExtraFields({ fields, values, onChange }: {
   fields: ExtraField[];
-  values: { hex?: string; url?: string | null; unit?: string; photoTip?: string | null };
-  onChange: (patch: { hex?: string; url?: string; unit?: string; photoTip?: string }) => void;
+  values: ExtraValues;
+  onChange: (patch: { hex?: string; url?: string; unit?: string; photoTip?: string; prompt?: string; needs?: string }) => void;
 }) {
   return (
     <>
@@ -26,7 +28,11 @@ export function EntryExtraFields({ fields, values, onChange }: {
           </Field>
         ) : f.type === "text" ? (
           <Field key={f.name} label={f.label} htmlFor={`field-${f.name}`}>
-            <Input id={`field-${f.name}`} value={(f.name === "photoTip" ? values.photoTip : values.unit) ?? ""} onChange={(e) => onChange(f.name === "photoTip" ? { photoTip: e.target.value } : { unit: e.target.value })} placeholder={f.placeholder} maxLength={f.maxLength ?? 12} />
+            {f.long ? (
+              <textarea id={`field-${f.name}`} value={(values as Record<string, string | null | undefined>)[f.name] ?? ""} onChange={(e) => onChange({ [f.name]: e.target.value })} placeholder={f.placeholder} maxLength={f.maxLength ?? 300} rows={3} className="w-full border border-ink bg-paper px-3 py-2 text-[14px] leading-snug outline-none placeholder:text-graphite/70" />
+            ) : (
+              <Input id={`field-${f.name}`} value={(values as Record<string, string | null | undefined>)[f.name] ?? ""} onChange={(e) => onChange({ [f.name]: e.target.value })} placeholder={f.placeholder} maxLength={f.maxLength ?? 12} />
+            )}
           </Field>
         ) : (
           <Field key={f.name} label={f.label} htmlFor={`field-${f.name}`}>

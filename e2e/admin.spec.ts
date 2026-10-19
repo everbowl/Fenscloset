@@ -118,3 +118,15 @@ test("admin re-invites a seeded family member and removes a person with the item
   await expect(page).toHaveURL(/\/admin\/people$/);
   await expect(page.getByRole("link", { name: /Olivia/ })).toHaveCount(0);
 });
+
+test("admin lists: the mirror's poses and wear options are editable lists, untucked first", async ({ page }) => {
+  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  await page.goto("/admin/lists");
+  await expect(page.getByRole("link", { name: /Mirror poses/ })).toBeVisible();
+  await page.goto("/admin/lists/mirrorPose");
+  await expect(page.getByText("Standing, as photographed")).toBeVisible();
+  await expect(page.getByText("Hands in pockets")).toBeVisible();
+  await page.goto("/admin/lists/wearOption");
+  const rows = page.locator("[data-testid^=list-row-]");
+  await expect(rows.first()).toContainText("Untucked"); // the Tuck group is first, and Untucked is its default
+});

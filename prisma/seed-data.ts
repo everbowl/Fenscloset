@@ -109,3 +109,59 @@ export const RULES = [
 ];
 
 export const DEV_PASSWORD = "0535";
+
+/**
+ * The mirror's styling lists (Jeff, 19 Oct 2026: "don't default to tucking it in; give me options on pose
+ * and how the clothes will show"). Editable under Admin → Lists; the first entry of each list is the
+ * default. A prompt is what the artist is told to change; blank means nothing needs changing.
+ */
+export const MIRROR_POSES: { name: string; prompt: string }[] = [
+  { name: "Standing, as photographed", prompt: "" },
+  { name: "Hands in pockets", prompt: "both hands resting in the front pockets of the bottoms, shoulders relaxed" },
+  { name: "One hand in a pocket", prompt: "one hand in a front pocket, the other arm relaxed at the side" },
+  { name: "Arms crossed", prompt: "arms crossed loosely over the chest" },
+  { name: "Walking", prompt: "caught mid-stride, walking toward the camera with a natural relaxed gait" },
+  { name: "Turned to the side", prompt: "the body turned three-quarters away from the camera, the head turned back to look at the camera" },
+  { name: "Looking back", prompt: "turned to face away from the camera, looking back over one shoulder" },
+];
+
+/** `needs`: every listed item feature must be in the look for the group to be offered (space-separated); blank = always. */
+export const WEAR_GROUPS: { name: string; needs: string; options: { name: string; prompt: string }[] }[] = [
+  { name: "Tuck", needs: "top bottom", options: [
+    { name: "Untucked", prompt: "the top is worn untucked, its hem hanging loose over the waistband" },
+    { name: "Tucked", prompt: "the top is tucked fully into the waistband all the way around" },
+    { name: "Front tuck", prompt: "only the front of the top is tucked into the waistband; the sides and back hang loose" },
+    { name: "Half tuck", prompt: "one side of the front of the top is tucked in at the waistband; the rest hangs loose" },
+  ] },
+  { name: "Buttons", needs: "button_front", options: [
+    { name: "Top one open", prompt: "the top button of the shirt is undone, the rest buttoned" },
+    { name: "All buttoned", prompt: "the shirt buttoned all the way up to the collar" },
+    { name: "Top two open", prompt: "the top two buttons of the shirt undone" },
+    { name: "Top three open", prompt: "the top three buttons of the shirt undone" },
+    { name: "Open", prompt: "the shirt worn fully unbuttoned and open at the front" },
+  ] },
+  { name: "Sleeves", needs: "long_sleeve", options: [
+    { name: "Down", prompt: "" },
+    { name: "Cuffed once", prompt: "the sleeves cuffed once at the wrist" },
+    { name: "Rolled to the elbow", prompt: "the sleeves rolled neatly up to the elbow" },
+    { name: "Pushed up", prompt: "the sleeves pushed casually up the forearms" },
+  ] },
+  { name: "Outer layer", needs: "outer", options: [
+    { name: "Open", prompt: "the outer layer worn open at the front" },
+    { name: "Closed", prompt: "the outer layer fully zipped or buttoned closed" },
+    { name: "Half closed", prompt: "the outer layer zipped or buttoned halfway up" },
+  ] },
+  { name: "Hood", needs: "hood", options: [
+    { name: "Down", prompt: "the hood down, resting on the back" },
+    { name: "Up", prompt: "the hood up over the head" },
+  ] },
+  { name: "Collar", needs: "collar", options: [
+    { name: "Down", prompt: "" },
+    { name: "Popped", prompt: "the collar popped up" },
+  ] },
+  { name: "Hem", needs: "bottom", options: [
+    { name: "As is", prompt: "" },
+    { name: "Cuffed once", prompt: "the pant legs cuffed once at the ankle" },
+    { name: "Rolled", prompt: "the pant legs rolled up twice above the ankle" },
+  ] },
+];

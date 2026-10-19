@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { isMockAi, structured } from "@/lib/ai/claude";
+import { FEATURE_KEYS, isFeatureKey } from "@/lib/tryon/features";
 
 export type Named = { id: string; name: string };
 export type TagLists = {
@@ -27,6 +28,8 @@ export type TagResult = {
   brandId: string | null;
   sizeText: string | null;
   confidence: number;
+  /** How the piece is made (button_front, zip_front, long_sleeve, hood, collar): the mirror's styling chips key off these. */
+  features: string[];
   /** Raw names the model said, kept for the confirm screen's "(best guess)" notes and debugging. */
   raw: RawTags;
 };
@@ -46,6 +49,8 @@ export type RawTags = {
   confidence: number;
   /** How the photo must turn so the piece hangs the way it is worn (collar, waistband or hood at the top). */
   orientation?: Orientation;
+  /** How the piece is made, from a fixed vocabulary (src/lib/tryon/styling.ts FEATURE_KEYS). */
+  features?: string[];
 };
 
 export type Orientation = "upright" | "rotate_right" | "rotate_left" | "upside_down";
@@ -77,7 +82,7 @@ export function tagSchema(lists: TagLists): Record<string, unknown> {
   return {
     type: "object",
     additionalProperties: false,
-    required: ["name", "category", "subcategory", "colors", "pattern", "fabric", "fabricConfidence", "seasons", "formality", "brandText", "sizeText", "confidence", "orientation"],
+    required: ["name", "category", "subcategory", "colors", "pattern", "fabric", "fabricConfidence", "seasons", "formality", "brandText", "sizeText", "confidence", "orientation", "features"],
     properties: {
       name: { type: "string", description: "Short item name a person would use, e.g. 'Black ribbed tank', 'Levi's 501 jeans'. 2–6 words." },
       category: { type: "string", enum: withUnknown(lists.categories) },
@@ -91,6 +96,7 @@ export function tagSchema(lists: TagLists): Record<string, unknown> {
       brandText: { type: ["string", "null"], description: "Brand if a logo or label is readable, else null." },
       sizeText: { type: ["string", "null"], description: "Size if a label is readable (S, M, 28, 8…), else null." },
       confidence: { type: "number", description: "0 to 1: overall confidence that category and colors are right." },
+      features: { type: "array", items: { type: "string", enum: [...FEATURE_KEYS] }, description: "How the piece is made, every one that applies: button_front = buttons (or a placket) down the front; zip_front = a zipper down the front; long_sleeve = sleeves to the wrist; hood = a hood; collar = a collar. Empty for pieces with none (a t-shirt, shorts, shoes)." },
       orientation: { type: "string", enum: ["upright", "rotate_right", "rotate_left", "upside_down"], description: "Is the piece shown the way it is worn (collar, waistband, hood or neckline at the TOP of the photo; shoes sole down)? If not, which single turn fixes it: rotate_right = turn the photo 90° clockwise, rotate_left = 90° counterclockwise, upside_down = 180°. Bags, hats and accessories with no clear top are upright." },
     },
   };
@@ -123,6 +129,7 @@ export function mapTags(raw: RawTags, lists: TagLists): TagResult {
     brandId: brand?.id ?? null,
     sizeText: raw.sizeText?.trim() || null,
     confidence: clamp(raw.confidence),
+    features: [...new Set((raw.features ?? []).filter(isFeatureKey))],
     raw,
   };
 }
@@ -146,6 +153,7 @@ function mockRaw(lists: TagLists): RawTags {
     sizeText: null,
     confidence: 0.9,
     orientation: (process.env.MOCK_ORIENTATION as Orientation | undefined) || "upright",
+    features: (process.env.MOCK_FEATURES ?? "").split(",").map((x) => x.trim()).filter(Boolean),
   };
 }
 

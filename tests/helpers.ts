@@ -8,7 +8,7 @@ export async function resetDb() {
     "ImportEntry", "ImportBatch", "ItemPhoto", "ItemShare", "ItemCloset", "Item", "Session", "PasswordResetToken", "InviteToken", "GuardianLink",
     "Closet", "Subcategory", "Category", "Color", "Pattern", "Fabric", "Season",
     "FormalityLevel", "Occasion", "Tag", "Brand", "Store", "CheckInOption", "CheckInScale",
-    "Rule", "Person",
+    "Rule", "Person", "MirrorPose", "WearOption", "WearGroup",
   ];
   await db.$executeRawUnsafe(`TRUNCATE TABLE ${tables.map((t) => `"${t}"`).join(", ")} CASCADE`);
 }

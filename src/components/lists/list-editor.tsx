@@ -92,7 +92,7 @@ export function ListEditor({ kind, entries: initial, parentId }: { kind: ListKin
     });
   }
 
-  function saveEdit(values: { name: string; hex?: string; url?: string; photoTip?: string }) {
+  function saveEdit(values: { name: string; hex?: string; url?: string; photoTip?: string; prompt?: string; needs?: string }) {
     if (!editing) return;
     start(async () => {
       const res = await updateEntryAction(kind, editing.id, values);
@@ -194,10 +194,10 @@ function IconBtn({ label, onClick, disabled, danger, children }: { label: string
   );
 }
 
-function EditForm({ entry, kind, onSave, pending }: { entry: ListEntry; kind: ListKind; onSave: (v: { name: string; hex?: string; url?: string; photoTip?: string }) => void; pending: boolean }) {
+function EditForm({ entry, kind, onSave, pending }: { entry: ListEntry; kind: ListKind; onSave: (v: { name: string; hex?: string; url?: string; photoTip?: string; prompt?: string; needs?: string }) => void; pending: boolean }) {
   const def = LIST_DEFS[kind];
   const [name, setName] = useState(entry.name);
-  const [extra, setExtra] = useState<{ hex?: string; url?: string; photoTip?: string }>({ hex: entry.hex, url: entry.url ?? "", photoTip: entry.photoTip ?? "" });
+  const [extra, setExtra] = useState<{ hex?: string; url?: string; photoTip?: string; prompt?: string; needs?: string }>({ hex: entry.hex, url: entry.url ?? "", photoTip: entry.photoTip ?? "", prompt: entry.prompt ?? "", needs: entry.needs ?? "" });
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSave({ name, ...extra }); }} className="space-y-4">
       <div className="space-y-1.5">

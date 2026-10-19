@@ -30,10 +30,12 @@ model Person {
   birthdate          DateTime?
   avatarKey          String?
   savedZip           String?
-  /** Virtual try-on opt-in (adults only; never minors). Sends the person's body photo and garment images to the try-on provider. */
-  tryOnEnabled       Boolean      @default(false)
+  /** Virtual try-on (adults only; never minors): on by default (Jeff, 19 Oct 2026: "no limitations or controls"), off in Settings for anyone who wants it off. Sends the person's body photo and garment images to the try-on provider. */
+  tryOnEnabled       Boolean      @default(true)
   /** "Don't show again" on the Add clothes photo tips. */
   addTipsHidden      Boolean      @default(false)
+  /** The mirror's last pose and "how clothes show" choices ({ poseId, options: { [groupId]: optionId } }), so the next look opens the way the person left it. */
+  mirrorPrefs        Json?
   passwordHash       String?
   mustChangePassword Boolean      @default(false)
   devPasswordActive  Boolean      @default(false)
@@ -362,6 +364,8 @@ model Item {
   retiredReason String?
   /** KEEP on the clean-out screen hides the item from the list until this date. */
   cleanOutSnoozedUntil DateTime?
+  /** How the piece is made, from the tagger or the person: button_front, zip_front, long_sleeve, hood, collar (src/lib/tryon/styling.ts). The mirror's "how clothes show" chips key off these. */
+  features      String[]      @default([])
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -416,6 +420,10 @@ model ItemPhoto {
   width     Int?
   height    Int?
   isPrimary Boolean   @default(false)
+  /** The person chose this photo for the mirror (try-on and mannequin), over whatever the app would pick. */
+  forMirror Boolean   @default(false)
+  /** The whole-garment check (src/lib/tryon/garment-check.ts): true = the full piece shows, false = cut off / folded / partial; null = not checked yet. */
+  wholeGarment Boolean?
   createdAt DateTime  @default(now())
   item      Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
@@ -714,6 +722,8 @@ model TryOn {
   itemIds      String[] @default([])
   bodyPhotoKey String
   source       String
+  /** The pose and wear choices this picture was styled with (src/lib/tryon/styling.ts stylingKey); null is the raw try-on before any styling. */
+  styling      String?
   createdAt    DateTime @default(now())
   person       Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
 
@@ -868,4 +878,46 @@ model ShoppingLookup {
 model SeedSet {
   name      String   @id
   appliedAt DateTime @default(now())
+}
+
+/**
+ * Editable lists behind the mirror's styling chips (Jeff, 19 Oct 2026: "don't default to tucking it in;
+ * give me options on pose and how the clothes will show"). The first active entry in each list is the
+ * default. `prompt` is what the artist is told; blank means nothing needs changing.
+ */
+model MirrorPose {
+  id         String   @id @default(cuid())
+  name       String
+  prompt     String   @default("")
+  sortOrder  Int      @default(0)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@unique([name])
+}
+
+/** A way clothes can show (Tuck, Buttons, Sleeves…). `needs` lists the item features every look must have for the group to be offered, space-separated; blank = always. */
+model WearGroup {
+  id         String       @id @default(cuid())
+  name       String
+  needs      String       @default("")
+  sortOrder  Int          @default(0)
+  isArchived Boolean      @default(false)
+  createdAt  DateTime     @default(now())
+  options    WearOption[]
+
+  @@unique([name])
+}
+
+model WearOption {
+  id         String    @id @default(cuid())
+  name       String
+  prompt     String    @default("")
+  groupId    String
+  sortOrder  Int       @default(0)
+  isArchived Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  group      WearGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, name])
 }

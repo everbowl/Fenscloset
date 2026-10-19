@@ -171,7 +171,7 @@ export async function readBackForEntry(entryId: string, backKey: string): Promis
 function emptyTags(brandText: string | null, brandId: string | null, sizeText: string | null): TagResult {
   return {
     name: "Untitled piece", categoryId: null, subcategoryId: null, colorIds: [], patternId: null, fabricId: null, fabricConfidence: 0,
-    seasonIds: [], formalityId: null, brandText, brandId, sizeText, confidence: 0,
+    seasonIds: [], formalityId: null, brandText, brandId, sizeText, confidence: 0, features: [],
     raw: { name: "", category: "unknown", subcategory: null, colors: [], pattern: "unknown", fabric: "unknown", fabricConfidence: 0, seasons: [], formality: "unknown", brandText, sizeText, confidence: 0 },
   };
 }

@@ -49,4 +49,21 @@ describe("see it on a mannequin", () => {
     expect(await listTryOns(mya.id)).toEqual([]);
     expect((await db.tryOn.findFirstOrThrow({ where: { id: first.id } })).source).toBe("mannequin:today");
   });
+
+  it("styling rides along on the mannequin: each set of choices is its own picture, remembered per person", async () => {
+    const mya = await by("Mya");
+    const cat = (n: string) => db.category.findFirstOrThrow({ where: { name: n } });
+    const pic = async () => { const k = newKey("originals", mya.id, "image/jpeg"); await putObject(k, await sharp({ create: { width: 200, height: 200, channels: 3, background: { r: 90, g: 90, b: 90 } } }).jpeg().toBuffer(), "image/jpeg"); return k; };
+    const top = await db.item.create({ data: { ownerId: mya.id, name: "Tee", categoryId: (await cat("Tops")).id, photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
+    const skirt = await db.item.create({ data: { ownerId: mya.id, name: "Skirt", categoryId: (await cat("Bottoms")).id, photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
+    const first = await mannequinLook(mya, mya.id, [top.id, skirt.id], "today");
+    expect(first.styling?.summary).toBe("Untucked · As is");
+    const tuck = first.styling!.groups.find((g) => g.name === "Tuck")!;
+    const tucked = await mannequinLook(mya, mya.id, [top.id, skirt.id], "today", undefined, undefined, { options: { [tuck.id]: tuck.options[1].id } });
+    expect(tucked.id).not.toBe(first.id);
+    expect(tucked.styling?.summary).toBe("Tucked · As is");
+    expect(await mannequinLook(mya, mya.id, [top.id, skirt.id], "today")).toMatchObject({ id: tucked.id, cached: true });
+    expect(await db.tryOn.count({ where: { personId: mya.id } })).toBe(2);
+  });
+
 });

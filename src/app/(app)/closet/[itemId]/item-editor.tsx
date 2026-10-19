@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { Sheet } from "@/components/ui/sheet";
+import { cn } from "@/lib/cn";
 import { Banner } from "@/components/ui/banner";
 import { Button } from "@/components/ui/button";
 import { PickSheet, Row, TextSheet } from "@/components/items/row-editor";
@@ -16,9 +17,10 @@ import { shrinkPhoto } from "@/lib/import/client-queue";
 import type { ItemLists } from "@/lib/items/query";
 import type { ItemDetailEdits } from "@/lib/items/service";
 import type { LaundryStatus, PhotoKind } from "@/generated/prisma/client";
-import { addItemPhotoAction, cycleLaundryAction, deleteItemAction, notNowPhotoAction, removeItemPhotoAction, rotateItemPhotoAction, updateItemAction } from "./actions";
+import { addItemPhotoAction, cycleLaundryAction, deleteItemAction, mirrorPhotoAction, notNowPhotoAction, removeItemPhotoAction, rotateItemPhotoAction, updateItemAction } from "./actions";
 import { unretireAction } from "../clean-out/actions";
 import { monoDate } from "@/lib/dates";
+import { FEATURE_KEYS, FEATURE_LABELS, isFeatureKey } from "@/lib/tryon/features";
 
 export type ItemView = {
   id: string; name: string; ownerId: string; ownerName: string; mine: boolean; status: string; laundryStatus: LaundryStatus;
@@ -26,8 +28,10 @@ export type ItemView = {
   categoryId: string | null; subcategoryId: string | null; colorIds: string[]; patternId: string | null; fabricId: string | null;
   seasonIds: string[]; formalityId: string | null; occasionIds: string[]; tagIds: string[]; brandId: string | null; storeId: string | null;
   size: string | null; purchasePrice: string | null; purchaseDate: string | null; purchaseUrl: string | null; fitNotes: string | null;
+  /** How it is made (buttons down the front, long sleeves…): the mirror's styling chips key off these. */
+  features: string[];
   closetIds: string[]; sharedWithIds: string[];
-  photos: { id: string; kind: PhotoKind; key: string; isPrimary: boolean }[];
+  photos: { id: string; kind: PhotoKind; key: string; isPrimary: boolean; /** The one the mirror dresses with (the person's choice). */ forMirror: boolean }[];
   lastWornAt: string | null;
   wearHistory: { wornOn: string; title: string | null }[];
   retired: { reason: string; at: string } | null;
@@ -35,7 +39,7 @@ export type ItemView = {
   photoNudge: "first" | "refresh" | null;
 };
 
-type SheetKind = "category" | "subcategory" | "color" | "pattern" | "fabric" | "season" | "formality" | "occasion" | "tag" | "brand" | "match" | "store" | "size" | "price" | "date" | "url" | "notes" | "closets" | "share" | "rename" | "photo" | "delete" | null;
+type SheetKind = "category" | "subcategory" | "color" | "pattern" | "fabric" | "season" | "formality" | "occasion" | "tag" | "brand" | "match" | "store" | "size" | "price" | "date" | "url" | "notes" | "made" | "closets" | "share" | "rename" | "photo" | "delete" | null;
 
 const LAUNDRY_WORD: Record<LaundryStatus, string> = { clean: "Clean", dirty: "Laundry", cleaners: "At cleaners" };
 const KIND_WORD: Record<PhotoKind, string> = { alone: "Photo", worn: "Worn", label: "Label", cutout: "Cutout", thumb: "Thumb", back: "Back", retail: "Store" };
@@ -66,7 +70,7 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
       setMatching(false);
       if (!r.ok) { setError(r.error); return; }
       const v = r.value;
-      setIt((x) => ({ ...x, brandId: v.brandId, fitNotes: x.fitNotes ?? v.fitNotes, photos: [...x.photos.filter((p) => p.kind !== "retail"), ...v.photos.map((ph) => ({ id: ph.id, kind: "retail" as const, key: ph.key, isPrimary: false }))] }));
+      setIt((x) => ({ ...x, brandId: v.brandId, fitNotes: x.fitNotes ?? v.fitNotes, photos: [...x.photos.filter((p) => p.kind !== "retail"), ...v.photos.map((ph) => ({ id: ph.id, kind: "retail" as const, key: ph.key, isPrimary: false, forMirror: false }))] }));
       if (!lists.brands.some((b) => b.id === v.brandId)) setLists((l) => ({ ...l, brands: [...l.brands, { id: v.brandId, name: v.brandName }] }));
       setSheet(null); router.refresh();
     });
@@ -115,9 +119,10 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
       <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={onPhoto} data-testid="item-photo" />
       <div className="relative -mx-5 h-[380px] bg-bone lg:mx-0 lg:h-[560px] lg:self-start lg:[grid-row:1/span_80]">
         {photo ? <img src={`/api/photo/${photo.key}`} alt={it.name} className="size-full object-contain" data-testid="item-hero" /> : null}
-        {canEdit && photo ? (
+        {canEdit && photo ? (<>
           <button type="button" disabled={pending} onClick={() => start(async () => { const r = await rotateItemPhotoAction(it.id, photo.id); if (!r.ok) setError(r.error); else setIt((x) => ({ ...x, photos: x.photos.map((p) => (p.id === r.value.photoId ? { ...p, key: r.value.key } : p)) })); })} className="mono mono-11 absolute bottom-2 right-2 bg-paper px-2.5 py-1.5 disabled:opacity-60" data-testid="rotate-photo" title="Turn the photo a quarter turn">Rotate ↻</button>
-        ) : null}
+          {canEdit && photo.kind !== "worn" && photo.kind !== "label" ? <button type="button" disabled={pending} aria-pressed={photo.forMirror} onClick={() => start(async () => { const r = await mirrorPhotoAction(it.id, photo.id); if (!r.ok) setError(r.error); else setIt((x) => ({ ...x, photos: x.photos.map((p) => ({ ...p, forMirror: p.id === r.value.photoId })) })); })} className={`mono mono-11 absolute bottom-2 left-2 px-2.5 py-1.5 disabled:opacity-60 ${photo.forMirror ? "bg-ink text-paper" : "bg-paper"}`} data-testid="mirror-photo" title="The mirror dresses you with this photo">{photo.forMirror ? "Mirror ✓" : "Use in mirror"}</button> : null}
+        </>) : null}
         {photo?.kind === "retail" ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">Store photo</span> : photo?.kind === "worn" || photo?.kind === "back" ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">{KIND_WORD[photo.kind]}</span> : it.storePhoto && photo?.isPrimary ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">Store photo</span> : null}
       </div>
       {it.photos.length > 1 ? (
@@ -181,6 +186,7 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
         <Row label="Price · Date" value={[price, it.purchaseDate].filter(Boolean).join(" · ") || "Not set"} muted={!price && !it.purchaseDate} onClick={() => open("price")} />
         <Row label="Link" value={it.purchaseUrl ?? "Not set"} muted={!it.purchaseUrl} onClick={() => open("url")} />
         <Row label="Fit notes" value={it.fitNotes ?? "None"} muted={!it.fitNotes} onClick={() => open("notes")} />
+        <Row label="Made with" value={it.features.filter(isFeatureKey).map((f) => FEATURE_LABELS[f]).join(" · ") || "Nothing special"} muted={!it.features.length} onClick={() => open("made")} testId="row-made" />
         <div className="flex min-h-[42px] items-center border-b border-line" data-testid="row-worn">
           <span className="mono w-[120px] shrink-0 text-graphite">Worn</span>
           <span className="flex-1 text-[14px]">{it.wearHistory.length ? `${it.wearCount}× · last ${monoDate(it.wearHistory[0].wornOn)}` : "Not yet"}</span>
@@ -248,6 +254,22 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
       <TextSheet open={sheet === "price"} onClose={() => setSheet(null)} title="Price" label="Price" value={it.purchasePrice ?? ""} placeholder="48.50" onSave={(v) => { save({ purchasePrice: v }, { purchasePrice: v.replace(/[$,\s]/g, "") || null }); setSheet("date"); }} />
       <TextSheet open={sheet === "date"} onClose={() => setSheet(null)} title="Bought on" label="Date (YYYY-MM-DD)" value={it.purchaseDate ?? ""} placeholder="2026-10-18" onSave={(v) => save({ purchaseDate: v }, { purchaseDate: v.trim() || null })} />
       <TextSheet open={sheet === "url"} onClose={() => setSheet(null)} title="Link" label="Where you bought it" value={it.purchaseUrl ?? ""} placeholder="https://" onSave={(v) => save({ purchaseUrl: v }, { purchaseUrl: v.trim() || null })} />
+      {/* How the piece is made: the mirror offers Buttons / Sleeves / Hood chips only when a piece in the look has them. */}
+      <Sheet open={sheet === "made"} onClose={() => setSheet(null)} title="Made with">
+        <p className="mono mb-3 text-graphite">The mirror asks how to show these: buttons open, sleeves rolled, hood up.</p>
+        <div className="flex flex-col" role="listbox" aria-multiselectable>
+          {FEATURE_KEYS.map((f) => {
+            const on = it.features.includes(f);
+            return (
+              <button key={f} type="button" role="option" aria-selected={on} onClick={() => { const next = on ? it.features.filter((x) => x !== f) : [...it.features, f]; save({ features: next }, { features: next }); }} className="flex h-12 items-center justify-between border-b border-line text-[15px]" data-testid={`made-${f}`}>
+                <span>{FEATURE_LABELS[f]}</span>
+                <span className={cn("mono", on ? "text-ink" : "text-transparent")}>{on ? "✓" : "·"}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-4 flex justify-end"><Button type="button" size="md" onClick={() => setSheet(null)}>Done</Button></div>
+      </Sheet>
       <TextSheet open={sheet === "notes"} onClose={() => setSheet(null)} title="Fit notes" label="How it fits" value={it.fitNotes ?? ""} placeholder="Runs small · long in the arms" onSave={(v) => save({ fitNotes: v }, { fitNotes: v.trim() || null })} />
       <Sheet open={sheet === "photo"} onClose={() => setSheet(null)} title="Add a photo">
         <div className="flex flex-col">

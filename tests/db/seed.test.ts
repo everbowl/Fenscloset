@@ -68,8 +68,15 @@ describe("seed guard", () => {
 
   it("additive seed sets land once on a database that already has people, and never re-create what was removed after", async () => {
     await seed();
-    expect(await db.seedSet.count()).toBe(8);
+    expect(await db.seedSet.count()).toBe(9);
     expect(await db.brand.count()).toBeGreaterThan(150); // the national catalog is in the Brands list
+    // the mirror's styling lists: untucked first, poses with "as photographed" first
+    expect((await db.mirrorPose.findMany({ orderBy: { sortOrder: "asc" } }))[0].name).toBe("Standing, as photographed");
+    expect(await db.wearGroup.count()).toBe(7);
+    const tuck = await db.wearGroup.findUniqueOrThrow({ where: { name: "Tuck" }, include: { options: { orderBy: { sortOrder: "asc" } } } });
+    expect(tuck.needs).toBe("top bottom");
+    expect(tuck.options[0]).toMatchObject({ name: "Untucked" });
+    expect(tuck.options[0].prompt).toMatch(/untucked/);
     expect((await db.brand.findFirstOrThrow({ where: { name: "Patagonia" } })).url).toBe("https://www.patagonia.com");
     // simulate a database seeded before Cup size existed
     await db.measurementKind.deleteMany({ where: { name: "Cup size" } });

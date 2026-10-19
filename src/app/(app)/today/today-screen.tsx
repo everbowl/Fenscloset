@@ -14,6 +14,7 @@ import { cn } from "@/lib/cn";
 import type { BoardView, Piece } from "@/lib/outfits/engine";
 import type { Scale } from "@/lib/checkins/service";
 import type { TryOnState, TryOnView } from "@/lib/tryon";
+import type { StylingChoice } from "@/lib/tryon/features";
 import { checkInSelfieAction, checkInTapsAction, mannequinAction, moreAction, rateAction, regenerateAction, removeAction, setLocationAction, setPlanAction, setZipAction, swapAction, tryOnAction, wearAction } from "./actions";
 import { RatingRow } from "../fits/rating-row";
 import { monoDate } from "@/lib/dates";
@@ -53,6 +54,17 @@ export function TodayScreen(p: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const boards = p.suggestion?.boards ?? [];
   const board = boards[index] ?? null;
+
+  /** A styling chip in the mirror: the same look, re-styled with this one change (pose, tuck, buttons…). */
+  function restyle(pick: StylingChoice) {
+    if (!tryOn || !p.suggestion) return;
+    setBusy("tryon"); setError(undefined);
+    start(async () => {
+      const r = tryOn.mannequin ? await mannequinAction(p.personId, p.suggestion!.id, index, pick) : await tryOnAction(p.personId, p.suggestion!.id, index, tryOn.view ?? "front", pick);
+      setBusy(null);
+      if (!r.ok) setError(r.error); else if (r.tryOn) setTryOn(r.tryOn);
+    });
+  }
 
   function run(label: string, fn: () => Promise<{ ok: boolean; error?: string }>, after?: () => void) {
     setError(undefined); setBusy(label);
@@ -287,6 +299,7 @@ export function TodayScreen(p: Props) {
           <div className="flex flex-col gap-3" data-testid="try-on-sheet">
             <div className="h-[460px] overflow-hidden bg-bone"><img src={`/api/photo/${tryOn.key}`} alt={tryOn.mannequin ? "This look on a mannequin" : "You wearing this look"} className="size-full object-contain" /></div>
             <p className="mono text-graphite">{board?.pieces.map((x) => x.label).join(" · ")}</p>
+            {tryOn.styling?.summary ? <p className="mono text-ink" data-testid="styling-summary">{tryOn.styling.summary}{tryOn.stylingFailed ? " · didn’t take this time, showing the plain try-on" : ""}</p> : null}
             <p className="mono text-ink">{tryOn.mannequin ? `On a mannequin · No body photo used${p.mine ? "" : ` · ${p.personName}’s look`}` : `On you${tryOn.view === "back" ? " · from behind" : ""} · Only you can see this picture`}{tryOn.cached ? " · saved from before" : ""}</p>
             {(p.tryOn === "ready" && p.mannequinAvailable) || (p.tryOn === "ready" && p.backPhoto) ? (
               <div className="flex flex-wrap gap-1.5" data-testid="mirror-views">
@@ -296,6 +309,25 @@ export function TodayScreen(p: Props) {
                     <button key={v} type="button" disabled={busy !== null} aria-pressed={on} onClick={() => { if (on) return; setBusy("tryon"); setError(undefined); start(async () => { const r = v === "mannequin" ? await mannequinAction(p.personId, p.suggestion!.id, index) : await tryOnAction(p.personId, p.suggestion!.id, index, v as "front" | "back"); setBusy(null); if (!r.ok) setError(r.error); else if (r.tryOn) setTryOn(r.tryOn); }); }} className={`mono mono-11 h-9 px-4 ${on ? "bg-ink text-paper" : "border border-ink"}`} data-testid={`mirror-${v}`}>{busy === "tryon" && !on ? "…" : word}</button>
                   );
                 })}
+              </div>
+            ) : null}
+            {/* How it shows: pose, tuck, buttons… one tap re-styles the same dressed picture (no second dressing). Lists live under Admin → Lists. */}
+            {tryOn.styling && (tryOn.styling.poses.length > 1 || tryOn.styling.groups.length) ? (
+              <div className="flex flex-col gap-3 border-t border-line pt-3" data-testid="mirror-styling">
+                {[...(tryOn.styling.poses.length > 1 ? [{ id: "pose", name: "Pose", chosen: tryOn.styling.poseId ?? "", options: tryOn.styling.poses }] : []), ...tryOn.styling.groups].map((g) => (
+                  <div key={g.id} className="flex flex-col gap-1.5" data-testid={`style-group-${g.id === "pose" ? "pose" : g.name.toLowerCase().replace(/\s+/g, "-")}`}>
+                    <span className="mono text-graphite">{g.name}</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {g.options.map((o) => {
+                        const on = o.id === g.chosen;
+                        return (
+                          <button key={o.id} type="button" disabled={busy !== null} aria-pressed={on} onClick={() => { if (on) return; restyle(g.id === "pose" ? { poseId: o.id } : { options: { [g.id]: o.id } }); }} className={`mono mono-11 h-9 px-3 ${on ? "bg-ink text-paper" : "border border-ink"}`} data-testid={`style-${o.id}`}>{o.name}</button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+                {busy === "tryon" ? <p className="mono text-graphite">Styling…</p> : null}
               </div>
             ) : null}
           </div>
