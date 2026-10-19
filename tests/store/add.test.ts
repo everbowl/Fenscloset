@@ -8,7 +8,8 @@ import { resetDb } from "../helpers";
 import { seed } from "../../prisma/seed";
 import { newKey, objectExists, putObject } from "@/lib/storage";
 import { drainQueue } from "@/lib/import/queue";
-import { createStoreEntries, findColorPhotos, lookupProduct, priceNumber, storeNameFromUrl } from "@/lib/store/add";
+import { createStoreEntries, findColorPhotos, lookupProduct, priceNumber, storeNameFromUrl, wordsFromUrl } from "@/lib/store/add";
+import { parseJsonLoose } from "@/lib/ai/claude";
 import { matchReceipt, readReceipt } from "@/lib/store/receipt";
 import { addItemPhoto, answerPhotoNudge, createItemFromEntry, photoNudge } from "@/lib/items/service";
 import type { EntryAiResult } from "@/lib/import/process";
@@ -18,7 +19,7 @@ describe("add from a store", () => {
   beforeEach(async () => {
     await resetDb();
     process.env.DEV_MODE = "true"; process.env.MOCK_AI = "true"; process.env.MOCK_S3 = "true"; process.env.MOCK_FETCH = "true"; process.env.MOCK_SERPER = "true";
-    delete process.env.MOCK_REMOVE_BG_FAIL;
+    delete process.env.MOCK_REMOVE_BG_FAIL; delete process.env.MOCK_FETCH_BLOCKED;
     process.env.MOCK_S3_DIR = await mkdtemp(path.join(os.tmpdir(), "fc-store-"));
     await seed();
     jeffId = (await db.person.findUniqueOrThrow({ where: { email: "jeff@everbowl.com" } })).id;
@@ -118,5 +119,27 @@ describe("add from a store", () => {
     const full = await db.item.findUniqueOrThrow({ where: { id: item.id } });
     expect(full.purchaseDate?.toISOString().slice(0, 10)).toBe("2026-10-12");
     expect(String(full.purchasePrice)).toBe("38");
+  });
+
+  it("a store that blocks link previews falls back to a product search on the link's words", async () => {
+    expect(wordsFromUrl("https://shop.lululemon.com/p/mens-t-shirts/Metal-Vent-Tech-Short-Sleeve-Shirt/_/prod10550086?color=31382")).toBe("mens t shirts Metal Vent Tech Short Sleeve Shirt");
+    expect(wordsFromUrl("https://www.nike.com/t/dri-fit-mens-training-top-abc123/DV9839-010")).toBe("t dri fit mens training top");
+    process.env.MOCK_FETCH_BLOCKED = "true";
+    const p = await lookupProduct("https://shop.lululemon.com/p/mens-t-shirts/Metal-Vent-Tech-Short-Sleeve-Shirt/_/prod10550086");
+    expect(p.source).toBe("search");
+    expect(p.storeName).toBe("Lululemon");
+    expect(p.name).toMatch(/Metal Vent Tech/);
+    expect(p.imageUrl).toMatch(/^https:\/\/mock\.example\/img\//);
+    expect(p.colors).toEqual([]);
+    process.env.MOCK_SERPER = "false"; delete process.env.SERPER_API_KEY;
+    await expect(lookupProduct("https://shop.lululemon.com/p/mens-t-shirts/Metal-Vent-Tech-Short-Sleeve-Shirt/_/prod10550086")).rejects.toThrow(/Lululemon blocks link previews/);
+    process.env.MOCK_SERPER = "true";
+  });
+
+  it("loose JSON parsing recovers an answer wrapped in a sentence or a code fence", () => {
+    expect(parseJsonLoose<{ a: number }>('{"a":1}')).toEqual({ a: 1 });
+    expect(parseJsonLoose<{ a: number }>('Here you go:\n```json\n{"a":1}\n```')).toEqual({ a: 1 });
+    expect(parseJsonLoose<{ a: number }>('Sure. {"a":1} Hope that helps.')).toEqual({ a: 1 });
+    expect(parseJsonLoose('no json here')).toBeUndefined();
   });
 });

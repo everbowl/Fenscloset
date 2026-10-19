@@ -24,7 +24,20 @@ export type StoreProduct = {
   sizes: string[];
   /** Photo per color when the page gave one. */
   colorImages: Record<string, string>;
+  /** "page" when the store's page was read; "search" when the store blocked the link and the card came from a product search (check the photo). */
+  source: "page" | "search";
 };
+
+/** The product words in a store link: "/p/metal-vent-tech-short-sleeve-shirt/prod10550086" → "metal vent tech short sleeve shirt". */
+export function wordsFromUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.split("/").filter(Boolean).map((seg) => decodeURIComponent(seg)).filter((seg) => !/^(p|products?|product|shop|item|items|dp|us|en|en-us|ca|women|men|womens|mens|collections?|c)$/i.test(seg));
+    const words = parts.map((seg) => seg.replace(/\.(html?|aspx|php)$/i, "").replace(/[_-]+/g, " ")).join(" ")
+      .replace(/\b(prod|sku|id|p)?\d{4,}\w*\b/gi, " ").replace(/\b[a-z]*\d+[a-z0-9]*\b/gi, " ").replace(/\s+/g, " ").trim();
+    return words.slice(0, 80);
+  } catch { return ""; }
+}
 
 /** What lands on ImportEntry.storeMeta and later on the item. */
 export type StoreMeta = {
@@ -94,10 +107,31 @@ async function shopifyVariants(url: string): Promise<Pick<StoreProduct, "colors"
 /** Read a product link into a card: store photo, name, brand, store, price, and the page's color/size choices. */
 export async function lookupProduct(input: string): Promise<StoreProduct> {
   let page;
-  try { page = await readProductPage(input); } catch (e) { if (e instanceof PageError) throw new StoreAddError(e.message); throw e; }
+  try { page = await readProductPage(input); } catch (e) {
+    if (!(e instanceof PageError)) throw e;
+    if (e.code === "bad_url") throw new StoreAddError(e.message);
+    // Big stores (Lululemon, Nike…) block link previews. Fall back to a product search on the words in the link.
+    const viaSearch = await lookupBySearch(input);
+    if (viaSearch) return viaSearch;
+    throw new StoreAddError(`${storeNameFromUrl(normalizeUrl(input).toString())} blocks link previews and no search match came back. Take a photo of the piece, or use the receipt.`);
+  }
   const variants = await shopifyVariants(page.url).catch(() => ({ colors: [], sizes: [], colorImages: {} }));
   const name = (page.title ?? "").replace(/\s*[|–-]\s*[^|–-]*$/, "").trim() || page.title || "Untitled piece";
-  return { url: page.url, name: name.slice(0, 80), brandText: page.brandText, storeName: page.siteName ?? storeNameFromUrl(page.url), priceText: page.priceText, imageUrl: page.imageUrl, ...variants };
+  return { url: page.url, name: name.slice(0, 80), brandText: page.brandText, storeName: page.siteName ?? storeNameFromUrl(page.url), priceText: page.priceText, imageUrl: page.imageUrl, ...variants, source: "page" };
+}
+
+/** A card from a product search on the link's words, preferring a hit on the same store. Null when nothing fits. */
+async function lookupBySearch(input: string): Promise<StoreProduct | null> {
+  const url = normalizeUrl(input).toString();
+  const host = new URL(url).hostname.replace(/^www\./, "");
+  const store = storeNameFromUrl(url);
+  const words = wordsFromUrl(url);
+  if (!words) return null;
+  const hits = (await searchProducts([`${store} ${words}`], { favoriteStores: [store], favoriteBrands: [] })).filter((h) => h.imageUrl);
+  const same = hits.find((h) => { try { return new URL(h.url).hostname.replace(/^www\./, "").endsWith(host.split(".").slice(-2).join(".")); } catch { return false; } });
+  const hit = same ?? hits[0];
+  if (!hit) return null;
+  return { url, name: hit.title.slice(0, 80), brandText: store, storeName: store, priceText: hit.priceText, imageUrl: hit.imageUrl, colors: [], sizes: [], colorImages: {}, source: "search" };
 }
 
 /** Pictures of this product in a color, from Google Shopping; the person picks the one that matches. */

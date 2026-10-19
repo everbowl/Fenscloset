@@ -138,6 +138,7 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
           <div>
             <h2 className="serif text-[26px] leading-tight" data-testid="product-name">{product.name}</h2>
             <p className="mono mt-1 text-graphite">{[product.brandText, product.storeName, product.priceText].filter(Boolean).join(" · ")}</p>
+            {product.source === "search" ? <p className="mono mt-2 normal-case text-graphite" data-testid="via-search">{product.storeName} blocked the link, so this came from a product search. Check the photo is your piece; if not, type the color and tap “Find a photo in this color”.</p> : null}
           </div>
           <ol className="mono flex gap-3 text-graphite" aria-label="Steps">
             {([["color", "Color"], ["size", "Size"], ["qty", "How many"]] as const).filter(([k]) => k === "qty" || (k === "color" ? product.colors.length : product.sizes.length)).map(([k, l], i) => <li key={k} className={step === k ? "text-ink" : ""}>{i + 1} {l}</li>)}

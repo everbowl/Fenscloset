@@ -72,7 +72,10 @@ export const MOCK_PAGE = `<html><head><title>Linen Blazer | Mock Store</title>
 /** Fetch and parse a store page. */
 export async function readProductPage(input: string): Promise<ProductPage> {
   const u = normalizeUrl(input);
-  if (process.env.MOCK_FETCH === "true") return parseProductPage(u.toString(), MOCK_PAGE);
+  if (process.env.MOCK_FETCH === "true") {
+    if (process.env.MOCK_FETCH_BLOCKED === "true") throw new PageError("That store blocks link previews. Paste a screenshot instead.", "blocked");
+    return parseProductPage(u.toString(), MOCK_PAGE);
+  }
   let res: Response;
   try {
     res = await fetch(u, { headers: { "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", accept: "text/html,application/xhtml+xml" }, redirect: "follow", signal: AbortSignal.timeout(12000) });
