@@ -13,9 +13,10 @@ import { PickSheet, TextSheet } from "@/components/items/row-editor";
 import { cn } from "@/lib/cn";
 import type { BoardView, Piece } from "@/lib/outfits/engine";
 import type { Scale } from "@/lib/checkins/service";
-import type { TryOnState, TryOnView } from "@/lib/tryon";
-import type { StylingChoice } from "@/lib/tryon/features";
-import { checkInSelfieAction, checkInTapsAction, mannequinAction, moreAction, rateAction, regenerateAction, removeAction, setLocationAction, setPlanAction, setZipAction, swapAction, tryOnAction, wearAction } from "./actions";
+import type { TryOnState } from "@/lib/tryon";
+import { MirrorGlyph, MirrorSheet } from "@/components/mirror/mirror-sheet";
+import { useMirror } from "@/components/mirror/use-mirror";
+import { checkInSelfieAction, checkInTapsAction, moreAction, rateAction, regenerateAction, removeAction, setLocationAction, setPlanAction, setZipAction, swapAction, wearAction } from "./actions";
 import { RatingRow } from "../fits/rating-row";
 import { monoDate } from "@/lib/dates";
 
@@ -48,34 +49,13 @@ export function TodayScreen(p: Props) {
   const [, start] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string>();
-  const [sheet, setSheet] = useState<"checkin" | "plan" | "planText" | "swap" | "zip" | "tryon" | null>(null);
-  const [tryOn, setTryOn] = useState<TryOnView | null>(null);
+  const [sheet, setSheet] = useState<"checkin" | "plan" | "planText" | "swap" | "zip" | null>(null);
   const [index, setIndex] = useState(Math.max(0, p.suggestion?.wornIndex ?? 0));
   const scroller = useRef<HTMLDivElement>(null);
   const boards = p.suggestion?.boards ?? [];
   const board = boards[index] ?? null;
-
-  /** A styling chip in the mirror: the same look, re-styled with this one change (pose, tuck, buttons…). */
-  function restyle(pick: StylingChoice) {
-    if (!tryOn || !p.suggestion) return;
-    setBusy("tryon"); setError(undefined);
-    start(async () => {
-      const r = tryOn.mannequin ? await mannequinAction(p.personId, p.suggestion!.id, index, pick) : await tryOnAction(p.personId, p.suggestion!.id, index, tryOn.view ?? "front", pick);
-      setBusy(null);
-      if (!r.ok) setError(r.error); else if (r.tryOn) setTryOn(r.tryOn);
-    });
-  }
-
-  /** "Dress again": the saved pictures of this look are thrown away and it is dressed from scratch. */
-  function redo() {
-    if (!tryOn || !p.suggestion) return;
-    setBusy("tryon"); setError(undefined);
-    start(async () => {
-      const r = tryOn.mannequin ? await mannequinAction(p.personId, p.suggestion!.id, index, undefined, true) : await tryOnAction(p.personId, p.suggestion!.id, index, tryOn.view ?? "front", undefined, true);
-      setBusy(null);
-      if (!r.ok) setError(r.error); else if (r.tryOn) setTryOn(r.tryOn);
-    });
-  }
+  // The mirror: dressed in the background, polled, shown in the shared sheet (src/components/mirror).
+  const m = useMirror(p.personId);
 
   function run(label: string, fn: () => Promise<{ ok: boolean; error?: string }>, after?: () => void) {
     setError(undefined); setBusy(label);
@@ -190,13 +170,13 @@ export function TodayScreen(p: Props) {
           </div>
           {p.canDress && (p.tryOn === "ready" || p.mannequin) ? (
             <div className="mt-4 lg:col-start-1 lg:row-start-4 lg:row-span-4 lg:self-start" data-testid="mirror">
-              <button type="button" disabled={busy !== null} onClick={() => { if (tryOn && tryOn.itemIds.join() === [...(board?.itemIds ?? [])].sort().join()) { setSheet("tryon"); return; } setBusy("tryon"); setError(undefined); start(async () => { const r = p.tryOn === "ready" ? await tryOnAction(p.personId, p.suggestion!.id, index) : await mannequinAction(p.personId, p.suggestion!.id, index); setBusy(null); if (!r.ok) setError(r.error); else if (r.tryOn) { setTryOn(r.tryOn); setSheet("tryon"); } }); }}
+              <button type="button" disabled={busy !== null} onClick={() => m.show({ look: { kind: "today", suggestionId: p.suggestion!.id, index }, on: p.tryOn === "ready" ? "me" : "mannequin" })}
                 className="flex w-full items-center gap-5 border border-ink p-3 text-left disabled:opacity-60" data-testid={p.tryOn === "ready" ? "try-on" : "see-on-mannequin"}>
                 <span className="relative h-[150px] w-[100px] shrink-0 overflow-hidden rounded-t-[60px] border-2 border-ink bg-paper">
-                  {tryOn ? <img src={`/api/photo/${tryOn.key}`} alt="" className="size-full object-cover" /> : <MirrorGlyph />}
+                  {m.tryOn ? <img src={`/api/photo/${m.tryOn.key}`} alt="" className="size-full object-cover" /> : <MirrorGlyph />}
                 </span>
                 <span className="flex flex-col gap-1">
-                  <span className="mono text-[13px] uppercase tracking-[0.18em] text-ink">{busy === "tryon" ? "Dressing…" : "Look in the mirror"}</span>
+                  <span className="mono text-[13px] uppercase tracking-[0.18em] text-ink">{m.busy ? "Dressing…" : "Look in the mirror"}</span>
                   <span className="text-[15px] leading-snug">{p.tryOn === "ready" ? "This look on you." : `This look on a mannequin${p.mine ? "" : ` for ${p.personName}`}.`}</span>
                   <span className="mono text-ink">Tap to see it →</span>
                 </span>
@@ -305,50 +285,7 @@ export function TodayScreen(p: Props) {
       </Sheet>
 
       {/* See it on: the look on your own body photo (yours alone), or on the shared mannequin (no body in it). */}
-      <Sheet open={sheet === "tryon"} onClose={() => setSheet(null)} title="In the mirror">
-        {tryOn ? (
-          <div className="flex flex-col gap-3" data-testid="try-on-sheet">
-            <div className="h-[460px] overflow-hidden bg-bone"><img src={`/api/photo/${tryOn.key}`} alt={tryOn.mannequin ? "This look on a mannequin" : "You wearing this look"} className="size-full object-contain" /></div>
-            <p className="mono text-graphite">{board?.pieces.map((x) => x.label).join(" · ")}</p>
-            {tryOn.styling?.summary ? <p className="mono text-ink" data-testid="styling-summary">{tryOn.styling.summary}{tryOn.stylingFailed ? " · didn’t take this time, showing the plain try-on" : ""}</p> : null}
-            <p className="mono text-ink">{tryOn.mannequin ? `On a mannequin · No body photo used${p.mine ? "" : ` · ${p.personName}’s look`}` : `On you${tryOn.view === "back" ? " · from behind" : ""} · Only you can see this picture`}{tryOn.cached ? " · saved from before" : ""}</p>
-            {tryOn.note ? <p className="mono text-graphite" data-testid="mirror-note">{tryOn.note}</p> : null}
-            <div className="flex items-center justify-between">
-              <button type="button" disabled={busy !== null} onClick={redo} className="mono mono-11 h-9 border border-ink px-4 disabled:opacity-60" data-testid="redo-tryon" title="Throw away the saved pictures of this look and dress it from scratch">{busy === "tryon" ? "Dressing…" : "Dress again"}</button>
-              <span className="mono text-graphite">Not right? Dress it from scratch</span>
-            </div>
-            {(p.tryOn === "ready" && p.mannequinAvailable) || (p.tryOn === "ready" && p.backPhoto) ? (
-              <div className="flex flex-wrap gap-1.5" data-testid="mirror-views">
-                {([["front", "On me"], ...(p.backPhoto ? [["back", "From behind"]] : []), ...(p.mannequinAvailable ? [["mannequin", "Mannequin"]] : [])] as [string, string][]).map(([v, word]) => {
-                  const on = v === "mannequin" ? Boolean(tryOn.mannequin) : !tryOn.mannequin && (tryOn.view ?? "front") === v;
-                  return (
-                    <button key={v} type="button" disabled={busy !== null} aria-pressed={on} onClick={() => { if (on) return; setBusy("tryon"); setError(undefined); start(async () => { const r = v === "mannequin" ? await mannequinAction(p.personId, p.suggestion!.id, index) : await tryOnAction(p.personId, p.suggestion!.id, index, v as "front" | "back"); setBusy(null); if (!r.ok) setError(r.error); else if (r.tryOn) setTryOn(r.tryOn); }); }} className={`mono mono-11 h-9 px-4 ${on ? "bg-ink text-paper" : "border border-ink"}`} data-testid={`mirror-${v}`}>{busy === "tryon" && !on ? "…" : word}</button>
-                  );
-                })}
-              </div>
-            ) : null}
-            {/* How it shows: pose, tuck, buttons… one tap re-styles the same dressed picture (no second dressing). Lists live under Admin → Lists. */}
-            {tryOn.styling && (tryOn.styling.poses.length > 1 || tryOn.styling.groups.length) ? (
-              <div className="flex flex-col gap-3 border-t border-line pt-3" data-testid="mirror-styling">
-                {[...(tryOn.styling.poses.length > 1 ? [{ id: "pose", name: "Pose", chosen: tryOn.styling.poseId ?? "", options: tryOn.styling.poses }] : []), ...tryOn.styling.groups].map((g) => (
-                  <div key={g.id} className="flex flex-col gap-1.5" data-testid={`style-group-${g.id === "pose" ? "pose" : g.name.toLowerCase().replace(/\s+/g, "-")}`}>
-                    <span className="mono text-graphite">{g.name}</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {g.options.map((o) => {
-                        const on = o.id === g.chosen;
-                        return (
-                          <button key={o.id} type="button" disabled={busy !== null} aria-pressed={on} onClick={() => { if (on) return; restyle(g.id === "pose" ? { poseId: o.id } : { options: { [g.id]: o.id } }); }} className={`mono mono-11 h-9 px-3 ${on ? "bg-ink text-paper" : "border border-ink"}`} data-testid={`style-${o.id}`}>{o.name}</button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-                {busy === "tryon" ? <p className="mono text-graphite">Styling…</p> : null}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-      </Sheet>
+      <MirrorSheet m={m} pieces={board?.pieces.map((x) => x.label).join(" · ") ?? ""} mine={p.mine} personId={p.personId} personName={p.personName} tryOnState={p.tryOn} backPhoto={p.backPhoto} mannequinAvailable={p.mannequinAvailable} />
 
       <TextSheet open={sheet === "zip"} onClose={() => setSheet(null)} title="Weather for your zip" label="Zip code" value={p.savedZip ?? ""} placeholder="92101" onSave={(v) => run("zip", () => setZipAction(v))} />
     </div>
@@ -478,17 +415,5 @@ function PlanPicker({ occasions, selected, isAdmin, busy, onPick, onText, onClea
       {onClear ? <Button variant="secondary" className="mt-2 w-full" disabled={busy} onClick={onClear}>Back to my calendar</Button> : null}
       <PickSheet open={pick} onClose={() => setPick(false)} title="Occasions" kind="occasion" options={occasions} selected={selected ? [selected] : []} canAdd onChange={(ids) => { if (ids[0]) onPick(ids[0]); }} />
     </div>
-  );
-}
-
-/** A simple mirror: an arched frame with a glint, for the empty mirror before the first look. */
-function MirrorGlyph() {
-  return (
-    <svg viewBox="0 0 100 150" className="size-full" aria-hidden>
-      <path d="M22 140 C22 60 30 22 50 22 C70 22 78 60 78 140" fill="none" stroke="#1A1A1A" strokeWidth="1.5" />
-      <path d="M36 60 L52 40" stroke="#1A1A1A" strokeWidth="2" strokeLinecap="round" />
-      <path d="M40 76 L62 50" stroke="#1A1A1A" strokeWidth="1.2" strokeLinecap="round" />
-      <text x="50" y="128" textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="9" fill="#1A1A1A" letterSpacing="1.5">YOU</text>
-    </svg>
   );
 }

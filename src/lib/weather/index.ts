@@ -47,13 +47,24 @@ export function conditionWord(code: number): string {
   return "Thunderstorm";
 }
 
+/** A failed lookup is not tried again for a short while: Today renders several times at once, and each render would hit the service again. */
+const RETRY_AFTER_MS = 2 * 60 * 1000;
+const failures = new Map<string, { at: number; error: Error }>();
+
 async function cached<T>(key: string, ttlMs: number | null, fetcher: () => Promise<T>): Promise<T> {
   const hit = await db.weatherCache.findUnique({ where: { key } });
   if (hit && (ttlMs === null || Date.now() - hit.fetchedAt.getTime() < ttlMs)) return hit.payload as T;
-  const payload = await fetcher();
+  const failed = failures.get(key);
+  if (failed && Date.now() - failed.at < RETRY_AFTER_MS) throw failed.error;
+  let payload: T;
+  try { payload = await fetcher(); } catch (e) { failures.set(key, { at: Date.now(), error: e as Error }); throw e; }
+  failures.delete(key);
   await db.weatherCache.upsert({ where: { key }, update: { payload: payload as object, fetchedAt: new Date() }, create: { key, payload: payload as object } });
   return payload;
 }
+
+/** Tests: forget the failures that are waiting to be retried. */
+export function forgetWeatherFailures(): void { failures.clear(); }
 
 export function isValidZip(zip: string): boolean {
   return /^\d{5}$/.test(zip.trim());
@@ -67,7 +78,7 @@ export async function geocodeZip(zip: string): Promise<Coords> {
   return cached(`zip:${z}`, null, async () => {
     const res = await fetch(`https://api.zippopotam.us/us/${z}`, { signal: AbortSignal.timeout(8000) });
     if (res.status === 404) throw new WeatherError("That zip code wasn't found.", "bad_zip");
-    if (!res.ok) throw new WeatherError("Zip lookup is unavailable right now.", "unavailable");
+    if (!res.ok) { console.error(`weather: Zippopotam answered ${res.status} ${res.statusText}`); throw new WeatherError("Zip lookup is unavailable right now.", "unavailable"); }
     const json = (await res.json()) as { places?: { latitude: string; longitude: string; "place name": string }[] };
     const p = json.places?.[0];
     if (!p) throw new WeatherError("That zip code wasn't found.", "bad_zip");
@@ -91,7 +102,10 @@ async function fetchForecast(c: Coords): Promise<OpenMeteo> {
     temperature_unit: "fahrenheit", timezone: "auto", forecast_days: "2",
   });
   const res = await fetch(`https://api.open-meteo.com/v1/forecast?${q}`, { signal: AbortSignal.timeout(8000) });
-  if (!res.ok) throw new WeatherError("Weather is unavailable right now.", "unavailable");
+  if (!res.ok) {
+    console.error(`weather: Open-Meteo answered ${res.status} ${res.statusText}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
+    throw new WeatherError("Weather is unavailable right now.", "unavailable");
+  }
   return (await res.json()) as OpenMeteo;
 }
 

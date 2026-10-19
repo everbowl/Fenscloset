@@ -20,7 +20,10 @@ import type { LaundryStatus, PhotoKind } from "@/generated/prisma/client";
 import { addItemPhotoAction, cycleLaundryAction, deleteItemAction, mirrorPhotoAction, notNowPhotoAction, removeItemPhotoAction, rotateItemPhotoAction, updateItemAction } from "./actions";
 import { unretireAction } from "../clean-out/actions";
 import { monoDate } from "@/lib/dates";
-import { FEATURE_KEYS, FEATURE_LABELS, isFeatureKey } from "@/lib/tryon/features";
+import { FEATURE_KEYS, FEATURE_LABELS, isFeatureKey, mirrorCanPlace } from "@/lib/tryon/features";
+import { MirrorSheet } from "@/components/mirror/mirror-sheet";
+import { useMirror } from "@/components/mirror/use-mirror";
+import type { MirrorConfig } from "@/lib/tryon/config";
 
 export type ItemView = {
   id: string; name: string; ownerId: string; ownerName: string; mine: boolean; status: string; laundryStatus: LaundryStatus;
@@ -51,9 +54,10 @@ function Title({ name }: { name: string }) {
 }
 
 /** Item detail: photo, serif title, mono meta, then every tag as a 42px row that edits in place. */
-export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }: { item: ItemView; lists: ItemLists; canEdit: boolean; canEditLists: boolean }) {
+export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists, mirror = null }: { item: ItemView; lists: ItemLists; canEdit: boolean; canEditLists: boolean; /** The signed-in person's mirror: "See it on me" dresses them in this one piece. */ mirror?: MirrorConfig | null }) {
   const router = useRouter();
   const [it, setIt] = useState(item);
+  const m = useMirror(mirror?.personId ?? "");
   const [lists, setLists] = useState(initialLists);
   const [sheet, setSheet] = useState<SheetKind>(null);
   const [photoIdx, setPhotoIdx] = useState(0);
@@ -117,6 +121,7 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
   return (
     <div className="-mt-5 lg:mt-0 lg:grid lg:grid-cols-[440px_minmax(0,1fr)] lg:gap-x-12 lg:gap-y-0">
       <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={onPhoto} data-testid="item-photo" />
+      {mirror ? <MirrorSheet m={m} pieces={it.name} mine personId={mirror.personId} personName={mirror.personName} tryOnState={mirror.tryOn} backPhoto={mirror.backPhoto} mannequinAvailable={mirror.mannequinAvailable} /> : null}
       <div className="relative -mx-5 h-[380px] bg-bone lg:mx-0 lg:h-[560px] lg:self-start lg:[grid-row:1/span_80]">
         {photo ? <img src={`/api/photo/${photo.key}`} alt={it.name} className="size-full object-contain" data-testid="item-hero" /> : null}
         {canEdit && photo ? (<>
@@ -140,6 +145,10 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
         {canEdit ? <button type="button" onClick={() => open("rename")} className="mono mono-11 py-2">Rename</button> : null}
       </div>
       <p className="mono mt-2 text-graphite">{[!it.mine ? it.ownerName : null, category?.name, it.status, it.isFavorite ? "Favorite" : null].filter(Boolean).join(" · ")}</p>
+      {/* This one piece in the mirror (Jeff, 19 Oct 2026, Q2 C): on you, or on the mannequin without a body photo. */}
+      {mirror && (mirror.tryOn === "ready" || mirror.mannequinAvailable) && !it.retired && mirrorCanPlace(category?.name) ? (
+        <Button variant="secondary" className="mt-3 w-full" disabled={m.busy} onClick={() => m.show({ look: { kind: "closet", itemIds: [it.id] }, on: mirror.tryOn === "ready" ? "me" : "mannequin" })} data-testid="see-on-me">{m.busy ? "Dressing…" : mirror.tryOn === "ready" ? "See it on me" : "See it on a mannequin"}</Button>
+      ) : null}
 
       {justAdded ? (
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-y border-line py-2" data-testid="ask-more-photos">

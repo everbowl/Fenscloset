@@ -5,6 +5,7 @@ import { getItemDetail, loadItemLists, statusWord } from "@/lib/items/query";
 import { canEditItem, canSeeWornPhoto } from "@/lib/people/visibility";
 import { ItemEditor } from "./item-editor";
 import { wearHistory } from "@/lib/fits/service";
+import { mirrorConfig } from "@/lib/tryon/config";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export default async function ItemPage({ params }: { params: Promise<{ itemId: s
   const { itemId } = await params;
   const item = await getItemDetail(itemId);
   if (!item) notFound();
-  const [lists, seeWorn, history] = await Promise.all([loadItemLists(person.id), canSeeWornPhoto(person, item.owner), wearHistory(item.id)]);
+  const [lists, seeWorn, history, mirror] = await Promise.all([loadItemLists(person.id), canSeeWornPhoto(person, item.owner), wearHistory(item.id), mirrorConfig(person)]);
   const photos = item.photos.filter((p) => p.kind !== "thumb" && (p.kind !== "worn" || seeWorn));
   return (
     <ItemEditor
@@ -44,6 +45,7 @@ export default async function ItemPage({ params }: { params: Promise<{ itemId: s
       lists={lists}
       canEdit={canEditItem(person, item.ownerId)}
       canEditLists={person.role === "admin"}
+      mirror={mirror}
     />
   );
 }

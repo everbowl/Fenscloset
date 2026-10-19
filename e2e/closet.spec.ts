@@ -59,4 +59,26 @@ test.describe("closet", () => {
     await expect(page.getByRole("heading", { name: /Olivia/ })).toBeVisible();
     await expect(page.getByText("0 pieces")).toBeVisible();
   });
+
+  test("mirror from the closet: tap Mirror, pick pieces, see them on a mannequin (no body photo yet); a piece's page has See it on", async ({ page }) => {
+    await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+    await page.goto("/closet");
+    await page.getByTestId("closet-mirror").click();
+    await expect(page.getByTestId("pick-bar")).toContainText("Tap the pieces");
+    await page.getByTestId("item-card").filter({ hasText: "White crew tee" }).click();
+    await page.getByTestId("item-card").filter({ hasText: "Dark jeans" }).click();
+    await expect(page.getByTestId("pick-bar")).toContainText("2 picked");
+    await page.getByTestId("see-picked").click();
+    await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("dialog")).toContainText("White crew tee · Dark jeans");
+    await expect(page.getByTestId("try-on-sheet")).toContainText("No body photo used");
+    await expect(page.getByTestId("try-on-sheet").locator("img")).toHaveAttribute("src", /\/api\/photo\/mannequin\//);
+    await expect(page.getByTestId("retake-body-photo")).toHaveText("Add photo"); // no body photo: the mirror offers it right here
+    await page.keyboard.press("Escape");
+    await page.getByTestId("pick-cancel").click();
+    await page.getByTestId("item-card").filter({ hasText: "White crew tee" }).click();
+    await page.getByTestId("see-on-me").click();
+    await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("dialog")).toContainText("White crew tee");
+  });
 });

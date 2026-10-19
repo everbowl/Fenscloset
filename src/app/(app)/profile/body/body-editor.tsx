@@ -113,7 +113,7 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, brands, categor
         ) : (
           <>
             {isMinor && body.photosApprovedBy ? <p className="mono py-2 text-graphite">Approved by {body.photosApprovedBy} · seen by {ownerFirst} and parents only</p> : null}
-            <p className="mono py-2 normal-case text-graphite">Four photos: front, back, left, right. Swimwear or underwear, phone at chest height, plain wall. The mirror uses the front; the back shows how a piece fits from behind. Retake them as your body changes: the newest of each is used, the rest stay as history.</p>
+            <p className="mono py-2 normal-case text-graphite" data-testid="body-tip">Four photos: front, back, left, right. Wear a plain fitted t-shirt and long pants, not swimwear: the mirror swaps the clothes it can see on you, so it needs clothes to swap. Phone at chest height, plain wall, arms a little away from your sides. The mirror uses the front; the back shows how a piece fits from behind. Retake them as your body changes: the newest of each is used, the rest stay as history.</p>
             <div className="grid grid-cols-4 gap-1.5 pt-1" data-testid="body-slots">
               {(["front", "back", "left", "right"] as const).map((v) => {
                 const p = body.photos.find((x) => x.view === v) ?? (v === "left" ? body.photos.find((x) => x.view === "side") : undefined); // newest first from the server

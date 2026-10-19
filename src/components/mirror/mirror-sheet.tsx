@@ -1,0 +1,147 @@
+"use client";
+
+/* eslint-disable @next/next/no-img-element */
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Sheet } from "@/components/ui/sheet";
+import { Banner } from "@/components/ui/banner";
+import { shrinkPhoto } from "@/lib/import/client-queue";
+import { addBodyPhotoAction } from "@/app/(app)/profile/actions";
+import type { TryOnState } from "@/lib/tryon";
+import type { Mirror } from "./use-mirror";
+
+/**
+ * "In the mirror": the look on the person's own body photo (theirs alone) or on the shared mannequin,
+ * with the view row (on me, from behind, mannequin), the styling chips (pose, tuck, buttons…), "Dress
+ * again", and the body photo right there (Jeff, 19 Oct 2026: the mirror must never send him away to
+ * fix something it needs). Shared by Today, the closet's pick mode and a piece's page.
+ */
+export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState, backPhoto, mannequinAvailable }: {
+  m: Mirror;
+  /** The pieces in the look, for the line under the picture ("White tee · Dark jeans"). */
+  pieces: string;
+  /** The person in the mirror is the one signed in (a parent dressing a minor's mannequin is not). */
+  mine: boolean;
+  personId: string;
+  personName: string;
+  tryOnState: TryOnState;
+  backPhoto: boolean;
+  mannequinAvailable: boolean;
+}) {
+  const router = useRouter();
+  const t = m.tryOn;
+  const [secs, setSecs] = useState(0);
+  const startedAt = m.progress?.startedAt ?? null;
+  useEffect(() => {
+    if (startedAt === null) return;
+    setSecs(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+    const id = setInterval(() => setSecs(Math.max(0, Math.floor((Date.now() - startedAt) / 1000))), 1000);
+    return () => clearInterval(id);
+  }, [startedAt]);
+
+  // The body photo, taken again (or added) without leaving the mirror; the look is then dressed on it.
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [saving, setSaving] = useState(false);
+  async function onPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]; e.target.value = "";
+    if (!file || !m.look) return;
+    setSaving(true); m.setError(undefined);
+    try {
+      const blob = await shrinkPhoto(file);
+      const signRes = await fetch("/api/uploads/sign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contentType: blob.type || "image/jpeg", kind: "bodies", ownerId: personId }) });
+      const signed = (await signRes.json()) as { key: string; url: string; headers: Record<string, string>; error?: string };
+      if (!signRes.ok) throw new Error(signed.error || "Upload failed.");
+      const put = await fetch(signed.url, { method: "PUT", headers: signed.headers, body: blob });
+      if (!put.ok) throw new Error("Upload failed.");
+      const view = m.on === "me" ? m.view : "front";
+      const r = await addBodyPhotoAction(personId, signed.key, false, view);
+      if (!r.ok) throw new Error(r.error);
+      router.refresh();
+      void m.dress({ look: m.look, on: "me", view });
+    } catch (err) { m.setError((err as Error).message); } finally { setSaving(false); }
+  }
+
+  const onMe = Boolean(t) && !t?.mannequin;
+  const views = tryOnState === "ready" && (mannequinAvailable || backPhoto)
+    ? ([["front", "On me"], ...(backPhoto ? [["back", "From behind"]] : []), ...(mannequinAvailable ? [["mannequin", "Mannequin"]] : [])] as [string, string][])
+    : [];
+  const photoRow = mine && (tryOnState === "ready" ? (onMe || !t) : tryOnState === "no_photo");
+
+  return (
+    <Sheet open={m.open} onClose={() => m.setOpen(false)} title="In the mirror">
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPhoto} data-testid="mirror-body-photo" />
+      {m.error ? <Banner tone="danger" title={m.error} className="mb-3" /> : null}
+      {t || m.busy ? (
+        <div className="flex flex-col gap-3" {...(t ? { "data-testid": "try-on-sheet" } : {})}>
+          <div className="relative h-[460px] overflow-hidden bg-bone">
+            {t ? <img src={`/api/photo/${t.key}`} alt={t.mannequin ? "This look on a mannequin" : "You wearing this look"} className={`size-full object-contain ${m.busy ? "opacity-40" : ""}`} /> : <div className="mx-auto h-full w-[200px] py-10"><MirrorGlyph /></div>}
+            {m.busy && m.progress ? (
+              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-paper/95 px-3 py-2.5" data-testid="mirror-progress" aria-live="polite">
+                <span className="mono text-[11px] uppercase tracking-[0.18em]">{m.progress.step}</span>
+                <span className="mono shrink-0 text-graphite">{secs}s</span>
+              </div>
+            ) : null}
+          </div>
+          {m.busy ? <p className="mono text-graphite">Usually 20 to 60 seconds. You can leave this screen; the picture is kept and waits for you.</p> : null}
+          <p className="mono text-graphite">{pieces}</p>
+          {t?.styling?.summary ? <p className="mono text-ink" data-testid="styling-summary">{t.styling.summary}{t.stylingFailed ? " · didn’t take this time, showing the plain try-on" : ""}</p> : null}
+          {t ? <p className="mono text-ink">{t.mannequin ? `On a mannequin · No body photo used${mine ? "" : ` · ${personName}’s look`}` : `On you${t.view === "back" ? " · from behind" : ""} · Only you can see this picture`}{t.cached ? " · saved from before" : ""}</p> : null}
+          {t?.note ? <p className="mono text-graphite" data-testid="mirror-note">{t.note}</p> : null}
+          {t ? (
+            <div className="flex items-center justify-between gap-3">
+              <button type="button" disabled={m.busy} onClick={m.redo} className="mono mono-11 h-9 shrink-0 whitespace-nowrap border border-ink px-4 disabled:opacity-60" data-testid="redo-tryon" title="Throw away the saved pictures of this look and dress it from scratch">{m.busy ? "Dressing…" : "Dress again"}</button>
+              <span className="mono text-graphite">Not right? Dress it from scratch</span>
+            </div>
+          ) : null}
+          {views.length ? (
+            <div className="flex flex-wrap gap-1.5" data-testid="mirror-views">
+              {views.map(([v, word]) => {
+                const current = v === "mannequin" ? m.on === "mannequin" : m.on === "me" && m.view === v;
+                return (
+                  <button key={v} type="button" disabled={m.busy} aria-pressed={current} onClick={() => { if (!current) m.switchTo(v as "front" | "back" | "mannequin"); }} className={`mono mono-11 h-9 px-4 ${current ? "bg-ink text-paper" : "border border-ink"}`} data-testid={`mirror-${v}`}>{word}</button>
+                );
+              })}
+            </div>
+          ) : null}
+          {/* The body photo, right here: a plain fitted t-shirt and pants, because the model swaps the clothes it can see (swimwear gave it nothing to swap). */}
+          {photoRow ? (
+            <div className="flex items-center justify-between gap-3 border-t border-line pt-3" data-testid="mirror-photo-row">
+              <span className="mono text-graphite">{tryOnState === "ready" ? "Your body photo · a plain fitted t-shirt and pants work best" : "See it on you · add a full-body photo in a plain fitted t-shirt and pants"}</span>
+              <button type="button" disabled={m.busy || saving} onClick={() => fileRef.current?.click()} className="mono mono-11 h-9 shrink-0 border border-ink px-3 disabled:opacity-60" data-testid="retake-body-photo">{saving ? "Saving…" : tryOnState === "ready" ? "Retake" : "Add photo"}</button>
+            </div>
+          ) : null}
+          {/* How it shows: pose, tuck, buttons… one tap re-styles the same dressed picture (no second dressing). Lists live under Admin → Lists. */}
+          {t?.styling && (t.styling.poses.length > 1 || t.styling.groups.length) ? (
+            <div className="flex flex-col gap-3 border-t border-line pt-3" data-testid="mirror-styling">
+              {[...(t.styling.poses.length > 1 ? [{ id: "pose", name: "Pose", chosen: t.styling.poseId ?? "", options: t.styling.poses }] : []), ...t.styling.groups].map((g) => (
+                <div key={g.id} className="flex flex-col gap-1.5" data-testid={`style-group-${g.id === "pose" ? "pose" : g.name.toLowerCase().replace(/\s+/g, "-")}`}>
+                  <span className="mono text-graphite">{g.name}</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {g.options.map((o) => {
+                      const current = o.id === g.chosen;
+                      return (
+                        <button key={o.id} type="button" disabled={m.busy} aria-pressed={current} onClick={() => { if (!current) m.restyle(g.id === "pose" ? { poseId: o.id } : { options: { [g.id]: o.id } }); }} className={`mono mono-11 h-9 px-3 ${current ? "bg-ink text-paper" : "border border-ink"}`} data-testid={`style-${o.id}`}>{o.name}</button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </Sheet>
+  );
+}
+
+/** A simple mirror: an arched frame with a glint, for the empty mirror before the first look. */
+export function MirrorGlyph() {
+  return (
+    <svg viewBox="0 0 100 150" className="size-full" aria-hidden>
+      <path d="M22 140 C22 60 30 22 50 22 C70 22 78 60 78 140" fill="none" stroke="#1A1A1A" strokeWidth="1.5" />
+      <path d="M36 60 L52 40" stroke="#1A1A1A" strokeWidth="2" strokeLinecap="round" />
+      <path d="M40 76 L62 50" stroke="#1A1A1A" strokeWidth="1.2" strokeLinecap="round" />
+      <text x="50" y="128" textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="9" fill="#1A1A1A" letterSpacing="1.5">YOU</text>
+    </svg>
+  );
+}

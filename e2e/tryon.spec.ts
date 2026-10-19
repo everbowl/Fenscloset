@@ -67,4 +67,18 @@ test("try-on: on by default, needs a body photo, then a picture of the look on y
   await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 });
   await page.getByTestId("mirror-back").click();
   await expect(page.getByTestId("try-on-sheet")).toContainText("from behind", { timeout: 20_000 });
+  await page.keyboard.press("Escape");
+
+  // the closet: pick a piece, see it on you; the body photo is taken again right in the mirror and the look is dressed on it
+  await page.goto("/closet");
+  await page.getByTestId("closet-mirror").click();
+  await page.getByTestId("item-card").filter({ hasNotText: "Not in the mirror" }).first().click();
+  await page.getByTestId("see-picked").click();
+  await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("try-on-sheet")).toContainText("Only you can see this picture");
+  const beforeRetake = await page.getByTestId("try-on-sheet").locator("img").getAttribute("src");
+  await expect(page.getByTestId("retake-body-photo")).toHaveText("Retake");
+  await page.getByTestId("mirror-body-photo").setInputFiles({ name: "me2.jpg", mimeType: "image/jpeg", buffer });
+  await expect(page.getByTestId("try-on-sheet").locator("img")).not.toHaveAttribute("src", beforeRetake!, { timeout: 20_000 });
+  await expect(page.getByTestId("try-on-sheet")).toContainText("Only you can see this picture");
 });

@@ -5,6 +5,7 @@ import { googleTryOn, isGoogleTryOnConfigured, TryOnModelError } from "@/lib/try
 import { googleImage } from "@/lib/images/smooth";
 import { checkRender, checkWholeGarment, isGarmentCheckAvailable } from "@/lib/tryon/garment-check";
 import { loadPrefs, loadStylingLists, lookFeatures, resolveStyling, savePrefs, stylingPrompt, type Styling, type StylingChoice, type StylingLists } from "@/lib/tryon/styling";
+import { MIRROR_CATEGORIES } from "@/lib/tryon/features";
 import type { Viewer } from "@/lib/people/visibility";
 
 /**
@@ -66,8 +67,10 @@ export async function forgetTryOns(itemId: string): Promise<number> {
 }
 
 export const MAX_GARMENTS = 3;
-/** Garment order that reads best on a body: outer layer last. */
-const ORDER = ["Tops", "Dresses", "Bottoms", "Shoes", "Outerwear"];
+/** Garment order that reads best on a body: outer layer last (src/lib/tryon/features.ts, shared with the closet's pick mode). */
+const ORDER: readonly string[] = MIRROR_CATEGORIES;
+/** Progress reports while a look is dressed ("Dressing you · Oxford", "Checking the picture…"), shown in the mirror while it runs. */
+export type DressingHooks = { step?: (step: string) => void };
 
 export function isTryOnConfigured(): boolean {
   return process.env.MOCK_TRYON === "true" || isGoogleTryOnConfigured();
@@ -167,7 +170,8 @@ export async function garmentImages(itemIds: string[], back = false): Promise<{ 
  * image pass), so changing a chip never re-dresses the body. `pick` is this call's change, remembered
  * for next time. `extraFeatures` describes a garment that is not an item (a shop candidate).
  */
-export async function tryOnLook(viewer: Viewer, personId: string, itemIds: string[], source: string, extraGarment?: Buffer, view: BodyViewSide = "front", pick?: StylingChoice, extraFeatures: string[] = [], fresh = false): Promise<TryOnView> {
+export async function tryOnLook(viewer: Viewer, personId: string, itemIds: string[], source: string, extraGarment?: Buffer, view: BodyViewSide = "front", pick?: StylingChoice, extraFeatures: string[] = [], fresh = false, hooks: DressingHooks = {}): Promise<TryOnView> {
+  const step = (s: string) => hooks.step?.(s);
   await assertReady(viewer, personId);
   // Front: the front photo, else the newest photo of any view. Back: only a back photo will do.
   const photo = view === "back"
@@ -197,10 +201,12 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
     if (!garments.length) throw new TryOnError("None of these pieces has a photo the try-on can use.");
     const body = await sharp((await getObject(photo.bucketKey)).body).rotate().resize(1024, 1024, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
     person = body;
+    step(`Dressing you · ${garments.map((g) => g.name).join(", ")}`);
     if (process.env.MOCK_TRYON === "true") {
       person = await mockTryOn(person, garments.map((g) => g.buf));
     } else {
       for (const g of garments) {
+        step(`Dressing you · ${g.name}`);
         const garment = await sharp(g.buf).flatten({ background: "#ffffff" }).resize(1024, 1024, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
         let out: { data: Buffer };
         try { out = await googleTryOn(person, garment); } catch (e) {
@@ -214,11 +220,14 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
     // person once more with the pieces named, and the first picture that passes is kept. Neither passing: the try-on's
     // picture stays, with what the check saw under it, rather than nothing at all.
     let note: string | null = null;
+    step("Checking the picture…");
     const verdict = await renderVerdict(person, garments);
     if (!verdict.ok) {
       console.log(`tryon: render check: ${verdict.problem}; dressing again with the image model`);
+      step("Dressing again…");
       try {
         const again = process.env.MOCK_TRYON === "true" ? await mockStyle(person) : await sharp(await googleImage([{ data: body, mimeType: "image/jpeg" }, ...(await Promise.all(garments.map(async (g) => ({ data: await sharp(g.buf).flatten({ background: "#ffffff" }).resize(1024, 1024, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer(), mimeType: "image/jpeg" as const }))))], dressPrompt(garments.map((g) => g.name)), fetch, { relaxed: true })).jpeg({ quality: 90 }).toBuffer();
+        step("Checking again…");
         const second = await renderVerdict(again, garments);
         if (second.ok) person = again;
         else { note = `The mirror isn’t sure about this one: ${second.problem ?? verdict.problem}`; console.log(`tryon: second render check: ${second.problem}`); }
@@ -232,6 +241,7 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
   if (!styling.instructions.length) return pack(raw, rawCached);
   // The styling pass: pose and wear choices on the dressed picture. If it fails, the plain try-on is shown.
   let styledBuf: Buffer;
+  step(`Styling · ${styling.summary}`);
   try {
     // An adult's own body picture (assertReady keeps minors out): Google's filters are loosened for this pass only.
     styledBuf = process.env.MOCK_TRYON === "true" ? await mockStyle(person) : await sharp(await googleImage([{ data: person, mimeType: "image/jpeg" }], stylingPrompt(styling.instructions), fetch, { relaxed: true })).jpeg({ quality: 90 }).toBuffer();
@@ -241,6 +251,7 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
   }
   // The styling pass is an edit by the image model and can re-draw a piece (a crew neck came back as a polo): the styled
   // picture gets the same check as the dressed one, and when a piece changed, the verified picture is shown instead.
+  step("Checking the styled picture…");
   const styledGarments = await garmentImages(ids, view === "back");
   const styledVerdict = await renderVerdict(styledBuf, styledGarments);
   if (!styledVerdict.ok) { console.log(`tryon: styled picture failed the check (${styledVerdict.problem}); showing the plain try-on`); return pack(raw, rawCached, true); }

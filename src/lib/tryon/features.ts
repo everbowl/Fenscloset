@@ -40,6 +40,13 @@ export type Styling = {
   groups: { id: string; name: string; chosen: string; options: { id: string; name: string }[] }[];
 };
 
+/** The kinds of pieces the try-on model can place on a body, in the order they go on (outer layer last). Hats, bags and jewelry can't be placed. */
+export const MIRROR_CATEGORIES = ["Tops", "Dresses", "Bottoms", "Shoes", "Outerwear"] as const;
+/** Can the mirror dress someone in a piece of this category? An untyped piece is given the benefit of the doubt. */
+export function mirrorCanPlace(category: string | null | undefined): boolean {
+  return !category || (MIRROR_CATEGORIES as readonly string[]).includes(category);
+}
+
 /** Which kinds of pieces count as a top, a bottom, or an outer layer when a group's `needs` asks for one. */
 const TOP_CATEGORIES = new Set(["Tops", "Activewear", "Dresses", "Swimwear", "Sleepwear"]);
 const BOTTOM_CATEGORIES = new Set(["Bottoms"]);

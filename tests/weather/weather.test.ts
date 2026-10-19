@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
-import { conditionWord, geocodeZip, getWeather, summarize, weatherLine } from "@/lib/weather";
+import { conditionWord, forgetWeatherFailures, geocodeZip, getWeather, summarize, weatherLine } from "@/lib/weather";
 import { dayKey, hourIn, monoDate, addDays, clock } from "@/lib/dates";
 
 const sample = {
@@ -40,6 +40,15 @@ describe("weather", () => {
     expect(w.nowF).toBe(68);
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
+  });
+
+  it("a failed forecast is not asked for again for a while: Today renders several times at once", async () => {
+    forgetWeatherFailures();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("busy", { status: 429, statusText: "Too Many Requests" }));
+    await expect(getWeather({ lat: 40, lon: -74 })).rejects.toMatchObject({ code: "unavailable" });
+    await expect(getWeather({ lat: 40, lon: -74 })).rejects.toMatchObject({ code: "unavailable" });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    fetchSpy.mockRestore(); forgetWeatherFailures();
   });
 
   it("date helpers follow the household time zone", () => {

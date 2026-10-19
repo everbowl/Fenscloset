@@ -6,9 +6,10 @@ import { PageHeader } from "@/components/ui/page-header";
 import { listEntries } from "@/lib/lists/service";
 import { resolveView, VIEW_COOKIE } from "@/lib/people/visibility";
 import { countClosetItems, listClosetItems } from "@/lib/items/query";
-import { ItemCard } from "@/components/item-card";
+import { mirrorConfig } from "@/lib/tryon/config";
 import { FilterTabs } from "@/components/filter-tabs";
 import { ClosetSearch } from "@/components/closet-search";
+import { ClosetGrid } from "./closet-grid";
 
 export const metadata = { title: "Closet" };
 export const dynamic = "force-dynamic";
@@ -21,6 +22,8 @@ export default async function ClosetPage({ searchParams }: { searchParams: Promi
   const categoryId = cat && categories.some((c) => c.id === cat) ? cat : undefined;
   const [items, total] = await Promise.all([listClosetItems(view, { categoryId, q }), countClosetItems(view)]);
   const mine = view.kind === "person" && view.personId === person.id;
+  // The mirror's pick mode: from your own closet or the Family closet, the pieces go on you (or the mannequin).
+  const mirror = mine || view.kind === "family" ? await mirrorConfig(person) : null;
 
   return (
     <div>
@@ -28,9 +31,7 @@ export default async function ClosetPage({ searchParams }: { searchParams: Promi
       <PageHeader title={view.kind === "family" ? "Family" : mine ? "Closet" : view.name} accent={view.kind === "family" ? "closet" : mine ? undefined : "closet"} aside={`${total} ${total === 1 ? "piece" : "pieces"}`} />
       <FilterTabs categories={categories} active={categoryId} basePath="/closet" q={q} canEdit={isAdmin(person)} />
       {items.length ? (
-        <div className="mt-4 grid grid-cols-2 gap-x-2.5 gap-y-[18px] lg:grid-cols-4 lg:gap-x-4 lg:gap-y-7">
-          {items.map((it) => <ItemCard key={it.id} item={it} showOwner={view.kind === "family"} />)}
-        </div>
+        <ClosetGrid items={items} showOwner={view.kind === "family"} mirror={mirror} />
       ) : (
         <div className="mt-4">
           <div className="grid grid-cols-2 gap-x-2.5 gap-y-[18px]">

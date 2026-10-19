@@ -78,6 +78,25 @@ describe("virtual try-on", () => {
     expect((await tryOnLook(jeff, jeff.id, [shoes.id], "today", undefined, "back")).id).toBe(b.id); // cached per body photo
   });
 
+  it("reports its steps while it dresses (the mirror shows them); a cached look reports nothing", async () => {
+    const jeff = await by("Jeff");
+    const bodyKey = newKey("bodies", jeff.id, "image/jpeg"); await putObject(bodyKey, await jpeg(), "image/jpeg");
+    await db.bodyPhoto.create({ data: { personId: jeff.id, bucketKey: bodyKey, view: "front" } });
+    const cat = (n: string) => db.category.findFirstOrThrow({ where: { name: n } });
+    const pic = async () => { const k = newKey("originals", jeff.id, "image/jpeg"); await putObject(k, await jpeg(90), "image/jpeg"); return k; };
+    const tee = await db.item.create({ data: { ownerId: jeff.id, name: "Tee", categoryId: (await cat("Tops")).id, photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
+    const jeans = await db.item.create({ data: { ownerId: jeff.id, name: "Jeans", categoryId: (await cat("Bottoms")).id, photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
+    const steps: string[] = [];
+    await tryOnLook(jeff, jeff.id, [tee.id, jeans.id], "closet", undefined, "front", undefined, [], false, { step: (s) => steps.push(s) });
+    expect(steps[0]).toBe("Dressing you · Tee, Jeans");
+    expect(steps).toContain("Checking the picture…");
+    expect(steps.some((s) => s.startsWith("Styling · ") && s.includes("Untucked"))).toBe(true);
+    expect(steps.at(-1)).toBe("Checking the styled picture…");
+    const again: string[] = [];
+    await tryOnLook(jeff, jeff.id, [tee.id, jeans.id], "closet", undefined, "front", undefined, [], false, { step: (s) => again.push(s) });
+    expect(again).toEqual([]);
+  });
+
   it("styling: untucked by default on a top + bottom look, one raw picture plus one styled per set of choices; a pick is remembered", async () => {
     const jeff = await by("Jeff");
     await setTryOnEnabled(jeff, jeff.id, true);
