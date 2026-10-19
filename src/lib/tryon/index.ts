@@ -239,6 +239,11 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
     console.error("styling pass failed", e);
     return pack(raw, rawCached, true);
   }
+  // The styling pass is an edit by the image model and can re-draw a piece (a crew neck came back as a polo): the styled
+  // picture gets the same check as the dressed one, and when a piece changed, the verified picture is shown instead.
+  const styledGarments = await garmentImages(ids, view === "back");
+  const styledVerdict = await renderVerdict(styledBuf, styledGarments);
+  if (!styledVerdict.ok) { console.log(`tryon: styled picture failed the check (${styledVerdict.problem}); showing the plain try-on`); return pack(raw, rawCached, true); }
   const key = newKey("tryon", personId, "image/jpeg");
   await putObject(key, styledBuf, "image/jpeg");
   const row = await db.tryOn.create({ data: { personId, bucketKey: key, itemIds: cacheIds, bodyPhotoKey: photo.bucketKey, source, styling: styling.key, note: raw.note } });
