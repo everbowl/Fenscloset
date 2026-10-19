@@ -44,7 +44,15 @@ export type RawTags = {
   brandText: string | null;
   sizeText: string | null;
   confidence: number;
+  /** How the photo must turn so the piece hangs the way it is worn (collar, waistband or hood at the top). */
+  orientation?: Orientation;
 };
+
+export type Orientation = "upright" | "rotate_right" | "rotate_left" | "upside_down";
+/** Degrees clockwise that fix the photo, 0 when it is already upright. */
+export function rotationFor(o: Orientation | string | null | undefined): 0 | 90 | 180 | 270 {
+  return o === "rotate_right" ? 90 : o === "upside_down" ? 180 : o === "rotate_left" ? 270 : 0;
+}
 
 const UNKNOWN = "unknown";
 
@@ -69,7 +77,7 @@ export function tagSchema(lists: TagLists): Record<string, unknown> {
   return {
     type: "object",
     additionalProperties: false,
-    required: ["name", "category", "subcategory", "colors", "pattern", "fabric", "fabricConfidence", "seasons", "formality", "brandText", "sizeText", "confidence"],
+    required: ["name", "category", "subcategory", "colors", "pattern", "fabric", "fabricConfidence", "seasons", "formality", "brandText", "sizeText", "confidence", "orientation"],
     properties: {
       name: { type: "string", description: "Short item name a person would use, e.g. 'Black ribbed tank', 'Levi's 501 jeans'. 2–6 words." },
       category: { type: "string", enum: withUnknown(lists.categories) },
@@ -83,6 +91,7 @@ export function tagSchema(lists: TagLists): Record<string, unknown> {
       brandText: { type: ["string", "null"], description: "Brand if a logo or label is readable, else null." },
       sizeText: { type: ["string", "null"], description: "Size if a label is readable (S, M, 28, 8…), else null." },
       confidence: { type: "number", description: "0 to 1: overall confidence that category and colors are right." },
+      orientation: { type: "string", enum: ["upright", "rotate_right", "rotate_left", "upside_down"], description: "Is the piece shown the way it is worn (collar, waistband, hood or neckline at the TOP of the photo; shoes sole down)? If not, which single turn fixes it: rotate_right = turn the photo 90° clockwise, rotate_left = 90° counterclockwise, upside_down = 180°. Bags, hats and accessories with no clear top are upright." },
     },
   };
 }
@@ -136,6 +145,7 @@ function mockRaw(lists: TagLists): RawTags {
     brandText: null,
     sizeText: null,
     confidence: 0.9,
+    orientation: (process.env.MOCK_ORIENTATION as Orientation | undefined) || "upright",
   };
 }
 

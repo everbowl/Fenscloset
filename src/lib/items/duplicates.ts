@@ -8,6 +8,8 @@ const PHOTO_MAX_DISTANCE = 10;
 /**
  * "Looks like one you own": a near-identical photo hash, or the same category + first color + brand.
  * Two different black tees are NOT a match unless the hash says so (brand is required for the tag rule).
+ * A photo match never crosses item types: when both the new photo and the piece have a category, they
+ * must agree (gray sweats on white and a tee on white hash alike, but are not the same piece).
  */
 export async function findLikelyDuplicate(personId: string, probe: { phash: string | null; categoryId: string | null; colorIds: string[]; brandId: string | null }, excludeItemId?: string): Promise<DuplicateHint | null> {
   const items = await db.item.findMany({
@@ -20,6 +22,7 @@ export async function findLikelyDuplicate(personId: string, probe: { phash: stri
   if (probe.phash) {
     for (const it of items) {
       if (!it.phash) continue;
+      if (probe.categoryId && it.categoryId && it.categoryId !== probe.categoryId) continue;
       const d = hamming(probe.phash, it.phash);
       if (d <= PHOTO_MAX_DISTANCE && (!best || d < best.score)) best = { itemId: it.id, name: it.name, thumbKey: it.photos[0]?.bucketKey ?? null, score: d, reason: "photo" };
     }

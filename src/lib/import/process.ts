@@ -1,9 +1,10 @@
 import { db } from "@/lib/db";
-import { getObject, newKey, NotFoundError, putObject } from "@/lib/storage";
+import { deleteObject, getObject, newKey, NotFoundError, putObject } from "@/lib/storage";
 import { removeBackground, RemoveBgError } from "@/lib/images/remove-bg";
 import { fitCutout, makeThumb, normalizeOriginal, toAiImage } from "@/lib/images/thumb";
 import { phash } from "@/lib/images/phash";
-import { loadTagLists, tagItem, type TagResult } from "@/lib/ai/tag-item";
+import { loadTagLists, rotationFor, tagItem, type TagResult } from "@/lib/ai/tag-item";
+import { rotateImage } from "@/lib/images/rotate";
 import { readLabel } from "@/lib/ai/read-label";
 import { AiError } from "@/lib/ai/claude";
 import type { ImportEntry } from "@/generated/prisma/client";
@@ -53,15 +54,28 @@ export async function processEntry(entryId: string): Promise<ProcessOutcome> {
       } else throw e;
     }
 
-    const source = cutout ?? normalized;
-    const thumb = await makeThumb(source);
-    const thumbKey = newKey("thumbs", ownerId, "image/jpeg");
-    await putObject(thumbKey, thumb, "image/jpeg");
-    const hash = await phash(source);
+    let source = cutout ?? normalized;
 
     const lists = await loadTagLists();
     let tags = await tagItem({ image: await toAiImage(source), lists });
     if (entry.storeMeta) tags = applyStoreMeta(tags, entry.storeMeta as StoreMeta, lists);
+
+    // Auto-upright: a phone held sideways leaves the piece lying on its side; Claude says which turn fixes it.
+    const deg = rotationFor(tags.raw.orientation);
+    if (deg) {
+      const type = cutout ? "image/png" : "image/jpeg";
+      source = await rotateImage(source, deg, type);
+      const fixedKey = newKey("cutouts", ownerId, type);
+      await putObject(fixedKey, source, type);
+      if (cutoutKey) await deleteObject(cutoutKey).catch(() => undefined);
+      cutoutKey = fixedKey;
+      warnings.push(`auto_rotated:${deg}`);
+    }
+
+    const thumb = await makeThumb(source);
+    const thumbKey = newKey("thumbs", ownerId, "image/jpeg");
+    await putObject(thumbKey, thumb, "image/jpeg");
+    const hash = await phash(source);
     const aiResult: EntryAiResult = { tags, warnings };
 
     await db.importEntry.update({

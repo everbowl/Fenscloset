@@ -172,7 +172,10 @@ export function emptyTags(): TagResult {
 
 // ---------- Item detail editing ----------
 
-import { deleteObject } from "@/lib/storage";
+import { deleteObject, getObject, newKey, putObject, type PhotoKeyKind } from "@/lib/storage";
+import { quarterTurn, rotateImage, type RotateDirection } from "@/lib/images/rotate";
+import { makeThumb } from "@/lib/images/thumb";
+import { phash } from "@/lib/images/phash";
 import type { LaundryStatus } from "@/generated/prisma/client";
 
 export type ItemDetailEdits = ItemEdits & {
@@ -295,6 +298,40 @@ export async function removeItemPhoto(viewer: { id: string; role: string }, phot
     const next = await db.itemPhoto.findFirst({ where: { itemId: photo.itemId, kind: { in: ["cutout", "alone"] } }, orderBy: { createdAt: "asc" } });
     if (next) await db.itemPhoto.update({ where: { id: next.id }, data: { isPrimary: true } });
   }
+}
+
+/**
+ * ROTATE on a saved piece: a quarter turn of one photo (new key, old object removed). Turning the
+ * main photo also remakes the grid thumbnail and the duplicate hash.
+ */
+export async function rotateItemPhoto(viewer: { id: string; role: string }, photoId: string, dir: RotateDirection = "right"): Promise<{ photoId: string; key: string }> {
+  const photo = await db.itemPhoto.findUnique({ where: { id: photoId } });
+  if (!photo) throw new ItemError("That photo is gone.", 404);
+  const item = await ownedItem(viewer, photo.itemId);
+  const deg = quarterTurn(dir);
+  const type = photo.bucketKey.endsWith(".png") ? "image/png" : "image/jpeg";
+  const out = await rotateImage((await getObject(photo.bucketKey)).body, deg, type);
+  const kindDir = /^(originals|worn|labels|cutouts|thumbs)\//.exec(photo.bucketKey)?.[1] as PhotoKeyKind | undefined;
+  const key = newKey(kindDir ?? "cutouts", item.ownerId, type);
+  await putObject(key, out, type);
+  const main = photo.isPrimary || photo.kind === "cutout" || photo.kind === "alone";
+  let thumbKey: string | null = null;
+  const oldThumb = main ? await db.itemPhoto.findFirst({ where: { itemId: item.id, kind: "thumb" } }) : null;
+  if (main && photo.isPrimary) {
+    thumbKey = newKey("thumbs", item.ownerId, "image/jpeg");
+    await putObject(thumbKey, await makeThumb(out), "image/jpeg");
+  }
+  await db.$transaction(async (tx) => {
+    await tx.itemPhoto.update({ where: { id: photoId }, data: { bucketKey: key, width: null, height: null } });
+    if (thumbKey) {
+      if (oldThumb) await tx.itemPhoto.update({ where: { id: oldThumb.id }, data: { bucketKey: thumbKey } });
+      else await tx.itemPhoto.create({ data: { itemId: item.id, kind: "thumb", bucketKey: thumbKey } });
+      await tx.item.update({ where: { id: item.id }, data: { phash: await phash(out) } });
+    }
+  });
+  await deleteObject(photo.bucketKey).catch(() => {});
+  if (thumbKey && oldThumb) await deleteObject(oldThumb.bucketKey).catch(() => {});
+  return { photoId, key };
 }
 
 /** Deletes the item and its photos from the bucket. */

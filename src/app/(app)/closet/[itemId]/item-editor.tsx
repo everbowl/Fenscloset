@@ -12,7 +12,7 @@ import { shrinkPhoto } from "@/lib/import/client-queue";
 import type { ItemLists } from "@/lib/items/query";
 import type { ItemDetailEdits } from "@/lib/items/service";
 import type { LaundryStatus, PhotoKind } from "@/generated/prisma/client";
-import { addItemPhotoAction, cycleLaundryAction, deleteItemAction, notNowPhotoAction, removeItemPhotoAction, updateItemAction } from "./actions";
+import { addItemPhotoAction, cycleLaundryAction, deleteItemAction, notNowPhotoAction, removeItemPhotoAction, rotateItemPhotoAction, updateItemAction } from "./actions";
 import { unretireAction } from "../clean-out/actions";
 import { monoDate } from "@/lib/dates";
 
@@ -97,7 +97,10 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
     <div className="-mt-5 lg:mt-0 lg:grid lg:grid-cols-[440px_minmax(0,1fr)] lg:gap-x-12 lg:gap-y-0">
       <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={onPhoto} data-testid="item-photo" />
       <div className="relative -mx-5 h-[380px] bg-bone lg:mx-0 lg:h-[560px] lg:self-start lg:[grid-row:1/span_80]">
-        {photo ? <img src={`/api/photo/${photo.key}`} alt={it.name} className="size-full object-contain" /> : null}
+        {photo ? <img src={`/api/photo/${photo.key}`} alt={it.name} className="size-full object-contain" data-testid="item-photo" /> : null}
+        {canEdit && photo ? (
+          <button type="button" disabled={pending} onClick={() => start(async () => { const r = await rotateItemPhotoAction(it.id, photo.id); if (!r.ok) setError(r.error); else setIt((x) => ({ ...x, photos: x.photos.map((p) => (p.id === r.value.photoId ? { ...p, key: r.value.key } : p)) })); })} className="mono mono-11 absolute bottom-2 right-2 bg-paper px-2.5 py-1.5 disabled:opacity-60" data-testid="rotate-photo" title="Turn the photo a quarter turn">Rotate ↻</button>
+        ) : null}
         <Link href="/closet" aria-label="Back to closet" className="absolute left-2 top-2 flex size-11 items-center justify-center bg-paper text-ink">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden><path d="M15 5l-7 7 7 7" /></svg>
         </Link>

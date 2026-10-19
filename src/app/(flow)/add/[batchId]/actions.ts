@@ -5,6 +5,7 @@ import { requirePerson } from "@/lib/auth/current";
 import { attachEntryPhoto, createItemFromEntry, ItemError, mergeIntoItem, saveEntryEdits, skipEntry, type ItemEdits, mirrorFromItem } from "@/lib/items/service";
 import { readBackForEntry, readLabelForEntry } from "@/lib/import/process";
 import { keepSmooth, smoothEntry } from "@/lib/import/smooth-entry";
+import { rotateEntry } from "@/lib/import/rotate-entry";
 import { SmoothError } from "@/lib/images/smooth";
 import { abandonBatch, ImportError } from "@/lib/import/service";
 import { parseKey } from "@/lib/storage";
@@ -71,6 +72,12 @@ export async function attachPhotoAction(entryId: string, kind: "label" | "worn" 
 export async function smoothEntryAction(entryId: string, strength: "normal" | "more" = "normal"): Promise<ActionResult<{ smoothKey: string }>> {
   const person = await requirePerson();
   try { return { ok: true, value: await smoothEntry(person.id, entryId, strength) }; } catch (e) { return fail(e); }
+}
+
+/** ROTATE: a quarter turn of the photo on the card. */
+export async function rotateEntryAction(entryId: string, dir: "right" | "left" = "right"): Promise<ActionResult<{ photoKey: string; smoothKey: string | null }>> {
+  const person = await requirePerson();
+  try { return { ok: true, value: await rotateEntry(person.id, entryId, dir) }; } catch (e) { return fail(e); }
 }
 
 export async function keepSmoothAction(batchId: string, entryId: string, keep: boolean): Promise<ActionResult<{ photoKey: string }>> {

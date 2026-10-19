@@ -62,6 +62,12 @@ test.describe("add clothes", () => {
     await dialog.getByRole("button", { name: "Save" }).click();
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Black crew tee");
 
+    // rotate: a quarter turn swaps in a new photo
+    const unturned = await page.getByTestId("confirm-photo").getAttribute("src");
+    await page.getByTestId("rotate").click();
+    await expect(page.getByTestId("rotate")).toHaveText(/Rotate/, { timeout: 20_000 });
+    await expect(page.getByTestId("confirm-photo")).not.toHaveAttribute("src", unturned!);
+
     // smooth wrinkles: parked until KEEP; the rename survives the back-photo re-read
     const before = await page.getByTestId("confirm-photo").getAttribute("src");
     await page.getByTestId("smooth").click();

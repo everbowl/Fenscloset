@@ -6,10 +6,10 @@ import sharp from "sharp";
 import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
 import { seed } from "../../prisma/seed";
-import { newKey, putObject } from "@/lib/storage";
+import { getObject, newKey, objectExists, putObject } from "@/lib/storage";
 import { getOrCreateOpenBatch, openBatch, registerEntry } from "@/lib/import/service";
 import { drainQueue } from "@/lib/import/queue";
-import { createItemFromEntry, mergeIntoItem, mirrorFromItem, saveEntryEdits, skipEntry } from "@/lib/items/service";
+import { createItemFromEntry, mergeIntoItem, mirrorFromItem, rotateItemPhoto, saveEntryEdits, skipEntry } from "@/lib/items/service";
 import { findLikelyDuplicate } from "@/lib/items/duplicates";
 import { loadTagLists } from "@/lib/ai/tag-item";
 import type { EntryAiResult } from "@/lib/import/process";
@@ -71,6 +71,24 @@ describe("confirm → item", () => {
     expect(await openBatch(jeffId)).toBeNull();
   });
 
+  it("ROTATE on a saved piece turns the main photo, remakes the thumbnail and hash, drops the old files", async () => {
+    const e = await readyEntry();
+    const item = await createItemFromEntry(jeffId, e.id);
+    const main = await db.itemPhoto.findFirstOrThrow({ where: { itemId: item.id, isPrimary: true } });
+    const thumb = await db.itemPhoto.findFirstOrThrow({ where: { itemId: item.id, kind: "thumb" } });
+    const r = await rotateItemPhoto({ id: jeffId, role: "admin" }, main.id, "right");
+    expect(r.key).not.toBe(main.bucketKey);
+    const meta = await sharp((await getObject(r.key)).body).metadata();
+    expect([meta.width, meta.height]).toEqual([700, 500]);
+    const thumbAfter = await db.itemPhoto.findUniqueOrThrow({ where: { id: thumb.id } });
+    expect(thumbAfter.bucketKey).not.toBe(thumb.bucketKey);
+    expect(await objectExists(main.bucketKey)).toBe(false);
+    expect(await objectExists(thumb.bucketKey)).toBe(false);
+    expect(await objectExists(thumbAfter.bucketKey)).toBe(true);
+    const after = await db.item.findUniqueOrThrow({ where: { id: item.id } });
+    expect(after.phash).toHaveLength(16);
+  });
+
   it("flags the same photo as a likely duplicate, not a different one, and SAME? merges photos", async () => {
     const first = await readyEntry(40, 0);
     const item = await createItemFromEntry(jeffId, first.id);
@@ -83,6 +101,10 @@ describe("confirm → item", () => {
     expect(dup?.reason).toBe("photo");
     const none = await findLikelyDuplicate(jeffId, { phash: other.phash, categoryId: probeA.categoryId, colorIds: probeA.colorIds, brandId: null });
     expect(none).toBeNull();
+    // the same-looking photo of a different kind of piece (gray sweats vs a tee on white) is not "one you own"
+    const bottoms = lists.categories.find((c) => c.name === "Bottoms")!;
+    expect(await findLikelyDuplicate(jeffId, { phash: again.phash, categoryId: bottoms.id, colorIds: probeA.colorIds, brandId: null })).toBeNull();
+    expect((await findLikelyDuplicate(jeffId, { phash: again.phash, categoryId: null, colorIds: [], brandId: null }))?.itemId).toBe(item.id);
     // tag rule needs a brand: same category + color alone is not enough
     const nike = lists.brands.find((b) => b.name === "Nike")!;
     expect(await findLikelyDuplicate(jeffId, { phash: null, categoryId: probeA.categoryId, colorIds: probeA.colorIds, brandId: nike.id })).toBeNull();

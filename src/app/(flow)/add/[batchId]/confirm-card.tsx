@@ -11,7 +11,7 @@ import type { Named, TagLists, TagResult } from "@/lib/ai/tag-item";
 import type { ItemEdits } from "@/lib/items/service";
 import type { DuplicateHint } from "@/lib/items/duplicates";
 import { shrinkPhoto } from "@/lib/import/client-queue";
-import { attachPhotoAction, confirmEntryAction, keepSmoothAction, mergeEntryAction, mirrorEntryAction, saveEditsAction, skipEntryAction, smoothEntryAction } from "./actions";
+import { attachPhotoAction, confirmEntryAction, keepSmoothAction, mergeEntryAction, mirrorEntryAction, rotateEntryAction, saveEditsAction, skipEntryAction, smoothEntryAction } from "./actions";
 import { PickSheet, Row, TextSheet } from "@/components/items/row-editor";
 import type { MyBrand } from "@/lib/profiles/brands";
 import { sizeFor } from "@/lib/profiles/size-options";
@@ -73,6 +73,16 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
   const [side, setSide] = useState<"front" | "back">("front");
   const shownKey = side === "back" && backKey ? backKey : smoothKey && !showBefore ? smoothKey : photoKey;
 
+  const [rotating, setRotating] = useState(false);
+  function rotate() {
+    setRotating(true); setError(undefined);
+    start(async () => {
+      const r = await rotateEntryAction(entry.id, "right");
+      setRotating(false);
+      if (!r.ok) { setError(r.error); return; }
+      setPhotoKey(r.value.photoKey); setSmoothKey(r.value.smoothKey);
+    });
+  }
   function smooth(strength: "normal" | "more" = "normal") {
     setError(undefined); setSmoothing(true); setSide("front"); setShowBefore(false);
     start(async () => {
@@ -172,8 +182,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
         <div className="absolute inset-x-0 bottom-0 h-[3px] bg-black/[0.12]"><div className="h-[3px] bg-ink" style={{ width: `${progress}%` }} /></div>
       </div>
 
-      {backKey || canSmooth ? (
-        <div className="flex min-h-[44px] items-center justify-between px-5 pt-2" data-testid="photo-tools">
+      <div className="flex min-h-[44px] items-center justify-between px-5 pt-2" data-testid="photo-tools">
           <div className="flex gap-1.5">
             {backKey ? (
               <>
@@ -182,6 +191,9 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
               </>
             ) : null}
           </div>
+          {side === "front" ? (
+            <button type="button" onClick={rotate} disabled={rotating || pending} className="mono mono-11 h-9 border border-ink px-3 disabled:opacity-60" data-testid="rotate" title="Turn the photo a quarter turn">{rotating ? "Turning…" : "Rotate ↻"}</button>
+          ) : null}
           {canSmooth && side === "front" ? (
             smoothKey ? (
               <div className="flex gap-1.5">
@@ -195,7 +207,6 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
             )
           ) : null}
         </div>
-      ) : null}
 
       {duplicate ? (
         <div className="mx-5 mt-3 flex items-center justify-between border-y border-ink py-2.5" data-testid="duplicate-row">
