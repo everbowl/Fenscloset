@@ -29,25 +29,39 @@ export function isSmoothConfigured(): boolean {
  * One Gemini image call: zero or more JPEG/PNG inputs plus a prompt, image bytes out. Shared by
  * SMOOTH and the mannequin (src/lib/tryon/mannequin.ts).
  */
-export async function googleImage(images: { data: Buffer; mimeType: "image/jpeg" | "image/png" }[], prompt: string, fetchImpl: typeof fetch = fetch): Promise<Buffer> {
+export async function googleImage(images: { data: Buffer; mimeType: "image/jpeg" | "image/png" }[], prompt: string, fetchImpl: typeof fetch = fetch, opts: { /** An adult's own body picture (the try-on styling pass): Google's filters are loosened for it (Jeff, 19 Oct 2026). Never set for a minor's look, the mannequin or garment photos, which keep Google's defaults. */ relaxed?: boolean } = {}): Promise<Buffer> {
   const project = process.env.GOOGLE_VERTEX_PROJECT!;
   const location = process.env.GOOGLE_VERTEX_SMOOTH_LOCATION || "global";
   const model = process.env.GOOGLE_VERTEX_SMOOTH_MODEL || "gemini-2.5-flash-image";
   const host = location === "global" ? "aiplatform.googleapis.com" : `${location}-aiplatform.googleapis.com`;
   const url = `https://${host}/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:generateContent`;
-  const res = await fetchImpl(url, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${await accessToken(fetchImpl)}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [...images.map((im) => ({ inlineData: { mimeType: im.mimeType, data: im.data.toString("base64") } })), { text: prompt }] }],
-      generationConfig: { responseModalities: ["IMAGE"], temperature: 0.2 },
-    }),
-    signal: AbortSignal.timeout(90_000),
-  });
+  // Relaxed (an adult's own body picture): the filters go as far off as Google lets this project. OFF first, then BLOCK_NONE,
+  // then BLOCK_ONLY_HIGH (never needs approval), then Google's defaults; a 400 on one level means the next is tried.
+  // GOOGLE_VERTEX_IMAGE_SAFETY pins the first level. Not relaxed: Google's defaults, nothing sent.
+  const CATEGORIES = ["HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_HATE_SPEECH", "HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_DANGEROUS_CONTENT"];
+  const thresholds: (string | null)[] = opts.relaxed ? [...new Set([process.env.GOOGLE_VERTEX_IMAGE_SAFETY || "OFF", "BLOCK_NONE", "BLOCK_ONLY_HIGH"]), null] : [null];
+  const token = await accessToken(fetchImpl);
+  let res: Response | null = null;
+  for (const [i, threshold] of thresholds.entries()) {
+    res = await fetchImpl(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [...images.map((im) => ({ inlineData: { mimeType: im.mimeType, data: im.data.toString("base64") } })), { text: prompt }] }],
+        generationConfig: { responseModalities: ["IMAGE"], temperature: 0.2 },
+        ...(threshold ? { safetySettings: CATEGORIES.map((category) => ({ category, threshold })) } : {}),
+      }),
+      signal: AbortSignal.timeout(90_000),
+    });
+    if (res.status === 400 && i < thresholds.length - 1) { console.log(`image: Google refused safety threshold ${threshold}; trying ${thresholds[i + 1] ?? "defaults"}`); continue; }
+    if (res.ok && opts.relaxed && i > 0) console.log(`image: safety threshold ${threshold ?? "defaults"}`);
+    break;
+  }
+  if (!res) throw new SmoothError("Google image: nothing to call", 502);
   if (!res.ok) throw new SmoothError(`Google image ${res.status}: ${(await res.text()).slice(0, 200)}`, 502);
-  const json = (await res.json()) as { candidates?: { content?: { parts?: { inlineData?: { data?: string } }[] } }[] };
+  const json = (await res.json()) as { candidates?: { finishReason?: string; content?: { parts?: { inlineData?: { data?: string } }[] } }[]; promptFeedback?: { blockReason?: string } };
   const part = json.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
-  if (!part?.inlineData?.data) throw new SmoothError("Google returned no image.", 502);
+  if (!part?.inlineData?.data) throw new SmoothError(`Google returned no image${json.promptFeedback?.blockReason ? ` (blocked: ${json.promptFeedback.blockReason})` : json.candidates?.[0]?.finishReason ? ` (${json.candidates[0].finishReason})` : ""}.`, 502);
   return Buffer.from(part.inlineData.data, "base64");
 }
 

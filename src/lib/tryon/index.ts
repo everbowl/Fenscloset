@@ -200,7 +200,8 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
   // The styling pass: pose and wear choices on the dressed picture. If it fails, the plain try-on is shown.
   let styledBuf: Buffer;
   try {
-    styledBuf = process.env.MOCK_TRYON === "true" ? await mockStyle(person) : await sharp(await googleImage([{ data: person, mimeType: "image/jpeg" }], stylingPrompt(styling.instructions))).jpeg({ quality: 90 }).toBuffer();
+    // An adult's own body picture (assertReady keeps minors out): Google's filters are loosened for this pass only.
+    styledBuf = process.env.MOCK_TRYON === "true" ? await mockStyle(person) : await sharp(await googleImage([{ data: person, mimeType: "image/jpeg" }], stylingPrompt(styling.instructions), fetch, { relaxed: true })).jpeg({ quality: 90 }).toBuffer();
   } catch (e) {
     console.error("styling pass failed", e);
     return pack(raw, rawCached, true);

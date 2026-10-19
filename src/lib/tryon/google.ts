@@ -52,16 +52,25 @@ export async function googleTryOn(person: Buffer, garment: Buffer, fetchImpl: ty
   const project = process.env.GOOGLE_VERTEX_PROJECT!;
   const location = process.env.GOOGLE_VERTEX_LOCATION || "us-central1";
   const models = [...new Set([process.env.GOOGLE_VERTEX_TRYON_MODEL || "virtual-try-on-001", "virtual-try-on-001", "virtual-try-on-preview-08-04"])];
-  const body = JSON.stringify({
+  // Jeff, 19 Oct 2026: no visual restrictions on his own body photos; minors never reach this call (tryOnState). The loosest
+  // level goes first: block_none needs Google's allowlist and is refused (400) until the project is approved, so the next
+  // level down is tried, block_only_high, which needs no approval. GOOGLE_VERTEX_TRYON_SAFETY pins a level.
+  const levels = [...new Set([process.env.GOOGLE_VERTEX_TRYON_SAFETY || "block_none", "block_only_high"])];
+  const bodyFor = (safetySetting: string) => JSON.stringify({
     instances: [{ personImage: { image: { bytesBase64Encoded: person.toString("base64") } }, productImages: [{ image: { bytesBase64Encoded: garment.toString("base64") } }] }],
-    parameters: { sampleCount: 1, personGeneration: "allow_adult", safetySetting: "block_medium_and_above", addWatermark: false },
+    parameters: { sampleCount: 1, personGeneration: process.env.GOOGLE_VERTEX_TRYON_PERSON || "allow_adult", safetySetting, addWatermark: false },
   });
   const token = await accessToken(fetchImpl);
   let res: Response | null = null;
-  for (const model of models) {
+  outer: for (const model of models) {
     const url = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:predict`;
-    res = await fetchImpl(url, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body, signal: AbortSignal.timeout(90_000) });
-    if (res.status !== 404) break; // 404 = this model id is not on for the project; try the next id
+    for (const [i, level] of levels.entries()) {
+      res = await fetchImpl(url, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: bodyFor(level), signal: AbortSignal.timeout(90_000) });
+      if (res.status === 404) continue outer; // this model id is not on for the project; try the next id
+      if (res.status === 400 && i < levels.length - 1) { console.log(`tryon: Google refused safetySetting ${level}; trying ${levels[i + 1]}`); continue; }
+      if (res.ok && i > 0) console.log(`tryon: safetySetting ${level}`);
+      break outer;
+    }
   }
   if (!res) throw new Error("Vertex try-on: no model to call");
   if (res.status === 404 || res.status === 403) throw new TryOnModelError(`Google's try-on model isn't turned on for project ${project} yet (${res.status}). Enable Vertex AI and the Virtual Try-On model, then try again.`);
