@@ -19,6 +19,25 @@ test("admin edits a list in place: add, rename, reorder, archive, blocked delete
   await sheet.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Everbowl Merch")).toBeVisible();
 
+  // Drag to reorder: the fourth row goes up two rows (pointer events on the grip), and it sticks after a reload
+  await expect(sheet).toBeHidden();
+  await page.waitForTimeout(400); // the sheet's closing transition; a drag that starts under it is swallowed
+  const rows = page.locator("[data-testid^=list-row-]");
+  await page.locator("[data-testid^=grip-]").nth(1).scrollIntoViewIfNeeded(); // the page sits at the new row (bottom); the pointer needs the rows on screen
+  const fourth = (await rows.nth(3).innerText()).split("\n")[0];
+  const b = (await page.locator("[data-testid^=grip-]").nth(3).boundingBox())!;
+  const a = (await page.locator("[data-testid^=grip-]").nth(1).boundingBox())!;
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await page.mouse.down();
+  await page.mouse.move(b.x + b.width / 2, a.y + a.height / 2, { steps: 10 }); await page.mouse.up();
+  await expect(rows.nth(1)).toContainText(fourth);
+  await page.reload();
+  await expect(rows.nth(1)).toContainText(fourth);
+
+  // Find in the list
+  await page.getByTestId("list-filter").fill("merch");
+  await expect(page.locator("[data-testid^=list-row-]")).toHaveCount(1);
+  await page.getByTestId("list-filter").fill("");
+
   // Archive then restore
   const row = page.locator("div", { has: page.getByRole("button", { name: /^Everbowl Merch/ }) }).last();
   await row.getByRole("button", { name: "Archive" }).click();

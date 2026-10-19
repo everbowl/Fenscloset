@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { db } from "../src/lib/db";
 import { hashPassword } from "../src/lib/auth/password";
+import { BRAND_CATALOG } from "../src/lib/brands/catalog";
 import { isDevMode } from "../src/lib/auth/dev-mode";
 import {
   BODY_IMAGE_APPROVALS, BRANDS, CATEGORIES, CHECK_IN_SCALES, COLORS, DEV_PASSWORD, FABRICS, FORMALITY, MEASUREMENT_KINDS, OCCASIONS,
@@ -124,7 +125,8 @@ export async function seed() {
     }
   }
 
-  // A fresh database has everything: mark every additive set applied.
+  // A fresh database gets the sets that only live as sets (the brand catalog), then every set is marked applied.
+  await SEED_SETS["brands-catalog-v1"]();
   for (const name of Object.keys(SEED_SETS)) await db.seedSet.upsert({ where: { name }, update: {}, create: { name } });
 }
 
@@ -163,6 +165,16 @@ const SEED_SETS: Record<string, () => Promise<void>> = {
   "style-words-v1": () => seedSimple(db.styleWord, STYLE_WORDS),
   "brands-v1": () => seedSimple(db.brand, BRANDS),
   "stores-v1": () => seedSimple(db.store, STORES),
+  // The national brand catalog lands in the Brands list (Jeff, 19 Oct 2026: "brands didn't auto populate"), each with its store link.
+  "brands-catalog-v1": async () => {
+    const have = new Set((await db.brand.findMany({ select: { name: true } })).map((b) => b.name.toLowerCase()));
+    let order = (await db.brand.aggregate({ _max: { sortOrder: true } }))._max.sortOrder ?? 0;
+    for (const b of BRAND_CATALOG) {
+      if (have.has(b.name.toLowerCase())) continue;
+      await db.brand.create({ data: { name: b.name, url: `https://www.${b.domain}`, sortOrder: ++order } });
+      have.add(b.name.toLowerCase());
+    }
+  },
   // Shoes: plain numbers become "M 10 / W 11.5" (Jeff, 19 Oct 2026); only untouched numeric options are swapped.
   "shoe-sizes-v2": async () => {
     const shoes = await db.category.findUnique({ where: { name: "Shoes" } });

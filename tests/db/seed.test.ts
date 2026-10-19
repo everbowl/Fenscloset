@@ -68,7 +68,9 @@ describe("seed guard", () => {
 
   it("additive seed sets land once on a database that already has people, and never re-create what was removed after", async () => {
     await seed();
-    expect(await db.seedSet.count()).toBe(7);
+    expect(await db.seedSet.count()).toBe(8);
+    expect(await db.brand.count()).toBeGreaterThan(150); // the national catalog is in the Brands list
+    expect((await db.brand.findFirstOrThrow({ where: { name: "Patagonia" } })).url).toBe("https://www.patagonia.com");
     // simulate a database seeded before Cup size existed
     await db.measurementKind.deleteMany({ where: { name: "Cup size" } });
     await db.seedSet.delete({ where: { name: "measurement-kinds-v2" } });
