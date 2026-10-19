@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Banner } from "@/components/ui/banner";
 import { PickSheet, Row } from "@/components/items/row-editor";
+import { BrandSearch } from "@/components/items/brand-search";
 import { Sheet } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
@@ -82,9 +83,10 @@ export function FavoritesEditor({ ownerId, favs, brands, stores, myBrands, sizeO
       </section>
       <List title="Favorite brands" items={brandList} ids={favs.brandIds} onEdit={() => setSheet("brands")} testId="edit-brands" />
       <List title="Favorite stores" items={storeList} ids={favs.storeIds} onEdit={() => setSheet("stores")} testId="edit-stores" />
-      <PickSheet open={sheet === "brands"} onClose={() => setSheet(null)} title="Favorite brands" kind="brand" options={brandList} selected={favs.brandIds} multi canAdd={canEditLists} onChange={(ids) => save({ brandIds: ids })} onAdded={(e) => setBrandList((l) => [...l, e])} />
-      <PickSheet open={sheet === "pickMine"} onClose={() => setSheet(null)} title="Which brand?" kind="brand" options={brandList} selected={[]} canAdd
-        onChange={(ids) => { const id = ids[0]; if (!id) return; setSheet(null); const name = brandList.find((x) => x.id === id)?.name ?? ""; openEdit(myBrands.find((m) => m.brandId === id) ?? { brandId: id, name, url: null, sizes: [] }); }}
+      <BrandSearch open={sheet === "brands"} onClose={() => setSheet(null)} title="Favorite brands" brands={brandList} multi selectedIds={favs.brandIds}
+        onPick={(b) => save({ brandIds: favs.brandIds.includes(b.id) ? favs.brandIds.filter((x) => x !== b.id) : [...favs.brandIds, b.id] })} onAdded={(e) => setBrandList((l) => [...l, e])} />
+      <BrandSearch open={sheet === "pickMine"} onClose={() => setSheet(null)} title="Which brand?" brands={brandList} selectedId={null}
+        onPick={(b) => { setSheet(null); openEdit(myBrands.find((m) => m.brandId === b.id) ?? { brandId: b.id, name: b.name, url: null, sizes: [] }); }}
         onAdded={(e) => setBrandList((l) => [...l, e])} />
       <Sheet open={Boolean(editing)} onClose={() => setEditing(null)} title={editing?.name ?? "Brand"}>
         <div className="flex flex-col gap-5">

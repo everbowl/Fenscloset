@@ -851,3 +851,10 @@ model ShoppingLookup {
   @@index([shopperId, createdAt])
   @@index([forPersonId, createdAt])
 }
+
+/// Additive seed sets (size options, measurement kinds, tips…) applied once per database, so a list
+/// that grew after the family started still fills in, and a row an admin later deleted is never re-created.
+model SeedSet {
+  name      String   @id
+  appliedAt DateTime @default(now())
+}

@@ -29,7 +29,8 @@ export async function seed() {
     await db.rule.upsert({ where: { key: r.key }, update: { label: r.label, description: r.description }, create: r });
   }
   if ((await db.person.count()) > 0 && process.env.SEED_FORCE !== "true") {
-    console.log("Seed skipped: database already has people.");
+    const ran = await applySeedSets();
+    console.log(ran.length ? `Seed: people exist; applied new sets ${ran.join(", ")}.` : "Seed skipped: database already has people.");
     return;
   }
 
@@ -92,13 +93,7 @@ export async function seed() {
     }
   }
 
-  for (const [catName, sizes] of Object.entries(SIZE_OPTIONS)) {
-    const cat = await db.category.findUnique({ where: { name: catName } });
-    if (!cat) continue;
-    for (const [si, name] of sizes.entries()) {
-      await db.sizeOption.upsert({ where: { categoryId_name: { categoryId: cat.id, name } }, update: {}, create: { categoryId: cat.id, name, sortOrder: si } });
-    }
-  }
+  await seedSizeOptions();
 
   for (const [i, c] of COLORS.entries()) {
     await db.color.upsert({ where: { name: c.name }, update: {}, create: { name: c.name, hex: c.hex, sortOrder: i } });
@@ -112,9 +107,7 @@ export async function seed() {
   await seedSimple(db.brand, BRANDS);
   await seedSimple(db.store, STORES);
   await seedSimple(db.styleWord, STYLE_WORDS);
-  for (const [i, m] of MEASUREMENT_KINDS.entries()) {
-    await db.measurementKind.upsert({ where: { name: m.name }, update: {}, create: { name: m.name, unit: m.unit, sortOrder: i } });
-  }
+  await seedMeasurementKinds();
   for (const a of BODY_IMAGE_APPROVALS) {
     if (ids[a.minor] && ids[a.by]) await db.minorBodyImageApproval.upsert({ where: { minorId: ids[a.minor] }, update: {}, create: { minorId: ids[a.minor], approvedById: ids[a.by] } });
   }
@@ -131,6 +124,57 @@ export async function seed() {
     }
   }
 
+  // A fresh database has everything: mark every additive set applied.
+  for (const name of Object.keys(SEED_SETS)) await db.seedSet.upsert({ where: { name }, update: {}, create: { name } });
+}
+
+async function seedSizeOptions() {
+  for (const [catName, sizes] of Object.entries(SIZE_OPTIONS)) {
+    const cat = await db.category.findUnique({ where: { name: catName } });
+    if (!cat) continue;
+    for (const [si, name] of sizes.entries()) {
+      await db.sizeOption.upsert({ where: { categoryId_name: { categoryId: cat.id, name } }, update: {}, create: { categoryId: cat.id, name, sortOrder: si } });
+    }
+  }
+}
+
+async function seedMeasurementKinds() {
+  for (const [i, m] of MEASUREMENT_KINDS.entries()) {
+    await db.measurementKind.upsert({ where: { name: m.name }, update: { sortOrder: i }, create: { name: m.name, unit: m.unit, sortOrder: i } });
+  }
+}
+
+async function seedPhotoTips() {
+  for (const [name, tip] of Object.entries(PHOTO_TIPS)) {
+    const cat = await db.category.findUnique({ where: { name } });
+    if (cat && !cat.photoTip) await db.category.update({ where: { id: cat.id }, data: { photoTip: tip } });
+  }
+}
+
+/**
+ * Additive sets, each applied ONCE per database (SeedSet rows). Bump a set's name (…-v2) when its
+ * contents grow, so a database that already has people gets the new rows on the next deploy, while
+ * anything an admin deleted or renamed after that stays as they left it.
+ */
+const SEED_SETS: Record<string, () => Promise<void>> = {
+  "size-options-v1": seedSizeOptions,
+  "measurement-kinds-v2": seedMeasurementKinds,
+  "photo-tips-v1": seedPhotoTips,
+  "style-words-v1": () => seedSimple(db.styleWord, STYLE_WORDS),
+  "brands-v1": () => seedSimple(db.brand, BRANDS),
+  "stores-v1": () => seedSimple(db.store, STORES),
+};
+
+export async function applySeedSets(): Promise<string[]> {
+  const done = new Set((await db.seedSet.findMany()).map((r) => r.name));
+  const ran: string[] = [];
+  for (const [name, run] of Object.entries(SEED_SETS)) {
+    if (done.has(name)) continue;
+    await run();
+    await db.seedSet.create({ data: { name } });
+    ran.push(name);
+  }
+  return ran;
 }
 
 // Run directly: `npm run db:seed`

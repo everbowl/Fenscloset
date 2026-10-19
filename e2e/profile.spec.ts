@@ -118,7 +118,7 @@ test("my brands & sizes: add Lululemon with a size per item type and a link, the
   await page.goto("/profile/brands");
   await expect(page.getByTestId("my-brands")).toContainText("None yet");
   await page.getByTestId("add-my-brand").click();
-  await page.getByRole("dialog").getByRole("option", { name: "Lululemon" }).click();
+  await page.getByRole("dialog").getByRole("option", { name: /^Lululemon/ }).click();
   await expect(page.getByTestId("my-size-tops")).toContainText("Likely L");
   await page.getByTestId("my-size-tops").click();
   await page.getByTestId("size-sheet").getByRole("option", { name: /^L/ }).click();

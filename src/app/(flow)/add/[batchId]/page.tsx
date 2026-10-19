@@ -54,7 +54,8 @@ export default async function ConfirmPage({ params, searchParams }: { params: Pr
   const entry = await db.importEntry.findUniqueOrThrow({ where: { id: entryId } });
   const ai = (entry.aiResult as EntryAiResult | null) ?? { tags: emptyTags(), warnings: [] };
   const [lists, myBrands] = await Promise.all([loadTagLists(), listMyBrands(person.id)]);
-  const duplicate = await findLikelyDuplicate(person.id, { phash: entry.phash, categoryId: ai.tags.categoryId, colorIds: ai.tags.colorIds, brandId: ai.tags.brandId });
+  // Decided during processing (photo matches confirmed by Claude); older entries fall back to the hash-and-tags check.
+  const duplicate = ai.duplicate !== undefined ? ai.duplicate : await findLikelyDuplicate(person.id, { phash: entry.phash, categoryId: ai.tags.categoryId, colorIds: ai.tags.colorIds, brandId: ai.tags.brandId });
   const position = summary.position;
 
   return (

@@ -32,6 +32,8 @@ export function measurementOptions(kind: { name: string; unit: string }): string
   if (/shoulder/.test(n)) return range(13, 24);
   if (/sleeve/.test(n)) return range(26, 40);
   if (/neck/.test(n)) return range(12, 21);
+  if (/cup/.test(n)) return ["AA", "A", "B", "C", "D", "DD", "DDD", "G", "H"];
+  if (/hat/.test(n)) return ["XS", "S", "M", "L", "XL", "6 7/8", "7", "7 1/8", "7 1/4", "7 3/8", "7 1/2", "7 5/8", "7 3/4"];
   return [];
 }
 

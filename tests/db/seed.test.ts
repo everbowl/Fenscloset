@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
-import { seed } from "../../prisma/seed";
+import { applySeedSets, seed } from "../../prisma/seed";
 import { verifyPassword } from "@/lib/auth/password";
 
 describe("seed", () => {
@@ -64,5 +64,22 @@ describe("seed guard", () => {
     process.env.SEED_FORCE = "true";
     await seed();
     expect(await db.brand.count({ where: { name: "Nike" } })).toBe(1);
+  });
+
+  it("additive seed sets land once on a database that already has people, and never re-create what was removed after", async () => {
+    await seed();
+    expect(await db.seedSet.count()).toBe(6);
+    // simulate a database seeded before Cup size existed
+    await db.measurementKind.deleteMany({ where: { name: "Cup size" } });
+    await db.seedSet.delete({ where: { name: "measurement-kinds-v2" } });
+    delete process.env.SEED_FORCE;
+    await seed(); // people exist → only the missing set runs
+    expect(await db.measurementKind.count({ where: { name: "Cup size" } })).toBe(1);
+    const kinds = await db.measurementKind.findMany({ orderBy: { sortOrder: "asc" }, select: { name: true } });
+    expect(kinds.map((k) => k.name).slice(0, 4)).toEqual(["Height", "Weight", "Chest / bust", "Cup size"]);
+    // an admin removes it afterwards: the next deploy leaves it removed
+    await db.measurementKind.deleteMany({ where: { name: "Cup size" } });
+    expect(await applySeedSets()).toEqual([]);
+    expect(await db.measurementKind.count({ where: { name: "Cup size" } })).toBe(0);
   });
 });

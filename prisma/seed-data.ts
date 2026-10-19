@@ -74,10 +74,12 @@ export const SIZE_OPTIONS: Record<string, string[]> = {
   Hats: ["S/M", "L/XL", "One size", "Youth"],
   Belts: ["S", "M", "L", "XL", "28", "30", "32", "34", "36", "38", "40", "42", "44"],
 };
+/** Body measurements in the order they are asked (Jeff, 19 Oct 2026: basics preloaded, categorized and ordered). Each has preloaded options (src/lib/profiles/size-options.ts). */
 export const MEASUREMENT_KINDS: { name: string; unit: string }[] = [
-  { name: "Height", unit: "in" }, { name: "Weight", unit: "lb" }, { name: "Chest / bust", unit: "in" }, { name: "Waist", unit: "in" },
-  { name: "Hips", unit: "in" }, { name: "Inseam", unit: "in" }, { name: "Shoulders", unit: "in" }, { name: "Sleeve", unit: "in" },
-  { name: "Neck", unit: "in" }, { name: "Shoe size", unit: "US" },
+  { name: "Height", unit: "in" }, { name: "Weight", unit: "lb" },
+  { name: "Chest / bust", unit: "in" }, { name: "Cup size", unit: "" }, { name: "Waist", unit: "in" }, { name: "Hips", unit: "in" },
+  { name: "Inseam", unit: "in" }, { name: "Shoulders", unit: "in" }, { name: "Sleeve", unit: "in" }, { name: "Neck", unit: "in" },
+  { name: "Shoe size", unit: "US" }, { name: "Hat size", unit: "" },
 ];
 export const STYLE_WORDS = ["Minimal", "Classic", "Streetwear", "Preppy", "Boho", "Edgy", "Sporty", "Romantic", "Vintage", "Glam", "Comfy", "Polished"];
 /** Body photos approved for a minor by a parent admin (spec: Mya, approved by Jeff). */

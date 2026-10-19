@@ -9,10 +9,12 @@ import { readLabel } from "@/lib/ai/read-label";
 import { AiError } from "@/lib/ai/claude";
 import type { ImportEntry } from "@/generated/prisma/client";
 import type { StoreMeta } from "@/lib/store/add";
+import { confirmedDuplicate } from "@/lib/items/duplicates";
+import type { DuplicateHint } from "@/lib/items/duplicates";
 
 /** What lands in ImportEntry.aiResult. */
 /** `edited` lists the tag fields the person changed on the card, so a later re-read never undoes them. */
-export type EntryAiResult = { tags: TagResult; warnings: string[]; label?: { brand: string | null; size: string | null }; edited?: string[] };
+export type EntryAiResult = { tags: TagResult; warnings: string[]; label?: { brand: string | null; size: string | null }; edited?: string[]; /** "Looks like one you own", decided at processing (photo matches confirmed by Claude); undefined on entries processed before this existed. */ duplicate?: DuplicateHint | null };
 
 export type ProcessOutcome = { status: ImportEntry["status"]; error?: string };
 
@@ -76,7 +78,8 @@ export async function processEntry(entryId: string): Promise<ProcessOutcome> {
     const thumbKey = newKey("thumbs", ownerId, "image/jpeg");
     await putObject(thumbKey, thumb, "image/jpeg");
     const hash = await phash(source);
-    const aiResult: EntryAiResult = { tags, warnings };
+    const duplicate = await confirmedDuplicate(ownerId, { phash: hash, categoryId: tags.categoryId, colorIds: tags.colorIds, brandId: tags.brandId }, source);
+    const aiResult: EntryAiResult = { tags, warnings, duplicate };
 
     await db.importEntry.update({
       where: { id: entryId },

@@ -10,6 +10,7 @@ import { newKey, objectExists, putObject } from "@/lib/storage";
 import { processEntry, type EntryAiResult } from "@/lib/import/process";
 import { getObject } from "@/lib/storage";
 import { rotateEntry } from "@/lib/import/rotate-entry";
+import { createItemFromEntry } from "@/lib/items/service";
 
 async function photo() {
   return sharp({ create: { width: 900, height: 1200, channels: 3, background: { r: 30, g: 30, b: 30 } } }).jpeg().toBuffer();
@@ -82,6 +83,25 @@ describe("import processing", () => {
     // someone else's entry: refused
     const other = await db.person.create({ data: { name: "Other", email: "other@example.com", role: "member" } });
     await expect(rotateEntry(other.id, e.id, "right")).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("decides 'looks like one you own' while processing: the same picture again is confirmed, a different piece of the same kind is not", async () => {
+    const first = await entryWithPhoto();
+    await processEntry(first.id);
+    const item = await createItemFromEntry(jeffId, first.id);
+    const again = await entryWithPhoto(); // identical picture
+    await processEntry(again.id);
+    const dup = (await db.importEntry.findUniqueOrThrow({ where: { id: again.id } })).aiResult as EntryAiResult;
+    expect(dup.duplicate?.itemId).toBe(item.id);
+    expect(dup.duplicate?.reason).toBe("photo");
+    // another dark top of the same kind: the hash is close, Claude (mock: not byte-identical) says no
+    const batch = await db.importBatch.create({ data: { personId: jeffId } });
+    const key = newKey("originals", jeffId, "image/jpeg");
+    await putObject(key, await sharp({ create: { width: 900, height: 1200, channels: 3, background: { r: 34, g: 30, b: 32 } } }).jpeg().toBuffer(), "image/jpeg");
+    const other = await db.importEntry.create({ data: { batchId: batch.id, order: 1, originalKey: key, status: "uploaded" } });
+    await processEntry(other.id);
+    const none = (await db.importEntry.findUniqueOrThrow({ where: { id: other.id } })).aiResult as EntryAiResult;
+    expect(none.duplicate).toBeNull();
   });
 
   it("keeps the original usable when remove.bg fails, and says why", async () => {

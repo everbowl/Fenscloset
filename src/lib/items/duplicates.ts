@@ -1,5 +1,8 @@
 import { db } from "@/lib/db";
 import { hamming } from "@/lib/images/phash";
+import { getObject } from "@/lib/storage";
+import { toAiImage } from "@/lib/images/thumb";
+import { sameGarment } from "@/lib/ai/same-garment";
 
 export type DuplicateHint = { itemId: string; name: string | null; thumbKey: string | null; score: number; reason: "photo" | "tags" };
 
@@ -33,4 +36,21 @@ export async function findLikelyDuplicate(personId: string, probe: { phash: stri
     if (hit) return { itemId: hit.id, name: hit.name, thumbKey: hit.photos[0]?.bucketKey ?? null, score: 64, reason: "tags" };
   }
   return null;
+}
+
+/**
+ * The hint the card may show: a photo match is only kept when Claude confirms the two pictures show
+ * the same piece (the hash alone mistakes one black tee for another). Tag matches (category + brand +
+ * color) need no picture check. `image` is the new photo (cutout or original).
+ */
+export async function confirmedDuplicate(personId: string, probe: Parameters<typeof findLikelyDuplicate>[1], image: Buffer): Promise<DuplicateHint | null> {
+  const hint = await findLikelyDuplicate(personId, probe);
+  if (!hint || hint.reason !== "photo") return hint;
+  const photo = await db.itemPhoto.findFirst({ where: { itemId: hint.itemId, kind: { in: ["cutout", "alone"] } }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }], select: { bucketKey: true } });
+  if (!photo) return null;
+  try {
+    const [a, b] = await Promise.all([toAiImage(image), toAiImage((await getObject(photo.bucketKey)).body)]);
+    const r = await sameGarment(a, b);
+    return r.same ? hint : null;
+  } catch { return null; }
 }

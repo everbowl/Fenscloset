@@ -1,7 +1,7 @@
 import sharp from "sharp";
 import { db } from "@/lib/db";
 import { getObject, newKey, putObject } from "@/lib/storage";
-import { googleTryOn, isGoogleTryOnConfigured } from "@/lib/tryon/google";
+import { googleTryOn, isGoogleTryOnConfigured, TryOnModelError } from "@/lib/tryon/google";
 import type { Viewer } from "@/lib/people/visibility";
 
 /**
@@ -95,7 +95,11 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
   } else {
     for (const g of garments) {
       const garment = await sharp(g.buf).flatten({ background: "#ffffff" }).resize(1024, 1024, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
-      const out = await googleTryOn(person, garment);
+      let out: { data: Buffer };
+      try { out = await googleTryOn(person, garment); } catch (e) {
+        if (e instanceof TryOnModelError) throw new TryOnError(e.message, 502);
+        throw e;
+      }
       person = await sharp(out.data).jpeg({ quality: 90 }).toBuffer();
     }
   }

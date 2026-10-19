@@ -12,9 +12,11 @@ import type { Named } from "@/lib/ai/tag-item";
  * every letter. A catalog brand or a typed name joins the family's Brands list on first use, so it
  * stays editable in Admin → Lists → Brands.
  */
-export function BrandSearch({ open, onClose, brands, selectedId, onPick, onAdded }: {
-  open: boolean; onClose: () => void; brands: Named[]; selectedId: string | null; onPick: (b: Named) => void; onAdded: (b: Named) => void;
+export function BrandSearch({ open, onClose, brands, selectedId, selectedIds, multi, onPick, onAdded, title = "Brand" }: {
+  open: boolean; onClose: () => void; brands: Named[]; selectedId?: string | null; /** multi: the picked set; a tap toggles and the sheet stays open until Done */ selectedIds?: string[]; multi?: boolean;
+  onPick: (b: Named) => void; onAdded: (b: Named) => void; title?: string;
 }) {
+  const isOn = (id: string) => (multi ? (selectedIds ?? []).includes(id) : id === selectedId);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
@@ -23,7 +25,8 @@ export function BrandSearch({ open, onClose, brands, selectedId, onPick, onAdded
   const mine = useMemo(() => {
     const f = fold(q.trim());
     const rows = f ? brands.filter((b) => fold(b.name).includes(f)) : brands;
-    return [...rows].sort((a, b) => Number(fold(b.name).startsWith(f)) - Number(fold(a.name).startsWith(f)) || a.name.localeCompare(b.name)).slice(0, 12);
+    const sorted = [...rows].sort((a, b) => Number(fold(b.name).startsWith(f)) - Number(fold(a.name).startsWith(f)) || a.name.localeCompare(b.name));
+    return f ? sorted.slice(0, 12) : sorted; // all of the family's brands until something is typed
   }, [brands, q]);
   const national = useMemo(() => searchCatalog(q).filter((c) => !brands.some((b) => fold(b.name) === fold(c.name))), [brands, q]);
   const typed = q.trim();
@@ -36,18 +39,19 @@ export function BrandSearch({ open, onClose, brands, selectedId, onPick, onAdded
       if (!r.ok) { setError(r.error); return; }
       const b = { id: r.value.id, name: r.value.name };
       if (!brands.some((x) => x.id === b.id)) onAdded(b);
-      onClose(); onPick(b);
+      if (!multi) onClose();
+      onPick(b);
     });
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="Brand">
+    <Sheet open={open} onClose={onClose} title={title}>
       <Input value={q} onChange={(e) => setQ(e.target.value)} autoFocus placeholder="Start typing · Nike, Levi's, Vuori…" aria-label="Brand" data-testid="brand-search" maxLength={60} />
       {error ? <p className="mono mt-2 text-danger">{error}</p> : null}
       <div className="mt-3 flex flex-col" role="listbox" aria-label="Brands">
         {mine.map((b) => (
-          <button key={b.id} type="button" role="option" aria-selected={b.id === selectedId} onClick={() => { onClose(); onPick(b); }} className="flex h-12 items-center justify-between border-b border-line text-[15px]" data-testid={`brand-pick-${b.id}`}>
-            <span>{b.name}</span><span className={`mono ${b.id === selectedId ? "text-ink" : "text-graphite"}`}>{b.id === selectedId ? "✓" : "Yours"}</span>
+          <button key={b.id} type="button" role="option" aria-selected={isOn(b.id)} onClick={() => { if (!multi) onClose(); onPick(b); }} className="flex h-12 items-center justify-between border-b border-line text-[15px]" data-testid={`brand-pick-${b.id}`}>
+            <span>{b.name}</span><span className={`mono ${isOn(b.id) ? "text-ink" : "text-graphite"}`}>{isOn(b.id) ? "✓" : "Yours"}</span>
           </button>
         ))}
         {national.map((c) => (
@@ -62,6 +66,7 @@ export function BrandSearch({ open, onClose, brands, selectedId, onPick, onAdded
         ) : null}
         {!mine.length && !national.length && !typed ? <p className="mono py-4 text-graphite">No brands yet · start typing</p> : null}
       </div>
+      {multi ? <button type="button" onClick={onClose} className="mono mt-4 flex h-[46px] w-full items-center justify-center bg-ink text-paper" data-testid="brand-done">Done</button> : null}
     </Sheet>
   );
 }
