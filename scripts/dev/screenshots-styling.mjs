@@ -42,7 +42,10 @@ async function ready(page) {
   await page.goto(base + "/admin/lists/wearGroup"); await page.waitForTimeout(400);
   await page.screenshot({ path: `${out}/205-admin-groups.png` });
   await page.goto(base + "/closet"); await page.locator("a[href^='/closet/']").first().click(); await page.waitForURL(/\/closet\/.+/);
-  await page.getByTestId("mirror-photo").waitFor(); await page.waitForTimeout(300);
+  // the seeded pieces only have thumbnails: give this one a real photo, then choose it for the mirror
+  await page.getByTestId("item-photo").setInputFiles({ name: "piece.jpg", mimeType: "image/jpeg", buffer: await sharp({ create: { width: 600, height: 700, channels: 3, background: { r: 40, g: 60, b: 110 } } }).jpeg().toBuffer() });
+  await page.getByTestId("mirror-photo").waitFor({ timeout: 20000 }); await page.getByTestId("mirror-photo").click();
+  await page.getByText("Mirror ✓").waitFor(); await page.waitForTimeout(300);
   await page.screenshot({ path: `${out}/208-item-use-in-mirror.png` });
   await page.getByTestId("row-made").click(); await page.getByTestId("made-button_front").click(); await page.waitForTimeout(500);
   await page.screenshot({ path: `${out}/206-item-made-with.png` });
