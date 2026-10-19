@@ -49,11 +49,12 @@ async function assertCanDress(viewer: Viewer, personId: string) {
 }
 
 /** The look on the mannequin. `source` is "today" or "shop" for the record. `pick` is this call's styling change (pose, tuck…), remembered for the person. */
-export async function mannequinLook(viewer: Viewer, personId: string, itemIds: string[], source: string, extraGarment?: Buffer, fetchImpl: typeof fetch = fetch, pick?: StylingChoice, extraFeatures: string[] = []): Promise<TryOnView> {
+export async function mannequinLook(viewer: Viewer, personId: string, itemIds: string[], source: string, extraGarment?: Buffer, fetchImpl: typeof fetch = fetch, pick?: StylingChoice, extraFeatures: string[] = [], fresh = false): Promise<TryOnView> {
   await assertCanDress(viewer, personId);
   if (!isMannequinConfigured()) throw new TryOnError("The mannequin isn’t set up on the site yet.");
   const ids = [...new Set(itemIds)].sort();
   const cacheIds = extraGarment ? [...ids, `extra:${source}`].sort() : ids;
+  if (fresh) await db.tryOn.deleteMany({ where: { personId, bodyPhotoKey: MANNEQUIN_BASE_KEY, itemIds: { equals: cacheIds } } }); // "Dress again"
   const { lists, styling } = await stylingFor(personId, ids, pick, extraFeatures);
   const view = stylingView(lists, styling);
   const hit = await db.tryOn.findFirst({ where: { personId, bodyPhotoKey: MANNEQUIN_BASE_KEY, itemIds: { equals: cacheIds }, styling: styling.key }, orderBy: { createdAt: "desc" } });

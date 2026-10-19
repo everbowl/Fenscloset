@@ -14,6 +14,22 @@ type ServiceAccount = { client_email: string; private_key: string; token_uri?: s
 /** The project cannot use the model (not enabled, no access): a message a person can act on. */
 export class TryOnModelError extends Error { constructor(message: string) { super(message); this.name = "TryOnModelError"; } }
 
+/**
+ * Google answers 429 (too many requests this minute) and 503 (busy) for a few seconds at a time, especially when
+ * the mirror, Tidy and the mannequin call in a row. The same request is sent again after a short wait, three times.
+ * MOCK_BACKOFF_MS shortens the waits in tests.
+ */
+export async function fetchWithBackoff(fetchImpl: typeof fetch, url: string, init: RequestInit, tries = 4): Promise<Response> {
+  const base = Number(process.env.MOCK_BACKOFF_MS ?? 1500);
+  let res = await fetchImpl(url, init);
+  for (let i = 1; i < tries && (res.status === 429 || res.status === 503); i++) {
+    console.log(`google: ${res.status}, waiting ${base * 2 ** (i - 1)}ms before try ${i + 1}`);
+    await new Promise((r) => setTimeout(r, base * 2 ** (i - 1)));
+    res = await fetchImpl(url, init);
+  }
+  return res;
+}
+
 export function isGoogleTryOnConfigured(): boolean {
   return Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_JSON && process.env.GOOGLE_VERTEX_PROJECT);
 }
@@ -65,7 +81,7 @@ export async function googleTryOn(person: Buffer, garment: Buffer, fetchImpl: ty
   outer: for (const model of models) {
     const url = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:predict`;
     for (const [i, level] of levels.entries()) {
-      res = await fetchImpl(url, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: bodyFor(level), signal: AbortSignal.timeout(90_000) });
+      res = await fetchWithBackoff(fetchImpl, url, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: bodyFor(level), signal: AbortSignal.timeout(90_000) });
       if (res.status === 404) continue outer; // this model id is not on for the project; try the next id
       if (res.status === 400 && i < levels.length - 1) { console.log(`tryon: Google refused safetySetting ${level}; trying ${levels[i + 1]}`); continue; }
       if (res.ok && i > 0) console.log(`tryon: safetySetting ${level}`);

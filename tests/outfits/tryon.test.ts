@@ -151,13 +151,32 @@ describe("virtual try-on", () => {
     expect(await setMirrorPhoto(jeff, cut.id)).toEqual({ photoId: null });
     [g] = await garmentImages([polo.id]);
     expect(g.buf.equals(await buf(retailKey))).toBe(true);
-    // every photo of a piece fails the check: the first is still used (a try-on beats none), and the answers are kept
+    // every photo of a piece fails the check: the first in line is still used (a try-on beats none), and the answers are kept.
+    // The person's own photo comes before the cutout: Tidy swaps the cutout for an AI re-draw, which is how a tee lost its hem.
     process.env.MOCK_GARMENT_WHOLE = "false";
     const cut2 = await png(); const alone2 = await jpg(30);
     const tee = await db.item.create({ data: { ownerId: jeff.id, name: "Tee", categoryId: (await cat("Tops")).id, photos: { create: [{ kind: "alone", bucketKey: alone2 }, { kind: "cutout", bucketKey: cut2, isPrimary: true }] } } });
     [g] = await garmentImages([tee.id]);
-    expect(g.buf.equals(await buf(cut2))).toBe(true);
+    expect(g.buf.equals(await buf(alone2))).toBe(true);
     expect((await db.itemPhoto.findMany({ where: { itemId: tee.id } })).map((p) => p.wholeGarment)).toEqual([false, false]);
+    delete process.env.MOCK_GARMENT_WHOLE;
+    // a photo change forgets every picture made with the piece, and "Dress again" dresses one look from scratch
+    const bodyKey = newKey("bodies", jeff.id, "image/jpeg"); await putObject(bodyKey, await jpeg(), "image/jpeg");
+    await db.bodyPhoto.create({ data: { personId: jeff.id, bucketKey: bodyKey, view: "front" } });
+    await setTryOnEnabled(jeff, jeff.id, true);
+    const first = await tryOnLook(jeff, jeff.id, [polo.id], "today");
+    expect((await tryOnLook(jeff, jeff.id, [polo.id], "today")).id).toBe(first.id);
+    const redone = await tryOnLook(jeff, jeff.id, [polo.id], "today", undefined, "front", undefined, [], true);
+    expect(redone.id).not.toBe(first.id);
+    expect(await db.tryOn.count({ where: { personId: jeff.id } })).toBe(1);
+    const { forgetTryOns } = await import("@/lib/tryon");
+    expect(await forgetTryOns(polo.id)).toBe(1);
+    expect(await db.tryOn.count({ where: { personId: jeff.id } })).toBe(0);
+    // the render check is not satisfied even after the second dressing: the picture still comes, with the note under it
+    process.env.MOCK_RENDER_OK = "false";
+    const unsure = await tryOnLook(jeff, jeff.id, [polo.id], "today");
+    expect(unsure.note).toMatch(/isn’t sure/);
+    delete process.env.MOCK_RENDER_OK;
     delete process.env.MOCK_GARMENT_WHOLE;
     delete process.env.MOCK_AI;
   });

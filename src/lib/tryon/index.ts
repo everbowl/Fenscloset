@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { getObject, newKey, putObject } from "@/lib/storage";
 import { googleTryOn, isGoogleTryOnConfigured, TryOnModelError } from "@/lib/tryon/google";
 import { googleImage } from "@/lib/images/smooth";
-import { checkWholeGarment, isGarmentCheckAvailable } from "@/lib/tryon/garment-check";
+import { checkRender, checkWholeGarment, isGarmentCheckAvailable } from "@/lib/tryon/garment-check";
 import { loadPrefs, loadStylingLists, lookFeatures, resolveStyling, savePrefs, stylingPrompt, type Styling, type StylingChoice, type StylingLists } from "@/lib/tryon/styling";
 import type { Viewer } from "@/lib/people/visibility";
 
@@ -31,6 +31,7 @@ export type TryOnView = {
   /** On the shared mannequin, not the person (src/lib/tryon/mannequin.ts). */ mannequin?: boolean;
   /** How the look is styled (pose, tuck, buttons…) and what else could be picked. */ styling?: StylingView;
   /** The styling pass did not come back: this is the plain try-on. */ stylingFailed?: boolean;
+  /** The render check was not satisfied even after a second dressing: what it saw wrong, shown under the picture. */ note?: string | null;
 };
 
 /** The styling for a look as the person last left it (or the defaults), remembering any new picks. */
@@ -47,6 +48,21 @@ export function stylingView(lists: StylingLists, styling: Styling): StylingView 
 /** Dev/test stand-in for the styling pass: the same picture, a touch brighter, so a styled result is its own file. */
 async function mockStyle(raw: Buffer): Promise<Buffer> {
   return sharp(raw).modulate({ brightness: 1.05 }).jpeg({ quality: 85 }).toBuffer();
+}
+
+/** The render check, never fatal: when it cannot run, the picture passes. */
+async function renderVerdict(picture: Buffer, garments: { name: string; buf: Buffer }[]): Promise<{ ok: boolean; problem: string | null }> {
+  try { return await checkRender(picture, garments); } catch (e) { console.error("tryon: render check failed", e); return { ok: true, problem: null }; }
+}
+
+/** The image model's brief when the try-on model got a piece wrong: the person, dressed in exactly these pieces, nothing else touched. */
+function dressPrompt(names: string[]): string {
+  return `The first image is a photo of a person. The images after it are garments: ${names.join(", ")}. Dress the person in exactly these garments as they truly are: the same cut, color, print, lettering and fabric, each garment one whole piece with no holes and no missing panels, at its full length (a top hangs to the hip or below, over the waistband, unless its photo shows a cropped cut). Keep the person's face, hair, skin, body shape and pose, and the background, lighting and framing, exactly as they are. Add nothing else. Return only the photo.`;
+}
+
+/** An item's photos changed (new, removed, turned, chosen for the mirror): every picture made with it is forgotten, so the next look is dressed afresh. */
+export async function forgetTryOns(itemId: string): Promise<number> {
+  return (await db.tryOn.deleteMany({ where: { itemIds: { has: itemId } } })).count;
 }
 
 export const MAX_GARMENTS = 3;
@@ -93,25 +109,26 @@ export async function mockTryOn(person: Buffer, garments: Buffer[]): Promise<Buf
 }
 
 /**
- * Garment image for an item, in this order: the photo the person chose for the mirror, else (from behind)
- * its back photo, else the cutout, the store's product photos, the main photo, any photo. A photo that
- * does not show the whole piece (checked once, kept on the photo) is passed over for the next one, so a
- * folded or cut-off picture no longer dresses the person in a cropped version of the piece.
+ * Garment image for an item, in this order: the photo the person chose for the mirror, else (from behind) its
+ * back photo, else the store's product photo, the person's own photo of the piece, the cutout, any other photo,
+ * a thumbnail last. The cutout comes after the real photo on purpose: Tidy replaces it with an AI re-draw, and
+ * a re-draw (or a background-removal hole) is how a tee came out cropped with a hole in the back (Jeff, 19 Oct
+ * 2026). A photo that does not show the whole piece (checked once, kept on the photo) is passed over.
  */
-export async function garmentImages(itemIds: string[], back = false): Promise<{ id: string; buf: Buffer }[]> {
+export async function garmentImages(itemIds: string[], back = false): Promise<{ id: string; name: string; buf: Buffer }[]> {
   const items = await db.item.findMany({ where: { id: { in: itemIds } }, select: { id: true, name: true, category: { select: { name: true } }, photos: { select: { id: true, kind: true, bucketKey: true, isPrimary: true, forMirror: true, wholeGarment: true }, orderBy: { createdAt: "asc" } } } });
   const sorted = items.sort((a, b) => ORDER.indexOf(a.category?.name ?? "") - ORDER.indexOf(b.category?.name ?? ""));
-  const out: { id: string; buf: Buffer }[] = [];
+  const out: { id: string; name: string; buf: Buffer }[] = [];
   for (const it of sorted) {
     if (it.category?.name && !ORDER.includes(it.category.name)) continue; // accessories, bags, hats: the model can't place them
     const usable = it.photos.filter((p) => p.kind !== "label" && p.kind !== "worn");
     const chosen = usable.find((p) => p.forMirror);
     const ranked = [
       ...(back ? usable.filter((p) => p.kind === "back") : []),
-      ...usable.filter((p) => p.kind === "cutout"),
       ...usable.filter((p) => p.kind === "retail"),
-      ...usable.filter((p) => p.isPrimary),
       ...usable.filter((p) => p.kind === "alone"),
+      ...usable.filter((p) => p.kind === "cutout"),
+      ...usable.filter((p) => p.isPrimary),
       ...usable.filter((p) => p.kind !== "thumb"),
       ...usable, // a thumbnail is the last resort (a piece that only has one)
     ].filter((p, i, arr) => arr.findIndex((q) => q.id === p.id) === i && p.id !== chosen?.id);
@@ -138,7 +155,7 @@ export async function garmentImages(itemIds: string[], back = false): Promise<{ 
     picked ??= fallback; // nothing passed: the best there is, rather than no try-on
     if (!picked) continue;
     console.log(`tryon: ${it.name ?? it.id} → ${picked.kind} photo${skipped.length ? ` (passed over: ${skipped.join(", ")})` : ""}`);
-    out.push({ id: it.id, buf: picked.buf });
+    out.push({ id: it.id, name: it.name ?? (it.category?.name ?? "piece"), buf: picked.buf });
     if (out.length === MAX_GARMENTS) break;
   }
   return out;
@@ -150,7 +167,7 @@ export async function garmentImages(itemIds: string[], back = false): Promise<{ 
  * image pass), so changing a chip never re-dresses the body. `pick` is this call's change, remembered
  * for next time. `extraFeatures` describes a garment that is not an item (a shop candidate).
  */
-export async function tryOnLook(viewer: Viewer, personId: string, itemIds: string[], source: string, extraGarment?: Buffer, view: BodyViewSide = "front", pick?: StylingChoice, extraFeatures: string[] = []): Promise<TryOnView> {
+export async function tryOnLook(viewer: Viewer, personId: string, itemIds: string[], source: string, extraGarment?: Buffer, view: BodyViewSide = "front", pick?: StylingChoice, extraFeatures: string[] = [], fresh = false): Promise<TryOnView> {
   await assertReady(viewer, personId);
   // Front: the front photo, else the newest photo of any view. Back: only a back photo will do.
   const photo = view === "back"
@@ -161,8 +178,9 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
   const cacheIds = [...(extraGarment ? [...ids, `extra:${source}`] : ids)].sort();
   const { lists, styling } = await stylingFor(personId, ids, pick, extraFeatures);
   const where = { personId, bodyPhotoKey: photo.bucketKey, itemIds: { equals: cacheIds } };
-  const pack = (row: { id: string; bucketKey: string; itemIds: string[]; createdAt: Date }, cached: boolean, stylingFailed = false): TryOnView =>
-    ({ id: row.id, key: row.bucketKey, itemIds: row.itemIds, createdAt: row.createdAt.toISOString(), cached, view, styling: stylingView(lists, styling), ...(stylingFailed ? { stylingFailed } : {}) });
+  if (fresh) await db.tryOn.deleteMany({ where }); // "Dress again": the look is dressed from scratch, raw and styled
+  const pack = (row: { id: string; bucketKey: string; itemIds: string[]; createdAt: Date; note?: string | null }, cached: boolean, stylingFailed = false): TryOnView =>
+    ({ id: row.id, key: row.bucketKey, itemIds: row.itemIds, createdAt: row.createdAt.toISOString(), cached, view, styling: stylingView(lists, styling), note: row.note ?? null, ...(stylingFailed ? { stylingFailed } : {}) });
 
   // The styled picture for these exact choices, if it was made before.
   if (styling.instructions.length) {
@@ -175,9 +193,10 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
   let person: Buffer;
   if (raw) person = (await getObject(raw.bucketKey)).body;
   else {
-    const garments = [...(extraGarment ? [{ id: "extra", buf: extraGarment }] : []), ...(await garmentImages(ids, view === "back"))].slice(0, MAX_GARMENTS);
+    const garments = [...(extraGarment ? [{ id: "extra", name: "the new piece", buf: extraGarment }] : []), ...(await garmentImages(ids, view === "back"))].slice(0, MAX_GARMENTS);
     if (!garments.length) throw new TryOnError("None of these pieces has a photo the try-on can use.");
-    person = await sharp((await getObject(photo.bucketKey)).body).rotate().resize(1024, 1024, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
+    const body = await sharp((await getObject(photo.bucketKey)).body).rotate().resize(1024, 1024, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
+    person = body;
     if (process.env.MOCK_TRYON === "true") {
       person = await mockTryOn(person, garments.map((g) => g.buf));
     } else {
@@ -191,9 +210,23 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
         person = await sharp(out.data).jpeg({ quality: 90 }).toBuffer();
       }
     }
+    // Is each piece worn as it really is (full length, no holes, no missing panels)? If not, the image model dresses the
+    // person once more with the pieces named, and the first picture that passes is kept. Neither passing: the try-on's
+    // picture stays, with what the check saw under it, rather than nothing at all.
+    let note: string | null = null;
+    const verdict = await renderVerdict(person, garments);
+    if (!verdict.ok) {
+      console.log(`tryon: render check: ${verdict.problem}; dressing again with the image model`);
+      try {
+        const again = process.env.MOCK_TRYON === "true" ? await mockStyle(person) : await sharp(await googleImage([{ data: body, mimeType: "image/jpeg" }, ...(await Promise.all(garments.map(async (g) => ({ data: await sharp(g.buf).flatten({ background: "#ffffff" }).resize(1024, 1024, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer(), mimeType: "image/jpeg" as const }))))], dressPrompt(garments.map((g) => g.name)), fetch, { relaxed: true })).jpeg({ quality: 90 }).toBuffer();
+        const second = await renderVerdict(again, garments);
+        if (second.ok) person = again;
+        else { note = `The mirror isn’t sure about this one: ${second.problem ?? verdict.problem}`; console.log(`tryon: second render check: ${second.problem}`); }
+      } catch (e) { console.error("tryon: second dressing failed", e); note = `The mirror isn’t sure about this one: ${verdict.problem}`; }
+    }
     const key = newKey("tryon", personId, "image/jpeg");
     await putObject(key, person, "image/jpeg");
-    raw = await db.tryOn.create({ data: { personId, bucketKey: key, itemIds: cacheIds, bodyPhotoKey: photo.bucketKey, source } });
+    raw = await db.tryOn.create({ data: { personId, bucketKey: key, itemIds: cacheIds, bodyPhotoKey: photo.bucketKey, source, note } });
     rawCached = false;
   }
   if (!styling.instructions.length) return pack(raw, rawCached);
@@ -208,7 +241,7 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
   }
   const key = newKey("tryon", personId, "image/jpeg");
   await putObject(key, styledBuf, "image/jpeg");
-  const row = await db.tryOn.create({ data: { personId, bucketKey: key, itemIds: cacheIds, bodyPhotoKey: photo.bucketKey, source, styling: styling.key } });
+  const row = await db.tryOn.create({ data: { personId, bucketKey: key, itemIds: cacheIds, bodyPhotoKey: photo.bucketKey, source, styling: styling.key, note: raw.note } });
   return pack(row, false);
 }
 

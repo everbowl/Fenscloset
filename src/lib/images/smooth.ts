@@ -1,6 +1,6 @@
 import sharp from "sharp";
 import { removeBackground } from "@/lib/images/remove-bg";
-import { accessToken } from "@/lib/tryon/google";
+import { accessToken, fetchWithBackoff } from "@/lib/tryon/google";
 
 /**
  * Smooths the wrinkles out of a garment photo with Google's image editor on Vertex (Gemini 2.5 Flash
@@ -43,7 +43,7 @@ export async function googleImage(images: { data: Buffer; mimeType: "image/jpeg"
   const token = await accessToken(fetchImpl);
   let res: Response | null = null;
   for (const [i, threshold] of thresholds.entries()) {
-    res = await fetchImpl(url, {
+    res = await fetchWithBackoff(fetchImpl, url, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({

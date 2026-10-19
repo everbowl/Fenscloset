@@ -66,6 +66,17 @@ export function TodayScreen(p: Props) {
     });
   }
 
+  /** "Dress again": the saved pictures of this look are thrown away and it is dressed from scratch. */
+  function redo() {
+    if (!tryOn || !p.suggestion) return;
+    setBusy("tryon"); setError(undefined);
+    start(async () => {
+      const r = tryOn.mannequin ? await mannequinAction(p.personId, p.suggestion!.id, index, undefined, true) : await tryOnAction(p.personId, p.suggestion!.id, index, tryOn.view ?? "front", undefined, true);
+      setBusy(null);
+      if (!r.ok) setError(r.error); else if (r.tryOn) setTryOn(r.tryOn);
+    });
+  }
+
   function run(label: string, fn: () => Promise<{ ok: boolean; error?: string }>, after?: () => void) {
     setError(undefined); setBusy(label);
     start(async () => {
@@ -301,6 +312,11 @@ export function TodayScreen(p: Props) {
             <p className="mono text-graphite">{board?.pieces.map((x) => x.label).join(" · ")}</p>
             {tryOn.styling?.summary ? <p className="mono text-ink" data-testid="styling-summary">{tryOn.styling.summary}{tryOn.stylingFailed ? " · didn’t take this time, showing the plain try-on" : ""}</p> : null}
             <p className="mono text-ink">{tryOn.mannequin ? `On a mannequin · No body photo used${p.mine ? "" : ` · ${p.personName}’s look`}` : `On you${tryOn.view === "back" ? " · from behind" : ""} · Only you can see this picture`}{tryOn.cached ? " · saved from before" : ""}</p>
+            {tryOn.note ? <p className="mono text-graphite" data-testid="mirror-note">{tryOn.note}</p> : null}
+            <div className="flex items-center justify-between">
+              <button type="button" disabled={busy !== null} onClick={redo} className="mono mono-11 h-9 border border-ink px-4 disabled:opacity-60" data-testid="redo-tryon" title="Throw away the saved pictures of this look and dress it from scratch">{busy === "tryon" ? "Dressing…" : "Dress again"}</button>
+              <span className="mono text-graphite">Not right? Dress it from scratch</span>
+            </div>
             {(p.tryOn === "ready" && p.mannequinAvailable) || (p.tryOn === "ready" && p.backPhoto) ? (
               <div className="flex flex-wrap gap-1.5" data-testid="mirror-views">
                 {([["front", "On me"], ...(p.backPhoto ? [["back", "From behind"]] : []), ...(p.mannequinAvailable ? [["mannequin", "Mannequin"]] : [])] as [string, string][]).map(([v, word]) => {

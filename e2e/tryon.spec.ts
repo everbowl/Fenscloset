@@ -43,6 +43,11 @@ test("try-on: on by default, needs a body photo, then a picture of the look on y
   await expect(page.getByTestId("try-on-sheet").locator("img")).not.toHaveAttribute("src", firstSrc!);
   await page.getByTestId("style-group-pose").getByRole("button", { name: "Hands in pockets" }).click();
   await expect(page.getByTestId("styling-summary")).toContainText("Hands in pockets", { timeout: 20_000 });
+  // "Dress again" throws the saved pictures of the look away and dresses it from scratch (a new picture, same choices)
+  const beforeRedo = await page.getByTestId("try-on-sheet").locator("img").getAttribute("src");
+  await page.getByTestId("redo-tryon").click();
+  await expect(page.getByTestId("try-on-sheet").locator("img")).not.toHaveAttribute("src", beforeRedo!, { timeout: 20_000 });
+  await expect(page.getByTestId("styling-summary")).toContainText("Hands in pockets");
   await page.keyboard.press("Escape");
   // remembered: the mirror opens the way it was left
   await page.reload();

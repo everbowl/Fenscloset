@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { isFeatureKey } from "@/lib/tryon/features";
+import { forgetTryOns } from "@/lib/tryon";
 import { priceNumber, storeIdByName, type StoreMeta } from "@/lib/store/add";
 import { finishBatchIfDone } from "@/lib/import/service";
 import type { EntryAiResult } from "@/lib/import/process";
@@ -279,6 +280,7 @@ export async function addItemPhoto(viewer: { id: string; role: string }, itemId:
     await tx.itemPhoto.create({ data: { itemId, kind, bucketKey: key, isPrimary: replacesStorePhoto || (!hasPrimary && kind === "alone") } });
     if (kind === "alone") await tx.item.update({ where: { id: itemId }, data: { storePhoto: false, photoNudgedAt: item.wearCount } });
   });
+  if (kind !== "worn" && kind !== "label") await forgetTryOns(itemId); // a new picture of the piece: the mirror dresses it afresh
 }
 
 export type PhotoNudge = "first" | "refresh" | null;
@@ -305,6 +307,7 @@ export async function setMirrorPhoto(viewer: { id: string; role: string }, photo
     db.itemPhoto.updateMany({ where: { itemId: photo.itemId }, data: { forMirror: false } }),
     ...(on ? [db.itemPhoto.update({ where: { id: photoId }, data: { forMirror: true } })] : []),
   ]);
+  await forgetTryOns(photo.itemId); // the mirror dresses with the new choice from now on
   return { photoId: on ? photoId : null };
 }
 
@@ -314,6 +317,7 @@ export async function removeItemPhoto(viewer: { id: string; role: string }, phot
   await ownedItem(viewer, photo.itemId);
   await db.itemPhoto.delete({ where: { id: photoId } });
   await deleteObject(photo.bucketKey).catch(() => {});
+  if (photo.kind !== "worn" && photo.kind !== "label") await forgetTryOns(photo.itemId);
   if (photo.isPrimary) {
     const next = await db.itemPhoto.findFirst({ where: { itemId: photo.itemId, kind: { in: ["cutout", "alone"] } }, orderBy: { createdAt: "asc" } });
     if (next) await db.itemPhoto.update({ where: { id: next.id }, data: { isPrimary: true } });
@@ -328,6 +332,7 @@ export async function rotateItemPhoto(viewer: { id: string; role: string }, phot
   const photo = await db.itemPhoto.findUnique({ where: { id: photoId } });
   if (!photo) throw new ItemError("That photo is gone.", 404);
   const item = await ownedItem(viewer, photo.itemId);
+  if (photo.kind !== "worn" && photo.kind !== "label") await forgetTryOns(item.id); // the piece's picture changes: the mirror dresses it afresh
   const deg = quarterTurn(dir);
   const type = photo.bucketKey.endsWith(".png") ? "image/png" : "image/jpeg";
   const out = await rotateImage((await getObject(photo.bucketKey)).body, deg, type);

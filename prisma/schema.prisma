@@ -724,6 +724,8 @@ model TryOn {
   source       String
   /** The pose and wear choices this picture was styled with (src/lib/tryon/styling.ts stylingKey); null is the raw try-on before any styling. */
   styling      String?
+  /** What the render check still saw wrong after a second dressing (src/lib/tryon/garment-check.ts), shown under the picture; null when the picture passed. */
+  note         String?
   createdAt    DateTime @default(now())
   person       Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
 
