@@ -45,7 +45,6 @@ export function TogetherScreen({ meId, people, canDressIds, occasions, isAdmin, 
 
   return (
     <div data-testid="together">
-      <Link href="/today" className="mono mb-3 inline-block text-graphite">← Today</Link>
       <PageHeader title="Going out" accent="together" aside={session && !editing ? <button type="button" onClick={() => setEditing(true)} className="mono mono-11 text-ink">Change</button> : undefined} />
       {error ? <Banner tone="danger" title={error} className="mb-3" /> : null}
 

@@ -118,9 +118,6 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists }:
         {canEdit && photo ? (
           <button type="button" disabled={pending} onClick={() => start(async () => { const r = await rotateItemPhotoAction(it.id, photo.id); if (!r.ok) setError(r.error); else setIt((x) => ({ ...x, photos: x.photos.map((p) => (p.id === r.value.photoId ? { ...p, key: r.value.key } : p)) })); })} className="mono mono-11 absolute bottom-2 right-2 bg-paper px-2.5 py-1.5 disabled:opacity-60" data-testid="rotate-photo" title="Turn the photo a quarter turn">Rotate ↻</button>
         ) : null}
-        <Link href="/closet" aria-label="Back to closet" className="absolute left-2 top-2 flex size-11 items-center justify-center bg-paper text-ink">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden><path d="M15 5l-7 7 7 7" /></svg>
-        </Link>
         {photo?.kind === "retail" ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">Store photo</span> : photo?.kind === "worn" || photo?.kind === "back" ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">{KIND_WORD[photo.kind]}</span> : it.storePhoto && photo?.isPrimary ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">Store photo</span> : null}
       </div>
       {it.photos.length > 1 ? (

@@ -6,7 +6,7 @@
   --black: #000000;
   --paper: #ffffff;
   --bone: #f2f0eb;
-  --graphite: #6b6b6b;
+  --graphite: #454545; /* was #6b6b6b: too faint on paper (Jeff, 19 Oct 2026) */
   --line: #e5e3de;
   --danger: #b91c1c;
 }
@@ -48,10 +48,10 @@ html, body {
   font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.4;
 }
-.mono-11 { font-size: 11px; }
+.mono-11 { font-size: 12px; }
 .mono-12 { font-size: 12px; }
 .mono-13 { font-size: 13px; }
 

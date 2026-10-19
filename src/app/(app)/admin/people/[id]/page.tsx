@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { getPerson, listPeople } from "@/lib/people/service";
@@ -16,7 +15,6 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
   const bodyPhotos = person.role === "minor" ? await bodyPhotosAllowed(person.id) : null;
   return (
     <div>
-      <Link href="/admin/people" className="mono mb-3 inline-block text-graphite">← People</Link>
       <PageHeader title={person.name} />
       <PersonEditor person={person} admins={admins} smsReady={smsConfigured()} isSelf={person.id === admin.id} bodyPhotos={bodyPhotos ? { allowed: bodyPhotos.allowed, approvedBy: bodyPhotos.approvedBy ?? null, isParent: person.guardianIds.includes(admin.id) } : null} />
     </div>

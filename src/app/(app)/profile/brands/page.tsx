@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { db } from "@/lib/db";
 import { getFavorites } from "@/lib/profiles/service";
@@ -24,7 +23,6 @@ export default async function BrandsPage() {
 
   return (
     <div>
-      <Link href="/profile" className="mono mb-3 inline-block text-graphite">← Profile</Link>
       <PageHeader title={mine ? "Brands" : owner.first} accent={mine ? "& stores" : "brands"} />
       <FavoritesEditor ownerId={owner.id} favs={favs} brands={brands} stores={stores} myBrands={myBrands} sizeOptions={sizeOptions} likely={likely} canEdit={canEdit} canEditLists={viewer.role === "admin"} />
     </div>

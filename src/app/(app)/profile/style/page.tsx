@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { db } from "@/lib/db";
 import { getStyleProfile } from "@/lib/profiles/service";
@@ -23,7 +22,6 @@ export default async function StyleProfilePage() {
   ]);
   return (
     <div>
-      <Link href="/profile" className="mono mb-3 inline-block text-graphite">← Profile</Link>
       <PageHeader title={mine ? "Style" : owner.first} accent={mine ? "profile" : "style"} />
       <StyleEditor ownerId={owner.id} style={style} colors={colors} words={words} canEdit={canEdit} canEditLists={viewer.role === "admin"} />
       <div className="mt-6"><InspirationBoard ownerId={owner.id} looks={looks} canEdit={canEdit} isMinor={owner.role === "minor"} /></div>

@@ -18,7 +18,6 @@ export default async function CleanOutPage() {
   const name = view.kind === "person" && view.personId !== me.id ? view.name : null;
   return (
     <div>
-      <Link href="/closet" className="mono mb-3 inline-block text-graphite">← Closet</Link>
       <PageHeader
         eyebrow={<div className="flex items-center justify-between"><span>{items.length} {items.length === 1 ? "piece" : "pieces"} not worn in {months} months{name ? ` · ${name}` : ""}</span>{isAdmin(me) ? <Link href="/admin/rules" className="mono text-ink">Edit</Link> : null}</div>}
         title="Clean" accent="out" />

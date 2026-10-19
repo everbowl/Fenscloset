@@ -32,7 +32,6 @@ export default async function HelpTopicPage({ params }: { params: Promise<{ slug
   const next = visible[i + 1];
   return (
     <div className="lg:max-w-[640px]" data-testid="help-topic">
-      <Link href="/help" className="mono mono-11 inline-flex h-11 items-center">← All topics</Link>
       <PageHeader title={topic.title} accent={topic.accent} action={<Link href={topic.link.href} className="mono mono-11 inline-flex h-11 items-center whitespace-nowrap">{topic.link.label}</Link>} />
       <ol className="border-t border-ink">
         {steps.map((step, n) => (

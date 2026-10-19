@@ -15,7 +15,6 @@ export default async function BodyProfilePage() {
   if (!body) {
     return (
       <div>
-        <Link href="/profile" className="mono mb-3 inline-block text-graphite">← Profile</Link>
         <PageHeader title="Body" accent="profile" />
         <p className="mono text-graphite">{owner.first}&apos;s body profile is private</p>
       </div>
@@ -30,7 +29,6 @@ export default async function BodyProfilePage() {
   ]);
   return (
     <div>
-      <Link href="/profile" className="mono mb-3 inline-block text-graphite">← Profile</Link>
       <PageHeader title={mine ? "Body" : owner.first} accent="profile" />
       <BodyEditor ownerId={owner.id} ownerFirst={owner.first} isMinor={owner.role === "minor"} body={{ ...body, photos: body.photos.map((p) => ({ ...p, takenAt: p.takenAt.toISOString() })) }} brands={brands} categories={categories} sizeOptions={sizeOptions} likely={likely} canEdit={canEdit} canEditLists={viewer.role === "admin"} visibleTo={viewers} />
     </div>

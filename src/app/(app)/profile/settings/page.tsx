@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { requirePerson } from "@/lib/auth/current";
 import { db } from "@/lib/db";
@@ -20,7 +19,6 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   ]);
   return (
     <div>
-      <Link href="/profile" className="mono mb-3 inline-block text-graphite">← Profile</Link>
       <PageHeader title="Settings" accent="& privacy" />
       <SettingsEditor privacy={privacy} people={people.map((p) => ({ id: p.id, name: p.name.split(" ")[0] }))}
         calendar={{ configured: isGoogleConfigured(), email: connection?.email ?? null, connected: Boolean(connection), notice: calendar ?? null, calendars, calendarIds: connection?.calendarIds ?? [] }} />

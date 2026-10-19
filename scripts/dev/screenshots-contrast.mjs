@@ -1,0 +1,21 @@
+/** Dev-only: darker small text + the back control in the sticky header (Brands & stores, a piece) on :3100 (e2e DB, mocks). */
+import { chromium, devices } from "@playwright/test";
+import { execSync } from "node:child_process";
+const out = process.argv[2];
+const env = { ...process.env, DATABASE_URL: "postgresql://postgres@localhost:5433/fenscloset_e2e", DEV_MODE: "true", SEED_FORCE: "true", MOCK_S3: "true" };
+execSync(`psql -h localhost -p 5433 -U postgres -d fenscloset_e2e -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'`, { stdio: "ignore" });
+execSync("npx prisma migrate deploy && npx tsx prisma/seed.ts && npx tsx e2e/set-password.ts jeff@everbowl.com closet-rocks-2026 && npx tsx e2e/seed-closets.ts Jeff", { stdio: "ignore", env });
+const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || undefined });
+const base = "http://localhost:3100";
+const ctx = await browser.newContext({ ...devices["iPhone 15"] });
+const page = await ctx.newPage();
+await page.goto(base + "/login");
+await page.getByLabel("Email").fill("jeff@everbowl.com"); await page.getByLabel("Password").fill("closet-rocks-2026");
+await page.getByRole("button", { name: "Sign in" }).click(); await page.waitForURL(/today/);
+await page.goto(base + "/profile/brands"); await page.getByTestId("header-back").waitFor(); await page.waitForTimeout(300);
+await page.screenshot({ path: `${out}/170-brands-contrast-back.png` });
+await page.goto(base + "/closet"); await page.getByTestId("item-card").first().click(); await page.getByTestId("header-back").waitFor(); await page.waitForTimeout(300);
+await page.screenshot({ path: `${out}/171-item-header-back.png` });
+await page.goto(base + "/profile/body"); await page.getByTestId("header-back").waitFor(); await page.waitForTimeout(300);
+await page.screenshot({ path: `${out}/172-body-contrast.png` });
+await browser.close();
