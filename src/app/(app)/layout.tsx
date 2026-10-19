@@ -6,6 +6,7 @@ import { AppNav } from "@/components/app-nav";
 import { AppHeader } from "@/components/app-header";
 import { PersonMenu } from "@/components/person-menu";
 import { HeaderBack } from "@/components/header-back";
+import { accentColor } from "@/lib/rules";
 import { HeaderActionSlot } from "@/components/header-action";
 import { DevModeBanner } from "@/components/dev-mode-banner";
 import { ServiceWorkerRegistrar } from "@/components/sw-registrar";
@@ -16,10 +17,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const person = await requirePerson();
   if (person.mustChangePassword) redirect("/change-password");
   const cookieView = (await cookies()).get(VIEW_COOKIE)?.value;
-  const [views, view] = await Promise.all([viewableClosets(person), resolveView(person, cookieView)]);
+  const [views, view, accent] = await Promise.all([viewableClosets(person), resolveView(person, cookieView), accentColor()]);
   const current = view.kind === "family" ? "family" : view.personId;
   return (
     <div className="flex min-h-dvh flex-col bg-paper">
+      <style>{`:root{--accent:${accent}}`}</style>
       <ServiceWorkerRegistrar />
       <DevModeBanner />
       <AppHeader left={<div className="flex items-center"><HeaderBack /><PersonMenu views={views} current={current} isAdmin={isAdmin(person)} logout={logoutAction} setView={setViewAction} /></div>} right={<HeaderActionSlot />} />

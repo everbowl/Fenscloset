@@ -64,6 +64,7 @@ export default async function TodayPage() {
       tryOn={tryOn}
       mannequin={dress && tryOn !== "ready" && isMannequinConfigured()}
       backPhoto={tryOn === "ready" && (await hasBackPhoto(personId))}
+      mannequinAvailable={dress && isMannequinConfigured()}
     />
   );
 }

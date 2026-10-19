@@ -163,6 +163,13 @@ const SEED_SETS: Record<string, () => Promise<void>> = {
   "style-words-v1": () => seedSimple(db.styleWord, STYLE_WORDS),
   "brands-v1": () => seedSimple(db.brand, BRANDS),
   "stores-v1": () => seedSimple(db.store, STORES),
+  // Shoes: plain numbers become "M 10 / W 11.5" (Jeff, 19 Oct 2026); only untouched numeric options are swapped.
+  "shoe-sizes-v2": async () => {
+    const shoes = await db.category.findUnique({ where: { name: "Shoes" } });
+    if (!shoes) return;
+    await db.sizeOption.deleteMany({ where: { categoryId: shoes.id, name: { in: Array.from({ length: 23 }, (_, i) => (4 + i / 2).toString()) } } });
+    for (const [si, name] of SIZE_OPTIONS.Shoes.entries()) await db.sizeOption.upsert({ where: { categoryId_name: { categoryId: shoes.id, name } }, update: { sortOrder: si }, create: { categoryId: shoes.id, name, sortOrder: si } });
+  },
 };
 
 export async function applySeedSets(): Promise<string[]> {

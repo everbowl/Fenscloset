@@ -29,7 +29,7 @@ describe("my brands & sizes by item type", () => {
     const tops = opts.find((o) => o.categoryName === "Tops")!;
     expect(tops.options.slice(0, 6)).toEqual(["XS", "S", "M", "L", "XL", "XXL"]);
     expect(opts.find((o) => o.categoryName === "Bottoms")!.options).toContain("32");
-    expect(opts.find((o) => o.categoryName === "Shoes")!.options).toContain("10.5");
+    expect(opts.find((o) => o.categoryName === "Shoes")!.options).toContain("M 10.5 / W 12");
     expect(opts.find((o) => o.categoryName === "Jewelry")).toBeUndefined();
   });
 
@@ -97,7 +97,7 @@ describe("my brands & sizes by item type", () => {
     await setMeasurement(jeff, mya.id, height.id, "60"); await setMeasurement(jeff, mya.id, weight.id, "100");
     expect(await likelySizes(mya.id)).toBeNull();
     expect(measurementOptions({ name: "Height", unit: "in" })[0]).toBe("48");
-    expect(measurementOptions({ name: "Shoe size", unit: "US" })).toContain("10.5");
+    expect(measurementOptions({ name: "Shoe size", unit: "US" })).toContain("M 10.5 / W 12");
     expect(measurementOptions({ name: "Weight", unit: "lb" })).toContain("185");
     expect(measurementOptions({ name: "Tattoo count", unit: "" })).toEqual([]);
     expect(formatMeasurement({ name: "Height", unit: "in" }, "71")).toBe(`5'11"`);

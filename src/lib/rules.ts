@@ -12,6 +12,17 @@ export async function getRuleNumber(key: string, fallback: number): Promise<numb
   return Number.isFinite(n) ? n : fallback;
 }
 
+export async function getRuleText(key: string, fallback: string): Promise<string> {
+  const r = await db.rule.findUnique({ where: { key } });
+  return r?.value?.trim() || fallback;
+}
+
+/** The main-button color from Admin → Rules, as a hex the stylesheet can take; the default when the value is not a hex. */
+export async function accentColor(): Promise<string> {
+  const v = await getRuleText("accentColor", "#FF5A00");
+  return /^#[0-9a-f]{6}$/i.test(v) ? v : "#FF5A00";
+}
+
 export async function setRule(key: string, value: string): Promise<RuleRow> {
   const existing = await db.rule.findUnique({ where: { key } });
   if (!existing) throw new Error("Unknown rule");

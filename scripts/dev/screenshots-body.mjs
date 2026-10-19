@@ -20,13 +20,13 @@ await page.goto(base + "/profile/settings"); await page.getByTestId("tryon-toggl
 await page.goto(base + "/profile/body"); await page.getByTestId("add-body-photo-front").waitFor(); await page.waitForTimeout(300);
 await page.screenshot({ path: `${out}/161-body-three-slots.png`, fullPage: true });
 const body = (tone) => sharp({ create: { width: 300, height: 400, channels: 3, background: { r: tone, g: tone - 10, b: tone - 20 } } }).jpeg().toBuffer();
-for (const [v, tone] of [["front", 120], ["back", 150]]) {
+for (const [v, tone] of [["front", 120], ["back", 150], ["left", 135], ["right", 140]]) {
   await page.getByTestId(`add-body-photo-${v}`).click(); await page.getByTestId("photo-shared").click();
   await page.getByTestId("body-photo").setInputFiles({ name: `${v}.jpg`, mimeType: "image/jpeg", buffer: await body(tone) });
   await page.locator(`[data-testid^=body-photo-][data-view=${v}]`).waitFor();
 }
 await page.waitForTimeout(300); await page.screenshot({ path: `${out}/162-body-front-back.png`, fullPage: true });
 await page.goto(base + "/today"); await page.getByTestId("try-on").waitFor(); await page.getByTestId("try-on").click();
-await page.getByTestId("try-on-sheet").waitFor({ timeout: 20000 }); await page.getByTestId("mirror-back").click(); await page.getByTestId("try-on-sheet").getByText(/from behind/).first().waitFor({ timeout: 20000 }); await page.waitForTimeout(400);
+await page.getByTestId("try-on-sheet").waitFor({ timeout: 20000 }); await page.waitForTimeout(300); await page.screenshot({ path: `${out}/164-mirror-choices.png` }); await page.getByTestId("mirror-back").click(); await page.getByTestId("try-on-sheet").getByText(/from behind/).first().waitFor({ timeout: 20000 }); await page.waitForTimeout(400);
 await page.screenshot({ path: `${out}/163-mirror-from-behind.png` });
 await browser.close();

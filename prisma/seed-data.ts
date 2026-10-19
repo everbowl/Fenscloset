@@ -70,7 +70,8 @@ export const SIZE_OPTIONS: Record<string, string[]> = {
   Swimwear: ["XS", "S", "M", "L", "XL", "XXL", "Youth S", "Youth M", "Youth L", "Youth XL"],
   Dresses: ["XS", "S", "M", "L", "XL", "XXL", "0", "2", "4", "6", "8", "10", "12", "14", "16", "Youth S", "Youth M", "Youth L", "Youth XL"],
   Bottoms: ["XS", "S", "M", "L", "XL", "XXL", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "Youth 4", "Youth 5", "Youth 6", "Youth 7", "Youth 8", "Youth 10", "Youth 12", "Youth 14", "Youth 16"],
-  Shoes: ["5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12", "12.5", "13", "13.5", "14", "14.5", "15", "Youth 1", "Youth 2", "Youth 3", "Youth 4", "Youth 5", "Youth 6"],
+  // Shoes carry men's and women's US sizes side by side (Jeff, 19 Oct 2026): one option covers both.
+  Shoes: ["M 4 / W 5.5", "M 4.5 / W 6", "M 5 / W 6.5", "M 5.5 / W 7", "M 6 / W 7.5", "M 6.5 / W 8", "M 7 / W 8.5", "M 7.5 / W 9", "M 8 / W 9.5", "M 8.5 / W 10", "M 9 / W 10.5", "M 9.5 / W 11", "M 10 / W 11.5", "M 10.5 / W 12", "M 11 / W 12.5", "M 11.5 / W 13", "M 12 / W 13.5", "M 12.5 / W 14", "M 13 / W 14.5", "M 13.5 / W 15", "M 14 / W 15.5", "M 14.5 / W 16", "M 15 / W 16.5", "Youth 1", "Youth 2", "Youth 3", "Youth 4", "Youth 5", "Youth 6"],
   Hats: ["S/M", "L/XL", "One size", "Youth"],
   Belts: ["S", "M", "L", "XL", "28", "30", "32", "34", "36", "38", "40", "42", "44"],
 };
@@ -95,6 +96,7 @@ export const RULES = [
   { key: "noRepeatDays", value: "14", label: "No-repeat window (days)", description: "Don't suggest an outfit piece that was worn within this many days." },
   { key: "notWornMonths", value: "6", label: "Not-worn alert (months)", description: "Flag items that haven't been worn in this many months for a closet clean-out." },
   { key: "timezone", value: "America/Los_Angeles", label: "Household time zone", description: "Decides when 'today' starts for check-ins, looks and the Fits calendar." },
+  { key: "accentColor", value: "#FF5A00", label: "Button color (hex)", description: "The color of the main buttons. Everything else stays black and white. Jeff, 19 Oct 2026: real orange." },
   // Likely sizes from height and weight (adults only; a starting point, shown on the Body page and offered when recording a size in a brand).
   { key: "sizeBandXsMaxLb", value: "125", label: "Likely size · XS up to (lb)", description: "Weight at or under this reads as XS for tops, outerwear and dresses." },
   { key: "sizeBandSMaxLb", value: "150", label: "Likely size · S up to (lb)", description: "Weight at or under this reads as S." },

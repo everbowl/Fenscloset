@@ -553,8 +553,11 @@ model BodySizeByBrand {
 /// Which way the person faces in a body photo: front for the mirror, side for shape, back for how a piece fits from behind.
 enum BodyView {
   front
-  side
   back
+  left
+  right
+  /// older photos taken before left and right were separate
+  side
 }
 
 model BodyPhoto {

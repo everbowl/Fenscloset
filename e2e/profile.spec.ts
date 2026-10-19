@@ -136,7 +136,7 @@ test("my brands & sizes: add Lululemon with a size per item type and a link, the
   const confirmLink = page.getByRole("link", { name: /Confirm 1 ready/ });
   await expect(confirmLink).toBeVisible({ timeout: 30_000 });
   await confirmLink.click();
-  await expect(page.getByTestId("ask-more-photos")).toContainText("More photos of this piece?");
+  await expect(page.getByTestId("ask-more-photos")).toContainText("Now the back");
   await page.getByTestId("more-no").click();
   await expect(page.getByTestId("ask-more-photos")).toHaveCount(0);
   await expect(page.getByTestId("my-brand-pills")).toContainText("Lululemon · L");

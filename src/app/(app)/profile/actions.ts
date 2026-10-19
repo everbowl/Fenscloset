@@ -39,7 +39,7 @@ export async function upsertSizeAction(ownerId: string, input: { id?: string; br
 export async function removeSizeAction(ownerId: string, id: string): Promise<Result> {
   const me = await requirePerson(); return run(() => removeSize(me, ownerId, id));
 }
-export async function addBodyPhotoAction(ownerId: string, key: string, onlyMe = false, view: "front" | "side" | "back" = "front"): Promise<Result> {
+export async function addBodyPhotoAction(ownerId: string, key: string, onlyMe = false, view: "front" | "back" | "left" | "right" | "side" = "front"): Promise<Result> {
   const me = await requirePerson(); return run(() => addBodyPhoto(me, ownerId, key, { onlyMe, view }));
 }
 export async function setBodyPhotoPrivacyAction(ownerId: string, photoId: string, onlyMe: boolean): Promise<Result> {

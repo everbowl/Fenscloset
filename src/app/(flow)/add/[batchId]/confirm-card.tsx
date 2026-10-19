@@ -244,12 +244,19 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
       {bgFailed ? <p className="mono mx-5 mt-3 text-graphite">Background could not be removed · the original photo is used</p> : null}
 
       {askMore && !backKey && !labelKey && !wornKey ? (
-        <div className="mx-5 mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-y border-line py-2" data-testid="ask-more-photos">
-          <span className="mono tracking-[0.1em]">More photos of this piece?</span>
-          <button type="button" onClick={() => backRef.current?.click()} className="mono py-1.5" data-testid="more-back">Back</button>
-          <button type="button" onClick={() => labelRef.current?.click()} className="mono py-1.5" data-testid="more-label">Label</button>
-          <button type="button" onClick={() => wornRef.current?.click()} className="mono py-1.5" data-testid="more-worn">Worn</button>
-          <button type="button" onClick={() => setAskMore(false)} className="mono py-1.5 text-graphite" data-testid="more-no">No</button>
+        <div className="mx-5 mt-3 border-y border-ink py-2.5" data-testid="ask-more-photos">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[15px] leading-snug">Now the back<span className="mono block text-graphite">So the mirror can show the fit from behind</span></span>
+            <div className="flex shrink-0 gap-1.5">
+              <button type="button" onClick={() => backRef.current?.click()} className="mono mono-11 h-9 bg-ink px-3 text-paper" data-testid="more-back">Take it</button>
+              <button type="button" onClick={() => setAskMore(false)} className="mono mono-11 h-9 border border-ink px-3" data-testid="more-no">Not now</button>
+            </div>
+          </div>
+          <div className="mono mt-2 flex items-center gap-3 text-graphite">
+            <span>Also:</span>
+            <button type="button" onClick={() => labelRef.current?.click()} className="py-1 text-ink" data-testid="more-label">Label</button>
+            <button type="button" onClick={() => wornRef.current?.click()} className="py-1 text-ink" data-testid="more-worn">Worn</button>
+          </div>
         </div>
       ) : null}
 
@@ -281,7 +288,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
       {labelKey || wornKey || backKey ? <p className="mono px-5 pt-3 text-graphite" data-testid="photo-status">{[backKey ? "Back photo added" : null, labelKey ? "Label photo added" : null, wornKey ? "Worn photo added" : null].filter(Boolean).join(" · ")}</p> : null}
 
       <div className="mt-auto flex gap-2.5 px-5 pb-[26px] pt-5">
-        <button type="button" onClick={confirm} disabled={pending || Boolean(uploading)} data-testid="confirm-next" className={`h-[58px] flex-1 bg-ink font-mono text-[12px] uppercase tracking-[0.16em] text-paper disabled:opacity-60 ${LIFT}`}>
+        <button type="button" onClick={confirm} disabled={pending || Boolean(uploading)} data-testid="confirm-next" className={`h-[58px] flex-1 bg-accent font-mono text-[12px] uppercase tracking-[0.16em] text-paper disabled:opacity-60 ${LIFT}`}>
           {pending ? "Saving…" : readyCount > 1 ? "Looks right · Next" : "Looks right · Done"}
         </button>
         <button type="button" onClick={() => setSheet("camera")} aria-label="Add a label or worn photo" className="flex size-[54px] items-center justify-center border border-ink bg-paper text-ink">
@@ -328,7 +335,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
               <div className="h-[72px] w-[60px] overflow-hidden bg-bone">{duplicate.thumbKey ? <img src={`/api/photo/${duplicate.thumbKey}`} alt="" className="size-full object-cover" /> : null}</div>
               <p className="text-[15px] leading-snug">You own <strong>{duplicate.name ?? "a piece like this"}</strong>. Is this another one of the same?</p>
             </div>
-            <button type="button" onClick={mirror} className={`mono flex h-[54px] w-full items-center justify-center bg-ink text-[12px] uppercase tracking-[0.16em] text-paper ${LIFT}`} data-testid="like-mirror">Yes · same piece, new color or size</button>
+            <button type="button" onClick={mirror} className={`mono flex h-[54px] w-full items-center justify-center bg-accent text-[12px] uppercase tracking-[0.16em] text-paper ${LIFT}`} data-testid="like-mirror">Yes · same piece, new color or size</button>
             <button type="button" onClick={() => { dismissLike(); merge(); }} className="mono flex h-[46px] w-full items-center justify-center border border-ink text-[12px] uppercase tracking-[0.16em]" data-testid="like-merge">It&apos;s this exact one · add the photo to it</button>
             <button type="button" onClick={dismissLike} className="mono flex h-[46px] w-full items-center justify-center text-graphite" data-testid="like-new">No · a new piece</button>
           </div>

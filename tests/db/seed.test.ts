@@ -25,7 +25,7 @@ describe("seed", () => {
     expect(first.people).toBe(4);
     expect(first.closets).toBe(5); // 4 personal + Family
     expect(first.scales).toBe(3);
-    expect(first.rules).toBe(11); // 3 originals + 8 size-band rules
+    expect(first.rules).toBe(12); // 3 originals + 8 size-band rules + button color
 
     const mya = await db.person.findFirstOrThrow({ where: { name: "Mya" }, include: { guardians: true } });
     expect(mya.role).toBe("minor");
@@ -68,7 +68,7 @@ describe("seed guard", () => {
 
   it("additive seed sets land once on a database that already has people, and never re-create what was removed after", async () => {
     await seed();
-    expect(await db.seedSet.count()).toBe(6);
+    expect(await db.seedSet.count()).toBe(7);
     // simulate a database seeded before Cup size existed
     await db.measurementKind.deleteMany({ where: { name: "Cup size" } });
     await db.seedSet.delete({ where: { name: "measurement-kinds-v2" } });
@@ -81,5 +81,13 @@ describe("seed guard", () => {
     await db.measurementKind.deleteMany({ where: { name: "Cup size" } });
     expect(await applySeedSets()).toEqual([]);
     expect(await db.measurementKind.count({ where: { name: "Cup size" } })).toBe(0);
+    // shoes: a database seeded with plain numbers gets M / W side by side once
+    const shoes = await db.category.findUniqueOrThrow({ where: { name: "Shoes" } });
+    await db.sizeOption.create({ data: { categoryId: shoes.id, name: "10", sortOrder: 99 } });
+    await db.seedSet.delete({ where: { name: "shoe-sizes-v2" } });
+    await seed();
+    const names = (await db.sizeOption.findMany({ where: { categoryId: shoes.id }, orderBy: { sortOrder: "asc" } })).map((o) => o.name);
+    expect(names).toContain("M 10 / W 11.5");
+    expect(names).not.toContain("10");
   });
 });

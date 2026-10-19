@@ -9,6 +9,7 @@
   --graphite: #454545; /* was #6b6b6b: too faint on paper (Jeff, 19 Oct 2026) */
   --line: #e5e3de;
   --danger: #b91c1c;
+  --accent: #FF5A00; /* main buttons; overridden per household from Admin → Rules */
 }
 
 @theme inline {
@@ -22,7 +23,7 @@
   --color-surface: var(--paper);
   --color-border: var(--line);
   --color-line: var(--line);
-  --color-accent: var(--black);
+  --color-accent: var(--accent);
   --color-accent-foreground: var(--paper);
   --color-danger: var(--danger);
   --font-sans: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;

@@ -59,7 +59,7 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
           <PageHeader title="Add" accent="clothes" />
           <p className="mono text-graphite">How are you adding?</p>
           <div className="mt-4 flex flex-col gap-4" data-testid="add-doors">
-            <button type="button" onClick={() => setDoor("photo")} className={`flex min-h-[72px] w-full items-center justify-between bg-ink px-5 text-left text-paper ${LIFT}`} data-testid="door-photo">
+            <button type="button" onClick={() => setDoor("photo")} className={`flex min-h-[72px] w-full items-center justify-between bg-accent px-5 text-left text-paper ${LIFT}`} data-testid="door-photo">
               <span><span className="mono block text-[12px] uppercase tracking-[0.16em]">From photos</span><span className="mono mt-1 block text-[11px] text-paper/70">Hanger or flat-lay shots · one piece each</span></span>
               <CameraIcon />
             </button>

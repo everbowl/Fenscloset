@@ -5,7 +5,8 @@ type Variant = "primary" | "secondary" | "ghost" | "danger";
 type Size = "md" | "lg" | "sm";
 
 /*
- * Brand buttons: square, mono uppercase, tracked. Primary is solid black; secondary is a 1px black outline.
+ * Brand buttons: square, mono uppercase, tracked. Primary is the household's accent (real orange, Jeff 19 Oct 2026, Q11 A;
+ * editable in Admin → Rules); secondary is a 1px black outline. Everything else on the page stays black and white.
  * Primary gets a "lift" (Jeff, 19 Oct 2026, Q1 A): a second black edge sitting down and to the right with a
  * paper gap, so it reads as a thing to press and not as another block of type. Large primaries also sit
  * on a bone "shelf" (Q1 B) that reaches into the page gutter, and carry an arrow.
@@ -13,7 +14,7 @@ type Size = "md" | "lg" | "sm";
 export const LIFT = "shadow-[4px_4px_0_0_var(--color-paper),5px_5px_0_1px_var(--color-ink)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[2px_2px_0_0_var(--color-paper),3px_3px_0_1px_var(--color-ink)] disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0";
 export const SHELF = "relative before:absolute before:-inset-x-5 before:-inset-y-3 before:-z-10 before:bg-bone before:content-['']";
 const variants: Record<Variant, string> = {
-  primary: `bg-ink text-paper hover:bg-neutral-800 active:bg-neutral-900 disabled:bg-neutral-400 ${LIFT}`,
+  primary: `bg-accent text-paper hover:brightness-95 active:brightness-90 disabled:bg-neutral-400 ${LIFT}`,
   secondary: "bg-paper text-ink border border-ink hover:bg-bone active:bg-line",
   ghost: "bg-transparent text-ink hover:text-graphite",
   danger: "bg-paper text-ink border border-ink hover:bg-bone active:bg-line",

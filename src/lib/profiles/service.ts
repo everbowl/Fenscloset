@@ -100,6 +100,7 @@ export async function removeSize(viewer: Viewer, ownerId: string, id: string): P
   await db.bodySizeByBrand.deleteMany({ where: { id, personId: ownerId } });
 }
 
+/** Body photos keep their history: the newest of each view is what the mirror uses; older ones stay (and can be removed) so the shape can be followed over time. */
 export async function addBodyPhoto(viewer: Viewer, ownerId: string, key: string, opts: { onlyMe?: boolean; view?: BodyView } = {}): Promise<void> {
   await assertCanEdit(viewer, ownerId);
   const parsed = parseKey(key);

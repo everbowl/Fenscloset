@@ -35,6 +35,8 @@ type Props = {
   mannequin: boolean;
   /** A back body photo exists: the mirror can show the look from behind. */
   backPhoto: boolean;
+  /** The mannequin is set up: offered in the mirror even when the person has their own photo. */
+  mannequinAvailable: boolean;
 };
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -192,7 +194,7 @@ export function TodayScreen(p: Props) {
           {p.canDress ? (
             <div className="mt-4 flex flex-col gap-2 lg:col-start-2">
               {worn ? (
-                <Link href="/fits" className={`mono flex h-[58px] items-center justify-center bg-ink text-[12px] uppercase tracking-[0.16em] text-paper ${LIFT}`}>Wearing this · see Fits →</Link>
+                <Link href="/fits" className={`mono flex h-[58px] items-center justify-center bg-accent text-[12px] uppercase tracking-[0.16em] text-paper ${LIFT}`}>Wearing this · see Fits →</Link>
               ) : (
                 <Button size="lg" className="w-full" disabled={busy !== null} onClick={() => run("wear", () => wearAction(p.personId, p.suggestion!.id, index))} data-testid="wear-this">{busy === "wear" ? "Saving…" : "Wear this"}</Button>
               )}
@@ -284,11 +286,14 @@ export function TodayScreen(p: Props) {
             <div className="h-[460px] overflow-hidden bg-bone"><img src={`/api/photo/${tryOn.key}`} alt={tryOn.mannequin ? "This look on a mannequin" : "You wearing this look"} className="size-full object-contain" /></div>
             <p className="mono text-graphite">{board?.pieces.map((x) => x.label).join(" · ")}</p>
             <p className="mono text-ink">{tryOn.mannequin ? `On a mannequin · No body photo used${p.mine ? "" : ` · ${p.personName}’s look`}` : `On you${tryOn.view === "back" ? " · from behind" : ""} · Only you can see this picture`}{tryOn.cached ? " · saved from before" : ""}</p>
-            {!tryOn.mannequin && p.backPhoto ? (
-              <div className="flex gap-1.5">
-                {(["front", "back"] as const).map((v) => (
-                  <button key={v} type="button" disabled={busy !== null} aria-pressed={(tryOn.view ?? "front") === v} onClick={() => { if ((tryOn.view ?? "front") === v) return; setBusy("tryon"); setError(undefined); start(async () => { const r = await tryOnAction(p.personId, p.suggestion!.id, index, v); setBusy(null); if (!r.ok) setError(r.error); else if (r.tryOn) setTryOn(r.tryOn); }); }} className={`mono mono-11 h-9 px-4 ${(tryOn.view ?? "front") === v ? "bg-ink text-paper" : "border border-ink"}`} data-testid={`mirror-${v}`}>{v === "front" ? "Front" : busy === "tryon" ? "Turning…" : "From behind"}</button>
-                ))}
+            {(p.tryOn === "ready" && p.mannequinAvailable) || (p.tryOn === "ready" && p.backPhoto) ? (
+              <div className="flex flex-wrap gap-1.5" data-testid="mirror-views">
+                {([["front", "On me"], ...(p.backPhoto ? [["back", "From behind"]] : []), ...(p.mannequinAvailable ? [["mannequin", "Mannequin"]] : [])] as [string, string][]).map(([v, word]) => {
+                  const on = v === "mannequin" ? Boolean(tryOn.mannequin) : !tryOn.mannequin && (tryOn.view ?? "front") === v;
+                  return (
+                    <button key={v} type="button" disabled={busy !== null} aria-pressed={on} onClick={() => { if (on) return; setBusy("tryon"); setError(undefined); start(async () => { const r = v === "mannequin" ? await mannequinAction(p.personId, p.suggestion!.id, index) : await tryOnAction(p.personId, p.suggestion!.id, index, v as "front" | "back"); setBusy(null); if (!r.ok) setError(r.error); else if (r.tryOn) setTryOn(r.tryOn); }); }} className={`mono mono-11 h-9 px-4 ${on ? "bg-ink text-paper" : "border border-ink"}`} data-testid={`mirror-${v}`}>{busy === "tryon" && !on ? "…" : word}</button>
+                  );
+                })}
               </div>
             ) : null}
           </div>

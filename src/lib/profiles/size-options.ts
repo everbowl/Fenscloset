@@ -24,7 +24,7 @@ export function measurementOptions(kind: { name: string; unit: string }): string
   const range = (from: number, to: number, step = 1) => { const out: string[] = []; for (let v = from; v <= to + 1e-9; v += step) out.push(Number.isInteger(v) ? String(v) : v.toFixed(1)); return out; };
   if (/height/.test(n)) return range(48, 84); // 4'0" to 7'0", stored in inches
   if (/weight/.test(n)) return range(60, 350, 5);
-  if (/shoe/.test(n)) return range(3, 16, 0.5);
+  if (/shoe/.test(n)) return range(4, 15, 0.5).map((m) => `M ${m} / W ${(Number(m) + 1.5).toString()}`); // men's and women's US side by side
   if (/chest|bust/.test(n)) return range(26, 60);
   if (/waist/.test(n)) return range(20, 56);
   if (/hip/.test(n)) return range(28, 64);

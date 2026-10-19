@@ -15,9 +15,10 @@ import type { BodyProfileView, Named } from "@/lib/profiles/service";
 import { SizeSheet } from "@/components/profile/size-sheet";
 import type { CategorySizes } from "@/lib/profiles/sizes";
 import { formatMeasurement, likelyFor, measurementOptions, type LikelySizes } from "@/lib/profiles/size-options";
+import { monoDate } from "@/lib/dates";
 import { addBodyPhotoAction, removeBodyPhotoAction, removeSizeAction, setBodyPhotoPrivacyAction, setFitNotesAction, setMeasurementAction, upsertSizeAction } from "../actions";
 
-type BodyView = "front" | "side" | "back";
+type BodyView = "front" | "back" | "left" | "right" | "side";
 type Body = Omit<BodyProfileView, "photos"> & { photos: { id: string; key: string; takenAt: string; onlyMe: boolean; view: BodyView }[] };
 
 /**
@@ -112,27 +113,44 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, brands, categor
         ) : (
           <>
             {isMinor && body.photosApprovedBy ? <p className="mono py-2 text-graphite">Approved by {body.photosApprovedBy} · seen by {ownerFirst} and parents only</p> : null}
-            <p className="mono py-2 normal-case text-graphite">Front is what the mirror uses. Back shows how a piece fits from behind. Swimwear or fitted clothes give the truest shape.</p>
-            <div className="grid grid-cols-3 gap-1.5 pt-1">
-              {(["front", "side", "back"] as const).map((v) => {
-                const p = body.photos.find((x) => x.view === v); // newest first from the server
-                const word = v === "front" ? "Front" : v === "side" ? "Side" : "Back";
+            <p className="mono py-2 normal-case text-graphite">Four photos: front, back, left, right. Swimwear or underwear, phone at chest height, plain wall. The mirror uses the front; the back shows how a piece fits from behind. Retake them as your body changes: the newest of each is used, the rest stay as history.</p>
+            <div className="grid grid-cols-4 gap-1.5 pt-1" data-testid="body-slots">
+              {(["front", "back", "left", "right"] as const).map((v) => {
+                const p = body.photos.find((x) => x.view === v) ?? (v === "left" ? body.photos.find((x) => x.view === "side") : undefined); // newest first from the server
+                const word = v[0].toUpperCase() + v.slice(1);
                 return p ? (
                   <button key={v} type="button" onClick={() => canEdit && setPhotoSheet(p.id)} className="relative h-[150px] overflow-hidden bg-bone" data-testid={p.onlyMe ? "body-photo-locked" : "body-photo-shared"} data-view={v}>
                     <img src={`/api/photo/${p.key}`} alt={`${word} full-body photo`} className="size-full object-cover" />
-                    <span className="mono absolute bottom-1.5 left-1.5 bg-paper px-1.5 py-1">{word}</span>
+                    <span className="mono absolute bottom-1.5 left-1.5 bg-paper px-1.5 py-1">{word} · {monoDate(p.takenAt.slice(0, 10))}</span>
                     {p.onlyMe ? <span className="mono absolute left-1.5 top-1.5 bg-paper px-1.5 py-1">Only me</span> : null}
                   </button>
                 ) : canEdit ? (
                   <button key={v} type="button" onClick={() => { setNextView(v); setAskPrivacy(true); }} disabled={uploading} className="flex h-[150px] flex-col items-center justify-center gap-2 border border-dashed border-ink bg-paper" data-testid={`add-body-photo-${v}`}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden><path d="M3 8h4l2-3h6l2 3h4v12H3z" /><circle cx="12" cy="13.5" r="3.5" /></svg>
-                    <span className="mono">{uploading && nextView === v ? "Saving…" : `Add ${word.toLowerCase()}`}</span>
+                    <span className="mono">{uploading && nextView === v ? "Saving…" : word}</span>
                   </button>
                 ) : (
-                  <div key={v} className="flex h-[150px] items-center justify-center bg-bone"><span className="mono text-graphite">No {word.toLowerCase()}</span></div>
+                  <div key={v} className="flex h-[150px] items-center justify-center bg-bone"><span className="mono text-graphite">No {v}</span></div>
                 );
               })}
             </div>
+            {(() => {
+              const newest = new Set((["front", "back", "left", "right", "side"] as const).map((v) => body.photos.find((x) => x.view === v)?.id).filter(Boolean));
+              const older = body.photos.filter((x) => !newest.has(x.id));
+              return older.length ? (
+                <div className="pt-3" data-testid="body-history">
+                  <p className="mono pb-1.5 text-graphite">Older photos · {older.length}</p>
+                  <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
+                    {older.map((p) => (
+                      <button key={p.id} type="button" onClick={() => canEdit && setPhotoSheet(p.id)} className="relative h-[84px] w-[64px] shrink-0 overflow-hidden bg-bone">
+                        <img src={`/api/photo/${p.key}`} alt="" className="size-full object-cover" />
+                        <span className="mono absolute bottom-1 left-1 bg-paper px-1 py-0.5">{monoDate(p.takenAt.slice(0, 10))}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null;
+            })()}
             {body.photos.length === 0 && !canEdit ? <p className="mono py-3 text-graphite">No photos yet</p> : null}
           </>
         )}
@@ -176,6 +194,7 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, brands, categor
           <div className="space-y-2.5">
             <p className="mono text-graphite">{p.onlyMe ? "Locked · only you can see it" : `Seen by ${visibleTo.join(", ")}`}</p>
             <Button variant="secondary" className="w-full" disabled={pending} data-testid="toggle-photo-lock" onClick={() => { setPhotoSheet(null); run(() => setBodyPhotoPrivacyAction(ownerId, p.id, !p.onlyMe)); }}>{p.onlyMe ? "Unlock for my body-profile viewers" : "Lock to only me"}</Button>
+            <Button variant="secondary" className="w-full" disabled={pending} data-testid="retake-photo" onClick={() => { setPhotoSheet(null); setNextView(p.view === "side" ? "left" : p.view); setAskPrivacy(true); }}>Retake ({p.view === "side" ? "left" : p.view})</Button>
             <Button variant="secondary" className="w-full" disabled={pending} onClick={() => { setPhotoSheet(null); run(() => removeBodyPhotoAction(ownerId, p.id)); }}>Remove photo</Button>
           </div>
         ) : null; })()}
