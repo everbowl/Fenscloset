@@ -151,14 +151,14 @@ export function TodayScreen(p: Props) {
 
       {boards.length ? (
         <>
-          <div className="relative lg:col-start-1 lg:row-start-1 lg:row-span-6">
+          <div className="relative lg:col-start-1 lg:row-start-1 lg:row-span-3">
             <div ref={scroller} className="-mx-5 flex snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] lg:mx-0" data-testid="boards">
               {boards.map((b, i) => <Board key={i} index={i} board={b} active={i === index} />)}
             </div>
             {busy === "regen" ? <div className="absolute inset-0 flex items-center justify-center bg-paper/70" data-testid="refreshing"><span className="mono mono-11 bg-paper px-3 py-2">Building fresh looks…</span></div> : null}
           </div>
           {p.canDress && (p.tryOn === "ready" || p.mannequin) ? (
-            <div className="mt-4 lg:col-start-1 lg:row-start-7" data-testid="mirror">
+            <div className="mt-4 lg:col-start-1 lg:row-start-4 lg:row-span-4 lg:self-start" data-testid="mirror">
               <button type="button" disabled={busy !== null} onClick={() => { if (tryOn && tryOn.itemIds.join() === [...(board?.itemIds ?? [])].sort().join()) { setSheet("tryon"); return; } setBusy("tryon"); setError(undefined); start(async () => { const r = p.tryOn === "ready" ? await tryOnAction(p.personId, p.suggestion!.id, index) : await mannequinAction(p.personId, p.suggestion!.id, index); setBusy(null); if (!r.ok) setError(r.error); else if (r.tryOn) { setTryOn(r.tryOn); setSheet("tryon"); } }); }}
                 className="flex w-full items-center gap-5 border border-ink p-3 text-left disabled:opacity-60" data-testid={p.tryOn === "ready" ? "try-on" : "see-on-mannequin"}>
                 <span className="relative h-[150px] w-[100px] shrink-0 overflow-hidden rounded-t-[60px] border-2 border-ink bg-paper">
