@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { HeaderAction } from "@/components/header-action";
 import { PageHeader } from "@/components/ui/page-header";
-import { Button, LIFT } from "@/components/ui/button";
+import { Button, buttonClass, Icons, Shelf } from "@/components/ui/button";
 import { Banner } from "@/components/ui/banner";
 import { Sheet } from "@/components/ui/sheet";
 import { PickSheet, TextSheet } from "@/components/items/row-editor";
@@ -114,6 +114,7 @@ export function TodayScreen(p: Props) {
   }
 
   const worn = Boolean(board?.wornFitId);
+  const [flashWorn, setFlashWorn] = useState(false); // "✓ Worn" for a beat before the button turns into the Fits link
   const title = p.evening ? "Tonight’s" : "Today’s";
 
   return (
@@ -193,10 +194,11 @@ export function TodayScreen(p: Props) {
           ) : null}
           {p.canDress ? (
             <div className="mt-4 flex flex-col gap-2 lg:col-start-2">
-              {worn ? (
-                <Link href="/fits" className={`mono flex h-[58px] items-center justify-center bg-accent text-[12px] uppercase tracking-[0.16em] text-paper ${LIFT}`}>Wearing this · see Fits →</Link>
+              {worn && !flashWorn ? (
+                <Shelf><Link href="/fits" className={buttonClass({ size: "lg", className: "w-full" })}><Icons.calendar /><span className="flex flex-col items-start gap-0.5 text-left"><span>Wearing this · see Fits</span><span className="mono text-[9px] tracking-[0.12em] opacity-75">It is on your calendar</span></span><span aria-hidden className="ml-1 transition-transform duration-100 group-active:translate-x-1">→</span></Link></Shelf>
               ) : (
-                <Button size="lg" className="w-full" disabled={busy !== null} onClick={() => run("wear", () => wearAction(p.personId, p.suggestion!.id, index))} data-testid="wear-this">{busy === "wear" ? "Saving…" : "Wear this"}</Button>
+                <Button size="lg" className="w-full" icon={<Icons.shirt />} sub="Lands on your Fits calendar" flash={flashWorn ? "✓ Worn" : null} disabled={busy !== null}
+                  onClick={() => run("wear", () => wearAction(p.personId, p.suggestion!.id, index), () => { setFlashWorn(true); setTimeout(() => setFlashWorn(false), 900); })} data-testid="wear-this">{busy === "wear" ? "Saving…" : "Wear this"}</Button>
               )}
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="secondary" disabled={busy !== null || worn} onClick={() => setSheet("swap")} data-testid="swap">Change a piece</Button>

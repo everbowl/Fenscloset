@@ -46,6 +46,6 @@ test.describe("add from a store", () => {
 
     await page.goto("/closet");
     await page.getByTestId("item-card").first().click();
-    await expect(page.getByText("Store photo")).toBeVisible();
+    await expect(page.getByText("Store photo", { exact: true })).toBeVisible();
   });
 });
