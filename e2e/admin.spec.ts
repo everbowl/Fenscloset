@@ -64,8 +64,9 @@ test("admin changes a rule", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Saved" })).toBeVisible();
   await page.reload();
   await expect(page.getByLabel("No-repeat window (days)")).toHaveValue("21");
-  // the button color is a hex with a swatch
+  // the button color is a hex with a swatch; nothing waits for a re-cut, so that upkeep row is not shown
   await expect(page.getByLabel("Button color (hex)")).toHaveValue("#FF5A00");
+  await expect(page.getByTestId("untidy-photos")).toHaveCount(0);
   await page.getByLabel("Button color (hex)").fill("#1A2B3C");
   await page.getByTestId("rule-accentColor").getByRole("button", { name: "Save" }).click();
   await expect(page.getByTestId("rule-accentColor").getByRole("button", { name: "Saved" })).toBeVisible();

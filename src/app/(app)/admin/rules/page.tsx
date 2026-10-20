@@ -3,11 +3,13 @@ import { Card } from "@/components/ui/card";
 import { getRules } from "@/lib/rules";
 import { RuleForm } from "./rule-form";
 import { RefitPhotos } from "./refit-photos";
+import { UntidyPhotos } from "./untidy-photos";
+import { untidyPending } from "@/lib/items/untidy";
 
 export const metadata = { title: "Rules" };
 
 export default async function RulesPage() {
-  const rules = await getRules();
+  const [rules, pending] = await Promise.all([getRules(), untidyPending()]);
   return (
     <div>
       <PageHeader title="Rules" />
@@ -16,6 +18,7 @@ export default async function RulesPage() {
         {rules.map((r) => <RuleForm key={r.key} rule={r} />)}
       </Card>
       <div className="mt-10"><PageHeader title="Photo" accent="upkeep" /></div>
+      <UntidyPhotos pending={pending} />
       <RefitPhotos />
     </div>
   );

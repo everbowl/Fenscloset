@@ -21,7 +21,9 @@ import type { EntryAiResult } from "@/lib/import/process";
 export const UNTIDY_SET = "untidy-v1";
 export const UNTIDY_SINCE = new Date("2026-10-18T19:57:29Z");
 
-export type UntidyReport = { recut: number; skipped: number; failed: number; done: boolean };
+export type UntidyReport = { recut: number; skipped: number; failed: number; done: boolean; /** Why the last piece was left (remove.bg's word for it). */ lastError?: string };
+/** While pieces are left (remove.bg out of credits, say), the server tries again this often; Admin → Rules has a button for right now. */
+export const UNTIDY_RETRY_MS = 60 * 60_000;
 
 type Quarter = 0 | 90 | 180 | 270;
 
@@ -49,7 +51,8 @@ export async function untidyAll(opts: { log?: (line: string) => void } = {}): Pr
     let cut: Buffer;
     try { cut = await removeBackground(await normalizeOriginal(original)); } catch (e) {
       if (!(e instanceof RemoveBgError)) throw e;
-      log(`untidy: ${entry.id} left for the next start, remove.bg ${e.code}: ${e.message}`); report.failed++; continue;
+      report.lastError = `remove.bg ${e.code}: ${e.message}`;
+      log(`untidy: ${entry.id} left for later, ${report.lastError}`); report.failed++; continue;
     }
     let fitted = await fitCutout(cut);
     let old: Buffer | null = null;
@@ -76,6 +79,13 @@ export async function untidyAll(opts: { log?: (line: string) => void } = {}): Pr
   }
   if (report.failed === 0) { await db.seedSet.create({ data: { name: UNTIDY_SET } }); report.done = true; }
   return report;
+}
+
+/** How many pieces still wait for their fresh cutout (0 once the set is recorded). Admin → Rules shows it while it is above 0. */
+export async function untidyPending(): Promise<number> {
+  if (await db.seedSet.findUnique({ where: { name: UNTIDY_SET } })) return 0;
+  const entries = await db.importEntry.findMany({ where: { status: "done", itemId: { not: null }, cutoutKey: { not: null }, createdAt: { gte: UNTIDY_SINCE } }, select: { aiResult: true } });
+  return entries.filter((e) => !((e.aiResult as Partial<EntryAiResult> | null)?.warnings ?? []).some((w) => w.startsWith("recut"))).length;
 }
 
 /** The item's one photo of that kind, when there is exactly one (an entry's keys can be stale after a refit). */
@@ -106,12 +116,19 @@ export async function bestTurn(old: Buffer, fresh: Buffer): Promise<Quarter> {
   return best;
 }
 
-/** Server start: a short wait so the health check goes first, then one pass, with a one-line summary in the log. Never throws. */
-export async function untidyOnStart(delayMs = 5000): Promise<void> {
+/**
+ * Server start: a short wait so the health check goes first, then one pass, with a one-line summary in the log;
+ * while pieces are left, another pass every `retryMs`. Never throws.
+ */
+export async function untidyOnStart(delayMs = 5000, retryMs = UNTIDY_RETRY_MS): Promise<void> {
   await new Promise<void>((resolve) => { const t = setTimeout(resolve, delayMs); (t as { unref?: () => void }).unref?.(); });
   try {
     const r = await untidyAll({ log: (line) => console.log(line) });
-    if (r.recut || r.skipped || r.failed) console.log(`untidy: ${r.recut} re-cut, ${r.skipped} skipped, ${r.failed} left for the next start${r.done ? "; done" : ""}`);
+    if (r.recut || r.skipped || r.failed) console.log(`untidy: ${r.recut} re-cut, ${r.skipped} skipped, ${r.failed} left for later${r.done ? "; done" : ""}`);
+    if (!r.done) {
+      console.log(`untidy: the rest again in ${Math.round(retryMs / 60_000)} min, or now from Admin → Rules`);
+      void untidyOnStart(retryMs, retryMs);
+    }
   } catch (e) {
     console.error("untidy: failed", e);
   }

@@ -1,0 +1,36 @@
+/** Dev-only: the confirm card and Admin → Rules after Tidy and Smooth were removed (app on :3100). */
+import { chromium, devices } from "@playwright/test";
+import { execSync } from "node:child_process";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import sharp from "sharp";
+const out = process.argv[2];
+const env = { ...process.env, DATABASE_URL: "postgresql://postgres@localhost:5433/fenscloset_e2e", DEV_MODE: "true", SEED_FORCE: "true", MOCK_S3: "true" };
+execSync(`psql -h localhost -p 5433 -U postgres -d fenscloset_e2e -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'`, { stdio: "ignore" });
+execSync("npx prisma migrate deploy && npx tsx prisma/seed.ts && npx tsx e2e/set-password.ts jeff@everbowl.com closet-rocks-2026", { stdio: "ignore", env });
+const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || undefined });
+const ctx = await browser.newContext({ ...devices["iPhone 15"] });
+const page = await ctx.newPage();
+const base = "http://localhost:3100";
+await page.goto(base + "/login");
+await page.getByLabel("Email").fill("jeff@everbowl.com"); await page.getByLabel("Password").fill("closet-rocks-2026");
+await page.getByRole("button", { name: "Sign in" }).click(); await page.waitForURL(/today/);
+await page.goto(base + "/add"); await page.getByTestId("door-photo").click();
+const dir = mkdtempSync(path.join(os.tmpdir(), "fc-shots-"));
+const buf = await sharp({ create: { width: 800, height: 1100, channels: 3, background: { r: 20, g: 20, b: 20 } } }).composite([{ input: await sharp({ create: { width: 800, height: 300, channels: 3, background: { r: 255, g: 255, b: 255 } } }).png().toBuffer(), top: 100, left: 0 }]).jpeg().toBuffer();
+const p = path.join(dir, "piece-1.jpg"); writeFileSync(p, buf);
+await page.getByTestId("pick-photos").setInputFiles([p]);
+const link = page.getByRole("link", { name: /Confirm 1 ready/ }); await link.waitFor({ timeout: 30000 }); await link.click();
+await page.getByTestId("confirm-counter").waitFor(); await page.waitForTimeout(600);
+await page.screenshot({ path: `${out}/01-confirm-card.png`, fullPage: true });
+// one piece in the closet, added after Smooth went live: Admin → Rules offers the re-cut now (UNTIDY_ON_START=false on this server)
+await page.getByTestId("confirm-next").click(); await page.waitForTimeout(1200);
+await page.goto(base + "/admin/rules"); await page.waitForTimeout(500);
+await page.screenshot({ path: `${out}/02-admin-rules.png`, fullPage: true });
+await page.getByTestId("untidy-photos").scrollIntoViewIfNeeded(); await page.waitForTimeout(200);
+await page.screenshot({ path: `${out}/03-rules-recut-waiting.png` });
+await page.getByTestId("untidy-now").click(); await page.getByTestId("untidy-result").waitFor({ timeout: 30000 }); await page.waitForTimeout(300);
+await page.screenshot({ path: `${out}/04-rules-recut-done.png` });
+await browser.close();
+console.log("shots done");

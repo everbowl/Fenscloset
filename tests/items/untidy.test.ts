@@ -11,7 +11,7 @@ import { getOrCreateOpenBatch, registerEntry } from "@/lib/import/service";
 import { drainQueue } from "@/lib/import/queue";
 import { createItemFromEntry } from "@/lib/items/service";
 import { rotateImage } from "@/lib/images/rotate";
-import { bestTurn, untidyAll, UNTIDY_SET } from "@/lib/items/untidy";
+import { bestTurn, untidyAll, untidyOnStart, untidyPending, UNTIDY_SET } from "@/lib/items/untidy";
 import type { EntryAiResult } from "@/lib/import/process";
 
 /** A dark photo with a white band near the top: turned, it looks different, so the orientation check has something to see. */
@@ -58,8 +58,10 @@ describe("untidy: Tidy and Smooth undone on the pieces they touched", () => {
     const a = await piece();
     await tidied(a.cutout.bucketKey, 90);
     const b = await piece();
+    expect(await untidyPending()).toBe(2);
     const lines: string[] = [];
     expect(await untidyAll({ log: (l) => lines.push(l) })).toEqual({ recut: 2, skipped: 0, failed: 0, done: true });
+    expect(await untidyPending()).toBe(0);
     const aCut = await db.itemPhoto.findUniqueOrThrow({ where: { id: a.cutout.id } });
     expect(aCut.bucketKey).not.toBe(a.cutout.bucketKey);
     expect(await objectExists(a.cutout.bucketKey)).toBe(false);
@@ -87,13 +89,25 @@ describe("untidy: Tidy and Smooth undone on the pieces they touched", () => {
     await deleteObject(a.entry.originalKey);
     const b = await piece();
     process.env.MOCK_REMOVE_BG_FAIL = "insufficient_credits";
-    expect(await untidyAll()).toEqual({ recut: 0, skipped: 1, failed: 1, done: false });
+    expect(await untidyAll()).toEqual({ recut: 0, skipped: 1, failed: 1, done: false, lastError: "remove.bg insufficient_credits: Mock remove.bg failure" });
+    expect(await untidyPending()).toBe(1); // the one left for later
     expect(await warningsOf(a.entry.id)).toContain("recut:no_original");
     expect(await warningsOf(b.entry.id)).not.toContain("recut");
     expect(await db.seedSet.findUnique({ where: { name: UNTIDY_SET } })).toBeNull();
     delete process.env.MOCK_REMOVE_BG_FAIL;
     expect(await untidyAll()).toEqual({ recut: 1, skipped: 0, failed: 0, done: true });
     expect(await warningsOf(b.entry.id)).toContain("recut");
+  });
+
+  it("on server start it keeps trying until every piece is done", async () => {
+    const a = await piece();
+    process.env.MOCK_REMOVE_BG_FAIL = "insufficient_credits";
+    await untidyOnStart(0, 40);
+    expect(await db.seedSet.findUnique({ where: { name: UNTIDY_SET } })).toBeNull();
+    delete process.env.MOCK_REMOVE_BG_FAIL; // credits bought: the next pass, 40 ms later, finishes
+    await new Promise((r) => setTimeout(r, 600));
+    expect(await db.seedSet.findUnique({ where: { name: UNTIDY_SET } })).not.toBeNull();
+    expect(await warningsOf(a.entry.id)).toContain("recut");
   });
 
   it("pieces added before Smooth went live are left alone", async () => {
