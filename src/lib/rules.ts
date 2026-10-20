@@ -32,11 +32,6 @@ export async function getRuleFlag(key: string, fallback: boolean): Promise<boole
   return fallback;
 }
 
-/** Tidy and Smooth (Google's image editor on garment photos): off unless an admin turns the rule on (Jeff, 19 Oct 2026: "not very good, remove for now"). */
-export async function photoRetouchOn(): Promise<boolean> {
-  return getRuleFlag("photoRetouch", false);
-}
-
 export { ruleKind };
 
 export async function setRule(key: string, value: string): Promise<RuleRow> {

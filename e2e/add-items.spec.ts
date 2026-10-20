@@ -25,11 +25,6 @@ test.describe("add clothes", () => {
 
   test("pick three photos, confirm with one tap each, reload mid-batch keeps the counter, all done", async ({ page }) => {
     await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
-    // Tidy and Smooth are off unless an admin turns the rule on (Jeff, 19 Oct 2026); this flow tests them, so: on
-    await page.goto("/admin/rules");
-    await page.getByLabel("AI photo retouch (Tidy and Smooth)").selectOption("on");
-    await page.getByTestId("rule-photoRetouch").getByRole("button", { name: "Save" }).click();
-    await expect(page.getByTestId("rule-photoRetouch").getByRole("button", { name: "Saved" })).toBeVisible();
     await page.goto("/add");
     // three doors first: photos, a store link, a receipt
     await expect(page.getByTestId("add-doors")).toBeVisible();
@@ -84,26 +79,6 @@ test.describe("add clothes", () => {
     await page.getByTestId("rotate").click();
     await expect(page.getByTestId("rotate")).toHaveText(/Rotate/, { timeout: 20_000 });
     await expect(page.getByTestId("confirm-photo")).not.toHaveAttribute("src", unturned!);
-
-    // auto-tidy parked a clean product picture: Before/Undo/Keep are up; undo it to test smooth by hand
-    await expect(page.getByTestId("smooth-keep")).toBeVisible();
-    await expect(page.getByText("Tidied")).toBeVisible();
-    await page.getByTestId("smooth-undo").click();
-    await expect(page.getByTestId("smooth")).toBeVisible();
-
-    // smooth wrinkles: parked until KEEP; the rename survives the back-photo re-read
-    const before = await page.getByTestId("confirm-photo").getAttribute("src");
-    await page.getByTestId("smooth").click();
-    await expect(page.getByTestId("smooth-keep")).toBeVisible({ timeout: 20_000 });
-    expect(await page.getByTestId("confirm-photo").getAttribute("src")).not.toBe(before);
-    await page.getByTestId("smooth-undo").click();
-    await expect(page.getByTestId("smooth")).toBeVisible();
-    expect(await page.getByTestId("confirm-photo").getAttribute("src")).toBe(before);
-    await page.getByTestId("smooth").click();
-    await expect(page.getByTestId("smooth-keep")).toBeVisible({ timeout: 20_000 });
-    await page.getByTestId("smooth-keep").click();
-    await expect(page.getByTestId("smooth")).toBeVisible();
-    expect(await page.getByTestId("confirm-photo").getAttribute("src")).not.toBe(before);
 
     // back of the piece
     await page.getByRole("button", { name: "Add a label or worn photo" }).click();

@@ -16,7 +16,7 @@ export class TryOnModelError extends Error { constructor(message: string) { supe
 
 /**
  * Google answers 429 (too many requests this minute) and 503 (busy) for a few seconds at a time, especially when
- * the mirror, Tidy and the mannequin call in a row. The same request is sent again after a short wait, three times.
+ * the mirror, the styling pass and the mannequin call in a row. The same request is sent again after a short wait, three times.
  * MOCK_BACKOFF_MS shortens the waits in tests.
  */
 export async function fetchWithBackoff(fetchImpl: typeof fetch, url: string, init: RequestInit, tries = 4): Promise<Response> {

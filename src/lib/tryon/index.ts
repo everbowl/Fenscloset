@@ -2,7 +2,7 @@ import sharp from "sharp";
 import { db } from "@/lib/db";
 import { getObject, newKey, putObject } from "@/lib/storage";
 import { googleTryOn, isGoogleTryOnConfigured, TryOnModelError } from "@/lib/tryon/google";
-import { googleImage } from "@/lib/images/smooth";
+import { googleImage } from "@/lib/images/google-image";
 import { checkRender, checkWholeGarment, isGarmentCheckAvailable } from "@/lib/tryon/garment-check";
 import { loadPrefs, loadStylingLists, lookFeatures, resolveStyling, savePrefs, stylingPrompt, type Styling, type StylingChoice, type StylingLists } from "@/lib/tryon/styling";
 import { MIRROR_CATEGORIES } from "@/lib/tryon/features";
@@ -114,9 +114,8 @@ export async function mockTryOn(person: Buffer, garments: Buffer[]): Promise<Buf
 /**
  * Garment image for an item, in this order: the photo the person chose for the mirror, else (from behind) its
  * back photo, else the store's product photo, the person's own photo of the piece, the cutout, any other photo,
- * a thumbnail last. The cutout comes after the real photo on purpose: Tidy replaces it with an AI re-draw, and
- * a re-draw (or a background-removal hole) is how a tee came out cropped with a hole in the back (Jeff, 19 Oct
- * 2026). A photo that does not show the whole piece (checked once, kept on the photo) is passed over.
+ * a thumbnail last. The cutout comes after the real photo on purpose: a background-removal hole is how a tee
+ * came out cropped with a hole in the back (Jeff, 19 Oct 2026). A photo that does not show the whole piece (checked once, kept on the photo) is passed over.
  */
 export async function garmentImages(itemIds: string[], back = false): Promise<{ id: string; name: string; buf: Buffer }[]> {
   const items = await db.item.findMany({ where: { id: { in: itemIds } }, select: { id: true, name: true, category: { select: { name: true } }, photos: { select: { id: true, kind: true, bucketKey: true, isPrimary: true, forMirror: true, wholeGarment: true }, orderBy: { createdAt: "asc" } } } });

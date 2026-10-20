@@ -171,7 +171,7 @@ describe("virtual try-on", () => {
     [g] = await garmentImages([polo.id]);
     expect(g.buf.equals(await buf(retailKey))).toBe(true);
     // every photo of a piece fails the check: the first in line is still used (a try-on beats none), and the answers are kept.
-    // The person's own photo comes before the cutout: Tidy swaps the cutout for an AI re-draw, which is how a tee lost its hem.
+    // The person's own photo comes before the cutout: a cutout can have a background-removal hole, which is how a tee lost its hem.
     process.env.MOCK_GARMENT_WHOLE = "false";
     const cut2 = await png(); const alone2 = await jpg(30);
     const tee = await db.item.create({ data: { ownerId: jeff.id, name: "Tee", categoryId: (await cat("Tops")).id, photos: { create: [{ kind: "alone", bucketKey: alone2 }, { kind: "cutout", bucketKey: cut2, isPrimary: true }] } } });

@@ -11,7 +11,7 @@ import type { Named, TagLists, TagResult } from "@/lib/ai/tag-item";
 import type { ItemEdits } from "@/lib/items/service";
 import type { DuplicateHint } from "@/lib/items/duplicates";
 import { shrinkPhoto } from "@/lib/import/client-queue";
-import { attachPhotoAction, confirmEntryAction, keepSmoothAction, mergeEntryAction, mirrorEntryAction, rotateEntryAction, saveEditsAction, skipEntryAction, smoothEntryAction } from "./actions";
+import { attachPhotoAction, confirmEntryAction, mergeEntryAction, mirrorEntryAction, rotateEntryAction, saveEditsAction, skipEntryAction } from "./actions";
 import { PickSheet, Row, TextSheet } from "@/components/items/row-editor";
 import { BrandSearch } from "@/components/items/brand-search";
 import { MatchSheet } from "@/components/items/match-sheet";
@@ -22,8 +22,7 @@ import { sizeFor } from "@/lib/profiles/size-options";
 
 type Props = {
   batchId: string;
-  entry: { id: string; photoKey: string; labelKey: string | null; wornKey: string | null; backKey: string | null; smoothKey: string | null; retailKeys: string[]; warnings: string[] };
-  canSmooth: boolean;
+  entry: { id: string; photoKey: string; labelKey: string | null; wornKey: string | null; backKey: string | null; retailKeys: string[]; warnings: string[] };
   /** From Profile → Brands: one tap fills brand, size and (at save) the store link. */
   myBrands: MyBrand[];
   tags: TagResult;
@@ -46,7 +45,7 @@ function Title({ name }: { name: string }) {
 const nameOf = (xs: Named[], id: string | null) => xs.find((x) => x.id === id)?.name ?? null;
 
 /** Design 03: one tap per item when the tags are right. */
-export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists, counter, progress, duplicate, canEditLists, readyCount, canSmooth, myBrands }: Props) {
+export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists, counter, progress, duplicate, canEditLists, readyCount, myBrands }: Props) {
   const [askMore, setAskMore] = useState(true);
   /** "Another one like X?" asks once per entry (dismissal survives a reload through sessionStorage). */
   const [askLike, setAskLike] = useState<boolean>(() => Boolean(duplicate) && typeof window !== "undefined" && !window.sessionStorage.getItem(`like-asked:${entry.id}`));
@@ -71,15 +70,11 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
   const [wornKey, setWornKey] = useState(entry.wornKey);
   const [backKey, setBackKey] = useState(entry.backKey);
   const [photoKey, setPhotoKey] = useState(entry.photoKey);
-  const [smoothKey, setSmoothKey] = useState(entry.smoothKey);
-  const [smoothing, setSmoothing] = useState(false);
-  const [smoothWord, setSmoothWord] = useState(entry.warnings.includes("auto_tidied") && entry.smoothKey ? "Tidied" : "Smoothed");
-  const [showBefore, setShowBefore] = useState(false);
   const [side, setSide] = useState<"front" | "back" | "store">("front");
   const [retailKeys, setRetailKeys] = useState<string[]>(entry.retailKeys);
   const [matched, setMatched] = useState<{ store: string; priceText: string | null } | null>(null);
   const [matching, setMatching] = useState(false);
-  const shownKey = side === "store" && retailKeys[0] ? retailKeys[0] : side === "back" && backKey ? backKey : smoothKey && !showBefore ? smoothKey : photoKey;
+  const shownKey = side === "store" && retailKeys[0] ? retailKeys[0] : side === "back" && backKey ? backKey : photoKey;
   function pickMatch(pick: Product) {
     setMatching(true); setError(undefined);
     start(async () => {
@@ -98,25 +93,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
       const r = await rotateEntryAction(entry.id, "right");
       setRotating(false);
       if (!r.ok) { setError(r.error); return; }
-      setPhotoKey(r.value.photoKey); setSmoothKey(r.value.smoothKey);
-    });
-  }
-  function smooth(strength: "normal" | "more" | "tidy" = "normal") {
-    setSmoothWord(strength === "tidy" ? "Tidied" : "Smoothed");
-    setError(undefined); setSmoothing(true); setSide("front"); setShowBefore(false);
-    start(async () => {
-      const r = await smoothEntryAction(entry.id, strength);
-      setSmoothing(false);
-      if (!r.ok) { setError(r.error); return; }
-      setSmoothKey(r.value.smoothKey);
-    });
-  }
-  function decideSmooth(keep: boolean) {
-    setError(undefined);
-    start(async () => {
-      const r = await keepSmoothAction(batchId, entry.id, keep);
-      if (!r.ok) { setError(r.error); return; }
-      setPhotoKey(r.value.photoKey); setSmoothKey(null); setShowBefore(false);
+      setPhotoKey(r.value.photoKey);
     });
   }
 
@@ -196,8 +173,6 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
 
       <div className="relative mx-5 h-[400px] bg-bone">
         <img src={`/api/photo/${shownKey}`} alt="" className="size-full object-contain" data-testid="confirm-photo" />
-        {smoothing ? <span className="mono mono-11 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-paper px-3 py-2">Smoothing…</span> : null}
-        {smoothKey && side === "front" ? <span className="mono mono-11 absolute left-2 top-2 bg-paper px-2.5 py-1.5">{showBefore ? "Before" : smoothWord}</span> : null}
         <div className="absolute inset-x-0 bottom-0 h-[3px] bg-black/[0.12]"><div className="h-[3px] bg-ink" style={{ width: `${progress}%` }} /></div>
       </div>
 
@@ -213,21 +188,6 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
           </div>
           {side === "front" ? (
             <button type="button" onClick={rotate} disabled={rotating || pending} className="mono mono-11 h-9 border border-ink px-3 disabled:opacity-60" data-testid="rotate" title="Turn the photo a quarter turn">{rotating ? "Turning…" : "Rotate ↻"}</button>
-          ) : null}
-          {canSmooth && side === "front" ? (
-            smoothKey ? (
-              <div className="flex flex-wrap justify-end gap-1.5">
-                <button type="button" onPointerDown={() => setShowBefore(true)} onPointerUp={() => setShowBefore(false)} onPointerLeave={() => setShowBefore(false)} onClick={() => setShowBefore((v) => !v)} className="mono mono-11 h-9 border border-ink px-3" data-testid="smooth-before">Before</button>
-                <button type="button" onClick={() => decideSmooth(false)} disabled={pending} className="mono mono-11 h-9 border border-ink px-3" data-testid="smooth-undo">Undo</button>
-                <button type="button" onClick={() => smooth("more")} disabled={smoothing || pending} className="mono mono-11 h-9 border border-ink px-3 disabled:opacity-60" data-testid="smooth-more">{smoothing ? "Smoothing…" : "Smooth more"}</button>
-                <button type="button" onClick={() => decideSmooth(true)} disabled={pending} className="mono mono-11 h-9 bg-ink px-3 text-paper" data-testid="smooth-keep">Keep</button>
-              </div>
-            ) : (
-              <div className="flex flex-wrap justify-end gap-1.5">
-                <button type="button" onClick={() => smooth("tidy")} disabled={smoothing || pending} className="mono mono-11 h-9 border border-ink px-3 disabled:opacity-60" data-testid="tidy" title="A clean, flat, square-on product picture">{smoothing ? "Working…" : "Tidy"}</button>
-                <button type="button" onClick={() => smooth()} disabled={smoothing || pending} className="mono mono-11 h-9 border border-ink px-3 disabled:opacity-60" data-testid="smooth">{smoothing ? "Smoothing…" : "Smooth wrinkles"}</button>
-              </div>
-            )
           ) : null}
         </div>
 

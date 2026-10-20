@@ -29,6 +29,8 @@ export async function seed() {
   for (const r of RULES) {
     await db.rule.upsert({ where: { key: r.key }, update: { label: r.label, description: r.description }, create: r });
   }
+  // A rule that left the code leaves the page (the Tidy and Smooth switch, 19 Oct 2026); rules are code-defined keys, never admin-made.
+  await db.rule.deleteMany({ where: { key: { notIn: RULES.map((r) => r.key) } } });
   if ((await db.person.count()) > 0 && process.env.SEED_FORCE !== "true") {
     const ran = await applySeedSets();
     console.log(ran.length ? `Seed: people exist; applied new sets ${ran.join(", ")}.` : "Seed skipped: database already has people.");

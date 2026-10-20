@@ -64,9 +64,8 @@ test("admin changes a rule", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Saved" })).toBeVisible();
   await page.reload();
   await expect(page.getByLabel("No-repeat window (days)")).toHaveValue("21");
-  // the button color is a hex with a swatch; photo retouch is an on/off choice, off by default
+  // the button color is a hex with a swatch
   await expect(page.getByLabel("Button color (hex)")).toHaveValue("#FF5A00");
-  await expect(page.getByLabel("AI photo retouch (Tidy and Smooth)")).toHaveValue("off");
   await page.getByLabel("Button color (hex)").fill("#1A2B3C");
   await page.getByTestId("rule-accentColor").getByRole("button", { name: "Save" }).click();
   await expect(page.getByTestId("rule-accentColor").getByRole("button", { name: "Saved" })).toBeVisible();

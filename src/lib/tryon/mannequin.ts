@@ -1,7 +1,7 @@
 import sharp from "sharp";
 import { db } from "@/lib/db";
 import { getObject, newKey, objectExists, putObject } from "@/lib/storage";
-import { googleImage, isSmoothConfigured } from "@/lib/images/smooth";
+import { googleImage, isGoogleImageConfigured } from "@/lib/images/google-image";
 import { garmentImages, MAX_GARMENTS, mockTryOn, stylingFor, stylingView, TryOnError, type DressingHooks, type TryOnView } from "@/lib/tryon";
 import { stylingSentence, type StylingChoice } from "@/lib/tryon/features";
 import { MANNEQUIN_BASE_KEY } from "@/lib/tryon/mannequin-key";
@@ -23,7 +23,7 @@ function dressPrompt(instructions: string[]): string {
 }
 
 export function isMannequinConfigured(): boolean {
-  return process.env.MOCK_TRYON === "true" || isSmoothConfigured();
+  return process.env.MOCK_TRYON === "true" || isGoogleImageConfigured();
 }
 
 /** Dev/test stand-in for the shared mannequin: a drawn figure. */

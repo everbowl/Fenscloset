@@ -483,7 +483,6 @@ model ImportEntry {
   labelKey    String?
   wornKey     String?
   backKey     String?
-  smoothKey   String?
   /// Store product photos from the style match on the card, copied onto the item as `retail` photos.
   retailKeys  String[]    @default([])
   /// Set when the piece came from a store link or a receipt: name, brand, price, url, store, color, size, purchaseDate.

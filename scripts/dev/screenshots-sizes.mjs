@@ -1,4 +1,4 @@
-/** Dev-only: sizes by item type (brand sheet + chips), measurement pickers + likely sizes, Add screen store doors, Smooth more. */
+/** Dev-only: sizes by item type (brand sheet + chips), measurement pickers + likely sizes, Add screen store doors. *
 import { chromium, devices } from "@playwright/test";
 import { execSync } from "node:child_process";
 const out = process.argv[2];

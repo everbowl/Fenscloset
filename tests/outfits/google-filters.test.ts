@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { generateKeyPairSync } from "node:crypto";
 import { googleTryOn } from "@/lib/tryon/google";
-import { googleImage } from "@/lib/images/smooth";
+import { googleImage } from "@/lib/images/google-image";
 
 /**
  * Google's visual filters (Jeff, 19 Oct 2026: none on his own body pictures). The loosest level is sent first; when Google
@@ -29,7 +29,7 @@ describe("Google visual filters: loosest first, step down on refusal", () => {
     const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
     process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify({ client_email: "t@example.com", private_key: privateKey.export({ type: "pkcs8", format: "pem" }).toString() });
     process.env.GOOGLE_VERTEX_PROJECT = "fens-closet-test";
-    delete process.env.GOOGLE_VERTEX_TRYON_SAFETY; delete process.env.GOOGLE_VERTEX_IMAGE_SAFETY; delete process.env.MOCK_SMOOTH;
+    delete process.env.GOOGLE_VERTEX_TRYON_SAFETY; delete process.env.GOOGLE_VERTEX_IMAGE_SAFETY; delete process.env.MOCK_GOOGLE_IMAGE;
   });
   afterEach(() => { process.env = { ...env }; });
 
