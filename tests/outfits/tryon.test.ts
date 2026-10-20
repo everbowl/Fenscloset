@@ -9,7 +9,8 @@ import { seed } from "../../prisma/seed";
 import { personalClosetId } from "@/lib/items/service";
 import { newKey, putObject } from "@/lib/storage";
 import { canViewKey } from "@/lib/photos/visibility";
-import { garmentImages, hasBackPhoto, listTryOns, setTryOnEnabled, tryOnLook, tryOnState } from "@/lib/tryon";
+import { dressOnMe, garmentImages, hasBackPhoto, listTryOns, mirrorEngines, setTryOnEnabled, tryOnLook, tryOnState } from "@/lib/tryon";
+import { setRule } from "@/lib/rules";
 import { getPrivacy } from "@/lib/profiles/service";
 
 const jpeg = (r = 120) => sharp({ create: { width: 300, height: 400, channels: 3, background: { r, g: 110, b: 100 } } }).jpeg().toBuffer();
@@ -76,6 +77,43 @@ describe("virtual try-on", () => {
     expect(b.view).toBe("back");
     expect(b.key).not.toBe(f.key);
     expect((await tryOnLook(jeff, jeff.id, [shoes.id], "today", undefined, "back")).id).toBe(b.id); // cached per body photo
+  });
+
+  it("engines: FASHN by the rule (shoes left out, said under the picture), pictures cached per engine; Compare dresses with both at once", async () => {
+    process.env.MOCK_FASHN = "true";
+    const jeff = await by("Jeff");
+    const bodyKey = newKey("bodies", jeff.id, "image/jpeg"); await putObject(bodyKey, await jpeg(), "image/jpeg");
+    await db.bodyPhoto.create({ data: { personId: jeff.id, bucketKey: bodyKey, view: "front" } });
+    const cat = (n: string) => db.category.findFirstOrThrow({ where: { name: n } });
+    const pic = async () => { const k = newKey("originals", jeff.id, "image/jpeg"); await putObject(k, await jpeg(90), "image/jpeg"); return k; };
+    const tee = await db.item.create({ data: { ownerId: jeff.id, name: "Tee", categoryId: (await cat("Tops")).id, photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
+    const sneakers = await db.item.create({ data: { ownerId: jeff.id, name: "Sneakers", categoryId: (await cat("Shoes")).id, photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
+    expect(await mirrorEngines()).toEqual({ rule: "google", engines: ["google"] });
+    await setRule("mirrorEngine", "fashn");
+    const f = await tryOnLook(jeff, jeff.id, [tee.id, sneakers.id], "closet"); // the rule's engine
+    expect(f.engine).toBe("fashn");
+    expect(f.cached).toBe(false);
+    expect(f.note).toMatch(/FASHN doesn’t place shoes yet: Sneakers/);
+    const g = await tryOnLook(jeff, jeff.id, [tee.id, sneakers.id], "closet", undefined, "front", undefined, [], false, {}, "google");
+    expect(g.engine).toBe("google");
+    expect(g.key).not.toBe(f.key);
+    expect(g.cached).toBe(false);
+    expect((await tryOnLook(jeff, jeff.id, [sneakers.id, tee.id], "closet")).id).toBe(f.id); // cached per engine
+    await expect(tryOnLook(jeff, jeff.id, [sneakers.id], "closet")).rejects.toThrow(/doesn’t place shoes/);
+    await setRule("mirrorEngine", "compare");
+    const steps: string[] = [];
+    const both = await dressOnMe(jeff, jeff.id, [tee.id], "closet", "front", undefined, true, { step: (s) => steps.push(s) });
+    expect(both.engine).toBe("google");
+    expect(both.alt?.engine).toBe("fashn");
+    expect(both.alt?.key).not.toBe(both.key);
+    expect(steps.some((s) => s.includes("Google · ") && s.includes("FASHN · "))).toBe(true);
+    expect((await db.tryOn.findMany({ where: { personId: jeff.id, itemIds: { equals: [tee.id] }, styling: null } })).map((r) => r.engine).sort()).toEqual(["fashn", "google"]);
+    // FASHN without its key: Google dresses, and the picture says so
+    delete process.env.MOCK_FASHN;
+    const only = await dressOnMe(jeff, jeff.id, [tee.id], "closet");
+    expect(only.engine).toBe("google");
+    expect(only.alt).toBeUndefined();
+    expect(only.engineNote).toMatch(/FASHN isn’t set up yet/);
   });
 
   it("reports its steps while it dresses (the mirror shows them); a cached look reports nothing", async () => {

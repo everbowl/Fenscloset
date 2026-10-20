@@ -4,22 +4,27 @@ import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { saveRuleAction, type RuleState } from "./actions";
-import { ruleKind } from "@/lib/rules-kind";
+import { RULE_CHOICES, ruleKind } from "@/lib/rules-kind";
 import type { RuleRow } from "@/lib/rules";
 
-/** One rule: the input fits the value (on/off, a color, text, a number) and saves in place. */
+/** One rule: the input fits the value (a choice, on/off, a color, text, a number) and saves in place. */
 export function RuleForm({ rule }: { rule: RuleRow }) {
   const [state, action, pending] = useActionState<RuleState, FormData>(saveRuleAction, {});
   const kind = ruleKind(rule);
   const id = `rule-${rule.key}`;
+  const select = "h-[46px] border border-ink bg-paper px-3 font-mono text-[12px] uppercase tracking-[0.14em] text-ink";
   return (
     <form action={action} className="space-y-2" data-testid={`rule-${rule.key}`}>
       <input type="hidden" name="key" value={rule.key} />
       <label htmlFor={id} className="block text-[15px] font-medium">{rule.label}</label>
       <p className="text-[13px] leading-snug text-graphite">{rule.description}</p>
       <div className="flex gap-2">
-        {kind === "onoff" ? (
-          <select id={id} name="value" defaultValue={rule.value} className="h-[46px] border border-ink bg-paper px-3 font-mono text-[12px] uppercase tracking-[0.14em] text-ink">
+        {kind === "choice" ? (
+          <select id={id} name="value" defaultValue={rule.value} className={`${select} max-w-[70%]`}>
+            {RULE_CHOICES[rule.key].map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </select>
+        ) : kind === "onoff" ? (
+          <select id={id} name="value" defaultValue={rule.value} className={select}>
             <option value="on">On</option>
             <option value="off">Off</option>
           </select>

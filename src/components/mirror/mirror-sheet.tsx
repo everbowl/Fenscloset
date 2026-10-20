@@ -8,6 +8,7 @@ import { Banner } from "@/components/ui/banner";
 import { shrinkPhoto } from "@/lib/import/client-queue";
 import { addBodyPhotoAction } from "@/app/(app)/profile/actions";
 import type { TryOnState } from "@/lib/tryon";
+import { ENGINE_WORD } from "@/lib/tryon/engines";
 import type { Mirror } from "./use-mirror";
 
 /**
@@ -74,7 +75,16 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
       {t || m.busy ? (
         <div className="flex flex-col gap-3" {...(t ? { "data-testid": "try-on-sheet" } : {})}>
           <div className="relative h-[460px] overflow-hidden bg-bone">
-            {t ? <img src={`/api/photo/${t.key}`} alt={t.mannequin ? "This look on a mannequin" : "You wearing this look"} className={`size-full object-contain ${m.busy ? "opacity-40" : ""}`} /> : <div className="mx-auto h-full w-[200px] py-10"><MirrorGlyph /></div>}
+            {t?.alt ? (
+              <div className="grid h-full grid-cols-2 gap-1" data-testid="mirror-compare">
+                {[t, t.alt].map((p) => (
+                  <figure key={p.id} className="flex h-full flex-col">
+                    <figcaption className="mono px-2 pt-2 text-[11px] uppercase tracking-[0.18em]">{ENGINE_WORD[p.engine ?? "google"]}</figcaption>
+                    <img src={`/api/photo/${p.key}`} alt={`You wearing this look, by ${ENGINE_WORD[p.engine ?? "google"]}`} className={`min-h-0 flex-1 object-contain ${m.busy ? "opacity-40" : ""}`} />
+                  </figure>
+                ))}
+              </div>
+            ) : t ? <img src={`/api/photo/${t.key}`} alt={t.mannequin ? "This look on a mannequin" : "You wearing this look"} className={`size-full object-contain ${m.busy ? "opacity-40" : ""}`} /> : <div className="mx-auto h-full w-[200px] py-10"><MirrorGlyph /></div>}
             {m.busy && m.progress ? (
               <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-paper/95 px-3 py-2.5" data-testid="mirror-progress" aria-live="polite">
                 <span className="mono text-[11px] uppercase tracking-[0.18em]">{m.progress.step}</span>
@@ -85,8 +95,10 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
           {m.busy ? <p className="mono text-graphite">Usually 20 to 60 seconds. You can leave this screen; the picture is kept and waits for you.</p> : null}
           <p className="mono text-graphite">{pieces}</p>
           {t?.styling?.summary ? <p className="mono text-ink" data-testid="styling-summary">{t.styling.summary}{t.stylingFailed ? " · didn’t take this time, showing the plain try-on" : ""}</p> : null}
-          {t ? <p className="mono text-ink">{t.mannequin ? `On a mannequin · No body photo used${mine ? "" : ` · ${personName}’s look`}` : `On you${t.view === "back" ? " · from behind" : ""} · Only you can see this picture`}{t.cached ? " · saved from before" : ""}</p> : null}
-          {t?.note ? <p className="mono text-graphite" data-testid="mirror-note">{t.note}</p> : null}
+          {t ? <p className="mono text-ink">{t.mannequin ? `On a mannequin · No body photo used${mine ? "" : ` · ${personName}’s look`}` : t.alt ? `On you${t.view === "back" ? " · from behind" : ""} · ${ENGINE_WORD[t.engine ?? "google"]} and ${ENGINE_WORD[t.alt.engine ?? "fashn"]} side by side · Only you can see these pictures · pick the winner under Admin → Rules` : `On you${t.view === "back" ? " · from behind" : ""}${t.engine === "fashn" ? " · dressed by FASHN" : ""} · Only you can see this picture`}{t.cached ? " · saved from before" : ""}</p> : null}
+          {t?.note ? <p className="mono text-graphite" data-testid="mirror-note">{t.alt ? `${ENGINE_WORD[t.engine ?? "google"]} · ` : ""}{t.note}</p> : null}
+          {t?.alt?.note ? <p className="mono text-graphite" data-testid="mirror-alt-note">{ENGINE_WORD[t.alt.engine ?? "fashn"]} · {t.alt.note}</p> : null}
+          {t?.engineNote ? <p className="mono text-graphite" data-testid="mirror-engine-note">{t.engineNote}</p> : null}
           {t ? (
             <div className="flex items-center justify-between gap-3">
               <button type="button" disabled={m.busy} onClick={m.redo} className="mono mono-11 h-9 shrink-0 whitespace-nowrap border border-ink px-4 disabled:opacity-60" data-testid="redo-tryon" title="Throw away the saved pictures of this look and dress it from scratch">{m.busy ? "Dressing…" : "Dress again"}</button>

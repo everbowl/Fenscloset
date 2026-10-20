@@ -721,6 +721,8 @@ model TryOn {
   itemIds      String[] @default([])
   bodyPhotoKey String
   source       String
+  /** Who dressed it: google or fashn on a body photo, gemini for the mannequin. Pictures are cached per engine. */
+  engine       String   @default("google")
   /** The pose and wear choices this picture was styled with (src/lib/tryon/styling.ts stylingKey); null is the raw try-on before any styling. */
   styling      String?
   /** What the render check still saw wrong after a second dressing (src/lib/tryon/garment-check.ts), shown under the picture; null when the picture passed. */

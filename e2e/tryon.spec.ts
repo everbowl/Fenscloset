@@ -81,4 +81,20 @@ test("try-on: on by default, needs a body photo, then a picture of the look on y
   await page.getByTestId("mirror-body-photo").setInputFiles({ name: "me2.jpg", mimeType: "image/jpeg", buffer });
   await expect(page.getByTestId("try-on-sheet").locator("img")).not.toHaveAttribute("src", beforeRetake!, { timeout: 20_000 });
   await expect(page.getByTestId("try-on-sheet")).toContainText("Only you can see this picture");
+
+  // Compare (Admin → Rules → Mirror engine): Google and FASHN side by side, so the winner can be picked there
+  await page.keyboard.press("Escape");
+  await page.goto("/admin/rules");
+  await page.getByLabel("Mirror engine").selectOption("compare");
+  await page.getByTestId("rule-mirrorEngine").getByRole("button", { name: "Save" }).click();
+  await expect(page.getByTestId("rule-mirrorEngine").getByRole("button", { name: "Saved" })).toBeVisible();
+  await page.goto("/today");
+  await page.getByTestId("try-on").click();
+  await expect(page.getByTestId("mirror-compare")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("mirror-compare")).toContainText("Google");
+  await expect(page.getByTestId("mirror-compare")).toContainText("FASHN");
+  const pair = await page.getByTestId("mirror-compare").locator("img").evaluateAll((els) => els.map((e) => e.getAttribute("src")));
+  expect(pair).toHaveLength(2);
+  expect(pair[0]).not.toBe(pair[1]);
+  await expect(page.getByTestId("try-on-sheet")).toContainText("side by side");
 });

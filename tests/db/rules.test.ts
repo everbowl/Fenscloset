@@ -19,6 +19,13 @@ describe("rules (Admin → Rules)", () => {
     expect(ruleKind(rules.find((r) => r.key === "noRepeatDays")!)).toBe("number");
   });
 
+  it("a choice rule (the mirror engine) takes one of its values only", async () => {
+    expect(await setRule("mirrorEngine", "fashn")).toMatchObject({ value: "fashn" });
+    expect(await setRule("mirrorEngine", "compare")).toMatchObject({ value: "compare" });
+    await expect(setRule("mirrorEngine", "bing")).rejects.toThrow(/Choose one of/);
+    expect(ruleKind({ key: "mirrorEngine", value: "google" })).toBe("choice");
+  });
+
   it("an on/off rule keeps its value as on / off and reads as a flag", async () => {
     await db.rule.create({ data: { key: "testFlag", value: "off", label: "Test flag", description: "" } });
     expect(await getRuleFlag("testFlag", true)).toBe(false);

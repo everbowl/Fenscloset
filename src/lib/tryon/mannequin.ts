@@ -71,6 +71,6 @@ export async function mannequinLook(viewer: Viewer, personId: string, itemIds: s
   }
   const key = newKey("mannequin", personId, "image/jpeg");
   await putObject(key, picture, "image/jpeg");
-  const row = await db.tryOn.create({ data: { personId, bucketKey: key, itemIds: cacheIds, bodyPhotoKey: MANNEQUIN_BASE_KEY, source: `mannequin:${source}`, styling: styling.key } });
+  const row = await db.tryOn.create({ data: { personId, bucketKey: key, itemIds: cacheIds, bodyPhotoKey: MANNEQUIN_BASE_KEY, source: `mannequin:${source}`, engine: "gemini", styling: styling.key } });
   return { id: row.id, key, itemIds: row.itemIds, createdAt: row.createdAt.toISOString(), cached: false, mannequin: true, styling: view };
 }

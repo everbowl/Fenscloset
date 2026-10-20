@@ -23,7 +23,7 @@ export async function fetchWithBackoff(fetchImpl: typeof fetch, url: string, ini
   const base = Number(process.env.MOCK_BACKOFF_MS ?? 1500);
   let res = await fetchImpl(url, init);
   for (let i = 1; i < tries && (res.status === 429 || res.status === 503); i++) {
-    console.log(`google: ${res.status}, waiting ${base * 2 ** (i - 1)}ms before try ${i + 1}`);
+    console.log(`${new URL(url).hostname}: ${res.status}, waiting ${base * 2 ** (i - 1)}ms before try ${i + 1}`);
     await new Promise((r) => setTimeout(r, base * 2 ** (i - 1)));
     res = await fetchImpl(url, init);
   }

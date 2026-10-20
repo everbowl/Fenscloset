@@ -3,7 +3,7 @@
 import { requirePerson } from "@/lib/auth/current";
 import { db } from "@/lib/db";
 import { OutfitError } from "@/lib/outfits/engine";
-import { tryOnLook, TryOnError, type TryOnView } from "@/lib/tryon";
+import { dressOnMe, mirrorEngines, TryOnError, type TryOnView } from "@/lib/tryon";
 import { mannequinLook } from "@/lib/tryon/mannequin";
 import { jobStatus, settled, startJob, type JobStatus } from "@/lib/jobs";
 import type { StylingChoice } from "@/lib/tryon/features";
@@ -68,11 +68,12 @@ export async function dressAction(req: MirrorRequest): Promise<MirrorResult> {
     const ids = await lookItemIds(req.personId, req.look);
     const view = req.view === "back" ? "back" : "front";
     const on = req.on === "mannequin" ? "mannequin" : "me";
-    const key = [me.id, req.personId, on, view, [...ids].sort().join(","), JSON.stringify(req.pick ?? null), req.fresh ? "fresh" : ""].join("|");
+    const rule = on === "me" ? (await mirrorEngines()).rule : "mannequin";
+    const key = [me.id, req.personId, on, rule, view, [...ids].sort().join(","), JSON.stringify(req.pick ?? null), req.fresh ? "fresh" : ""].join("|");
     const job = startJob<TryOnView>(key, me.id, (step) =>
       on === "mannequin"
         ? mannequinLook(me, req.personId, ids, req.look.kind, undefined, undefined, req.pick, [], Boolean(req.fresh), { step })
-        : tryOnLook(me, req.personId, ids, req.look.kind, undefined, view, req.pick, [], Boolean(req.fresh), { step }));
+        : dressOnMe(me, req.personId, ids, req.look.kind, view, req.pick, Boolean(req.fresh), { step }));
     return answer(await settled(job, QUICK_MS), job.id);
   } catch (e) {
     return failed(e);

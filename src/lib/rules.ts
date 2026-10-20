@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { OFF_WORDS, ON_WORDS, ruleKind } from "@/lib/rules-kind";
+import { OFF_WORDS, ON_WORDS, RULE_CHOICES, ruleKind } from "@/lib/rules-kind";
 
 export type RuleRow = { key: string; value: string; label: string; description: string };
 
@@ -38,6 +38,12 @@ export async function setRule(key: string, value: string): Promise<RuleRow> {
   const existing = await db.rule.findUnique({ where: { key } });
   if (!existing) throw new Error("Unknown rule");
   const kind = ruleKind(existing);
+  if (kind === "choice") {
+    const choices = RULE_CHOICES[key];
+    const v = value.trim();
+    if (!choices.some((c) => c.value === v)) throw new Error(`Choose one of: ${choices.map((c) => c.label).join(", ")}.`);
+    return db.rule.update({ where: { key }, data: { value: v } });
+  }
   if (kind === "text") {
     try { new Intl.DateTimeFormat("en-US", { timeZone: value.trim() }); } catch { throw new Error("Enter a time zone like America/Los_Angeles."); }
     return db.rule.update({ where: { key }, data: { value: value.trim() } });
