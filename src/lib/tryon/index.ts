@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import { getObject, newKey, putObject } from "@/lib/storage";
 import { googleTryOn, isGoogleTryOnConfigured, TryOnModelError } from "@/lib/tryon/google";
 import { fashnCategory, fashnTryOn, FashnError, isFashnConfigured } from "@/lib/tryon/fashn";
-import { ENGINE_RULE_KEY, ENGINE_WORD, engineRuleOf, resolveEngines, type Engine, type EngineRule } from "@/lib/tryon/engines";
+import { isKlingConfigured, KlingError, klingTryOn } from "@/lib/tryon/kling";
+import { ENGINE_RULE_KEY, ENGINE_WORD, engineRuleOf, resolveEngines, type Engine, type EngineRule, enginePlacesShoes } from "@/lib/tryon/engines";
 import { getRuleText } from "@/lib/rules";
 import { googleImage, googleImageOnHold } from "@/lib/images/google-image";
 import { checkRender, checkWholeGarment, isGarmentCheckAvailable } from "@/lib/tryon/garment-check";
@@ -39,7 +40,7 @@ export type TryOnView = {
   /** The styling pass did not come back: this is the plain try-on. */ stylingFailed?: boolean;
   /** The render check was not satisfied even after a second dressing: what it saw wrong, shown under the picture. */ note?: string | null;
   /** Who dressed it. */ engine?: Engine;
-  /** Compare (Admin → Rules): the other engine's picture of the same look, shown beside this one. */ alt?: TryOnView;
+  /** Compare (Admin → Rules): the other engines' pictures of the same look, shown beside this one. */ alts?: TryOnView[];
   /** An engine without its key, or one that could not finish in a comparison: said under the picture. */ engineNote?: string;
 };
 
@@ -86,7 +87,7 @@ export function isTryOnConfigured(): boolean {
 
 /** Which engines have a key (MOCK_TRYON stands in for Google, MOCK_FASHN for FASHN). */
 function configuredEngines(): Record<Engine, boolean> {
-  return { google: process.env.MOCK_TRYON === "true" || isGoogleTryOnConfigured(), fashn: isFashnConfigured() };
+  return { google: process.env.MOCK_TRYON === "true" || isGoogleTryOnConfigured(), fashn: isFashnConfigured(), kling: isKlingConfigured() };
 }
 
 /** The rule under Admin → Rules and the engines it comes to, given which ones have a key. */
@@ -193,8 +194,8 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
   const step = (s: string) => hooks.step?.(s);
   await assertReady(viewer, personId);
   const by: Engine = engine ?? (await mirrorEngines()).engines[0] ?? "google";
-  // FASHN places tops, bottoms and one-pieces, not shoes: those stay as they are, said under the picture.
-  const leftOut = (g: { id: string; category: string | null }) => by === "fashn" && g.id !== "extra" && !fashnCategory(g.category);
+  // FASHN and Kling place tops, bottoms and one-pieces, not shoes: those stay as they are, said under the picture.
+  const leftOut = (g: { id: string; category: string | null }) => !enginePlacesShoes(by) && g.id !== "extra" && g.category === "Shoes";
   // Front: the front photo, else the newest photo of any view. Back: only a back photo will do.
   const photo = view === "back"
     ? await db.bodyPhoto.findFirst({ where: { personId, view: "back" }, orderBy: { takenAt: "desc" } })
@@ -235,10 +236,10 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
         const garment = await sharp(g.buf).flatten({ background: "#ffffff" }).resize(1024, 1024, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
         let out: { data: Buffer };
         try {
-          out = by === "fashn" ? await fashnTryOn(person, garment, g.id === "extra" ? "auto" : (fashnCategory(g.category) ?? "auto")) : await googleTryOn(person, garment);
+          out = by === "fashn" ? await fashnTryOn(person, garment, g.id === "extra" ? "auto" : (fashnCategory(g.category) ?? "auto")) : by === "kling" ? await klingTryOn(person, garment) : await googleTryOn(person, garment);
         } catch (e) {
           if (e instanceof TryOnModelError) throw new TryOnError(e.message, 502);
-          if (e instanceof FashnError) throw new TryOnError(e.message, e.status);
+          if (e instanceof FashnError || e instanceof KlingError) throw new TryOnError(e.message, e.status);
           throw e;
         }
         person = await sharp(out.data).jpeg({ quality: 90 }).toBuffer();
@@ -297,7 +298,7 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
 
 /**
  * The look on the person by the engine(s) the rule names: one picture, or in Compare both engines at once, each
- * reporting its own step, the second picture carried as `alt`. One engine failing in a comparison leaves the
+ * reporting its own step, the other pictures carried as `alts`. One engine failing in a comparison leaves the
  * other's picture with the failure said under it; both failing throws the first reason.
  */
 export async function dressOnMe(viewer: Viewer, personId: string, itemIds: string[], source: string, view: BodyViewSide = "front", pick?: StylingChoice, fresh = false, hooks: DressingHooks = {}): Promise<TryOnView> {
@@ -312,7 +313,7 @@ export async function dressOnMe(viewer: Viewer, personId: string, itemIds: strin
   const ok = results.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
   const failed = results.flatMap((r, i) => (r.status === "rejected" ? [`${ENGINE_WORD[engines[i]]}: ${(r.reason as Error).message}`] : []));
   if (!ok.length) throw results[0].status === "rejected" ? results[0].reason : new TryOnError("The mirror didn’t come back.");
-  return withNote(ok[1] ? { ...ok[0], alt: ok[1] } : ok[0], failed.join(" · "));
+  return withNote(ok.length > 1 ? { ...ok[0], alts: ok.slice(1) } : ok[0], failed.join(" · "));
 }
 
 /** Does this person have a back photo (so the mirror can offer the view from behind)? */

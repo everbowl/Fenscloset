@@ -84,7 +84,7 @@ test("try-on: on by default, needs a body photo, then a picture of the look on y
   await expect(page.getByTestId("try-on-sheet").locator("img").first()).not.toHaveAttribute("src", beforeRetake!, { timeout: 20_000 });
   await expect(page.getByTestId("try-on-sheet")).toContainText("Only you can see this picture");
 
-  // Compare (Admin → Rules → Mirror engine): Google and FASHN side by side, so the winner can be picked there
+  // Compare (Admin → Rules → Mirror engine): Google, FASHN and Kling side by side, so the winner can be picked there
   await page.keyboard.press("Escape");
   await page.goto("/admin/rules");
   await page.getByLabel("Mirror engine").selectOption("compare");
@@ -95,8 +95,9 @@ test("try-on: on by default, needs a body photo, then a picture of the look on y
   await expect(page.getByTestId("mirror-compare")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("mirror-compare")).toContainText("Google");
   await expect(page.getByTestId("mirror-compare")).toContainText("FASHN");
+  await expect(page.getByTestId("mirror-compare")).toContainText("Kling");
   const pair = await page.getByTestId("mirror-compare").locator("img").evaluateAll((els) => els.map((e) => e.getAttribute("src")));
-  expect(pair).toHaveLength(2);
-  expect(pair[0]).not.toBe(pair[1]);
+  expect(pair).toHaveLength(3);
+  expect(new Set(pair).size).toBe(3);
   await expect(page.getByTestId("try-on-sheet")).toContainText("side by side");
 });

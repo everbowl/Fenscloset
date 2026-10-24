@@ -9,7 +9,8 @@ export const RULE_CHOICES: Record<string, RuleChoice[]> = {
   mirrorEngine: [
     { value: "google", label: "Google" },
     { value: "fashn", label: "FASHN" },
-    { value: "compare", label: "Compare: both, side by side" },
+    { value: "kling", label: "Kling" },
+    { value: "compare", label: "Compare: every engine, side by side" },
   ],
 };
 
