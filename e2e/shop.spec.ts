@@ -15,7 +15,11 @@ test("link lookup for me, photo lookup for Mya as a parent, recent list and remo
   await page.getByTestId("paste-link").click();
   await page.getByRole("dialog").getByRole("textbox").fill("https://mock.example/p/1");
   await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
-  await expect(page.getByTestId("shop-result")).toBeVisible();
+  // the lookup runs in the background: the screen shows the step and the seconds while it works (MOCK_SHOP_SLOW_MS makes the mock slow enough to see)
+  await expect(page.getByTestId("shop-thinking")).toContainText(/Reading the store page|Looking at the piece|Judging it|Finding what to wear/);
+  await expect(page.getByTestId("shop-thinking")).toContainText(/[1-9]\d*s/);
+  await expect(page.getByTestId("shop-result")).toBeVisible({ timeout: 20000 });
+  await expect(page.getByTestId("shop-thinking")).toHaveCount(0);
   await expect(page.getByTestId("shop-result")).toContainText("Linen Blazer");
   await expect(page.getByTestId("verdict")).toContainText(/Fits|Risky|Pass/);
   await expect(page.getByTestId("pairings")).toBeVisible();

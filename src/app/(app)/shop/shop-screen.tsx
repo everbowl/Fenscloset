@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
-import { useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -12,29 +12,64 @@ import { TextSheet } from "@/components/items/row-editor";
 import { shrinkPhoto } from "@/lib/import/client-queue";
 import { cn } from "@/lib/cn";
 import type { LookupView } from "@/lib/shop/engine";
-import { deleteLookupAction, lookupLinkAction, lookupPhotoAction, tryOnLookupAction } from "./actions";
+import { deleteLookupAction, lookupLinkAction, lookupPhotoAction, lookupStatusAction, tryOnLookupAction, type LookupResult } from "./actions";
 import type { TryOnState, TryOnView } from "@/lib/tryon";
 
 const CALL_WORD = { FITS: "Fits · buy it", RISKY: "Risky · maybe", PASS: "Pass · skip it" } as const;
+/** How often the screen asks after a lookup that is still running. */
+const POLL_MS = 2000;
 
 export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn, mannequin }: { meId: string; people: { id: string; name: string }[]; forPersonId: string; selected: LookupView | null; recent: LookupView[]; tryOn: TryOnState; /** SEE IT ON dresses the shared mannequin when the person's own try-on is not ready. */ mannequin: boolean }) {
   const router = useRouter();
   const [, start] = useTransition();
   const [busy, setBusy] = useState<"link" | "photo" | "delete" | "tryon" | null>(null);
+  const [progress, setProgress] = useState<{ step: string; startedAt: number } | null>(null);
+  const [secs, setSecs] = useState(0);
   const [onMe, setOnMe] = useState<TryOnView | null>(null);
   const [error, setError] = useState<string>();
   const [sheet, setSheet] = useState<"for" | "link" | null>(null);
   const [source, setSource] = useState<"screenshot" | "photo">("screenshot");
   const file = useRef<HTMLInputElement>(null);
+  const seq = useRef(0);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const forName = people.find((p) => p.id === forPersonId)?.name ?? "me";
 
-  function run(kind: "link" | "photo" | "delete", fn: () => Promise<{ ok: boolean; error?: string; id?: string }>) {
-    setError(undefined); setBusy(kind);
+  useEffect(() => () => { seq.current++; if (timer.current) clearTimeout(timer.current); }, []);
+  const startedAt = progress?.startedAt ?? null;
+  useEffect(() => {
+    if (startedAt === null) return;
+    const tick = () => setSecs(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [startedAt]);
+
+  /** A lookup runs in the background: the first answer is the result when it was quick, else a job this asks about every two seconds. */
+  const settle = useCallback((r: LookupResult, mine: number) => {
+    if (mine !== seq.current) return; // a newer lookup took over
+    if (!r.ok) { setBusy(null); setProgress(null); setError(r.error); return; }
+    if ("id" in r) { setBusy(null); setProgress(null); router.replace(`/shop?for=${forPersonId}&l=${r.id}`); router.refresh(); return; }
+    setProgress((p) => ({ step: r.pending.step, startedAt: p?.startedAt ?? Date.now() })); // the phone's own clock for the seconds, not the server's
+    timer.current = setTimeout(async () => {
+      if (mine !== seq.current) return;
+      let next: LookupResult;
+      try { next = await lookupStatusAction(r.pending.jobId); } catch { next = r; } // a dropped poll (phone asleep): ask again
+      settle(next, mine);
+    }, POLL_MS);
+  }, [forPersonId, router]);
+  function run(kind: "link" | "photo", fn: () => Promise<LookupResult>) {
+    const mine = ++seq.current;
+    if (timer.current) clearTimeout(timer.current);
+    setError(undefined); setBusy(kind); setProgress({ step: "Looking at it…", startedAt: Date.now() });
     start(async () => {
-      const r = await fn(); setBusy(null);
-      if (!r.ok) setError(r.error); else if (r.id) router.replace(`/shop?for=${forPersonId}&l=${r.id}`);
-      router.refresh();
+      let r: LookupResult;
+      try { r = await fn(); } catch { r = { ok: false, error: "Something went wrong. Try again." }; }
+      settle(r, mine);
     });
+  }
+  function remove(id: string) {
+    setError(undefined); setBusy("delete");
+    start(async () => { const r = await deleteLookupAction(id); setBusy(null); if (!r.ok) setError(r.error); router.refresh(); });
   }
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; e.target.value = "";
@@ -61,7 +96,12 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
           <Button variant="secondary" className="h-[54px] px-2 text-[10px]" disabled={thinking} onClick={() => { setSource("photo"); file.current?.setAttribute("capture", "environment"); file.current?.click(); }} data-testid="take-photo">Take a photo</Button>
         </div>
         <input ref={file} type="file" accept="image/*" className="hidden" onChange={onFile} data-testid="shop-file" />
-        {thinking ? <p className="mono mt-3 text-graphite" data-testid="shop-thinking">Looking at it…</p> : null}
+        {thinking ? (
+          <div className="mt-3" data-testid="shop-thinking" aria-live="polite">
+            <p className="mono flex items-center justify-between gap-3 text-ink"><span>{progress?.step ?? "Looking at it…"}</span><span className="shrink-0 text-graphite">{secs}s</span></p>
+            <p className="mono mt-1 text-graphite">Usually 15 to 40 seconds. You can leave this screen; the answer is kept under Recent.</p>
+          </div>
+        ) : null}
       </div>
 
       {selected ? (
@@ -143,7 +183,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
               ))}
             </div>
           ) : null}
-          {(selected.shopperId === meId || selected.forPersonId === meId) ? <button type="button" disabled={busy === "delete"} onClick={() => run("delete", () => deleteLookupAction(selected.id))} className="mono mt-4 text-graphite" data-testid="remove-lookup">Remove</button> : null}
+          {(selected.shopperId === meId || selected.forPersonId === meId) ? <button type="button" disabled={busy === "delete"} onClick={() => remove(selected.id)} className="mono mt-4 text-graphite" data-testid="remove-lookup">Remove</button> : null}
         </section>
       ) : (
         <section className="mt-6 lg:col-start-1 lg:row-start-3 lg:mt-0" data-testid="shop-empty">

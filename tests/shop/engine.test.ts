@@ -8,8 +8,9 @@ import { resetDb } from "../helpers";
 import { seed } from "../../prisma/seed";
 import { personalClosetId } from "@/lib/items/service";
 import { parseProductPage, normalizeUrl, MOCK_PAGE } from "@/lib/shop/page";
-import { deleteLookup, getLookup, listRecent, lookup } from "@/lib/shop/engine";
+import { deleteLookup, getLookup, listRecent, lookup, startLookup } from "@/lib/shop/engine";
 import { canViewKey } from "@/lib/photos/visibility";
+import { forgetJobs, jobStatus, settled } from "@/lib/jobs";
 
 async function addItem(ownerId: string, name: string, category: string, color?: string) {
   const cat = await db.category.findFirstOrThrow({ where: { name: category } });
@@ -85,5 +86,30 @@ describe("shop", () => {
     await expect(deleteLookup(olivia, v.id)).rejects.toMatchObject({ status: 403 });
     await deleteLookup(jeff, v.id);
     expect(await getLookup(jeff, v.id)).toBeNull();
+  });
+
+  it("runs in the background: a job to poll when it is slow, the same input joins it, the result is the lookup's id, the steps in order; a blocked store fails with its reason", async () => {
+    forgetJobs();
+    const jeff = await by("Jeff");
+    process.env.MOCK_SHOP_SLOW_MS = "40";
+    try {
+      const job = startLookup(jeff, jeff.id, { source: "link", url: "https://mock.example/p/1" });
+      expect(await settled(job, 10)).toMatchObject({ state: "running" }); // not done in time: the screen gets a job to poll
+      expect(startLookup(jeff, jeff.id, { source: "link", url: "https://mock.example/p/1" })).toBe(job); // tapped twice: one lookup, not two
+      expect(jobStatus(job.id, "someone-else")).toBeNull();
+      const done = await settled(job, 10_000);
+      expect(done.state).toBe("done");
+      expect((await getLookup(jeff, (done as { state: "done"; result: string }).result))?.title).toBe("Linen Blazer");
+      const steps: string[] = [];
+      await lookup(jeff, jeff.id, { source: "link", url: "https://mock.example/p/1" }, { step: (s) => steps.push(s) });
+      expect(steps).toEqual(["Reading the store page…", "Looking at the piece…", "Judging it…", "Finding what to wear with it…"]);
+      const img = await sharp({ create: { width: 60, height: 80, channels: 3, background: { r: 20, g: 20, b: 20 } } }).jpeg().toBuffer();
+      const photoSteps: string[] = [];
+      await lookup(jeff, jeff.id, { source: "photo", data: img, contentType: "image/jpeg" }, { step: (s) => photoSteps.push(s) });
+      expect(photoSteps[0]).toBe("Looking at the piece…");
+      process.env.MOCK_FETCH_BLOCKED = "true";
+      const bad = startLookup(jeff, jeff.id, { source: "link", url: "https://mock.example/blocked" });
+      expect(await settled(bad, 10_000)).toMatchObject({ state: "failed", error: { message: expect.stringMatching(/blocks link previews/) } });
+    } finally { delete process.env.MOCK_SHOP_SLOW_MS; delete process.env.MOCK_FETCH_BLOCKED; forgetJobs(); }
   });
 });
