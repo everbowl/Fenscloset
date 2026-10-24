@@ -2,40 +2,103 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePerson } from "@/lib/auth/current";
-import { deleteLookup, lookup, ShopError } from "@/lib/shop/engine";
+import { deleteLookup, getLookup, ShopError, startLookup, type LookupInput } from "@/lib/shop/engine";
 import { getObject, IMAGE_TYPES } from "@/lib/storage";
-import { getLookup } from "@/lib/shop/engine";
+import { jobStatus, settled, type JobStatus } from "@/lib/jobs";
+import { refreshBrandFeedNow } from "@/lib/shop/brand-feed";
 import { tryOnLook, tryOnState, TryOnError, type TryOnView } from "@/lib/tryon";
 import { featuresOf } from "@/lib/tryon/features";
 import { isMannequinConfigured, mannequinLook } from "@/lib/tryon/mannequin";
 
 export type Result = { ok: true; id?: string } | { ok: false; error: string };
 
-async function run(fn: () => Promise<string | void>): Promise<Result> {
-  try { const id = await fn(); revalidatePath("/shop"); return { ok: true, id: id ?? undefined }; }
-  catch (e) { if (e instanceof ShopError) return { ok: false, error: e.message }; console.error(e); return { ok: false, error: "Something went wrong. Try again." }; }
+/**
+ * A lookup answers with the saved lookup's id when it is quick (the same input again, or the mocks), else with a
+ * job for the screen to poll with lookupStatusAction. The work carries on if the browser lets go; its answer
+ * is saved and waits under Recent.
+ */
+export type LookupResult =
+  | { ok: true; id: string }
+  | { ok: true; pending: { jobId: string; step: string; startedAt: number } }
+  | { ok: false; error: string };
+
+/** How long the first call waits before handing back a job to poll. */
+const QUICK_MS = 1500;
+
+function failed(e: unknown): { ok: false; error: string } {
+  if (e instanceof ShopError) return { ok: false, error: e.message };
+  console.error(e);
+  return { ok: false, error: "Something went wrong. Try again." };
 }
 
-export async function lookupLinkAction(forPersonId: string, url: string): Promise<Result> {
+function answer(status: JobStatus<string>, jobId: string): LookupResult {
+  if (status.state === "done") { revalidatePath("/shop"); return { ok: true, id: status.result }; }
+  if (status.state === "failed") return failed(status.error);
+  return { ok: true, pending: { jobId, step: status.step, startedAt: status.startedAt } };
+}
+
+async function begin(forPersonId: string, input: LookupInput): Promise<LookupResult> {
   const me = await requirePerson();
-  return run(async () => (await lookup(me, forPersonId, { source: "link", url })).id);
+  const job = startLookup(me, forPersonId, input);
+  return answer(await settled(job, QUICK_MS), job.id);
+}
+
+export async function lookupLinkAction(forPersonId: string, url: string): Promise<LookupResult> {
+  return begin(forPersonId, { source: "link", url });
 }
 
 /** form: `photo` (file) + `source` ("screenshot" | "photo") */
-export async function lookupPhotoAction(forPersonId: string, form: FormData): Promise<Result> {
+export async function lookupPhotoAction(forPersonId: string, form: FormData): Promise<LookupResult> {
+  const file = form.get("photo");
+  const source = form.get("source") === "photo" ? "photo" : "screenshot";
+  if (!(file instanceof File) || !IMAGE_TYPES[file.type]) return { ok: false, error: "Use a JPEG, PNG or WebP image." };
+  if (file.size > 12 * 1024 * 1024) return { ok: false, error: "That image is too large." };
+  return begin(forPersonId, { source, data: Buffer.from(await file.arrayBuffer()), contentType: file.type as "image/jpeg" });
+}
+
+/** Where a lookup stands: still running (with its step), done (the lookup's id), or failed (why). */
+export async function lookupStatusAction(jobId: string): Promise<LookupResult> {
   const me = await requirePerson();
-  return run(async () => {
-    const file = form.get("photo");
-    const source = form.get("source") === "photo" ? "photo" : "screenshot";
-    if (!(file instanceof File) || !IMAGE_TYPES[file.type]) throw new ShopError("Use a JPEG, PNG or WebP image.");
-    if (file.size > 12 * 1024 * 1024) throw new ShopError("That image is too large.");
-    return (await lookup(me, forPersonId, { source, data: Buffer.from(await file.arrayBuffer()), contentType: file.type as "image/jpeg" })).id;
-  });
+  const status = jobStatus<string>(jobId, me.id);
+  if (!status) return { ok: false, error: "That lookup is gone. Try again." };
+  return answer(status, jobId);
+}
+
+/** The brand feed's refresh: done, or a job to poll with brandFeedStatusAction. */
+export type FeedResult =
+  | { ok: true; done: true }
+  | { ok: true; pending: { jobId: string; step: string; startedAt: number } }
+  | { ok: false; error: string };
+
+// No revalidatePath here: the screen refreshes the page itself when the job is done. A revalidate inside the action
+// would render the page once more in the action's own response, and openBrandFeed would count the new products as seen
+// before the person saw them.
+function feedAnswer(status: JobStatus<string>, jobId: string): FeedResult {
+  if (status.state === "done") return { ok: true, done: true };
+  if (status.state === "failed") return failed(status.error);
+  return { ok: true, pending: { jobId, step: status.step, startedAt: status.startedAt } };
+}
+
+/** "New from your brands": search the stores for each favorite brand again, in the background. */
+export async function brandFeedAction(forPersonId: string): Promise<FeedResult> {
+  const me = await requirePerson();
+  try {
+    const job = await refreshBrandFeedNow(me, forPersonId);
+    return feedAnswer(await settled(job, QUICK_MS), job.id);
+  } catch (e) { return failed(e); }
+}
+
+export async function brandFeedStatusAction(jobId: string): Promise<FeedResult> {
+  const me = await requirePerson();
+  const status = jobStatus<string>(jobId, me.id);
+  if (!status) return { ok: false, error: "That refresh is gone. Try again." };
+  return feedAnswer(status, jobId);
 }
 
 export async function deleteLookupAction(id: string): Promise<Result> {
   const me = await requirePerson();
-  return run(() => deleteLookup(me, id));
+  try { await deleteLookup(me, id); revalidatePath("/shop"); return { ok: true }; }
+  catch (e) { return failed(e); }
 }
 
 /** SEE IT ON: the candidate piece (its store photo) on the person's own body photo when their try-on is ready, else on the shared mannequin (V A), with the first pairing's other pieces. */

@@ -22,7 +22,7 @@ export function StoreScreen({ canSearch, initialTab = "link" }: { canSearch: boo
   const [tab, setTab] = useState<Tab>(initialTab);
   return (
     <div>
-      <PageHeader title="Add from" accent="a store" aside={<Link href="/add" className="mono mono-11 py-2">Photos instead</Link>} />
+      <PageHeader title="Add from" accent="a store" aside={<Link href="/add" className="pill pill-sm">Photos instead</Link>} />
       <div className="mt-2 flex gap-1.5" role="tablist">
         {(["link", "receipt"] as const).map((t) => (
           <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`mono mono-11 h-9 px-4 ${tab === t ? "bg-ink text-paper" : "border border-ink"}`} data-testid={`tab-${t}`}>{t === "link" ? "Product link" : "Receipt"}</button>
@@ -150,7 +150,7 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
             </Field>
           ) : null}
           {step !== "color" && color ? <p className="mono" data-testid="chosen-color">Color · {color} <button type="button" onClick={() => setStep("color")} className="ml-2 text-graphite">change</button></p> : null}
-          {step !== "color" && canSearch && color.trim() && !product.colorImages[color] && !picks ? <button type="button" onClick={findPhotos} disabled={pending} className="mono self-start py-2" data-testid="find-photos">{busy === "photos" ? "Searching…" : "Find a photo in this color"}</button> : null}
+          {step !== "color" && canSearch && color.trim() && !product.colorImages[color] && !picks ? <button type="button" onClick={findPhotos} disabled={pending} className="pill self-start" data-testid="find-photos">{busy === "photos" ? "Searching…" : "Find a photo in this color"}</button> : null}
           {picks && picks.length ? <PhotoPicks picks={picks} chosen={imageUrl} onPick={setImageUrl} /> : null}
           {step === "size" ? (
             <Field label="Which size?" htmlFor="store-size" hint="Tap one, type it, or skip.">
@@ -168,7 +168,7 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
           {added > 0 ? (
             <div className="flex items-center justify-between border-y border-ink py-2.5" data-testid="added-strip">
               <span className="mono tracking-[0.1em]">{added} added</span>
-              <div className="flex gap-4"><button type="button" onClick={again} className="mono py-2 tracking-[0.1em]" data-testid="add-another-color">Another color or size</button><Link href="/add" className="mono py-2 tracking-[0.1em]">Confirm →</Link></div>
+              <div className="flex gap-4"><button type="button" onClick={again} className="pill" data-testid="add-another-color">Another color or size</button><Link href="/add" className="pill pill-solid">Confirm →</Link></div>
             </div>
           ) : null}
         </div>
@@ -241,8 +241,8 @@ function ReceiptTab() {
                   <p className="text-[15px] font-medium leading-snug">{l.name}</p>
                   <p className="mono mt-1 text-graphite">{[l.color, l.size, l.quantity > 1 ? `×${l.quantity}` : null, l.priceText, l.pick?.query === "exact" ? "Exact item at the store" : l.pick ? "Closest match" : null].filter(Boolean).join(" · ")}</p>
                   <div className="mt-1.5 flex gap-4">
-                    {l.picks.length ? <button type="button" onClick={() => setOpenPicks(openPicks === i ? null : i)} className="mono py-1" data-testid="pick-another">{l.pick ? "Pick another" : "Pick a photo"}</button> : <span className="mono text-graphite">No photo found · take one later</span>}
-                    {l.pick ? <button type="button" onClick={() => update(i, { pick: null })} className="mono py-1 text-graphite">Skip this one</button> : null}
+                    {l.picks.length ? <button type="button" onClick={() => setOpenPicks(openPicks === i ? null : i)} className="pill pill-sm" data-testid="pick-another">{l.pick ? "Pick another" : "Pick a photo"}</button> : <span className="mono text-graphite">No photo found · take one later</span>}
+                    {l.pick ? <button type="button" onClick={() => update(i, { pick: null })} className="pill pill-sm pill-quiet">Skip this one</button> : null}
                   </div>
                 </div>
               </div>
@@ -252,7 +252,7 @@ function ReceiptTab() {
           {done ? (
             <div className="mt-4 flex items-center justify-between border-y border-ink py-2.5" data-testid="added-strip">
               <span className="mono tracking-[0.1em]">{done.count} added{done.skipped ? ` · ${done.skipped} skipped` : ""}</span>
-              <Link href="/add" className="mono py-2 tracking-[0.1em]">Confirm →</Link>
+              <Link href="/add" className="pill pill-solid">Confirm →</Link>
             </div>
           ) : (
             <Button size="lg" className="mt-4" onClick={add} disabled={pending || !total} data-testid="add-receipt">{busy === "add" ? "Adding…" : `Add ${total} piece${total === 1 ? "" : "s"}`}</Button>

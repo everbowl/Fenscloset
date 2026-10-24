@@ -54,7 +54,7 @@ export function FavoritesEditor({ ownerId, favs, brands, stores, myBrands, sizeO
     <section>
       <div className="flex items-center justify-between border-b border-ink pb-2">
         <p className="mono text-graphite">{title}</p>
-        {canEdit ? <button type="button" onClick={onEdit} className="mono py-1" data-testid={testId}>Edit</button> : null}
+        {canEdit ? <button type="button" onClick={onEdit} className="pill pill-sm" data-testid={testId}>Edit</button> : null}
       </div>
       {ids.length === 0 ? <p className="mono py-3 text-graphite">None yet</p> : null}
       {ids.map((id) => <div key={id} className="flex h-[42px] items-center border-b border-line text-[14px]">{items.find((x) => x.id === id)?.name}</div>)}
@@ -67,7 +67,7 @@ export function FavoritesEditor({ ownerId, favs, brands, stores, myBrands, sizeO
       <section data-testid="my-brands">
         <div className="flex items-center justify-between border-b border-ink pb-2">
           <p className="mono text-graphite">My brands &amp; sizes</p>
-          {canEdit ? <button type="button" onClick={() => setSheet("pickMine")} className="mono py-1" data-testid="add-my-brand">Add</button> : null}
+          {canEdit ? <button type="button" onClick={() => setSheet("pickMine")} className="pill pill-sm" data-testid="add-my-brand">Add</button> : null}
         </div>
         <p className="mono mt-2 normal-case text-graphite">Your size per item type in each brand. Pick them with one tap when you add clothes: the right size and the store link come along.</p>
         {myBrands.length === 0 ? <p className="mono py-3 text-graphite">None yet</p> : null}
@@ -77,7 +77,7 @@ export function FavoritesEditor({ ownerId, favs, brands, stores, myBrands, sizeO
               <span className="block truncate">{b.name}</span>
               <span className="mono block truncate text-graphite">{[...b.sizes.map((s) => `${s.categoryName ?? "Any"} ${s.size}`), b.url ? shortUrl(b.url) : "No link"].join(" · ") || "No sizes yet"}</span>
             </span>
-            {canEdit ? <><button type="button" onClick={() => openEdit(b)} className="mono py-1" data-testid={`edit-my-brand-${b.brandId}`}>Edit</button><button type="button" onClick={() => start(async () => { const r = await removeMyBrandAction(ownerId, b.brandId); if (!r.ok) setError(r.error); router.refresh(); })} className="mono py-1 text-graphite">Remove</button></> : null}
+            {canEdit ? <><button type="button" onClick={() => openEdit(b)} className="pill pill-sm" data-testid={`edit-my-brand-${b.brandId}`}>Edit</button><button type="button" onClick={() => start(async () => { const r = await removeMyBrandAction(ownerId, b.brandId); if (!r.ok) setError(r.error); router.refresh(); })} className="pill pill-sm pill-quiet">Remove</button></> : null}
           </div>
         ))}
       </section>

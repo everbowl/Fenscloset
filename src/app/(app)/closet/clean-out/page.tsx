@@ -19,7 +19,7 @@ export default async function CleanOutPage() {
   return (
     <div>
       <PageHeader
-        eyebrow={<div className="flex items-center justify-between"><span>{items.length} {items.length === 1 ? "piece" : "pieces"} not worn in {months} months{name ? ` · ${name}` : ""}</span>{isAdmin(me) ? <Link href="/admin/rules" className="mono text-ink">Edit</Link> : null}</div>}
+        eyebrow={<div className="flex items-center justify-between"><span>{items.length} {items.length === 1 ? "piece" : "pieces"} not worn in {months} months{name ? ` · ${name}` : ""}</span>{isAdmin(me) ? <Link href="/admin/rules" className="pill pill-sm">Edit</Link> : null}</div>}
         title="Clean" accent="out" />
       <CleanOutList items={items.map((i) => ({ ...i, lastWornAt: i.lastWornAt?.toISOString() ?? null, createdAt: i.createdAt.toISOString() }))} canDecide={canEditItem(me, personId)} />
     </div>

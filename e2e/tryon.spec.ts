@@ -18,7 +18,7 @@ test("try-on: on by default, needs a body photo, then a picture of the look on y
   await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole("dialog")).toContainText("On a mannequin");
   await expect(page.getByTestId("try-on-sheet")).toContainText("No body photo used");
-  await expect(page.getByTestId("try-on-sheet").locator("img")).toHaveAttribute("src", /\/api\/photo\/mannequin\//);
+  await expect(page.getByTestId("try-on-sheet").locator("img").first()).toHaveAttribute("src", /\/api\/photo\/mannequin\//);
   await page.keyboard.press("Escape");
   await page.goto("/profile/settings");
   await expect(page.getByTestId("tryon-toggle")).toHaveAttribute("aria-checked", "true"); // on from the start; the switch is there for anyone who wants it off
@@ -32,21 +32,21 @@ test("try-on: on by default, needs a body photo, then a picture of the look on y
   await page.getByTestId("try-on").click();
   await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId("try-on-sheet")).toContainText("Only you can see this picture");
-  await expect(page.getByTestId("try-on-sheet").locator("img")).toHaveAttribute("src", /\/api\/photo\/tryon\//);
+  await expect(page.getByTestId("try-on-sheet").locator("img").first()).toHaveAttribute("src", /\/api\/photo\/tryon\//);
   await expect(page.getByTestId("mirror-back")).toHaveCount(0); // no back photo yet
   // how it shows: untucked by default (the look has a top and a bottom); a chip re-styles the same picture
   await expect(page.getByTestId("mirror-styling")).toBeVisible();
   await expect(page.getByTestId("styling-summary")).toContainText("Untucked");
-  const firstSrc = await page.getByTestId("try-on-sheet").locator("img").getAttribute("src");
+  const firstSrc = await page.getByTestId("try-on-sheet").locator("img").first().getAttribute("src");
   await page.getByTestId("style-group-tuck").getByRole("button", { name: "Tucked", exact: true }).click();
   await expect(page.getByTestId("styling-summary")).toContainText("Tucked", { timeout: 20_000 });
-  await expect(page.getByTestId("try-on-sheet").locator("img")).not.toHaveAttribute("src", firstSrc!);
+  await expect(page.getByTestId("try-on-sheet").locator("img").first()).not.toHaveAttribute("src", firstSrc!);
   await page.getByTestId("style-group-pose").getByRole("button", { name: "Hands in pockets" }).click();
   await expect(page.getByTestId("styling-summary")).toContainText("Hands in pockets", { timeout: 20_000 });
   // "Dress again" throws the saved pictures of the look away and dresses it from scratch (a new picture, same choices)
-  const beforeRedo = await page.getByTestId("try-on-sheet").locator("img").getAttribute("src");
+  const beforeRedo = await page.getByTestId("try-on-sheet").locator("img").first().getAttribute("src");
   await page.getByTestId("redo-tryon").click();
-  await expect(page.getByTestId("try-on-sheet").locator("img")).not.toHaveAttribute("src", beforeRedo!, { timeout: 20_000 });
+  await expect(page.getByTestId("try-on-sheet").locator("img").first()).not.toHaveAttribute("src", beforeRedo!, { timeout: 20_000 });
   await expect(page.getByTestId("styling-summary")).toContainText("Hands in pockets");
   await page.keyboard.press("Escape");
   // remembered: the mirror opens the way it was left
@@ -74,12 +74,14 @@ test("try-on: on by default, needs a body photo, then a picture of the look on y
   await page.getByTestId("closet-mirror").click();
   await page.getByTestId("item-card").filter({ hasNotText: "Not in the mirror" }).first().click();
   await page.getByTestId("see-picked").click();
+  // one piece picked: the mirror asks to complete the look first (e2e/mirror-complete.spec.ts covers the asking); go without
+  while (await page.getByTestId("complete-skip").isVisible()) await page.getByTestId("complete-skip").click();
   await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId("try-on-sheet")).toContainText("Only you can see this picture");
-  const beforeRetake = await page.getByTestId("try-on-sheet").locator("img").getAttribute("src");
+  const beforeRetake = await page.getByTestId("try-on-sheet").locator("img").first().getAttribute("src");
   await expect(page.getByTestId("retake-body-photo")).toHaveText("Retake");
   await page.getByTestId("mirror-body-photo").setInputFiles({ name: "me2.jpg", mimeType: "image/jpeg", buffer });
-  await expect(page.getByTestId("try-on-sheet").locator("img")).not.toHaveAttribute("src", beforeRetake!, { timeout: 20_000 });
+  await expect(page.getByTestId("try-on-sheet").locator("img").first()).not.toHaveAttribute("src", beforeRetake!, { timeout: 20_000 });
   await expect(page.getByTestId("try-on-sheet")).toContainText("Only you can see this picture");
 
   // Compare (Admin → Rules → Mirror engine): Google and FASHN side by side, so the winner can be picked there

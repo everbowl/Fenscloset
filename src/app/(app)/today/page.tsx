@@ -6,13 +6,15 @@ import { canDress, getSuggestion, type Suggestion } from "@/lib/outfits/engine";
 import { loadCandidates } from "@/lib/outfits/catalog";
 import { countCleanOut } from "@/lib/outfits/cleanout";
 import { unratedRecentFit } from "@/lib/fits/service";
-import { tryOnState, hasBackPhoto } from "@/lib/tryon";
+import { tryOnState, hasBackPhoto, mirrorEngines } from "@/lib/tryon";
+import { mirrorWardrobe } from "@/lib/tryon/wardrobe";
 import { isMannequinConfigured } from "@/lib/tryon/mannequin";
 import { getScales } from "@/lib/checkins/service";
 import { listEntries } from "@/lib/lists/service";
 import { getConnection, isGoogleConfigured } from "@/lib/plans/google";
 import { monoDate } from "@/lib/dates";
 import { planLine } from "@/lib/plans";
+import { newMatchCount } from "@/lib/shop/wants";
 import { TodayScreen } from "./today-screen";
 
 export const metadata = { title: "Today" };
@@ -27,7 +29,7 @@ export default async function TodayPage() {
     loadTodayContext(me, personId), canDress(me, personId), loadCandidates(personId), getScales(), listEntries("occasion"), countCleanOut(personId),
     getConnection(personId),
   ]);
-  const [unrated, tryOn] = await Promise.all([dress ? unratedRecentFit(personId, ctx.date) : null, tryOnState(me, personId)]);
+  const [unrated, tryOn, lookingFor, wardrobe, engines] = await Promise.all([dress ? unratedRecentFit(personId, ctx.date) : null, tryOnState(me, personId), newMatchCount(me, personId), mirrorWardrobe(personId), mirrorEngines()]);
   const enough = cand.usable.length + cand.restingIds.length >= 2;
   // The page never builds looks itself (Claude takes 20 to 40 seconds and a phone gives up on a load that long):
   // it shows what exists, and the screen asks for the day's looks in the background when there are none yet.
@@ -64,11 +66,14 @@ export default async function TodayPage() {
       needsLooks={needsLooks}
       enoughClothes={enough}
       cleanOutCount={cleanOut}
+      lookingForNew={lookingFor.newMatches}
       unrated={unrated}
       tryOn={tryOn}
       mannequin={dress && tryOn !== "ready" && isMannequinConfigured()}
       backPhoto={tryOn === "ready" && (await hasBackPhoto(personId))}
       mannequinAvailable={dress && isMannequinConfigured()}
+      wardrobe={wardrobe}
+      engine={engines.engines[0] ?? "google"}
     />
   );
 }

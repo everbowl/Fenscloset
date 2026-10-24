@@ -72,9 +72,12 @@ export async function googleTryOn(person: Buffer, garment: Buffer, fetchImpl: ty
   // level goes first: block_none needs Google's allowlist and is refused (400) until the project is approved, so the next
   // level down is tried, block_only_high, which needs no approval. GOOGLE_VERTEX_TRYON_SAFETY pins a level.
   const levels = [...new Set([process.env.GOOGLE_VERTEX_TRYON_SAFETY || "block_none", "block_only_high"])];
+  // baseSteps: Google's diffusion steps, default 32; more is a better picture for a longer wait (Jeff, 23 Oct 2026: quality over
+  // speed, the mirror runs in the background anyway). GOOGLE_VERTEX_TRYON_STEPS overrides.
+  const baseSteps = Math.max(1, Math.round(Number(process.env.GOOGLE_VERTEX_TRYON_STEPS) || 50));
   const bodyFor = (safetySetting: string) => JSON.stringify({
     instances: [{ personImage: { image: { bytesBase64Encoded: person.toString("base64") } }, productImages: [{ image: { bytesBase64Encoded: garment.toString("base64") } }] }],
-    parameters: { sampleCount: 1, personGeneration: process.env.GOOGLE_VERTEX_TRYON_PERSON || "allow_adult", safetySetting, addWatermark: false },
+    parameters: { sampleCount: 1, baseSteps, personGeneration: process.env.GOOGLE_VERTEX_TRYON_PERSON || "allow_adult", safetySetting, addWatermark: false },
   });
   const token = await accessToken(fetchImpl);
   let res: Response | null = null;

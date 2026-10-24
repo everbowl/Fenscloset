@@ -70,9 +70,9 @@ export function SettingsEditor({ privacy, people, calendar }: { privacy: Privacy
         <div className="flex min-h-[42px] items-center justify-between gap-3 border-b border-line text-[14px]" data-testid="row-calendar">
           <span className="min-w-0"><span className="block">Google Calendar</span>{calendar.connected ? <span className="mono block truncate text-graphite">{calendar.email ?? "Connected"}</span> : null}</span>
           {calendar.connected
-            ? <button type="button" onClick={() => run(() => disconnectCalendarAction())} className="mono mono-11 shrink-0 py-2">Disconnect</button>
+            ? <button type="button" onClick={() => run(() => disconnectCalendarAction())} className="pill pill-sm shrink-0">Disconnect</button>
             : calendar.configured
-              ? <a href="/api/google/connect" className="mono mono-11 shrink-0 py-2" data-testid="connect-calendar">Connect</a>
+              ? <a href="/api/google/connect" className="pill pill-sm shrink-0" data-testid="connect-calendar">Connect</a>
               : <span className="mono shrink-0 text-graphite">Not set up yet</span>}
         </div>
         {calendar.connected ? <Row label="Calendars" value={calendarWords} onClick={() => setSheet("calendars")} testId="row-calendars" /> : null}

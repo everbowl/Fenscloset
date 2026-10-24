@@ -1,4 +1,6 @@
+import { createHash } from "node:crypto";
 import { db } from "@/lib/db";
+import { startJob, type Job } from "@/lib/jobs";
 import { isMockAi, structured } from "@/lib/ai/claude";
 import { loadTagLists, type TagLists } from "@/lib/ai/tag-item";
 import { newKey, putObject, deleteObject } from "@/lib/storage";
@@ -166,14 +168,23 @@ export async function assertCanShop(viewer: Viewer, forPersonId: string) {
   if (!(await canShopFor(viewer, forPersonId))) throw new ShopError("You can shop for yourself, your kids, or people who let you.", 403);
 }
 
-type Input = { source: "link"; url: string } | { source: "screenshot" | "photo"; data: Buffer; contentType: "image/jpeg" | "image/png" | "image/webp" };
+export type LookupInput = { source: "link"; url: string } | { source: "screenshot" | "photo"; data: Buffer; contentType: "image/jpeg" | "image/png" | "image/webp" };
+export type LookupHooks = { step?: (s: string) => void };
 
-/** Run a lookup end to end and store it. */
-export async function lookup(viewer: Viewer, forPersonId: string, input: Input): Promise<LookupView> {
+/** Dev and tests: a pause after each step of a mock lookup, so the progress line can be seen and tested. Unset in production. */
+async function slowStep(): Promise<void> {
+  const ms = Number(process.env.MOCK_SHOP_SLOW_MS ?? 0);
+  if (ms > 0 && isMockAi()) await new Promise((r) => setTimeout(r, ms));
+}
+
+/** Run a lookup end to end and store it. `hooks.step` hears each stage, for a progress line while it runs in the background. */
+export async function lookup(viewer: Viewer, forPersonId: string, input: LookupInput, hooks: LookupHooks = {}): Promise<LookupView> {
+  const step = async (s: string) => { hooks.step?.(s); await slowStep(); };
   await assertCanShop(viewer, forPersonId);
   let title: string | null = null, description: string | null = null, priceText: string | null = null, brandText: string | null = null, inputUrl: string | null = null;
   let image: { data: Buffer; contentType: string } | null = null;
   if (input.source === "link") {
+    await step("Reading the store page…");
     const page = await readProductPage(input.url).catch((e) => { if (e instanceof PageError) throw new ShopError(e.message); throw e; });
     ({ title, description, priceText, brandText } = page); inputUrl = page.url;
     if (page.imageUrl) image = await fetchImage(page.imageUrl);
@@ -188,10 +199,13 @@ export async function lookup(viewer: Viewer, forPersonId: string, input: Input):
     await putObject(imageKey, normalized, "image/jpeg");
     ai = await toAiImage(normalized);
   }
+  await step("Looking at the piece…");
   const lists = await loadTagLists();
   const read = await readCandidate(lists, { image: ai, title, description, brandText });
+  await step("Judging it…");
   const [style, body, closet, similar] = await Promise.all([styleContext(forPersonId), bodyContext(viewer, forPersonId, read.brandText), loadCandidates(forPersonId, new Date(), { noRepeatDays: 0 }), similarOwned(forPersonId, read)]);
   const verdict = await decide(read, style, body, closet.usable, similar, priceText);
+  await step("Finding what to wear with it…");
   const [boards, recommendations, products] = await Promise.all([pairings(forPersonId, read, imageKey, closet.usable, style), recommend(forPersonId, read, verdict), findProducts(forPersonId, verdict)]);
   const row = await db.shoppingLookup.create({
     data: {
@@ -200,6 +214,19 @@ export async function lookup(viewer: Viewer, forPersonId: string, input: Input):
     },
   });
   return (await getLookup(viewer, row.id))!;
+}
+
+/**
+ * The same lookup as a background job (src/lib/jobs.ts), so the Shop answers at once and polls: a store
+ * page, two Claude reads, three looks and a product search take 15 to 40 seconds, longer than a phone
+ * waits on one request (Jeff, 23 Oct 2026: a 28-second lookup that Safari gave up on). The job's result
+ * is the saved lookup's id; the row itself is the record, so the answer is under Recent even when the
+ * browser let go. The same input tapped twice joins the running job instead of paying twice.
+ */
+export function startLookup(viewer: Viewer, forPersonId: string, input: LookupInput): Job<string> {
+  const what = input.source === "link" ? input.url.trim().toLowerCase() : createHash("sha1").update(input.data).digest("hex");
+  const key = ["shop", viewer.id, forPersonId, input.source, what].join("|");
+  return startJob<string>(key, viewer.id, async (step) => (await lookup(viewer, forPersonId, input, { step })).id);
 }
 
 export async function getLookup(viewer: Viewer, id: string): Promise<LookupView | null> {

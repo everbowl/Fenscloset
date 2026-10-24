@@ -14,6 +14,8 @@ import { cn } from "@/lib/cn";
 import type { BoardView, Piece } from "@/lib/outfits/engine";
 import type { Scale } from "@/lib/checkins/service";
 import type { TryOnState } from "@/lib/tryon";
+import type { Wardrobe } from "@/lib/tryon/complete";
+import type { Engine } from "@/lib/tryon/engines";
 import { MirrorGlyph, MirrorSheet } from "@/components/mirror/mirror-sheet";
 import { useMirror } from "@/components/mirror/use-mirror";
 import { checkInSelfieAction, checkInTapsAction, looksStatusAction, moreAction, rateAction, regenerateAction, removeAction, setLocationAction, setPlanAction, setZipAction, swapAction, wearAction, type LooksResult } from "./actions";
@@ -31,6 +33,8 @@ type Props = {
   /** No looks for today yet: the screen asks for them in the background as soon as it opens. */
   needsLooks: boolean;
   enoughClothes: boolean; cleanOutCount: number;
+  /** New matches waiting on the person's Looking-for list (Shop v2 item 2); 0 keeps Today quiet. */
+  lookingForNew: number;
   /** The most recent fit (last 7 days) with no "how did it go?" answer yet. */
   unrated: { id: string; date: string; title: string } | null;
   /** Whether TRY IT ON is offered: ready, or why not (off → Settings link; no_photo → Body page link). Hidden for minors and others' closets. */
@@ -41,6 +45,10 @@ type Props = {
   backPhoto: boolean;
   /** The mannequin is set up: offered in the mirror even when the person has their own photo. */
   mannequinAvailable: boolean;
+  /** The person's placeable pieces, for the mirror's "To go with it" rows. */
+  wardrobe: Wardrobe;
+  /** Who dresses on the person's photo (FASHN can't place shoes). */
+  engine: Engine;
 };
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -57,7 +65,7 @@ export function TodayScreen(p: Props) {
   const boards = p.suggestion?.boards ?? [];
   const board = boards[index] ?? null;
   // The mirror: dressed in the background, polled, shown in the shared sheet (src/components/mirror).
-  const m = useMirror(p.personId);
+  const m = useMirror(p.personId, p.wardrobe, p.engine);
 
   function run(label: string, fn: () => Promise<{ ok: boolean; error?: string }>, after?: () => void) {
     setError(undefined); setBusy(label);
@@ -155,14 +163,14 @@ export function TodayScreen(p: Props) {
 
   return (
     <div data-testid="today" className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-14">
-      {p.canDress ? <HeaderAction><button type="button" onClick={() => setSheet("checkin")} className="mono mono-11 px-2 py-3" data-testid="check-in">Check-in</button></HeaderAction> : null}
+      {p.canDress ? <HeaderAction><button type="button" onClick={() => setSheet("checkin")} className="pill pill-sm" data-testid="check-in">Check-in</button></HeaderAction> : null}
       {error ? <Banner tone="danger" title={error} className="mb-3 lg:col-start-2" /> : null}
       <div className="lg:col-start-2">
       <PageHeader
         eyebrow={
           <div className="flex items-start justify-between gap-3">
             <span className="text-ink" data-testid="context-line">{p.mine ? p.contextLine : `${p.personName.toUpperCase()} · ${p.contextLine}`}</span>
-            {p.canDress ? <button type="button" onClick={() => setSheet("plan")} className="mono shrink-0 text-ink" data-testid="edit-plan">Edit</button> : null}
+            {p.canDress ? <button type="button" onClick={() => setSheet("plan")} className="pill pill-sm shrink-0" data-testid="edit-plan">Edit</button> : null}
           </div>
         }
         title={title} accent="look"
@@ -187,8 +195,8 @@ export function TodayScreen(p: Props) {
         <div className="mb-4 flex items-center justify-between border-y border-ink py-2.5 lg:col-start-2">
           <span className="mono">{p.weatherNote === "failed" ? "Weather is unavailable right now" : "Where are you today?"}</span>
           <span className="flex gap-4">
-            {p.weatherNote === "none" ? <button type="button" onClick={askLocation} disabled={busy === "location"} className="mono mono-11">{busy === "location" ? "Finding…" : "Use my location"}</button> : null}
-            <button type="button" onClick={() => setSheet("zip")} className="mono mono-11" data-testid="enter-zip">{p.savedZip ? "Change zip" : "Enter zip"}</button>
+            {p.weatherNote === "none" ? <button type="button" onClick={askLocation} disabled={busy === "location"} className="pill pill-sm">{busy === "location" ? "Finding…" : "Use my location"}</button> : null}
+            <button type="button" onClick={() => setSheet("zip")} className="pill pill-sm" data-testid="enter-zip">{p.savedZip ? "Change zip" : "Enter zip"}</button>
           </span>
         </div>
       ) : null}
@@ -275,6 +283,16 @@ export function TodayScreen(p: Props) {
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden><path d="M4 12h16M14 6l6 6-6 6" /></svg>
       </Link>
 
+      {p.lookingForNew > 0 ? (
+        <Link href={`/shop/looking-for?for=${p.personId}`} className="mt-3 flex items-center justify-between border border-ink px-4 py-3.5 hover:bg-bone lg:col-start-2" data-testid="looking-for-strip">
+          <span className="flex flex-col gap-0.5">
+            <span className="serif text-[22px]">Something <em>turned up</em></span>
+            <span className="mono text-ink">{p.lookingForNew} new {p.lookingForNew === 1 ? "match" : "matches"} for what {p.mine ? "you’re" : `${p.personName} is`} looking for</span>
+          </span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden><path d="M4 12h16M14 6l6 6-6 6" /></svg>
+        </Link>
+      ) : null}
+
       {p.cleanOutCount > 0 && p.canDress ? (
         <Link href="/closet/clean-out" className="mt-3 flex items-center justify-between border border-ink px-4 py-3.5 hover:bg-bone lg:col-start-2" data-testid="clean-out-link">
           <span className="flex flex-col gap-0.5">
@@ -310,8 +328,8 @@ export function TodayScreen(p: Props) {
             <div key={x.id} className="flex h-12 items-center gap-3 border-b border-line">
               <span className="size-9 shrink-0 bg-bone">{x.thumbKey ? <img src={`/api/photo/${x.thumbKey}`} alt="" className="size-full object-contain" /> : null}</span>
               <span className="min-w-0 flex-1"><span className="block truncate text-[15px]">{x.name}</span><span className="mono text-graphite">{x.label}</span></span>
-              <button type="button" disabled={busy !== null} onClick={() => run("swap", () => swapAction(p.personId, index, x.id), () => setSheet(null))} className="mono mono-11 h-9 border border-ink px-3" data-testid={`swap-${x.id}`}>Swap</button>
-              {(board?.pieces.length ?? 0) > 2 ? <button type="button" disabled={busy !== null} onClick={() => run("swap", () => removeAction(p.personId, index, x.id), () => setSheet(null))} className="mono mono-11 h-9 px-2 text-graphite" data-testid={`remove-${x.id}`}>Remove</button> : null}
+              <button type="button" disabled={busy !== null} onClick={() => run("swap", () => swapAction(p.personId, index, x.id), () => setSheet(null))} className="pill pill-sm" data-testid={`swap-${x.id}`}>Swap</button>
+              {(board?.pieces.length ?? 0) > 2 ? <button type="button" disabled={busy !== null} onClick={() => run("swap", () => removeAction(p.personId, index, x.id), () => setSheet(null))} className="pill pill-sm pill-quiet" data-testid={`remove-${x.id}`}>Remove</button> : null}
             </div>
           ))}
         </div>
@@ -443,8 +461,8 @@ function PlanPicker({ occasions, selected, isAdmin, busy, onPick, onText, onClea
         ))}
       </div>
       <div className="mt-2 flex items-center justify-between">
-        <button type="button" onClick={onText} className="mono mono-11">Something else…</button>
-        {isAdmin ? <button type="button" onClick={() => setPick(true)} className="mono mono-11">Edit list</button> : null}
+        <button type="button" onClick={onText} className="pill pill-sm">Something else…</button>
+        {isAdmin ? <button type="button" onClick={() => setPick(true)} className="pill pill-sm">Edit list</button> : null}
       </div>
       {onClear ? <Button variant="secondary" className="mt-2 w-full" disabled={busy} onClick={onClear}>Back to my calendar</Button> : null}
       <PickSheet open={pick} onClose={() => setPick(false)} title="Occasions" kind="occasion" options={occasions} selected={selected ? [selected] : []} canAdd onChange={(ids) => { if (ids[0]) onPick(ids[0]); }} />

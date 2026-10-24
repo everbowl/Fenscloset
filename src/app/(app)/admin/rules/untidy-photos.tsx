@@ -19,7 +19,7 @@ export function UntidyPhotos({ pending }: { pending: number }) {
       <p className="text-[14px] leading-snug text-graphite">
         {finished ? <>Every piece has its fresh cutout again.</> : <><span className="font-medium text-ink">{word(left)}</span> still {left === 1 ? "shows" : "show"} the AI-edited picture Tidy or Smooth made. Each gets a fresh cutout from its original photo (one remove.bg credit each). The site tries again every hour on its own; this does it now.</>}
       </p>
-      {finished ? null : <button type="submit" disabled={busy} className="mono mt-4 flex h-[46px] w-full items-center justify-center border border-ink disabled:opacity-60" data-testid="untidy-now">{busy ? "Re-cutting…" : `Re-cut ${word(left)} now`}</button>}
+      {finished ? null : <button type="submit" disabled={busy} className="pill mt-4 h-[50px] w-full" data-testid="untidy-now">{busy ? "Re-cutting…" : `Re-cut ${word(left)} now`}</button>}
       {state.done ? (
         <p className="mono mt-3 text-graphite" data-testid="untidy-result">
           {state.done.recut} re-cut{state.done.skipped ? ` · ${state.done.skipped} had no original` : ""}{state.done.failed ? ` · ${state.done.failed} still waiting` : ""}{state.done.done ? " · all done" : ""}

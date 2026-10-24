@@ -75,7 +75,7 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
     return (
       <div>
         {inputs}
-        <PageHeader title="Add" accent="clothes" aside={<button type="button" onClick={() => setDoor(null)} className="mono mono-11 py-2" data-testid="door-back">Other ways</button>} />
+        <PageHeader title="Add" accent="clothes" aside={<button type="button" onClick={() => setDoor(null)} className="pill pill-sm" data-testid="door-back">Other ways</button>} />
         <p className="mono text-graphite">Hanger or flat-lay photos · one piece per photo</p>
         <button type="button" onClick={() => pickRef.current?.click()} className="mt-4 flex h-[380px] w-full flex-col items-center justify-center gap-3 bg-bone">
           <CameraIcon />
@@ -112,7 +112,7 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
       {upload.failed.length > 0 ? (
         <Banner tone="danger" title={`${upload.failed.length} photo${upload.failed.length > 1 ? "s" : ""} did not upload`} className="mt-4">
           <p className="text-[13px]">{upload.failed[0].error}</p>
-          <button type="button" onClick={retryFailedUploads} className="mono mt-2 py-2">Try again</button>
+          <button type="button" onClick={retryFailedUploads} className="pill mt-3">Try again</button>
         </Banner>
       ) : null}
       {batch && batch.failed.length > 0 ? (
@@ -136,8 +136,8 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
       <div className="mt-5 border-t border-ink pt-4" data-testid="add-from-store">
           <p className="mono text-graphite">Or add from a store</p>
           <div className="mt-2 grid grid-cols-2 gap-2">
-            <Link href="/add/store?tab=link" className="mono flex h-[54px] items-center justify-center border border-ink text-[12px] uppercase tracking-[0.16em] text-ink" data-testid="add-by-link">By link</Link>
-            <Link href="/add/store?tab=receipt" className="mono flex h-[54px] items-center justify-center border border-ink text-[12px] uppercase tracking-[0.16em] text-ink" data-testid="add-by-receipt">By receipt</Link>
+            <Link href="/add/store?tab=link" className="pill h-[54px] w-full" data-testid="add-by-link">By link</Link>
+            <Link href="/add/store?tab=receipt" className="pill h-[54px] w-full" data-testid="add-by-receipt">By receipt</Link>
           </div>
         </div>
     </div>
@@ -147,7 +147,7 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
 function RetryAll({ ids }: { ids: string[] }) {
   const { refresh } = useImportQueue();
   return (
-    <button type="button" className="mono mt-2 py-2" onClick={async () => { await Promise.all(ids.map((id) => fetch(`/api/import/entries/${id}/process`, { method: "POST" }))); await refresh(); }}>
+    <button type="button" className="pill mt-3" onClick={async () => { await Promise.all(ids.map((id) => fetch(`/api/import/entries/${id}/process`, { method: "POST" }))); await refresh(); }}>
       Try again
     </button>
   );

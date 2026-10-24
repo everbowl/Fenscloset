@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { generateKeyPairSync } from "node:crypto";
 import { googleTryOn } from "@/lib/tryon/google";
-import { googleImage } from "@/lib/images/google-image";
+import { clearGoogleImageHold, googleImage, googleImageOnHold } from "@/lib/images/google-image";
 
 /**
  * Google's visual filters (Jeff, 19 Oct 2026: none on his own body pictures). The loosest level is sent first; when Google
@@ -39,6 +39,12 @@ describe("Google visual filters: loosest first, step down on refusal", () => {
     expect(out.data.length).toBeGreaterThan(0);
     expect(calls.map((c) => (c.body.parameters as { safetySetting: string }).safetySetting)).toEqual(["block_none", "block_only_high"]);
     expect((calls[0].body.parameters as { personGeneration: string }).personGeneration).toBe("allow_adult");
+    expect((calls[0].body.parameters as { baseSteps: number }).baseSteps).toBe(50); // quality over speed (Jeff, 23 Oct 2026)
+    process.env.GOOGLE_VERTEX_TRYON_STEPS = "32";
+    const fewer: Call[] = [];
+    await googleTryOn(png, png, fakeGoogle(() => false, fewer));
+    expect((fewer[0].body.parameters as { baseSteps: number }).baseSteps).toBe(32);
+    delete process.env.GOOGLE_VERTEX_TRYON_STEPS;
     // an allowlisted project: block_none is accepted on the first try
     const ok: Call[] = [];
     await googleTryOn(png, png, fakeGoogle(() => false, ok));
@@ -63,5 +69,25 @@ describe("Google visual filters: loosest first, step down on refusal", () => {
     const all: Call[] = [];
     await expect(googleImage([{ data: png, mimeType: "image/png" }], "x", fakeGoogle(() => true, all), { relaxed: true })).rejects.toThrow(/Google image 400/);
     expect(all.map((c) => level(c.body))).toEqual(["OFF", "BLOCK_NONE", "BLOCK_ONLY_HIGH", null]);
+  });
+
+  it("image model: after a 429 that survives the backoff, it is left alone for a while and the next call fails at once", async () => {
+    process.env.MOCK_BACKOFF_MS = "1"; process.env.GOOGLE_IMAGE_HOLD_MS = "60000";
+    clearGoogleImageHold();
+    try {
+      let n = 0;
+      const quotaOut = (async (input: string | URL | Request) => {
+        if (String(input).includes("oauth2.googleapis.com/token")) return new Response(JSON.stringify({ access_token: "t", expires_in: 3600 }), { status: 200 });
+        n++; return new Response(JSON.stringify({ error: { code: 429, status: "RESOURCE_EXHAUSTED" } }), { status: 429 });
+      }) as typeof fetch;
+      expect(googleImageOnHold()).toBe(false);
+      await expect(googleImage([{ data: png, mimeType: "image/png" }], "x", quotaOut)).rejects.toMatchObject({ status: 429 });
+      expect(n).toBe(4); // the backoff's four tries
+      expect(googleImageOnHold()).toBe(true);
+      await expect(googleImage([{ data: png, mimeType: "image/png" }], "x", quotaOut)).rejects.toThrow(/out of quota/);
+      expect(n).toBe(4); // not called again while on hold
+      clearGoogleImageHold();
+      expect(googleImageOnHold()).toBe(false);
+    } finally { clearGoogleImageHold(); delete process.env.GOOGLE_IMAGE_HOLD_MS; }
   });
 });

@@ -38,7 +38,7 @@ export function StyleEditor({ ownerId, style, colors, words, canEdit, canEditLis
         {style.neverSuggest.map((it) => (
           <div key={it.id} className="flex h-[42px] items-center justify-between border-b border-line">
             <Link href={`/closet/${it.id}`} className="truncate text-[14px]">{it.name ?? "Untitled piece"}</Link>
-            {canEdit ? <button type="button" className="mono ml-3 shrink-0 py-2 text-graphite" onClick={() => start(async () => { await setNeverSuggestAction(ownerId, it.id, false); router.refresh(); })}>Suggest again</button> : null}
+            {canEdit ? <button type="button" className="pill pill-sm ml-3 shrink-0" onClick={() => start(async () => { await setNeverSuggestAction(ownerId, it.id, false); router.refresh(); })}>Suggest again</button> : null}
           </div>
         ))}
       </section>

@@ -66,7 +66,7 @@ export function BrandSearch({ open, onClose, brands, selectedId, selectedIds, mu
         ) : null}
         {!mine.length && !national.length && !typed ? <p className="mono py-4 text-graphite">No brands yet · start typing</p> : null}
       </div>
-      {multi ? <button type="button" onClick={onClose} className="mono mt-4 flex h-[46px] w-full items-center justify-center bg-ink text-paper" data-testid="brand-done">Done</button> : null}
+      {multi ? <button type="button" onClick={onClose} className="pill pill-solid mt-4 h-[50px] w-full" data-testid="brand-done">Done</button> : null}
     </Sheet>
   );
 }

@@ -95,7 +95,7 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, brands, categor
           <Row key={s.id} label={s.brandName} value={`${s.size}${s.categoryName ? ` · ${s.categoryName}` : ""}`} onClick={() => canEdit && setSize({ id: s.id, brandId: s.brandId, categoryId: s.categoryId, size: s.size })} />
         ))}
         {body.sizes.length === 0 ? <p className="mono py-3 text-graphite">No sizes yet</p> : null}
-        {canEdit ? <button type="button" onClick={() => setSize({ brandId: brandList[0]?.id ?? "", categoryId: null, size: "" })} className="mono mt-2 flex h-[46px] w-full items-center justify-center border border-ink" data-testid="add-size">Add a size</button> : null}
+        {canEdit ? <button type="button" onClick={() => setSize({ brandId: brandList[0]?.id ?? "", categoryId: null, size: "" })} className="pill mt-2 h-[50px] w-full" data-testid="add-size">Add a size</button> : null}
       </section>
 
       <section>

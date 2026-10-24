@@ -34,7 +34,7 @@ export function MatchSheet({ open, onClose, probe, onPick, busy }: { open: boole
           </button>
         ))}
       </div>
-      <button type="button" onClick={onClose} className="mono mt-4 flex h-[46px] w-full items-center justify-center border border-ink" data-testid="match-none">{rows && rows.length ? "None of these" : "Close"}</button>
+      <button type="button" onClick={onClose} className="pill mt-4 h-[50px] w-full" data-testid="match-none">{rows && rows.length ? "None of these" : "Close"}</button>
     </Sheet>
   );
 }

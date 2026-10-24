@@ -40,7 +40,7 @@ export default async function ClosetPage({ searchParams }: { searchParams: Promi
           <p className="mono mt-6 text-center text-graphite">
             {q ? `Nothing matches “${q}”` : total === 0 ? (mine ? "Nothing here yet · tap + to add clothes" : "Nothing here yet") : "Nothing in this category"}
           </p>
-          {mine && total === 0 ? <div className="mt-4 text-center"><Link href="/add" className="mono mono-11 inline-block border border-ink px-5 py-3.5">Add clothes</Link></div> : null}
+          {mine && total === 0 ? <div className="mt-4 text-center"><Link href="/add" className="pill pill-solid h-[50px] px-6">Add clothes</Link></div> : null}
         </div>
       )}
     </div>
