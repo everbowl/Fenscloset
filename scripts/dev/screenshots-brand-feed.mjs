@@ -1,0 +1,22 @@
+/** Dev-only: "New from your brands" on the Shop (Shop v2 item 3): first open (everything new), after a look (Refresh), and with no brands picked. App on :3100 with the mock env (WANTS_ON_START=false). */
+import { chromium, devices } from "@playwright/test";
+import { execSync } from "node:child_process";
+const out = process.argv[2];
+const env = { ...process.env, DATABASE_URL: "postgresql://postgres@localhost:5433/fenscloset_e2e", DEV_MODE: "true", SEED_FORCE: "true", MOCK_S3: "true" };
+execSync(`psql -h localhost -p 5433 -U postgres -d fenscloset_e2e -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'`, { stdio: "ignore" });
+execSync("npx prisma migrate deploy && npx tsx prisma/seed.ts && npx tsx e2e/set-password.ts jeff@everbowl.com closet-rocks-2026 && npx tsx e2e/seed-closets.ts Jeff", { stdio: "ignore", env });
+const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || undefined });
+const ctx = await browser.newContext({ ...devices["iPhone 15"] });
+const page = await ctx.newPage();
+const base = "http://localhost:3100";
+const shot = async (name, full = false) => { await page.waitForTimeout(500); await page.screenshot({ path: `${out}/${name}.png`, fullPage: full }); };
+await page.goto(base + "/login");
+await page.getByLabel("Email").fill("jeff@everbowl.com"); await page.getByLabel("Password").fill("closet-rocks-2026");
+await page.getByRole("button", { name: "Sign in" }).click(); await page.waitForURL(/today/);
+await page.goto(base + "/shop"); await page.getByTestId("brand-feed-none").waitFor(); await page.getByTestId("brand-feed").scrollIntoViewIfNeeded(); await shot("01-no-brands-yet");
+execSync("npx tsx e2e/seed-brands.ts Jeff Everlane Vuori 'J.Crew'", { stdio: "ignore", env });
+await page.goto(base + "/shop"); await page.getByTestId("brand-feed-new").waitFor({ timeout: 30000 }); await page.getByTestId("brand-feed").scrollIntoViewIfNeeded(); await shot("02-first-open-all-new");
+await shot("03-shop-full", true);
+await page.goto(base + "/shop"); await page.getByTestId("brand-feed-refresh").waitFor(); await page.getByTestId("brand-feed").scrollIntoViewIfNeeded(); await shot("04-after-a-look");
+await browser.close();
+console.log("shots done");

@@ -5,6 +5,7 @@ import { requirePerson } from "@/lib/auth/current";
 import { deleteLookup, getLookup, ShopError, startLookup, type LookupInput } from "@/lib/shop/engine";
 import { getObject, IMAGE_TYPES } from "@/lib/storage";
 import { jobStatus, settled, type JobStatus } from "@/lib/jobs";
+import { refreshBrandFeedNow } from "@/lib/shop/brand-feed";
 import { tryOnLook, tryOnState, TryOnError, type TryOnView } from "@/lib/tryon";
 import { featuresOf } from "@/lib/tryon/features";
 import { isMannequinConfigured, mannequinLook } from "@/lib/tryon/mannequin";
@@ -61,6 +62,37 @@ export async function lookupStatusAction(jobId: string): Promise<LookupResult> {
   const status = jobStatus<string>(jobId, me.id);
   if (!status) return { ok: false, error: "That lookup is gone. Try again." };
   return answer(status, jobId);
+}
+
+/** The brand feed's refresh: done, or a job to poll with brandFeedStatusAction. */
+export type FeedResult =
+  | { ok: true; done: true }
+  | { ok: true; pending: { jobId: string; step: string; startedAt: number } }
+  | { ok: false; error: string };
+
+// No revalidatePath here: the screen refreshes the page itself when the job is done. A revalidate inside the action
+// would render the page once more in the action's own response, and openBrandFeed would count the new products as seen
+// before the person saw them.
+function feedAnswer(status: JobStatus<string>, jobId: string): FeedResult {
+  if (status.state === "done") return { ok: true, done: true };
+  if (status.state === "failed") return failed(status.error);
+  return { ok: true, pending: { jobId, step: status.step, startedAt: status.startedAt } };
+}
+
+/** "New from your brands": search the stores for each favorite brand again, in the background. */
+export async function brandFeedAction(forPersonId: string): Promise<FeedResult> {
+  const me = await requirePerson();
+  try {
+    const job = await refreshBrandFeedNow(me, forPersonId);
+    return feedAnswer(await settled(job, QUICK_MS), job.id);
+  } catch (e) { return failed(e); }
+}
+
+export async function brandFeedStatusAction(jobId: string): Promise<FeedResult> {
+  const me = await requirePerson();
+  const status = jobStatus<string>(jobId, me.id);
+  if (!status) return { ok: false, error: "That refresh is gone. Try again." };
+  return feedAnswer(status, jobId);
 }
 
 export async function deleteLookupAction(id: string): Promise<Result> {

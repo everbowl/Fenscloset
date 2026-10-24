@@ -29,7 +29,7 @@ export const MAX_MATCHES = 30;
 const FRESH_HOURS = 1;
 const DEFAULT_SWEEP_HOURS = 24;
 
-type StoredMatch = Product & { firstSeenAt: string };
+export type StoredMatch = Product & { firstSeenAt: string };
 type Parsed = { queries: string[]; category: string | null; maxPrice: number | null };
 
 async function access(viewer: Viewer, row: { askedById: string; forPersonId: string }): Promise<boolean> {
@@ -222,11 +222,15 @@ export async function sweepWants(now = new Date(), log: (line: string) => void =
   return out;
 }
 
-/** Started once when the server starts (src/instrumentation.ts): a sweep soon after start, then every `everyMs`. */
+/** Started once when the server starts (src/instrumentation.ts): the Looking-for sweep and the brand feeds soon after start, then every `everyMs`. */
 export async function wantsOnStart(delayMs = 20_000, everyMs = 30 * 60_000): Promise<void> {
   const unref = (t: ReturnType<typeof setTimeout>) => (t as { unref?: () => void }).unref?.();
   await new Promise<void>((resolve) => unref(setTimeout(resolve, delayMs)));
-  const run = async () => { try { await sweepWants(); } catch (e) { console.error("looking for: sweep failed", e); } };
+  const { sweepBrandFeeds } = await import("@/lib/shop/brand-feed");
+  const run = async () => {
+    try { await sweepWants(); } catch (e) { console.error("looking for: sweep failed", e); }
+    try { await sweepBrandFeeds(); } catch (e) { console.error("brand feed: sweep failed", e); }
+  };
   await run();
   unref(setInterval(run, everyMs));
 }

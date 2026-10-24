@@ -2,6 +2,7 @@ import { requirePerson } from "@/lib/auth/current";
 import { getLookup, listRecent } from "@/lib/shop/engine";
 import { shoppingFor } from "@/lib/shop/people";
 import { newMatchCount } from "@/lib/shop/wants";
+import { openBrandFeed } from "@/lib/shop/brand-feed";
 import { ShopScreen } from "./shop-screen";
 import { tryOnState } from "@/lib/tryon";
 import { isMannequinConfigured } from "@/lib/tryon/mannequin";
@@ -15,8 +16,8 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
   const me = await requirePerson();
   const { for: forParam, l, link } = await searchParams;
   const { people, forPersonId } = await shoppingFor(me, forParam);
-  const [recent, selected, lookingFor] = await Promise.all([listRecent(me, forPersonId), l ? getLookup(me, l) : Promise.resolve(null), newMatchCount(me, forPersonId)]);
+  const [recent, selected, lookingFor, brandFeed] = await Promise.all([listRecent(me, forPersonId), l ? getLookup(me, l) : Promise.resolve(null), newMatchCount(me, forPersonId), openBrandFeed(me, forPersonId)]);
   const tryOn = await tryOnState(me, forPersonId);
   const mannequin = tryOn !== "ready" && isMannequinConfigured() && (await canDress(me, forPersonId));
-  return <ShopScreen meId={me.id} people={people} forPersonId={forPersonId} selected={selected ?? recent[0] ?? null} recent={recent} tryOn={tryOn} mannequin={mannequin} autoLink={link?.trim() || null} lookingFor={lookingFor} />;
+  return <ShopScreen meId={me.id} people={people} forPersonId={forPersonId} selected={selected ?? recent[0] ?? null} recent={recent} tryOn={tryOn} mannequin={mannequin} autoLink={link?.trim() || null} lookingFor={lookingFor} brandFeed={brandFeed ?? { personId: forPersonId, brands: [], products: [], newCount: 0, lastFetchedAt: null, stale: false }} />;
 }

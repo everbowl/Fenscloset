@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { requirePerson } from "@/lib/auth/current";
 import { jobStatus, settled, type JobStatus } from "@/lib/jobs";
 import { ShopError } from "@/lib/shop/engine";
@@ -24,8 +23,11 @@ function failed(e: unknown): { ok: false; error: string } {
   return { ok: false, error: "Something went wrong. Try again." };
 }
 
+// No revalidatePath in these actions: the screens refresh the page themselves. A revalidate inside the action would
+// render the page once more in the action's own response, and openWant would count the new matches as seen before
+// the person saw them.
 function answer(id: string, status: JobStatus<string>, jobId: string): WantResult {
-  if (status.state === "done") { revalidatePath("/shop/looking-for"); return { ok: true, id }; }
+  if (status.state === "done") return { ok: true, id };
   if (status.state === "failed") return failed(status.error);
   return { ok: true, id, pending: { jobId, step: status.step, startedAt: status.startedAt } };
 }
@@ -34,7 +36,6 @@ export async function addWantAction(forPersonId: string, text: string): Promise<
   const me = await requirePerson();
   try {
     const { id, job } = await addWant(me, forPersonId, text);
-    revalidatePath("/shop/looking-for");
     return answer(id, await settled(job, QUICK_MS), job.id);
   } catch (e) { return failed(e); }
 }
@@ -43,7 +44,6 @@ export async function editWantAction(wantId: string, text: string): Promise<Want
   const me = await requirePerson();
   try {
     const job = await editWant(me, wantId, text);
-    revalidatePath("/shop/looking-for");
     return answer(wantId, await settled(job, QUICK_MS), job.id);
   } catch (e) { return failed(e); }
 }
@@ -66,12 +66,12 @@ export async function wantStatusAction(wantId: string, jobId: string): Promise<W
 
 export async function foundWantAction(wantId: string, found: boolean): Promise<Result> {
   const me = await requirePerson();
-  try { await setWantFound(me, wantId, found); revalidatePath("/shop/looking-for"); return { ok: true }; }
+  try { await setWantFound(me, wantId, found); return { ok: true }; }
   catch (e) { return failed(e); }
 }
 
 export async function deleteWantAction(wantId: string): Promise<Result> {
   const me = await requirePerson();
-  try { await deleteWant(me, wantId); revalidatePath("/shop/looking-for"); return { ok: true }; }
+  try { await deleteWant(me, wantId); return { ok: true }; }
   catch (e) { return failed(e); }
 }

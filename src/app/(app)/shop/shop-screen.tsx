@@ -12,14 +12,16 @@ import { TextSheet } from "@/components/items/row-editor";
 import { shrinkPhoto } from "@/lib/import/client-queue";
 import { cn } from "@/lib/cn";
 import type { LookupView, SimilarItem } from "@/lib/shop/engine";
-import { deleteLookupAction, lookupLinkAction, lookupPhotoAction, lookupStatusAction, tryOnLookupAction, type LookupResult } from "./actions";
+import type { BrandFeedView } from "@/lib/shop/brand-feed";
+import { brandFeedAction, brandFeedStatusAction, deleteLookupAction, lookupLinkAction, lookupPhotoAction, lookupStatusAction, tryOnLookupAction, type FeedResult, type LookupResult } from "./actions";
 import type { TryOnState, TryOnView } from "@/lib/tryon";
+import { ago } from "./looking-for/ago";
 
 const CALL_WORD = { FITS: "Fits · buy it", RISKY: "Risky · maybe", PASS: "Pass · skip it" } as const;
 /** How often the screen asks after a lookup that is still running. */
 const POLL_MS = 2000;
 
-export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn, mannequin, autoLink = null, lookingFor }: { meId: string; people: { id: string; name: string }[]; forPersonId: string; selected: LookupView | null; recent: LookupView[]; tryOn: TryOnState; /** SEE IT ON dresses the shared mannequin when the person's own try-on is not ready. */ mannequin: boolean; /** A store link to judge as soon as the page opens ("Judge it" from a piece's go-with page). */ autoLink?: string | null; /** The person's Looking-for list: how many lines are open and how many matches are new. */ lookingFor: { wants: number; newMatches: number } }) {
+export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn, mannequin, autoLink = null, lookingFor, brandFeed }: { meId: string; people: { id: string; name: string }[]; forPersonId: string; selected: LookupView | null; recent: LookupView[]; tryOn: TryOnState; /** SEE IT ON dresses the shared mannequin when the person's own try-on is not ready. */ mannequin: boolean; /** A store link to judge as soon as the page opens ("Judge it" from a piece's go-with page). */ autoLink?: string | null; /** The person's Looking-for list: how many lines are open and how many matches are new. */ lookingFor: { wants: number; newMatches: number }; /** "New from your brands": the feed as stored, refreshed in the background when stale. */ brandFeed: BrandFeedView }) {
   const router = useRouter();
   const [, start] = useTransition();
   const [busy, setBusy] = useState<"link" | "photo" | "delete" | "tryon" | null>(null);
@@ -88,6 +90,44 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
     run("photo", () => lookupPhotoAction(forPersonId, fd));
   }
   const thinking = busy === "link" || busy === "photo";
+
+  // Shop v2 item 3 (Jeff, 23 Oct 2026): "suggest items from my favorite brands". The feed is refreshed in the
+  // background when it is stale (never fetched, a day old, or the brand list changed) and on Refresh.
+  const [feedBusy, setFeedBusy] = useState<{ step: string; startedAt: number } | null>(null);
+  const [feedSecs, setFeedSecs] = useState(0);
+  const feedSeq = useRef(0);
+  const feedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { feedSeq.current++; if (feedTimer.current) clearTimeout(feedTimer.current); }, []);
+  const feedStartedAt = feedBusy?.startedAt ?? null;
+  useEffect(() => {
+    if (feedStartedAt === null) return;
+    const tick = () => setFeedSecs(Math.max(0, Math.floor((Date.now() - feedStartedAt) / 1000)));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [feedStartedAt]);
+  const settleFeed = useCallback((r: FeedResult, mine: number) => {
+    if (mine !== feedSeq.current) return;
+    if (!r.ok) { setFeedBusy(null); setError(r.error); return; }
+    if ("done" in r) { setFeedBusy(null); router.refresh(); return; }
+    setFeedBusy((p) => ({ step: r.pending.step, startedAt: p?.startedAt ?? Date.now() }));
+    feedTimer.current = setTimeout(async () => {
+      if (mine !== feedSeq.current) return;
+      let next: FeedResult;
+      try { next = await brandFeedStatusAction(r.pending.jobId); } catch { next = r; }
+      settleFeed(next, mine);
+    }, POLL_MS);
+  }, [router]);
+  const runFeed = useCallback(async () => {
+    const mine = ++feedSeq.current;
+    if (feedTimer.current) clearTimeout(feedTimer.current);
+    setFeedBusy({ step: "Checking your brands…", startedAt: Date.now() });
+    let r: FeedResult;
+    try { r = await brandFeedAction(forPersonId); } catch { r = { ok: false, error: "Something went wrong. Try again." }; }
+    settleFeed(r, mine);
+  }, [forPersonId, settleFeed]);
+  const feedStarted = useRef(false);
+  useEffect(() => { if (brandFeed.stale && !feedStarted.current) { feedStarted.current = true; void runFeed(); } }, [brandFeed.stale, runFeed]);
 
   return (
     <div data-testid="shop" className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-14">
@@ -214,6 +254,39 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
           <p className="serif mt-3.5 text-[21px] italic leading-[1.3]">Paste a store link, drop a screenshot, or snap a dressing-room photo. You get a verdict, what you already own like it, and three ways to wear it.</p>
         </section>
       )}
+
+      <section className="mt-8 lg:col-start-1 lg:row-start-6" data-testid="brand-feed">
+        <div className="flex items-end justify-between gap-3 border-b border-ink pb-2">
+          <p className="mono text-graphite">New from {forPersonId === meId ? "your" : `${forName}’s`} brands</p>
+          {feedBusy ? <p className="mono shrink-0 text-ink" data-testid="brand-feed-thinking" aria-live="polite">{feedBusy.step} · {feedSecs}s</p>
+            : brandFeed.newCount ? <p className="mono shrink-0 text-ink" data-testid="brand-feed-new">{brandFeed.newCount} new</p>
+            : brandFeed.brands.length ? <button type="button" onClick={() => void runFeed()} className="mono shrink-0 text-ink underline underline-offset-4" data-testid="brand-feed-refresh">Refresh</button> : null}
+        </div>
+        {brandFeed.brands.length ? <p className="mono mt-1.5 text-graphite" data-testid="brand-feed-brands" suppressHydrationWarning>{brandFeed.brands.join(" · ")}{brandFeed.lastFetchedAt ? ` · checked ${ago(brandFeed.lastFetchedAt)}` : ""}</p> : null}
+        {!brandFeed.brands.length ? (
+          <div className="mt-3" data-testid="brand-feed-none">
+            <p className="serif text-[21px] italic leading-[1.3]">{forPersonId === meId ? "Pick the brands you love and the Shop shows what’s new from them, every day." : `When ${forName} picks favorite brands in their Profile, what’s new from them shows here every day.`}</p>
+            {forPersonId === meId ? <Link href="/profile/brands" className="pill mt-3" data-testid="brand-feed-pick">Pick my brands</Link> : null}
+          </div>
+        ) : brandFeed.products.length ? (
+          <div className="-mx-5 mt-3 flex snap-x gap-2.5 overflow-x-auto px-5 pb-2 lg:mx-0 lg:px-0">
+            {brandFeed.products.map((p) => (
+              <div key={p.url} className="relative w-[150px] shrink-0 snap-start" data-testid="brand-feed-product" data-new={p.isNew ? "1" : undefined}>
+                <a href={p.url} target="_blank" rel="noreferrer" className="block h-[190px] overflow-hidden bg-bone" aria-label={p.title}>
+                  {p.imageUrl ? <img src={p.imageUrl} alt="" referrerPolicy="no-referrer" loading="lazy" className="size-full object-cover" /> : null}
+                </a>
+                {p.isNew ? <span className="mono absolute left-2 top-2 bg-ink px-1.5 py-0.5 text-paper">New</span> : null}
+                <p className="mt-2 line-clamp-2 text-[13px] font-medium leading-snug">{p.title}</p>
+                <p className="mono mt-1 text-graphite">{[p.priceText, p.storeName].filter(Boolean).join(" · ")}</p>
+                <div className="mt-2 flex flex-col gap-1.5">
+                  <a href={p.url} target="_blank" rel="noreferrer" className="pill pill-sm w-full">Buy →</a>
+                  <button type="button" disabled={thinking} onClick={() => run("link", () => lookupLinkAction(forPersonId, p.url))} className="pill pill-sm pill-solid w-full" data-testid="brand-feed-judge">Judge it</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : feedBusy ? null : <p className="mono mt-3 text-graphite" data-testid="brand-feed-empty">Nothing from these brands in the stores right now. Refresh to look again.</p>}
+      </section>
 
       {recent.length > 1 || (recent.length === 1 && recent[0].id !== selected?.id) ? (
         <section className="mt-8 lg:col-start-2 lg:row-start-4">

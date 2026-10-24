@@ -86,6 +86,7 @@ model Person {
   goWithAsked        GoWith[]         @relation("goWithAskedBy")
   wantsFor           Want[]           @relation("wantFor")
   wantsAsked         Want[]           @relation("wantAskedBy")
+  brandFeed          BrandFeed?
 }
 
 model Session {
@@ -915,6 +916,23 @@ model Want {
   askedBy        Person    @relation("wantAskedBy", fields: [askedById], references: [id], onDelete: Cascade)
 
   @@index([forPersonId, foundAt, createdAt])
+}
+
+/**
+ * "New from your brands" (Jeff, 23 Oct 2026, Shop v2 item 3): what the stores have from a person's favorite brands,
+ * fetched when the Shop opens if it is older than the schedule (Admin → Rules, wantSweepHours) and on the sweep.
+ * Products not seen before count as new until the Shop is opened.
+ */
+model BrandFeed {
+  personId      String    @id
+  /** The favorite brands the feed was built from; a change in the list makes the feed stale. */
+  brands        String[]  @default([])
+  /** Product & { firstSeenAt }, newest first. */
+  products      Json      @default("[]")
+  lastFetchedAt DateTime?
+  seenAt        DateTime?
+  updatedAt     DateTime  @updatedAt
+  person        Person    @relation(fields: [personId], references: [id], onDelete: Cascade)
 }
 
 /** One "should I buy this?" lookup: the candidate piece, who it is for, and what the app said. */
