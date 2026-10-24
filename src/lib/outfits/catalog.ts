@@ -26,7 +26,24 @@ export type Candidate = {
 
 export type CandidateSet = { usable: Candidate[]; restingIds: string[]; noRepeatDays: number };
 
-const select = {
+type CandidateRow = {
+  id: string; name: string | null; ownerId: string; isFavorite: boolean; wearCount: number; lastWornAt: Date | null;
+  category: { name: string } | null; subcategory: { name: string } | null; brand: { name: string } | null;
+  colors: { name: string }[]; patterns: { name: string }[]; fabrics: { name: string }[]; seasons: { name: string }[]; formalities: { name: string }[]; occasions: { name: string }[];
+  photos: { bucketKey: string }[];
+};
+export function toCandidate(it: CandidateRow): Candidate {
+  return {
+    id: it.id, name: it.name ?? "Untitled piece", ownerId: it.ownerId,
+    category: it.category?.name ?? null, subcategory: it.subcategory?.name ?? null,
+    colors: it.colors.map((c) => c.name), pattern: it.patterns[0]?.name ?? null, fabric: it.fabrics[0]?.name ?? null,
+    seasons: it.seasons.map((s) => s.name), formality: it.formalities[0]?.name ?? null, occasions: it.occasions.map((o) => o.name),
+    brand: it.brand?.name ?? null, isFavorite: it.isFavorite, wearCount: it.wearCount, lastWornAt: it.lastWornAt, thumbKey: it.photos[0]?.bucketKey ?? null,
+  };
+}
+
+/** The item fields a Candidate is built from; `toCandidate` turns one row into a Candidate (the Shop's "go with it" loads one piece this way). */
+export const candidateSelect = {
   id: true, name: true, ownerId: true, isFavorite: true, wearCount: true, lastWornAt: true,
   category: { select: { name: true } }, subcategory: { select: { name: true } }, brand: { select: { name: true } },
   colors: { select: { name: true } }, patterns: { select: { name: true } }, fabrics: { select: { name: true } },
@@ -46,19 +63,13 @@ export async function loadCandidates(personId: string, now = new Date(), opts: {
       OR: [{ ownerId: personId }, { closets: { some: { closet: { kind: "family" } } } }],
       laundryStatus: "clean", neverSuggest: false, retiredAt: null,
     },
-    select, orderBy: { createdAt: "asc" },
+    select: candidateSelect, orderBy: { createdAt: "asc" },
   });
   const cutoff = now.getTime() - noRepeatDays * 24 * 3600 * 1000;
   // Pieces worn earlier today are not "resting": you are wearing them, and Together / More looks may still use them.
   const tz = await getTimezone();
   const today = dayKey(now, tz);
-  const all = items.map<Candidate>((it) => ({
-    id: it.id, name: it.name ?? "Untitled piece", ownerId: it.ownerId,
-    category: it.category?.name ?? null, subcategory: it.subcategory?.name ?? null,
-    colors: it.colors.map((c) => c.name), pattern: it.patterns[0]?.name ?? null, fabric: it.fabrics[0]?.name ?? null,
-    seasons: it.seasons.map((s) => s.name), formality: it.formalities[0]?.name ?? null, occasions: it.occasions.map((o) => o.name),
-    brand: it.brand?.name ?? null, isFavorite: it.isFavorite, wearCount: it.wearCount, lastWornAt: it.lastWornAt, thumbKey: it.photos[0]?.bucketKey ?? null,
-  }));
+  const all = items.map(toCandidate);
   const resting = all.filter((c) => c.lastWornAt && c.lastWornAt.getTime() > cutoff && dayKey(c.lastWornAt, tz) !== today);
   return { usable: all.filter((c) => !resting.includes(c)), restingIds: resting.map((c) => c.id), noRepeatDays };
 }

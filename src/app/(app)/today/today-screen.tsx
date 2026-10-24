@@ -155,14 +155,14 @@ export function TodayScreen(p: Props) {
 
   return (
     <div data-testid="today" className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-14">
-      {p.canDress ? <HeaderAction><button type="button" onClick={() => setSheet("checkin")} className="mono mono-11 px-2 py-3" data-testid="check-in">Check-in</button></HeaderAction> : null}
+      {p.canDress ? <HeaderAction><button type="button" onClick={() => setSheet("checkin")} className="pill pill-sm" data-testid="check-in">Check-in</button></HeaderAction> : null}
       {error ? <Banner tone="danger" title={error} className="mb-3 lg:col-start-2" /> : null}
       <div className="lg:col-start-2">
       <PageHeader
         eyebrow={
           <div className="flex items-start justify-between gap-3">
             <span className="text-ink" data-testid="context-line">{p.mine ? p.contextLine : `${p.personName.toUpperCase()} · ${p.contextLine}`}</span>
-            {p.canDress ? <button type="button" onClick={() => setSheet("plan")} className="mono shrink-0 text-ink" data-testid="edit-plan">Edit</button> : null}
+            {p.canDress ? <button type="button" onClick={() => setSheet("plan")} className="pill pill-sm shrink-0" data-testid="edit-plan">Edit</button> : null}
           </div>
         }
         title={title} accent="look"
@@ -187,8 +187,8 @@ export function TodayScreen(p: Props) {
         <div className="mb-4 flex items-center justify-between border-y border-ink py-2.5 lg:col-start-2">
           <span className="mono">{p.weatherNote === "failed" ? "Weather is unavailable right now" : "Where are you today?"}</span>
           <span className="flex gap-4">
-            {p.weatherNote === "none" ? <button type="button" onClick={askLocation} disabled={busy === "location"} className="mono mono-11">{busy === "location" ? "Finding…" : "Use my location"}</button> : null}
-            <button type="button" onClick={() => setSheet("zip")} className="mono mono-11" data-testid="enter-zip">{p.savedZip ? "Change zip" : "Enter zip"}</button>
+            {p.weatherNote === "none" ? <button type="button" onClick={askLocation} disabled={busy === "location"} className="pill pill-sm">{busy === "location" ? "Finding…" : "Use my location"}</button> : null}
+            <button type="button" onClick={() => setSheet("zip")} className="pill pill-sm" data-testid="enter-zip">{p.savedZip ? "Change zip" : "Enter zip"}</button>
           </span>
         </div>
       ) : null}
@@ -310,8 +310,8 @@ export function TodayScreen(p: Props) {
             <div key={x.id} className="flex h-12 items-center gap-3 border-b border-line">
               <span className="size-9 shrink-0 bg-bone">{x.thumbKey ? <img src={`/api/photo/${x.thumbKey}`} alt="" className="size-full object-contain" /> : null}</span>
               <span className="min-w-0 flex-1"><span className="block truncate text-[15px]">{x.name}</span><span className="mono text-graphite">{x.label}</span></span>
-              <button type="button" disabled={busy !== null} onClick={() => run("swap", () => swapAction(p.personId, index, x.id), () => setSheet(null))} className="mono mono-11 h-9 border border-ink px-3" data-testid={`swap-${x.id}`}>Swap</button>
-              {(board?.pieces.length ?? 0) > 2 ? <button type="button" disabled={busy !== null} onClick={() => run("swap", () => removeAction(p.personId, index, x.id), () => setSheet(null))} className="mono mono-11 h-9 px-2 text-graphite" data-testid={`remove-${x.id}`}>Remove</button> : null}
+              <button type="button" disabled={busy !== null} onClick={() => run("swap", () => swapAction(p.personId, index, x.id), () => setSheet(null))} className="pill pill-sm" data-testid={`swap-${x.id}`}>Swap</button>
+              {(board?.pieces.length ?? 0) > 2 ? <button type="button" disabled={busy !== null} onClick={() => run("swap", () => removeAction(p.personId, index, x.id), () => setSheet(null))} className="pill pill-sm pill-quiet" data-testid={`remove-${x.id}`}>Remove</button> : null}
             </div>
           ))}
         </div>
@@ -443,8 +443,8 @@ function PlanPicker({ occasions, selected, isAdmin, busy, onPick, onText, onClea
         ))}
       </div>
       <div className="mt-2 flex items-center justify-between">
-        <button type="button" onClick={onText} className="mono mono-11">Something else…</button>
-        {isAdmin ? <button type="button" onClick={() => setPick(true)} className="mono mono-11">Edit list</button> : null}
+        <button type="button" onClick={onText} className="pill pill-sm">Something else…</button>
+        {isAdmin ? <button type="button" onClick={() => setPick(true)} className="pill pill-sm">Edit list</button> : null}
       </div>
       {onClear ? <Button variant="secondary" className="mt-2 w-full" disabled={busy} onClick={onClear}>Back to my calendar</Button> : null}
       <PickSheet open={pick} onClose={() => setPick(false)} title="Occasions" kind="occasion" options={occasions} selected={selected ? [selected] : []} canAdd onChange={(ids) => { if (ids[0]) onPick(ids[0]); }} />

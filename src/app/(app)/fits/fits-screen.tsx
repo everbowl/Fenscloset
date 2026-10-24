@@ -107,7 +107,7 @@ export function FitsScreen(p: {
                 <p className="mono text-graphite">{monoDate(f.date)}{p.scope === "family" ? ` · ${f.ownerName.toUpperCase()}` : ""}</p>
                 {f.canEdit ? <button type="button" onClick={() => setSheet({ kind: "title", fitId: f.id })} className="text-left" data-testid="fit-title"><Title title={f.title} /></button> : <Title title={f.title} />}
               </div>
-              {f.canEdit ? <button type="button" onClick={() => setSheet({ kind: "share", fitId: f.id })} className="mono mono-11 py-2" data-testid="share">Share</button> : null}
+              {f.canEdit ? <button type="button" onClick={() => setSheet({ kind: "share", fitId: f.id })} className="pill pill-sm" data-testid="share">Share</button> : null}
             </div>
             <div className="grid grid-cols-3 grid-rows-[112px_112px] gap-1">
               <div className="col-span-2 row-span-2 overflow-hidden bg-bone">
@@ -130,7 +130,7 @@ export function FitsScreen(p: {
                 <Button variant="secondary" className="h-[50px]" disabled={busy !== null} onClick={() => { photoFor.current = f.id; file.current?.click(); }} data-testid="add-photo">{f.photoKey ? "Change photo" : "Add photo"}</Button>
               </div>
             ) : null}
-            {f.canEdit ? <div className="flex justify-between"><button type="button" onClick={() => setSheet({ kind: "remove", fitId: f.id })} className="mono text-graphite">Remove fit</button>{f.photoKey ? <button type="button" onClick={() => run("photo", () => setFitPhotoAction(f.id, null))} className="mono text-graphite">Remove photo</button> : null}</div> : null}
+            {f.canEdit ? <div className="flex justify-between"><button type="button" onClick={() => setSheet({ kind: "remove", fitId: f.id })} className="pill pill-sm pill-quiet">Remove fit</button>{f.photoKey ? <button type="button" onClick={() => run("photo", () => setFitPhotoAction(f.id, null))} className="pill pill-sm pill-quiet">Remove photo</button> : null}</div> : null}
           </section>
         )) : (
           <section className="flex flex-col gap-3" data-testid="fit-empty">

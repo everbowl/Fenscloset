@@ -11,7 +11,9 @@ type Size = "md" | "lg" | "sm";
  * editable in Admin → Rules) sitting on a stone base; big ones carry a line icon and a second line that says
  * what happens next, and sit on a bone shelf. Press: the pill sinks onto its base and the arrow slides.
  * Done: a quick black "✓ …" flash. The big button rises in a beat after the page. Everything else on the
- * page stays black and white; secondary is a 1px black outline pill.
+ * page stays black and white: secondary is a solid black pill (Jeff, 23 Oct 2026: "all buttons should be
+ * louder and apparent"; it was a 1px outline), danger an outlined one, and every text action on a screen
+ * is a .pill (globals.css) so that anything tappable reads as a button.
  */
 export const LIFT = "shadow-[0_6px_0_0_var(--color-stone)] active:translate-y-[4px] active:shadow-[0_2px_0_0_var(--color-stone)] transition-[transform,box-shadow,background-color,filter] duration-100 disabled:shadow-none disabled:translate-y-0";
 /** The bone band a big button sits on (Q11 D "warm paper"). It wraps the button rather than being a pseudo on it: the button animates (a stacking context of its own), and a -z pseudo inside it would paint over the orange. */
@@ -21,14 +23,14 @@ export function Shelf({ children, className }: { children: ReactNode; className?
 }
 const variants: Record<Variant, string> = {
   primary: `bg-accent text-paper hover:brightness-95 active:brightness-90 disabled:bg-neutral-400 ${LIFT}`,
-  secondary: "bg-paper text-ink border border-ink hover:bg-bone active:bg-line active:translate-y-[1px]",
+  secondary: "bg-ink text-paper hover:bg-graphite active:bg-ink active:translate-y-[1px] disabled:bg-neutral-400 disabled:text-paper",
   ghost: "bg-transparent text-ink hover:text-graphite",
-  danger: "bg-paper text-ink border border-ink hover:bg-bone active:bg-line",
+  danger: "bg-paper text-ink border-2 border-ink hover:bg-bone active:bg-line",
 };
 const sizes: Record<Size, string> = {
-  sm: "h-9 px-4 text-[10px] tracking-[0.14em]",
-  md: "h-[46px] px-5 text-[11px] tracking-[0.14em]",
-  lg: "min-h-[58px] px-6 text-[12px] tracking-[0.16em]",
+  sm: "h-10 px-4 text-[11px] tracking-[0.14em]",
+  md: "h-[50px] px-6 text-[12px] tracking-[0.14em]",
+  lg: "min-h-[60px] px-7 text-[13px] tracking-[0.16em]",
 };
 
 /** The classes of a button, for a Link that must look like one. */
@@ -36,7 +38,7 @@ export function buttonClass(opts: { variant?: Variant; size?: Size; className?: 
   const variant = opts.variant ?? "primary"; const size = opts.size ?? "md";
   const big = variant === "primary" && size === "lg";
   return cn(
-    "group inline-flex items-center justify-center gap-3 whitespace-nowrap rounded-full font-mono uppercase select-none",
+    "group inline-flex items-center justify-center gap-3 whitespace-nowrap rounded-full font-mono font-medium uppercase select-none",
     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:opacity-60",
     variants[variant], sizes[size], big && "rise", opts.className,
   );

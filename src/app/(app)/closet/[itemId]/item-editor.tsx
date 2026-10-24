@@ -7,7 +7,7 @@ import { useRef, useState, useTransition } from "react";
 import { Sheet } from "@/components/ui/sheet";
 import { cn } from "@/lib/cn";
 import { Banner } from "@/components/ui/banner";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
 import { PickSheet, Row, TextSheet } from "@/components/items/row-editor";
 import { BrandSearch } from "@/components/items/brand-search";
 import { MatchSheet } from "@/components/items/match-sheet";
@@ -125,8 +125,8 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists, m
       <div className="relative -mx-5 h-[380px] bg-bone lg:mx-0 lg:h-[560px] lg:self-start lg:[grid-row:1/span_80]">
         {photo ? <img src={`/api/photo/${photo.key}`} alt={it.name} className="size-full object-contain" data-testid="item-hero" /> : null}
         {canEdit && photo ? (<>
-          <button type="button" disabled={pending} onClick={() => start(async () => { const r = await rotateItemPhotoAction(it.id, photo.id); if (!r.ok) setError(r.error); else setIt((x) => ({ ...x, photos: x.photos.map((p) => (p.id === r.value.photoId ? { ...p, key: r.value.key } : p)) })); })} className="mono mono-11 absolute bottom-2 right-2 bg-paper px-2.5 py-1.5 disabled:opacity-60" data-testid="rotate-photo" title="Turn the photo a quarter turn">Rotate ↻</button>
-          {canEdit && photo.kind !== "worn" && photo.kind !== "label" ? <button type="button" disabled={pending} aria-pressed={photo.forMirror} onClick={() => start(async () => { const r = await mirrorPhotoAction(it.id, photo.id); if (!r.ok) setError(r.error); else setIt((x) => ({ ...x, photos: x.photos.map((p) => ({ ...p, forMirror: p.id === r.value.photoId })) })); })} className={`mono mono-11 absolute bottom-2 left-2 px-2.5 py-1.5 disabled:opacity-60 ${photo.forMirror ? "bg-ink text-paper" : "bg-paper"}`} data-testid="mirror-photo" title="The mirror dresses you with this photo">{photo.forMirror ? "Mirror ✓" : "Use in mirror"}</button> : null}
+          <button type="button" disabled={pending} onClick={() => start(async () => { const r = await rotateItemPhotoAction(it.id, photo.id); if (!r.ok) setError(r.error); else setIt((x) => ({ ...x, photos: x.photos.map((p) => (p.id === r.value.photoId ? { ...p, key: r.value.key } : p)) })); })} className="pill pill-sm absolute bottom-2 right-2" data-testid="rotate-photo" title="Turn the photo a quarter turn">Rotate ↻</button>
+          {canEdit && photo.kind !== "worn" && photo.kind !== "label" ? <button type="button" disabled={pending} aria-pressed={photo.forMirror} onClick={() => start(async () => { const r = await mirrorPhotoAction(it.id, photo.id); if (!r.ok) setError(r.error); else setIt((x) => ({ ...x, photos: x.photos.map((p) => ({ ...p, forMirror: p.id === r.value.photoId })) })); })} className={`pill pill-sm absolute bottom-2 left-2 ${photo.forMirror ? "pill-solid" : ""}`} data-testid="mirror-photo" title="The mirror dresses you with this photo">{photo.forMirror ? "Mirror ✓" : "Use in mirror"}</button> : null}
         </>) : null}
         {photo?.kind === "retail" ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">Store photo</span> : photo?.kind === "worn" || photo?.kind === "back" ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">{KIND_WORD[photo.kind]}</span> : it.storePhoto && photo?.isPrimary ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">Store photo</span> : null}
       </div>
@@ -142,40 +142,42 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists, m
 
       <div className="flex items-end justify-between pt-[18px]">
         <Title name={it.name} />
-        {canEdit ? <button type="button" onClick={() => open("rename")} className="mono mono-11 py-2">Rename</button> : null}
+        {canEdit ? <button type="button" onClick={() => open("rename")} className="pill pill-sm">Rename</button> : null}
       </div>
       <p className="mono mt-2 text-graphite">{[!it.mine ? it.ownerName : null, category?.name, it.status, it.isFavorite ? "Favorite" : null].filter(Boolean).join(" · ")}</p>
       {/* This one piece in the mirror (Jeff, 19 Oct 2026, Q2 C): on you, or on the mannequin without a body photo. */}
       {mirror && (mirror.tryOn === "ready" || mirror.mannequinAvailable) && !it.retired && mirrorCanPlace(category?.name) ? (
         <Button variant="secondary" className="mt-3 w-full" disabled={m.busy} onClick={() => m.show({ look: { kind: "closet", itemIds: [it.id] }, on: mirror.tryOn === "ready" ? "me" : "mannequin" })} data-testid="see-on-me">{m.busy ? "Dressing…" : mirror.tryOn === "ready" ? "See it on me" : "See it on a mannequin"}</Button>
       ) : null}
+      {/* Shop v2 item 1 (Jeff, 23 Oct 2026): what would complete this piece, products for it, looks from the closet. */}
+      {!it.retired ? <Link href={`/closet/${it.id}/go-with`} className={buttonClass({ variant: "secondary", className: "mt-3 w-full" })} data-testid="go-with">Shop for something to go with it</Link> : null}
 
       {justAdded ? (
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-y border-line py-2" data-testid="ask-more-photos">
           <span className="mono tracking-[0.1em]">Added · another?</span>
-          {([["back", "Back"], ["label", "Label"], ["worn", "Worn"], ["alone", "Photo"]] as const).map(([k, l]) => <button key={k} type="button" onClick={() => { setPhotoKind(k); photoRef.current?.click(); }} className="mono py-1.5">{l}</button>)}
-          <button type="button" onClick={() => setJustAdded(false)} className="mono py-1.5 text-graphite">Done</button>
+          {([["back", "Back"], ["label", "Label"], ["worn", "Worn"], ["alone", "Photo"]] as const).map(([k, l]) => <button key={k} type="button" onClick={() => { setPhotoKind(k); photoRef.current?.click(); }} className="pill pill-sm">{l}</button>)}
+          <button type="button" onClick={() => setJustAdded(false)} className="pill pill-sm pill-quiet">Done</button>
         </div>
       ) : null}
       {canEdit && it.photoNudge && !it.retired ? (
         <div className="mt-3 flex items-center justify-between border-y border-ink py-2.5" data-testid="photo-nudge">
           <span className="mono tracking-[0.1em]">{it.photoNudge === "first" ? "Worn once · add a photo of your own?" : `Worn ${it.wearCount}× · time for a fresh photo?`}</span>
           <div className="flex gap-3">
-            <button type="button" onClick={() => { setPhotoKind("alone"); photoRef.current?.click(); }} className="mono py-2 tracking-[0.1em]" data-testid="nudge-add">Add photo</button>
-            <button type="button" disabled={pending} onClick={() => start(async () => { const r = await notNowPhotoAction(it.id); if (!r.ok) setError(r.error); else { setIt((x) => ({ ...x, photoNudge: null })); router.refresh(); } })} className="mono py-2 tracking-[0.1em] text-graphite" data-testid="nudge-later">Not now</button>
+            <button type="button" onClick={() => { setPhotoKind("alone"); photoRef.current?.click(); }} className="pill" data-testid="nudge-add">Add photo</button>
+            <button type="button" disabled={pending} onClick={() => start(async () => { const r = await notNowPhotoAction(it.id); if (!r.ok) setError(r.error); else { setIt((x) => ({ ...x, photoNudge: null })); router.refresh(); } })} className="pill pill-quiet" data-testid="nudge-later">Not now</button>
           </div>
         </div>
       ) : null}
       {it.retired ? (
         <div className="mt-3 flex items-center justify-between border-y border-ink py-2.5" data-testid="retired-strip">
           <span className="mono tracking-[0.1em]">Retired · {it.retired.reason === "sell" ? "to sell" : "to donate"}</span>
-          {canEdit ? <button type="button" disabled={pending} onClick={() => start(async () => { const r = await unretireAction(it.id); if (!r.ok) setError(r.error); else { setIt((x) => ({ ...x, retired: null })); router.refresh(); } })} className="mono py-2 tracking-[0.1em]">Bring it back</button> : null}
+          {canEdit ? <button type="button" disabled={pending} onClick={() => start(async () => { const r = await unretireAction(it.id); if (!r.ok) setError(r.error); else { setIt((x) => ({ ...x, retired: null })); router.refresh(); } })} className="pill">Bring it back</button> : null}
         </div>
       ) : null}
       {canEdit && !it.retired ? (
         <div className="mt-3 flex items-center justify-between border-y border-ink py-2.5">
           <span className="mono tracking-[0.1em]">Laundry · {LAUNDRY_WORD[it.laundryStatus]}</span>
-          <button type="button" onClick={laundry} disabled={pending} data-testid="laundry-cycle" className="mono py-2 tracking-[0.1em]">
+          <button type="button" onClick={laundry} disabled={pending} data-testid="laundry-cycle" className="pill">
             {it.laundryStatus === "clean" ? "In the wash?" : it.laundryStatus === "dirty" ? "At cleaners?" : "Back & clean?"}
           </button>
         </div>
@@ -250,7 +252,7 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists, m
           <BrandPick lists={lists} brandId={it.brandId} canAdd={canEditLists} onChange={(id) => save({ brandId: id }, { brandId: id })} onAdded={(e) => setLists((l) => ({ ...l, brands: [...l.brands, e] }))} />
           {brandName ? <Row label="Find it online" value={it.photos.some((p) => p.kind === "retail") ? "Store photos added · match again" : `Match the style at ${brandName} · details + store photos`} muted={!it.photos.some((p) => p.kind === "retail")} onClick={() => setSheet("match")} testId="match-style" /> : null}
           <Row label="Size" value={it.size ?? "Add a size"} muted={!it.size} onClick={() => setSheet("size")} />
-          <button type="button" onClick={() => { setPhotoKind("label"); photoRef.current?.click(); }} className="mono mt-4 flex h-[46px] items-center justify-center border border-ink">Add a label photo</button>
+          <button type="button" onClick={() => { setPhotoKind("label"); photoRef.current?.click(); }} className="pill mt-4 h-[50px]">Add a label photo</button>
         </div>
       </Sheet>
       <PickSheet open={sheet === "store"} onClose={() => setSheet(null)} title="Store" kind="store" options={lists.stores} selected={it.storeId ? [it.storeId] : []} canAdd={canEditLists} onChange={(ids) => save({ storeId: ids[0] ?? null }, { storeId: ids[0] ?? null })} onAdded={(e) => setLists((l) => ({ ...l, stores: [...l.stores, e] }))} />
@@ -286,7 +288,7 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists, m
             <button key={k} type="button" onClick={() => { setPhotoKind(k); photoRef.current?.click(); }} className="flex h-12 items-center justify-between border-b border-line text-[15px]">{l}<span className="mono text-graphite">{m}</span></button>
           ))}
           {it.photos.length > 1 && photo ? (
-            <button type="button" onClick={() => start(async () => { const r = await removeItemPhotoAction(it.id, photo.id); if (!r.ok) setError(r.error); setSheet(null); setPhotoIdx(0); router.refresh(); })} className="mono mt-5 flex h-[46px] items-center justify-center border border-ink">Remove the photo shown</button>
+            <button type="button" onClick={() => start(async () => { const r = await removeItemPhotoAction(it.id, photo.id); if (!r.ok) setError(r.error); setSheet(null); setPhotoIdx(0); router.refresh(); })} className="pill mt-5 h-[50px]">Remove the photo shown</button>
           ) : null}
         </div>
       </Sheet>

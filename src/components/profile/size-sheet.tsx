@@ -38,8 +38,8 @@ export function SizeSheet({ open, onClose, title, options, value, suggested, uni
         </div>
         {other === null ? (
           <div className="mt-4 flex items-center justify-between">
-            <button type="button" onClick={() => setOther(value && !options.includes(value) ? value : "")} className="mono py-2" data-testid="size-other">Other…</button>
-            {value ? <button type="button" onClick={() => pick(null)} className="mono py-2 text-graphite" data-testid="size-clear">Clear</button> : null}
+            <button type="button" onClick={() => setOther(value && !options.includes(value) ? value : "")} className="pill pill-sm" data-testid="size-other">Other…</button>
+            {value ? <button type="button" onClick={() => pick(null)} className="pill pill-sm pill-quiet" data-testid="size-clear">Clear</button> : null}
           </div>
         ) : (
           <form onSubmit={(e) => { e.preventDefault(); if (other.trim()) pick(other.trim()); }} className="mt-4 flex items-end gap-2">

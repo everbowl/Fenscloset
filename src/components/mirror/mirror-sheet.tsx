@@ -101,7 +101,7 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
           {t?.engineNote ? <p className="mono text-graphite" data-testid="mirror-engine-note">{t.engineNote}</p> : null}
           {t ? (
             <div className="flex items-center justify-between gap-3">
-              <button type="button" disabled={m.busy} onClick={m.redo} className="mono mono-11 h-9 shrink-0 whitespace-nowrap border border-ink px-4 disabled:opacity-60" data-testid="redo-tryon" title="Throw away the saved pictures of this look and dress it from scratch">{m.busy ? "Dressing…" : "Dress again"}</button>
+              <button type="button" disabled={m.busy} onClick={m.redo} className="pill pill-sm shrink-0" data-testid="redo-tryon" title="Throw away the saved pictures of this look and dress it from scratch">{m.busy ? "Dressing…" : "Dress again"}</button>
               <span className="mono text-graphite">Not right? Dress it from scratch</span>
             </div>
           ) : null}
@@ -119,7 +119,7 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
           {photoRow ? (
             <div className="flex items-center justify-between gap-3 border-t border-line pt-3" data-testid="mirror-photo-row">
               <span className="mono text-graphite">{tryOnState === "ready" ? "Your body photo · a plain fitted t-shirt and pants work best" : "See it on you · add a full-body photo in a plain fitted t-shirt and pants"}</span>
-              <button type="button" disabled={m.busy || saving} onClick={() => fileRef.current?.click()} className="mono mono-11 h-9 shrink-0 border border-ink px-3 disabled:opacity-60" data-testid="retake-body-photo">{saving ? "Saving…" : tryOnState === "ready" ? "Retake" : "Add photo"}</button>
+              <button type="button" disabled={m.busy || saving} onClick={() => fileRef.current?.click()} className="pill pill-sm shrink-0" data-testid="retake-body-photo">{saving ? "Saving…" : tryOnState === "ready" ? "Retake" : "Add photo"}</button>
             </div>
           ) : null}
           {/* How it shows: pose, tuck, buttons… one tap re-styles the same dressed picture (no second dressing). Lists live under Admin → Lists. */}

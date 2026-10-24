@@ -18,14 +18,14 @@ export function PhotoTips({ tips, isAdmin }: { tips: AddTips; isAdmin: boolean }
   const [cat, setCat] = useState(tips.categories[0]?.id ?? null);
   const toggle = (hidden: boolean) => start(async () => { await setAddTipsHiddenAction(hidden); router.refresh(); });
   if (tips.hidden) {
-    return <button type="button" onClick={() => toggle(false)} className="mono mt-3 py-2 text-graphite" data-testid="show-tips">Photo tips</button>;
+    return <button type="button" onClick={() => toggle(false)} className="pill pill-sm pill-quiet mt-3" data-testid="show-tips">Photo tips</button>;
   }
   const current = tips.categories.find((c) => c.id === cat) ?? tips.categories[0];
   return (
     <section className="mt-5 border-t border-ink pt-3" data-testid="photo-tips">
       <div className="flex items-end justify-between">
         <p className="serif text-[22px]">Before you <em>start</em></p>
-        <button type="button" onClick={() => toggle(true)} className="mono py-2 text-graphite" data-testid="hide-tips">Don’t show again</button>
+        <button type="button" onClick={() => toggle(true)} className="pill pill-sm pill-quiet" data-testid="hide-tips">Don’t show again</button>
       </div>
       <ol className="mt-2 space-y-1.5">
         {tips.general.map((t, i) => (
@@ -36,7 +36,7 @@ export function PhotoTips({ tips, isAdmin }: { tips: AddTips; isAdmin: boolean }
         <div className="mt-4">
           <div className="flex items-center justify-between border-b border-ink pb-2">
             <p className="mono text-graphite">Tips by piece</p>
-            {isAdmin ? <Link href="/admin/lists/category" className="mono text-ink">Edit</Link> : null}
+            {isAdmin ? <Link href="/admin/lists/category" className="pill pill-sm">Edit</Link> : null}
           </div>
           <div className="-mx-5 mt-2 flex gap-[18px] overflow-x-auto px-5 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:px-0" role="tablist">
             {tips.categories.map((c) => (

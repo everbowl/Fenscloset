@@ -45,7 +45,7 @@ export function TogetherScreen({ meId, people, canDressIds, occasions, isAdmin, 
 
   return (
     <div data-testid="together">
-      <PageHeader title="Going out" accent="together" aside={session && !editing ? <button type="button" onClick={() => setEditing(true)} className="mono mono-11 text-ink">Change</button> : undefined} />
+      <PageHeader title="Going out" accent="together" aside={session && !editing ? <button type="button" onClick={() => setEditing(true)} className="pill pill-sm">Change</button> : undefined} />
       {error ? <Banner tone="danger" title={error} className="mb-3" /> : null}
 
       {editing ? (
@@ -75,7 +75,7 @@ export function TogetherScreen({ meId, people, canDressIds, occasions, isAdmin, 
               <span className={cn("flex-1 truncate text-[14px]", !planLabel && "text-graphite")}>{planLabel ?? "Pick one"}</span>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6B6B6B" strokeWidth="2" aria-hidden><path d="m9 6 6 6-6 6" /></svg>
             </button>
-            <button type="button" onClick={() => setSheet("text")} className="mono mono-11 mt-2">Something else…</button>
+            <button type="button" onClick={() => setSheet("text")} className="pill pill-sm mt-2">Something else…</button>
           </section>
           <Button size="lg" className="w-full" disabled={busy !== null || ids.length < 2} onClick={() => run("dress", () => dressTogetherAction({ personIds: ids, mode, occasionId, occasionText: occasionId ? null : text }))} data-testid="dress-us">{busy === "dress" ? "Thinking…" : "Dress us"}</Button>
           {ids.length < 2 ? <p className="mono text-center text-graphite">Pick at least two people</p> : null}
@@ -101,7 +101,7 @@ export function TogetherScreen({ meId, people, canDressIds, occasions, isAdmin, 
               <p className="mono mt-3 text-graphite">{b.pieces.map((x) => x.label).join(" · ")}</p>
               <p className="mt-1 text-[16px] leading-snug">{b.board.reason}</p>
               {canDressIds.includes(b.personId) ? (
-                b.wornFitId ? <Link href="/fits" className="mono mt-3 flex h-[46px] items-center justify-center border border-ink text-[11px] uppercase tracking-[0.14em]">Wearing this · see Fits</Link>
+                b.wornFitId ? <Link href="/fits" className="pill mt-3 h-[50px]">Wearing this · see Fits</Link>
                 : <Button className="mt-3 w-full" disabled={busy !== null} onClick={() => run(`wear-${b.personId}`, () => wearTogetherAction(b.personId, b.suggestionId, session.occasionLabel ?? "Together"))} data-testid={`wear-${b.personName}`}>{busy === `wear-${b.personId}` ? "Saving…" : `Wear this · ${b.personName}`}</Button>
               ) : null}
             </section>

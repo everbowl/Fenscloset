@@ -25,7 +25,7 @@ export function FilterTabs({ categories, active, basePath, q, canEdit }: { categ
       {categories.filter((c) => !c.isArchived).map((c) => tab(c.name, c.id))}
       {canEdit ? (
         <>
-          <button type="button" onClick={() => setEditing(true)} aria-label="Edit categories" className="mono mono-11 ml-auto shrink-0 py-2 text-ink">Edit</button>
+          <button type="button" onClick={() => setEditing(true)} aria-label="Edit categories" className="pill pill-sm ml-auto shrink-0">Edit</button>
           <Sheet open={editing} onClose={() => { setEditing(false); router.refresh(); }} title="Categories">
             <ListEditor kind="category" entries={categories} />
           </Sheet>

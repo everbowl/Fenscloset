@@ -46,3 +46,24 @@ test("link lookup for me, photo lookup for Mya as a parent, recent list and remo
   await page.getByTestId("remove-lookup").click();
   await expect(page.getByTestId("shop-empty")).toBeVisible();
 });
+
+test("from a piece in the closet: what would go with it, products for that, looks from the closet; Judge it lands on the Shop", async ({ page }) => {
+  // the seeded blazer gets the mock reader's color, so the judged Linen Blazer finds it as "own similar"
+  execSync('npx tsx e2e/seed-color.ts "Jeff linen blazer" "beige|cream|tan|oat"', { stdio: "ignore", env: { ...process.env, DATABASE_URL: E2E_DB, MOCK_S3: "true" } });
+  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  await page.goto("/closet");
+  await page.getByRole("link", { name: /dark jeans/i }).first().click();
+  await page.getByTestId("go-with").click();
+  await expect(page).toHaveURL(/\/go-with/);
+  await expect(page.getByTestId("go-with-result")).toBeVisible({ timeout: 30000 });
+  await expect(page.getByTestId("go-with-result")).toContainText("Would complete it · Tops");
+  expect(await page.getByTestId("go-with-product").count()).toBeGreaterThan(2);
+  await expect(page.getByTestId("go-with-looks")).toBeVisible();
+  await page.getByTestId("go-with-judge").first().click();
+  await expect(page).toHaveURL(/\/shop\?/);
+  await expect(page.getByTestId("shop-result")).toContainText("Linen Blazer", { timeout: 30000 });
+  // bigger "own similar": the blazer's twin in the closet, side by side on a tap
+  await expect(page.getByTestId("own-similar")).toBeVisible();
+  await page.getByTestId("own-similar-piece").first().click();
+  await expect(page.getByTestId("compare-sheet")).toContainText("Yours");
+});

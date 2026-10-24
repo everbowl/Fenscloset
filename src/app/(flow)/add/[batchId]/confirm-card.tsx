@@ -163,12 +163,12 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden><path d="M5 5l14 14M19 5 5 19" /></svg>
         </Link>
         <span className="mono mono-11 px-2.5 py-1.5" data-testid="confirm-counter">{counter}</span>
-        <button type="button" onClick={skip} disabled={pending} className="mono mono-11 p-3">Skip</button>
+        <button type="button" onClick={skip} disabled={pending} className="pill pill-sm pill-quiet">Skip</button>
       </div>
 
       <div className="flex items-end justify-between px-5 pb-3">
         <Title name={tags.name} />
-        <button type="button" onClick={() => setSheet("rename")} className="mono mono-11 py-2">Rename</button>
+        <button type="button" onClick={() => setSheet("rename")} className="pill pill-sm">Rename</button>
       </div>
 
       <div className="relative mx-5 h-[400px] bg-bone">
@@ -187,7 +187,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
             ) : null}
           </div>
           {side === "front" ? (
-            <button type="button" onClick={rotate} disabled={rotating || pending} className="mono mono-11 h-9 border border-ink px-3 disabled:opacity-60" data-testid="rotate" title="Turn the photo a quarter turn">{rotating ? "Turning…" : "Rotate ↻"}</button>
+            <button type="button" onClick={rotate} disabled={rotating || pending} className="pill pill-sm" data-testid="rotate" title="Turn the photo a quarter turn">{rotating ? "Turning…" : "Rotate ↻"}</button>
           ) : null}
         </div>
 
@@ -196,7 +196,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
           <span className="mono tracking-[0.1em]">{mirrored ? `Details copied from ${duplicate.name ?? "it"} · check the color` : "Looks like one you own"}</span>
           <div className="flex items-center gap-2.5">
             <div className="h-9 w-[30px] overflow-hidden bg-bone">{duplicate.thumbKey ? <img src={`/api/photo/${duplicate.thumbKey}`} alt={duplicate.name ?? "Item you own"} className="size-full object-cover" /> : null}</div>
-            <button type="button" onClick={merge} disabled={pending} className="mono py-2 tracking-[0.1em]">Same?</button>
+            <button type="button" onClick={merge} disabled={pending} className="pill pill-sm">Same?</button>
           </div>
         </div>
       ) : null}
@@ -208,8 +208,8 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
           <div className="flex items-center justify-between gap-3">
             <span className="text-[15px] leading-snug">Now the back<span className="mono block text-graphite">So the mirror can show the fit from behind</span></span>
             <div className="flex shrink-0 gap-1.5">
-              <button type="button" onClick={() => backRef.current?.click()} className="mono mono-11 h-9 bg-ink px-3 text-paper" data-testid="more-back">Take it</button>
-              <button type="button" onClick={() => setAskMore(false)} className="mono mono-11 h-9 border border-ink px-3" data-testid="more-no">Not now</button>
+              <button type="button" onClick={() => backRef.current?.click()} className="pill pill-sm pill-solid" data-testid="more-back">Take it</button>
+              <button type="button" onClick={() => setAskMore(false)} className="pill pill-sm pill-quiet" data-testid="more-no">Not now</button>
             </div>
           </div>
           <div className="mono mt-2 flex items-center gap-3 text-graphite">
@@ -226,9 +226,9 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
           <div className="-mx-5 mt-1.5 flex gap-1.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none]">
             {myBrands.map((b) => {
               const size = sizeFor(b, tags.categoryId);
-              return <button key={b.brandId} type="button" onClick={() => edit({ brandId: b.brandId, brandText: b.name, ...(size ? { sizeText: size } : {}) })} className="mono mono-11 h-8 shrink-0 border border-ink px-3" data-testid={`my-brand-${b.brandId}`}>{b.name}{size ? ` · ${size}` : ""}</button>;
+              return <button key={b.brandId} type="button" onClick={() => edit({ brandId: b.brandId, brandText: b.name, ...(size ? { sizeText: size } : {}) })} className="pill pill-sm shrink-0" data-testid={`my-brand-${b.brandId}`}>{b.name}{size ? ` · ${size}` : ""}</button>;
             })}
-            <button type="button" onClick={() => setSheet("brand")} className="mono mono-11 h-8 shrink-0 px-2 text-graphite">Other…</button>
+            <button type="button" onClick={() => setSheet("brand")} className="pill pill-sm pill-quiet shrink-0">Other…</button>
           </div>
         </div>
       ) : null}
@@ -296,8 +296,8 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
               <p className="text-[15px] leading-snug">You own <strong>{duplicate.name ?? "a piece like this"}</strong>. Is this another one of the same?</p>
             </div>
             <Button size="lg" className="w-full justify-start" shelf={false} icon={<Icons.copy />} sub="Copies its details · you check the color" onClick={mirror} data-testid="like-mirror">Yes · same piece</Button>
-            <button type="button" onClick={() => { dismissLike(); merge(); }} className="mono flex h-[46px] w-full items-center justify-center border border-ink text-[12px] uppercase tracking-[0.16em]" data-testid="like-merge">It&apos;s this exact one · add the photo to it</button>
-            <button type="button" onClick={dismissLike} className="mono flex h-[46px] w-full items-center justify-center text-graphite" data-testid="like-new">No · a new piece</button>
+            <button type="button" onClick={() => { dismissLike(); merge(); }} className="pill pill-solid h-[50px] w-full" data-testid="like-merge">It&apos;s this exact one · add the photo to it</button>
+            <button type="button" onClick={dismissLike} className="pill pill-quiet h-[50px] w-full" data-testid="like-new">No · a new piece</button>
           </div>
         ) : null}
       </Sheet>
@@ -314,7 +314,7 @@ function BrandRows({ lists, tags, canAdd, onBrand, onSize, onScan, onAdded }: {
     <>
       <Row label="Brand" value={brandName ?? "Pick a brand"} muted={!brandName} onClick={() => setPicking(true)} />
       <Row label="Size" value={tags.sizeText ?? "Add a size"} muted={!tags.sizeText} onClick={onSize} />
-      <button type="button" onClick={onScan} className="mono mt-4 flex h-[46px] items-center justify-center border border-ink">Scan the label</button>
+      <button type="button" onClick={onScan} className="pill mt-4 h-[50px]">Scan the label</button>
       <BrandSearch open={picking} onClose={() => setPicking(false)} brands={lists.brands} selectedId={tags.brandId} onPick={(b) => onBrand(b.id, b.name)} onAdded={onAdded} />
     </>
   );

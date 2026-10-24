@@ -11,7 +11,7 @@ import { Sheet } from "@/components/ui/sheet";
 import { TextSheet } from "@/components/items/row-editor";
 import { shrinkPhoto } from "@/lib/import/client-queue";
 import { cn } from "@/lib/cn";
-import type { LookupView } from "@/lib/shop/engine";
+import type { LookupView, SimilarItem } from "@/lib/shop/engine";
 import { deleteLookupAction, lookupLinkAction, lookupPhotoAction, lookupStatusAction, tryOnLookupAction, type LookupResult } from "./actions";
 import type { TryOnState, TryOnView } from "@/lib/tryon";
 
@@ -19,7 +19,7 @@ const CALL_WORD = { FITS: "Fits · buy it", RISKY: "Risky · maybe", PASS: "Pass
 /** How often the screen asks after a lookup that is still running. */
 const POLL_MS = 2000;
 
-export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn, mannequin }: { meId: string; people: { id: string; name: string }[]; forPersonId: string; selected: LookupView | null; recent: LookupView[]; tryOn: TryOnState; /** SEE IT ON dresses the shared mannequin when the person's own try-on is not ready. */ mannequin: boolean }) {
+export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn, mannequin, autoLink = null }: { meId: string; people: { id: string; name: string }[]; forPersonId: string; selected: LookupView | null; recent: LookupView[]; tryOn: TryOnState; /** SEE IT ON dresses the shared mannequin when the person's own try-on is not ready. */ mannequin: boolean; /** A store link to judge as soon as the page opens ("Judge it" from a piece's go-with page). */ autoLink?: string | null }) {
   const router = useRouter();
   const [, start] = useTransition();
   const [busy, setBusy] = useState<"link" | "photo" | "delete" | "tryon" | null>(null);
@@ -28,6 +28,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
   const [onMe, setOnMe] = useState<TryOnView | null>(null);
   const [error, setError] = useState<string>();
   const [sheet, setSheet] = useState<"for" | "link" | null>(null);
+  const [compare, setCompare] = useState<SimilarItem | null>(null);
   const [source, setSource] = useState<"screenshot" | "photo">("screenshot");
   const file = useRef<HTMLInputElement>(null);
   const seq = useRef(0);
@@ -71,6 +72,14 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
     setError(undefined); setBusy("delete");
     start(async () => { const r = await deleteLookupAction(id); setBusy(null); if (!r.ok) setError(r.error); router.refresh(); });
   }
+  // "Judge it" from a piece's go-with page lands here with the link: the lookup starts on its own, once.
+  const auto = useRef(false);
+  useEffect(() => {
+    if (auto.current || !autoLink) return;
+    auto.current = true;
+    run("link", () => lookupLinkAction(forPersonId, autoLink));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoLink, forPersonId]);
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; e.target.value = "";
     if (!f) return;
@@ -91,9 +100,9 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
 
       <div className="lg:col-start-2 lg:row-start-3">
         <div className="grid grid-cols-3 gap-2">
-          <Button variant="secondary" className="h-[54px] px-2 text-[10px]" disabled={thinking} onClick={() => setSheet("link")} data-testid="paste-link">Paste a link</Button>
-          <Button variant="secondary" className="h-[54px] px-2 text-[10px]" disabled={thinking} onClick={() => { setSource("screenshot"); file.current?.removeAttribute("capture"); file.current?.click(); }} data-testid="upload-screenshot">Screenshot</Button>
-          <Button variant="secondary" className="h-[54px] px-2 text-[10px]" disabled={thinking} onClick={() => { setSource("photo"); file.current?.setAttribute("capture", "environment"); file.current?.click(); }} data-testid="take-photo">Take a photo</Button>
+          <Button variant="secondary" className="h-[54px] px-2 text-[11px]" disabled={thinking} onClick={() => setSheet("link")} data-testid="paste-link">Paste a link</Button>
+          <Button variant="secondary" className="h-[54px] px-2 text-[11px]" disabled={thinking} onClick={() => { setSource("screenshot"); file.current?.removeAttribute("capture"); file.current?.click(); }} data-testid="upload-screenshot">Screenshot</Button>
+          <Button variant="secondary" className="h-[54px] px-2 text-[11px]" disabled={thinking} onClick={() => { setSource("photo"); file.current?.setAttribute("capture", "environment"); file.current?.click(); }} data-testid="take-photo">Take a photo</Button>
         </div>
         <input ref={file} type="file" accept="image/*" className="hidden" onChange={onFile} data-testid="shop-file" />
         {thinking ? (
@@ -127,10 +136,16 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
             </div>
           ) : null}
           {selected.similar.length ? (
-            <div className="mt-4">
-              <p className="mono text-graphite">You already own similar</p>
-              <div className="mt-2 flex gap-1.5">
-                {selected.similar.map((s) => <Link key={s.id} href={`/closet/${s.id}`} className="h-[84px] w-[64px] overflow-hidden bg-bone" aria-label={s.name}>{s.thumbKey ? <img src={`/api/photo/${s.thumbKey}`} alt="" className="size-full object-cover" /> : null}</Link>)}
+            // Jeff, 23 Oct 2026 (Shop v2, A): bigger, with a tap to see the two side by side.
+            <div className="mt-5" data-testid="own-similar">
+              <p className="mono border-b border-ink pb-2 text-graphite">You already own similar · tap to compare</p>
+              <div className="-mx-5 mt-3 flex gap-2.5 overflow-x-auto px-5 pb-1 lg:mx-0 lg:px-0">
+                {selected.similar.map((s) => (
+                  <button key={s.id} type="button" onClick={() => setCompare(s)} className="w-[110px] shrink-0 text-left" data-testid="own-similar-piece" aria-label={`Compare with ${s.name}`}>
+                    <span className="block h-[146px] overflow-hidden bg-bone">{s.thumbKey ? <img src={`/api/photo/${s.thumbKey}`} alt="" className="size-full object-cover" /> : null}</span>
+                    <span className="mt-1.5 block truncate text-[13px] font-medium">{s.name}</span>
+                  </button>
+                ))}
               </div>
             </div>
           ) : null}
@@ -162,9 +177,9 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
                     </a>
                     <p className="mt-2 line-clamp-2 text-[13px] font-medium leading-snug">{p.title}</p>
                     <p className="mono mt-1 text-graphite">{[p.priceText, p.storeName].filter(Boolean).join(" · ")}</p>
-                    <div className="mt-1.5 flex items-center justify-between">
-                      <a href={p.url} target="_blank" rel="noreferrer" className="mono py-2 text-ink">Buy →</a>
-                      <button type="button" disabled={thinking} onClick={() => run("link", () => lookupLinkAction(forPersonId, p.url))} className="mono py-2 text-ink" data-testid="judge-product">Judge it</button>
+                    <div className="mt-2 flex flex-col gap-1.5">
+                      <a href={p.url} target="_blank" rel="noreferrer" className="pill pill-sm w-full">Buy →</a>
+                      <button type="button" disabled={thinking} onClick={() => run("link", () => lookupLinkAction(forPersonId, p.url))} className="pill pill-sm pill-solid w-full" data-testid="judge-product">Judge it</button>
                     </div>
                   </div>
                 ))}
@@ -183,7 +198,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
               ))}
             </div>
           ) : null}
-          {(selected.shopperId === meId || selected.forPersonId === meId) ? <button type="button" disabled={busy === "delete"} onClick={() => remove(selected.id)} className="mono mt-4 text-graphite" data-testid="remove-lookup">Remove</button> : null}
+          {(selected.shopperId === meId || selected.forPersonId === meId) ? <button type="button" disabled={busy === "delete"} onClick={() => remove(selected.id)} className="pill pill-sm pill-quiet mt-5" data-testid="remove-lookup">Remove</button> : null}
         </section>
       ) : (
         <section className="mt-6 lg:col-start-1 lg:row-start-3 lg:mt-0" data-testid="shop-empty">
@@ -209,6 +224,25 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
           <div className="flex flex-col gap-3" data-testid="see-it-on-me-sheet">
             <div className="h-[460px] overflow-hidden bg-bone"><img src={`/api/photo/${onMe.key}`} alt={onMe.mannequin ? "This piece on a mannequin" : "You wearing this piece"} className="size-full object-contain" /></div>
             <p className="mono text-graphite">{onMe.mannequin ? "No body photo used" : "Only you can see this picture"}{onMe.cached ? " · saved from before" : ""}</p>
+          </div>
+        ) : null}
+      </Sheet>
+      <Sheet open={compare !== null} onClose={() => setCompare(null)} title="Side by side">
+        {compare && selected ? (
+          <div data-testid="compare-sheet">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="h-[260px] overflow-hidden bg-bone">{selected.imageKey ? <img src={`/api/photo/${selected.imageKey}`} alt={selected.title ?? "The new piece"} className="size-full object-cover" /> : null}</div>
+                <p className="mono mt-2 text-graphite">New</p>
+                <p className="truncate text-[14px] font-medium">{selected.title ?? "New piece"}</p>
+              </div>
+              <div>
+                <div className="h-[260px] overflow-hidden bg-bone">{compare.thumbKey ? <img src={`/api/photo/${compare.thumbKey}`} alt={compare.name} className="size-full object-cover" /> : null}</div>
+                <p className="mono mt-2 text-graphite">Yours</p>
+                <p className="truncate text-[14px] font-medium">{compare.name}</p>
+              </div>
+            </div>
+            <Link href={`/closet/${compare.id}`} className="pill mt-4 h-[50px] w-full">Open yours in the closet</Link>
           </div>
         ) : null}
       </Sheet>

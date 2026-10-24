@@ -34,7 +34,7 @@ export function ClosetGrid({ items, showOwner, mirror }: { items: ItemCardData[]
         picking ? (
           <div className="mono mt-4 flex items-center justify-between border-y border-ink py-2.5" data-testid="pick-bar" aria-live="polite">
             <span>{picked.length ? `${picked.length} picked` : "Tap the pieces"} · up to {PICK_MAX}</span>
-            <button type="button" onClick={stop} className="mono mono-11" data-testid="pick-cancel">Cancel</button>
+            <button type="button" onClick={stop} className="pill pill-sm" data-testid="pick-cancel">Cancel</button>
           </div>
         ) : (
           <button type="button" onClick={() => setPicking(true)} className="mt-4 flex w-full items-center justify-between gap-3 border border-ink px-4 py-3 text-left hover:bg-bone" data-testid="closet-mirror">
