@@ -14,6 +14,8 @@ import { cn } from "@/lib/cn";
 import type { BoardView, Piece } from "@/lib/outfits/engine";
 import type { Scale } from "@/lib/checkins/service";
 import type { TryOnState } from "@/lib/tryon";
+import type { Wardrobe } from "@/lib/tryon/complete";
+import type { Engine } from "@/lib/tryon/engines";
 import { MirrorGlyph, MirrorSheet } from "@/components/mirror/mirror-sheet";
 import { useMirror } from "@/components/mirror/use-mirror";
 import { checkInSelfieAction, checkInTapsAction, looksStatusAction, moreAction, rateAction, regenerateAction, removeAction, setLocationAction, setPlanAction, setZipAction, swapAction, wearAction, type LooksResult } from "./actions";
@@ -43,6 +45,10 @@ type Props = {
   backPhoto: boolean;
   /** The mannequin is set up: offered in the mirror even when the person has their own photo. */
   mannequinAvailable: boolean;
+  /** The person's placeable pieces, for the mirror's "To go with it" rows. */
+  wardrobe: Wardrobe;
+  /** Who dresses on the person's photo (FASHN can't place shoes). */
+  engine: Engine;
 };
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -59,7 +65,7 @@ export function TodayScreen(p: Props) {
   const boards = p.suggestion?.boards ?? [];
   const board = boards[index] ?? null;
   // The mirror: dressed in the background, polled, shown in the shared sheet (src/components/mirror).
-  const m = useMirror(p.personId);
+  const m = useMirror(p.personId, p.wardrobe, p.engine);
 
   function run(label: string, fn: () => Promise<{ ok: boolean; error?: string }>, after?: () => void) {
     setError(undefined); setBusy(label);

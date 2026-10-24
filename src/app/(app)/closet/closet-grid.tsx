@@ -20,7 +20,7 @@ export const PICK_MAX = 3;
 export function ClosetGrid({ items, showOwner, mirror }: { items: ItemCardData[]; showOwner: boolean; mirror: MirrorConfig | null }) {
   const [picking, setPicking] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
-  const m = useMirror(mirror?.personId ?? "");
+  const m = useMirror(mirror?.personId ?? "", mirror?.wardrobe, mirror?.engine);
   const onMe = mirror?.tryOn === "ready";
   const canMirror = Boolean(mirror && (onMe || mirror.mannequinAvailable));
   const full = picked.length >= PICK_MAX;
@@ -56,7 +56,7 @@ export function ClosetGrid({ items, showOwner, mirror }: { items: ItemCardData[]
         <div className="fixed inset-x-0 bottom-[calc(76px_+_env(safe-area-inset-bottom))] z-30 border-t border-ink bg-paper px-5 py-3 lg:bottom-0 lg:py-4">
           <div className="mx-auto max-w-[440px] lg:max-w-[1040px]">
             <Button size="lg" className="w-full" disabled={!picked.length || m.busy} shelf={false} sub={picked.length ? names : "Tap pieces in the grid"}
-              onClick={() => mirror && m.dress({ look: { kind: "closet", itemIds: picked }, on: onMe ? "me" : "mannequin" })} data-testid="see-picked">
+              onClick={() => mirror && m.begin({ look: { kind: "closet", itemIds: picked }, on: onMe ? "me" : "mannequin" })} data-testid="see-picked">
               {m.busy ? "Dressing…" : onMe ? "See it on me" : "See it on a mannequin"}
             </Button>
           </div>

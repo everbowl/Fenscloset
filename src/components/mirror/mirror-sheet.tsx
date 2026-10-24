@@ -1,6 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sheet } from "@/components/ui/sheet";
@@ -9,6 +10,7 @@ import { shrinkPhoto } from "@/lib/import/client-queue";
 import { addBodyPhotoAction } from "@/app/(app)/profile/actions";
 import type { TryOnState } from "@/lib/tryon";
 import { ENGINE_WORD } from "@/lib/tryon/engines";
+import { shoesPlaceable, slotOf, SLOT_WORD, type Slot } from "@/lib/tryon/complete";
 import type { Mirror } from "./use-mirror";
 
 /**
@@ -67,12 +69,15 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
     ? ([["front", "On me"], ...(backPhoto ? [["back", "From behind"]] : []), ...(mannequinAvailable ? [["mannequin", "Mannequin"]] : [])] as [string, string][])
     : [];
   const photoRow = mine && (tryOnState === "ready" ? (onMe || !t) : tryOnState === "no_photo");
+  // The pieces in the picture, by name when the wardrobe knows them (a swap under the picture changes them); else the screen's line.
+  const known = t ? m.piecesOf(t.itemIds) : [];
+  const line = t && known.length && known.length === t.itemIds.length ? known.map((k) => k.name).join(" · ") : pieces;
 
   return (
-    <Sheet open={m.open} onClose={() => m.setOpen(false)} title="In the mirror">
+    <Sheet open={m.open} onClose={() => m.setOpen(false)} title={m.pending ? "Complete the look" : "In the mirror"}>
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPhoto} data-testid="mirror-body-photo" />
       {m.error ? <Banner tone="danger" title={m.error} className="mb-3" /> : null}
-      {t || m.busy ? (
+      {m.pending ? <CompletePanel m={m} /> : t || m.busy ? (
         <div className="flex flex-col gap-3" {...(t ? { "data-testid": "try-on-sheet" } : {})}>
           <div className="relative h-[460px] overflow-hidden bg-bone">
             {t?.alt ? (
@@ -93,7 +98,7 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
             ) : null}
           </div>
           {m.busy ? <p className="mono text-graphite">Usually 20 to 60 seconds. You can leave this screen; the picture is kept and waits for you.</p> : null}
-          <p className="mono text-graphite">{pieces}</p>
+          <p className="mono text-graphite" data-testid="mirror-pieces">{line}</p>
           {t?.styling?.summary ? <p className="mono text-ink" data-testid="styling-summary">{t.styling.summary}{t.stylingFailed ? " · didn’t take this time, showing the plain try-on" : ""}</p> : null}
           {t ? <p className="mono text-ink">{t.mannequin ? `On a mannequin · No body photo used${mine ? "" : ` · ${personName}’s look`}` : t.alt ? `On you${t.view === "back" ? " · from behind" : ""} · ${ENGINE_WORD[t.engine ?? "google"]} and ${ENGINE_WORD[t.alt.engine ?? "fashn"]} side by side · Only you can see these pictures · pick the winner under Admin → Rules` : `On you${t.view === "back" ? " · from behind" : ""}${t.engine === "fashn" ? " · dressed by FASHN" : ""} · Only you can see this picture`}{t.cached ? " · saved from before" : ""}</p> : null}
           {t?.note ? <p className="mono text-graphite" data-testid="mirror-note">{t.alt ? `${ENGINE_WORD[t.engine ?? "google"]} · ` : ""}{t.note}</p> : null}
@@ -140,9 +145,93 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
               ))}
             </div>
           ) : null}
+          {t && !m.busy ? <GoWithRows m={m} /> : null}
         </div>
       ) : null}
     </Sheet>
+  );
+}
+
+const TAG = "mono absolute left-1 top-1 bg-ink px-1 py-0.5 text-[10px] text-paper";
+
+/**
+ * Before the mirror dresses a piece from the closet (Jeff, 24 Oct 2026): "Add a bottom?" for a top, "Add a top?" for a
+ * bottom, "Add shoes?" when the picture can show them; the closet's pieces for that slot as thumbnails, the Shop's
+ * suggestions first, and a way to go without. The last answer dresses the look.
+ */
+function CompletePanel({ m }: { m: Mirror }) {
+  const p = m.pending!;
+  const chosen = m.piecesOf(p.itemIds);
+  const slot = p.ask[0];
+  const options = m.options(slot, p.itemIds);
+  const next = p.ask.slice(1);
+  const shoesLeftOut = !shoesPlaceable(p.on, m.engine) && m.wardrobe.pieces.some((x) => slotOf(x.category) === "shoes");
+  return (
+    <div className="flex flex-col gap-3" data-testid="complete-look">
+      <p className="mono text-graphite" data-testid="complete-chosen">{chosen.map((c) => c.name).join(" · ")}</p>
+      <p className="serif text-[28px] leading-none" data-testid="complete-ask">{SLOT_WORD[slot].ask}</p>
+      <div className="-mx-5 flex gap-2.5 overflow-x-auto px-5 pb-1">
+        {options.map((o) => (
+          <button key={o.id} type="button" onClick={() => m.choose(o)} className="w-[96px] shrink-0 text-left" data-testid="complete-option" aria-label={o.name}>
+            <span className="relative block h-[128px] overflow-hidden bg-bone">
+              {o.thumbKey ? <img src={`/api/photo/${o.thumbKey}`} alt="" className="size-full object-cover" /> : null}
+              {o.suggested ? <span className={TAG}>Goes with it</span> : o.isFavorite ? <span className={TAG}>Favorite</span> : null}
+            </span>
+            <span className="mt-1 block truncate text-[12px] font-medium">{o.name}</span>
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <button type="button" onClick={() => m.choose(null)} className="pill pill-sm shrink-0" data-testid="complete-skip">{SLOT_WORD[slot].skip(chosen)}</button>
+        <span className="mono text-right text-graphite">{next.length ? `Then: ${next.map((s) => (s === "shoes" ? "shoes" : `a ${s}`)).join(", ")}` : p.on === "me" ? "Then the mirror dresses you" : "Then the mannequin wears it"}</span>
+      </div>
+      {shoesLeftOut ? <p className="mono text-graphite" data-testid="complete-shoes-note">Shoes stay off this picture: FASHN can’t put them on yet. The mannequin can.</p> : null}
+    </div>
+  );
+}
+
+/**
+ * Under the picture (Jeff, 24 Oct 2026: "go to the bottom of the page and decide or observe suggested shoes, other
+ * shirts or tops or bottoms to go with the outfit"): the closet's shoes, other tops and other bottoms, the Shop's
+ * suggestions first; a tap swaps the piece in and the mirror dresses the look again.
+ */
+function GoWithRows({ m }: { m: Mirror }) {
+  const t = m.tryOn;
+  if (!t || !m.wardrobe.pieces.length) return null;
+  const ids = t.itemIds;
+  const chosen = m.piecesOf(ids);
+  if (chosen.length !== ids.length) return null; // a look the wardrobe doesn't know (a shop candidate)
+  const slots = new Set(chosen.map((c) => slotOf(c.category)));
+  const canShoes = shoesPlaceable(m.on, m.engine);
+  const rows: { slot: Slot; title: string }[] = [];
+  if (canShoes) rows.push({ slot: "shoes", title: slots.has("shoes") ? "Other shoes" : "Add shoes" });
+  if (!slots.has("onePiece")) {
+    rows.push({ slot: "top", title: slots.has("top") ? "Other tops" : "Add a top" });
+    rows.push({ slot: "bottom", title: slots.has("bottom") ? "Other bottoms" : "Add a bottom" });
+  }
+  const filled = rows.map((r) => ({ ...r, options: m.options(r.slot, ids).slice(0, 12) })).filter((r) => r.options.length);
+  if (!filled.length) return null;
+  return (
+    <div className="flex flex-col gap-4 border-t border-line pt-3" data-testid="mirror-go-with">
+      <p className="mono text-graphite">To go with it · tap a piece and the mirror dresses it again</p>
+      {filled.map((r) => (
+        <div key={r.slot} data-testid={`mirror-row-${r.slot}`}>
+          <p className="mono text-ink">{r.title}</p>
+          <div className="-mx-5 mt-1.5 flex gap-2.5 overflow-x-auto px-5 pb-1">
+            {r.options.map((o) => (
+              <button key={o.id} type="button" disabled={m.busy} onClick={() => m.swap(o)} className="w-[84px] shrink-0 text-left" data-testid="mirror-swap" aria-label={o.name}>
+                <span className="relative block h-[112px] overflow-hidden bg-bone">
+                  {o.thumbKey ? <img src={`/api/photo/${o.thumbKey}`} alt="" className="size-full object-cover" /> : null}
+                  {o.suggested ? <span className={TAG}>Goes with it</span> : o.isFavorite ? <span className={TAG}>Favorite</span> : null}
+                </span>
+                <span className="mt-1 block truncate text-[12px]">{o.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+      <Link href={`/closet/${ids[0]}/go-with`} className="pill pill-sm self-start" data-testid="mirror-shop-go-with">Shop for something to go with it</Link>
+    </div>
   );
 }
 

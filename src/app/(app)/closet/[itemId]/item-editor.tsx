@@ -57,7 +57,7 @@ function Title({ name }: { name: string }) {
 export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists, mirror = null }: { item: ItemView; lists: ItemLists; canEdit: boolean; canEditLists: boolean; /** The signed-in person's mirror: "See it on me" dresses them in this one piece. */ mirror?: MirrorConfig | null }) {
   const router = useRouter();
   const [it, setIt] = useState(item);
-  const m = useMirror(mirror?.personId ?? "");
+  const m = useMirror(mirror?.personId ?? "", mirror?.wardrobe, mirror?.engine);
   const [lists, setLists] = useState(initialLists);
   const [sheet, setSheet] = useState<SheetKind>(null);
   const [photoIdx, setPhotoIdx] = useState(0);
@@ -147,7 +147,7 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists, m
       <p className="mono mt-2 text-graphite">{[!it.mine ? it.ownerName : null, category?.name, it.status, it.isFavorite ? "Favorite" : null].filter(Boolean).join(" · ")}</p>
       {/* This one piece in the mirror (Jeff, 19 Oct 2026, Q2 C): on you, or on the mannequin without a body photo. */}
       {mirror && (mirror.tryOn === "ready" || mirror.mannequinAvailable) && !it.retired && mirrorCanPlace(category?.name) ? (
-        <Button variant="secondary" className="mt-3 w-full" disabled={m.busy} onClick={() => m.show({ look: { kind: "closet", itemIds: [it.id] }, on: mirror.tryOn === "ready" ? "me" : "mannequin" })} data-testid="see-on-me">{m.busy ? "Dressing…" : mirror.tryOn === "ready" ? "See it on me" : "See it on a mannequin"}</Button>
+        <Button variant="secondary" className="mt-3 w-full" disabled={m.busy} onClick={() => m.begin({ look: { kind: "closet", itemIds: [it.id] }, on: mirror.tryOn === "ready" ? "me" : "mannequin" })} data-testid="see-on-me">{m.busy ? "Dressing…" : mirror.tryOn === "ready" ? "See it on me" : "See it on a mannequin"}</Button>
       ) : null}
       {/* Shop v2 item 1 (Jeff, 23 Oct 2026): what would complete this piece, products for it, looks from the closet. */}
       {!it.retired ? <Link href={`/closet/${it.id}/go-with`} className={buttonClass({ variant: "secondary", className: "mt-3 w-full" })} data-testid="go-with">Shop for something to go with it</Link> : null}
