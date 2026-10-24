@@ -1,38 +1,91 @@
 @import "tailwindcss";
 
+/* Brand: Fen's Closet identity v1. Black, Paper, Bone, Graphite. Archivo (wide) for the wordmark,
+   Instrument Serif for editorial headings, IBM Plex Mono for labels. No rounded corners. */
 :root {
-  --background: #faf8f5;
-  --foreground: #1c1917;
-  --muted: #78716c;
-  --surface: #ffffff;
-  --border: #e7e5e4;
-  --accent: #b45309;
-  --accent-foreground: #ffffff;
+  --black: #000000;
+  --paper: #ffffff;
+  --bone: #f2f0eb;
+  --graphite: #454545; /* was #6b6b6b: too faint on paper (Jeff, 19 Oct 2026) */
+  --line: #e5e3de;
   --danger: #b91c1c;
-  --success: #15803d;
+  --accent: #FF5A00; /* main buttons; overridden per household from Admin → Rules */
+  --stone: #bdb8ad; /* the base a pill button sits on (Q11 D) */
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-muted: var(--muted);
-  --color-surface: var(--surface);
-  --color-border: var(--border);
+  --color-background: var(--paper);
+  --color-foreground: var(--black);
+  --color-ink: var(--black);
+  --color-paper: var(--paper);
+  --color-bone: var(--bone);
+  --color-graphite: var(--graphite);
+  --color-muted: var(--graphite);
+  --color-surface: var(--paper);
+  --color-border: var(--line);
+  --color-line: var(--line);
   --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
+  --color-stone: var(--stone);
+  --color-accent-foreground: var(--paper);
   --color-danger: var(--danger);
-  --color-success: var(--success);
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --font-serif: "Instrument Serif", Georgia, serif;
+  --radius: 0px;
 }
 
+html { color-scheme: light; }
 html, body {
   height: 100%;
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--paper);
+  color: var(--black);
   font-family: var(--font-sans);
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
 }
 
+/* Brand text styles live in the components layer so Tailwind utilities (e.g. normal-case) can override them. */
+@layer components {
+/* Mono uppercase label, the brand's secondary voice. */
+.mono {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.mono-11 { font-size: 12px; }
+.mono-12 { font-size: 12px; }
+.mono-13 { font-size: 13px; }
+
+/* Editorial serif heading; wrap the accent word in <em>. */
+.serif {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  line-height: 0.95;
+  letter-spacing: -0.005em;
+}
+.serif em { font-style: italic; }
+
+/* Wide-set wordmark. */
+.wordmark {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-stretch: 125%;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+}
+
 .safe-top { padding-top: env(safe-area-inset-top); }
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+/* Native <dialog> as a bottom sheet. */
+dialog.sheet { border: 0; padding: 0; }
+dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.45); }
+
+/* Motion for the main buttons (Q11): the big button rises in a beat after the page; the press sinks it onto its base. */
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.rise { animation: rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) 0.12s both; }
+@media (prefers-reduced-motion: reduce) { .rise { animation: none; } }

@@ -19,6 +19,25 @@ test("admin edits a list in place: add, rename, reorder, archive, blocked delete
   await sheet.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Everbowl Merch")).toBeVisible();
 
+  // Drag to reorder: the fourth row goes up two rows (pointer events on the grip), and it sticks after a reload
+  await expect(sheet).toBeHidden();
+  await page.waitForTimeout(400); // the sheet's closing transition; a drag that starts under it is swallowed
+  const rows = page.locator("[data-testid^=list-row-]");
+  await page.locator("[data-testid^=grip-]").nth(1).scrollIntoViewIfNeeded(); // the page sits at the new row (bottom); the pointer needs the rows on screen
+  const fourth = (await rows.nth(3).innerText()).split("\n")[0];
+  const b = (await page.locator("[data-testid^=grip-]").nth(3).boundingBox())!;
+  const a = (await page.locator("[data-testid^=grip-]").nth(1).boundingBox())!;
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await page.mouse.down();
+  await page.mouse.move(b.x + b.width / 2, a.y + a.height / 2, { steps: 10 }); await page.mouse.up();
+  await expect(rows.nth(1)).toContainText(fourth);
+  await page.reload();
+  await expect(rows.nth(1)).toContainText(fourth);
+
+  // Find in the list
+  await page.getByTestId("list-filter").fill("merch");
+  await expect(page.locator("[data-testid^=list-row-]")).toHaveCount(1);
+  await page.getByTestId("list-filter").fill("");
+
   // Archive then restore
   const row = page.locator("div", { has: page.getByRole("button", { name: /^Everbowl Merch/ }) }).last();
   await row.getByRole("button", { name: "Archive" }).click();
@@ -45,6 +64,14 @@ test("admin changes a rule", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Saved" })).toBeVisible();
   await page.reload();
   await expect(page.getByLabel("No-repeat window (days)")).toHaveValue("21");
+  // the button color is a hex with a swatch; nothing waits for a re-cut, so that upkeep row is not shown
+  await expect(page.getByLabel("Button color (hex)")).toHaveValue("#FF5A00");
+  await expect(page.getByTestId("untidy-photos")).toHaveCount(0);
+  await page.getByLabel("Button color (hex)").fill("#1A2B3C");
+  await page.getByTestId("rule-accentColor").getByRole("button", { name: "Save" }).click();
+  await expect(page.getByTestId("rule-accentColor").getByRole("button", { name: "Saved" })).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("Button color (hex)")).toHaveValue("#1A2B3C");
 });
 
 test("admin invites a new member; she accepts, lands in her closet, and cannot open admin", async ({ page, browser }) => {
@@ -56,7 +83,7 @@ test("admin invites a new member; she accepts, lands in her closet, and cannot o
   await sheet.getByRole("textbox", { name: "Email" }).fill("sue@example.com");
   await sheet.getByRole("button", { name: "Create invite" }).click();
   await expect(page.getByText("Invite created")).toBeVisible();
-  const url = (await page.locator(".font-mono").textContent())!.trim();
+  const url = (await page.getByTestId("invite-url").textContent())!.trim();
   expect(url).toContain("/invite/");
 
   const ctx = await browser.newContext();
@@ -67,7 +94,7 @@ test("admin invites a new member; she accepts, lands in her closet, and cannot o
   await sue.getByLabel("Type it again").fill("grandma-rules-1");
   await sue.getByRole("button", { name: "Open my closet" }).click();
   await expect(sue).toHaveURL(/\/today$/);
-  await expect(sue.getByRole("heading", { name: "Hi Grandma" })).toBeVisible();
+  await expect(sue.getByRole("heading", { name: /look/ })).toBeVisible();
 
   await sue.goto("/admin/people");
   await expect(sue.getByRole("heading", { name: "Admins only" })).toBeVisible();
@@ -98,4 +125,16 @@ test("admin re-invites a seeded family member and removes a person with the item
   await page.getByRole("button", { name: "Move them to the Family closet" }).click();
   await expect(page).toHaveURL(/\/admin\/people$/);
   await expect(page.getByRole("link", { name: /Olivia/ })).toHaveCount(0);
+});
+
+test("admin lists: the mirror's poses and wear options are editable lists, untucked first", async ({ page }) => {
+  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  await page.goto("/admin/lists");
+  await expect(page.getByRole("link", { name: /Mirror poses/ })).toBeVisible();
+  await page.goto("/admin/lists/mirrorPose");
+  await expect(page.getByText("Standing, as photographed")).toBeVisible();
+  await expect(page.getByText("Hands in pockets")).toBeVisible();
+  await page.goto("/admin/lists/wearOption");
+  const rows = page.locator("[data-testid^=list-row-]");
+  await expect(rows.first()).toContainText("Untucked"); // the Tuck group is first, and Untucked is its default
 });

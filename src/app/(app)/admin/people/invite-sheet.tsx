@@ -59,7 +59,7 @@ export function InviteSheet({ admins, smsReady, existing, trigger }: {
   return (
     <>
       <span onClick={() => { setResult(undefined); setOpen(true); }}>
-        {trigger ?? <Button size="sm"><Plus className="size-4" /> Add person</Button>}
+        {trigger ?? <Button size="sm"><Plus className="size-3.5" strokeWidth={1.8} /> Add person</Button>}
       </span>
       <Sheet open={open} onClose={() => setOpen(false)} title={existing ? `Invite ${existing.name}` : "Add a person"}>
         {result?.ok ? (
@@ -69,7 +69,7 @@ export function InviteSheet({ admins, smsReady, existing, trigger }: {
               The link works for 7 days.
             </Banner>
             {result.deliveryError ? <Banner tone="danger">{result.deliveryError}</Banner> : null}
-            <div className="rounded-xl border border-border bg-stone-50 p-3 font-mono text-xs break-all">{result.url}</div>
+            <div data-testid="invite-url" className="break-all bg-bone p-3 font-mono text-[11px]">{result.url}</div>
             <div className="flex gap-2">
               <Button variant="secondary" className="flex-1" onClick={() => copy(result.url)}>{copied ? <Check className="size-4" /> : <Copy className="size-4" />} {copied ? "Copied" : "Copy link"}</Button>
               <Button className="flex-1" onClick={() => share(result.url)}><Share2 className="size-4" /> Share…</Button>
@@ -91,10 +91,10 @@ export function InviteSheet({ admins, smsReady, existing, trigger }: {
             </Field>
             {role === "minor" ? (
               <fieldset className="space-y-2">
-                <legend className="text-sm font-medium">Parent admins</legend>
+                <legend className="mono tracking-[0.14em] text-graphite">Parent admins</legend>
                 {admins.map((a) => (
                   <label key={a.id} className="flex h-10 items-center gap-3 text-[15px]">
-                    <input type="checkbox" className="size-5 accent-accent" checked={guardianIds.includes(a.id)}
+                    <input type="checkbox" className="size-5 accent-black" checked={guardianIds.includes(a.id)}
                       onChange={(e) => setGuardianIds((g) => (e.target.checked ? [...g, a.id] : g.filter((x) => x !== a.id)))} />
                     {a.name}
                   </label>
@@ -102,10 +102,10 @@ export function InviteSheet({ admins, smsReady, existing, trigger }: {
               </fieldset>
             ) : null}
             <fieldset className="space-y-2">
-              <legend className="text-sm font-medium">Send the invite by</legend>
-              <label className="flex h-10 items-center gap-3 text-[15px]"><input type="checkbox" className="size-5 accent-accent" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} disabled={!email} /> Email {email ? "" : "(add an email)"}</label>
-              <label className="flex h-10 items-center gap-3 text-[15px]"><input type="checkbox" className="size-5 accent-accent" checked={sendSms} onChange={(e) => setSendSms(e.target.checked)} disabled={!phone || !smsReady} /> Text message {!smsReady ? "(SMS not connected yet)" : phone ? "" : "(add a number)"}</label>
-              <p className="text-sm text-muted">You&apos;ll always get a link to copy or share yourself.</p>
+              <legend className="mono tracking-[0.14em] text-graphite">Send the invite by</legend>
+              <label className="flex h-10 items-center gap-3 text-[15px]"><input type="checkbox" className="size-5 accent-black" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} disabled={!email} /> Email {email ? "" : "(add an email)"}</label>
+              <label className="flex h-10 items-center gap-3 text-[15px]"><input type="checkbox" className="size-5 accent-black" checked={sendSms} onChange={(e) => setSendSms(e.target.checked)} disabled={!phone || !smsReady} /> Text message {!smsReady ? "(SMS not connected yet)" : phone ? "" : "(add a number)"}</label>
+              <p className="text-[13px] leading-snug text-graphite">You&apos;ll always get a link to copy or share yourself.</p>
             </fieldset>
             <Button type="submit" className="w-full" disabled={pending || !name}>{pending ? "Creating…" : "Create invite"}</Button>
           </form>

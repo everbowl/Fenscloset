@@ -1,0 +1,48 @@
+/** Dev-only: seeds the e2e DB with items, drives the app on :3100, screenshots every Phase 1 screen. */
+import { chromium, devices } from "@playwright/test";
+import { execSync } from "node:child_process";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import sharp from "sharp";
+const out = process.argv[2];
+const env = { ...process.env, DATABASE_URL: "postgresql://postgres@localhost:5433/fenscloset_e2e", DEV_MODE: "true", SEED_FORCE: "true", MOCK_S3: "true" };
+execSync(`psql -h localhost -p 5433 -U postgres -d fenscloset_e2e -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'`, { stdio: "ignore" });
+execSync("npx prisma migrate deploy && npx tsx prisma/seed.ts && npx tsx e2e/set-password.ts jeff@everbowl.com closet-rocks-2026 && npx tsx e2e/seed-items.ts", { stdio: "ignore", env });
+const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || undefined });
+const ctx = await browser.newContext({ ...devices["iPhone 15"] });
+const page = await ctx.newPage();
+const base = "http://localhost:3100";
+await page.goto(base + "/login");
+await page.getByLabel("Email").fill("jeff@everbowl.com"); await page.getByLabel("Password").fill("closet-rocks-2026");
+await page.getByRole("button", { name: "Sign in" }).click(); await page.waitForURL(/today/);
+await page.goto(base + "/closet"); await page.waitForTimeout(500); await page.screenshot({ path: `${out}/02-closet.png` });
+await page.getByTestId("item-card").first().click(); await page.waitForTimeout(500); await page.screenshot({ path: `${out}/06-item-detail.png`, fullPage: true });
+await page.getByTestId("row-category").click(); await page.waitForTimeout(300); await page.screenshot({ path: `${out}/07-item-row-picker.png` });
+await page.keyboard.press("Escape");
+await page.getByRole("button", { name: /Jeff menu/ }).click(); await page.waitForTimeout(300); await page.screenshot({ path: `${out}/08-person-switcher.png` });
+await page.keyboard.press("Escape");
+await page.goto(base + "/add"); await page.waitForTimeout(500); await page.screenshot({ path: `${out}/03a-add-pick.png` });
+const dir = mkdtempSync(path.join(os.tmpdir(), "fc-shots-"));
+const files = [];
+for (const [i, rgb] of [[20, 20, 20], [200, 30, 30], [30, 60, 200]].entries()) {
+  const [r, g, b] = rgb;
+  const buf = await sharp({ create: { width: 800, height: 1100, channels: 3, background: { r, g, b } } }).composite([{ input: await sharp({ create: { width: 800, height: 300, channels: 3, background: { r: 255, g: 255, b: 255 } } }).png().toBuffer(), top: i * 250, left: 0 }]).jpeg().toBuffer();
+  const p = path.join(dir, `piece-${i + 1}.jpg`); writeFileSync(p, buf); files.push(p);
+}
+await page.getByTestId("pick-photos").setInputFiles(files);
+await page.waitForTimeout(400); await page.screenshot({ path: `${out}/03b-add-progress.png` });
+await page.getByRole("link", { name: /Confirm 3 ready/ }).waitFor({ timeout: 30000 }); await page.screenshot({ path: `${out}/03c-add-ready.png` });
+await page.getByRole("link", { name: /Confirm 3 ready/ }).click(); await page.getByTestId("confirm-counter").waitFor(); await page.waitForTimeout(500);
+await page.screenshot({ path: `${out}/03d-confirm.png` });
+await page.getByTestId("row-colour").click(); await page.waitForTimeout(300); await page.screenshot({ path: `${out}/03e-confirm-colour-picker.png` });
+await page.keyboard.press("Escape");
+await page.getByTestId("confirm-next").click(); await page.waitForTimeout(800);
+await page.getByTestId("confirm-next").click(); await page.waitForTimeout(800);
+await page.getByTestId("confirm-next").click(); await page.waitForTimeout(800);
+await page.screenshot({ path: `${out}/03f-all-done.png` });
+await page.goto(base + "/closet"); await page.waitForTimeout(500); await page.screenshot({ path: `${out}/02b-closet-after-add.png` });
+await page.getByRole("button", { name: /Jeff menu/ }).click(); await page.getByRole("option", { name: "Family closet" }).click(); await page.waitForTimeout(800);
+await page.goto(base + "/closet"); await page.waitForTimeout(500); await page.screenshot({ path: `${out}/02c-family-closet.png` });
+await browser.close();
+console.log("done");

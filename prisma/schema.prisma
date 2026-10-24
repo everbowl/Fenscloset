@@ -30,6 +30,12 @@ model Person {
   birthdate          DateTime?
   avatarKey          String?
   savedZip           String?
+  /** Virtual try-on (adults only; never minors): on by default (Jeff, 19 Oct 2026: "no limitations or controls"), off in Settings for anyone who wants it off. Sends the person's body photo and garment images to the try-on provider. */
+  tryOnEnabled       Boolean      @default(true)
+  /** "Don't show again" on the Add clothes photo tips. */
+  addTipsHidden      Boolean      @default(false)
+  /** The mirror's last pose and "how clothes show" choices ({ poseId, options: { [groupId]: optionId } }), so the next look opens the way the person left it. */
+  mirrorPrefs        Json?
   passwordHash       String?
   mustChangePassword Boolean      @default(false)
   devPasswordActive  Boolean      @default(false)
@@ -38,13 +44,44 @@ model Person {
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
-  sessions       Session[]
-  resetTokens    PasswordResetToken[]
-  invitesCreated InviteToken[]
-  guardians      GuardianLink[]       @relation("minorGuardians")
-  wards          GuardianLink[]       @relation("parentWards")
-  closets        Closet[]
-  items          Item[]
+  sessions           Session[]
+  resetTokens        PasswordResetToken[]
+  invitesCreated     InviteToken[]
+  guardians          GuardianLink[]           @relation("minorGuardians")
+  wards              GuardianLink[]           @relation("parentWards")
+  closets            Closet[]
+  items              Item[]
+  sharedItems        ItemShare[]
+  importBatches      ImportBatch[]
+  bodyProfile        BodyProfile?
+  measurements       BodyMeasurement[]
+  sizesByBrand       BodySizeByBrand[]
+  bodyPhotos         BodyPhoto[]
+  lovedColors        Color[]                  @relation("lovedColors")
+  avoidColors        Color[]                  @relation("avoidColors")
+  styleWords         StyleWord[]
+  favoriteBrands     Brand[]                  @relation("favoriteBrands")
+  favoriteStores     Store[]                  @relation("favoriteStores")
+  bodyGrantsGiven    BodyDataGrant[]          @relation("bodyGrantOwner")
+  bodyGrantsReceived BodyDataGrant[]          @relation("bodyGrantViewer")
+  shopGrantsGiven    ShopForGrant[]           @relation("shopGrantOwner")
+  shopGrantsReceived ShopForGrant[]           @relation("shopGrantShopper")
+  bodyImageApproval  MinorBodyImageApproval?  @relation("approvalMinor")
+  approvalsGiven     MinorBodyImageApproval[] @relation("approvalParent")
+  checkIns           CheckIn[]
+  outfitSuggestions  OutfitSuggestion[]
+  lookFeedback       LookFeedback[]
+  inspirationLooks   InspirationLook[]
+  tryOns             TryOn[]
+  wearLogs           WearLog[]
+  fits               Fit[]
+  fitViews           FitViewer[]
+  togetherPeople     TogetherPerson[]
+  togetherCreated    TogetherSession[]
+  googleCalendar     GoogleCalendarConnection?
+  dayPlans           DayPlan[]
+  shopLookups        ShoppingLookup[] @relation("shopper")
+  shopLookupsFor     ShoppingLookup[] @relation("shopTarget")
 }
 
 model Session {
@@ -107,8 +144,11 @@ model Category {
   name          String
   sortOrder     Int           @default(0)
   isArchived    Boolean       @default(false)
+  /** How to photograph this kind of piece, shown on Add clothes and in Help. Admins edit it under Lists. */
+  photoTip      String?
   createdAt     DateTime      @default(now())
   subcategories Subcategory[]
+  sizes         SizeOption[]
   items         Item[]
 
   @@unique([name])
@@ -127,6 +167,22 @@ model Subcategory {
   @@unique([categoryId, name])
 }
 
+/**
+ * Editable list: the sizes offered for a category when someone records their size in a brand
+ * (Tops XS–XXL, Bottoms by waist, Shoes in half sizes…). Jeff, 18 Oct 2026: size by item type.
+ */
+model SizeOption {
+  id         String   @id @default(cuid())
+  name       String
+  categoryId String
+  sortOrder  Int      @default(0)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, name])
+}
+
 model Color {
   id         String   @id @default(cuid())
   name       String   @unique
@@ -134,6 +190,9 @@ model Color {
   sortOrder  Int      @default(0)
   isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
+  items      Item[]
+  lovedBy    Person[] @relation("lovedColors")
+  avoidedBy  Person[] @relation("avoidColors")
 }
 
 model Pattern {
@@ -142,6 +201,7 @@ model Pattern {
   sortOrder  Int      @default(0)
   isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
+  items      Item[]
 }
 
 model Fabric {
@@ -150,6 +210,7 @@ model Fabric {
   sortOrder  Int      @default(0)
   isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
+  items      Item[]
 }
 
 model Season {
@@ -158,6 +219,7 @@ model Season {
   sortOrder  Int      @default(0)
   isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
+  items      Item[]
 }
 
 model FormalityLevel {
@@ -166,6 +228,7 @@ model FormalityLevel {
   sortOrder  Int      @default(0)
   isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
+  items      Item[]
 }
 
 model Occasion {
@@ -174,6 +237,10 @@ model Occasion {
   sortOrder  Int      @default(0)
   isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
+  items      Item[]
+  fits       Fit[]
+  togetherSessions TogetherSession[]
+  dayPlans   DayPlan[]
 }
 
 model Tag {
@@ -182,14 +249,20 @@ model Tag {
   sortOrder  Int      @default(0)
   isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
+  items      Item[]
 }
 
 model Brand {
-  id         String   @id @default(cuid())
-  name       String   @unique
-  sortOrder  Int      @default(0)
-  isArchived Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  id         String            @id @default(cuid())
+  name       String            @unique
+  /// The brand's store page, filled in once by anyone in the family; new pieces of the brand get it as their link.
+  url        String?
+  sortOrder  Int               @default(0)
+  isArchived Boolean           @default(false)
+  createdAt  DateTime          @default(now())
+  items      Item[]
+  favoredBy  Person[]          @relation("favoriteBrands")
+  sizes      BodySizeByBrand[]
 }
 
 model Store {
@@ -199,6 +272,8 @@ model Store {
   sortOrder  Int      @default(0)
   isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
+  items      Item[]
+  favoredBy  Person[] @relation("favoriteStores")
 }
 
 enum ClosetKind {
@@ -208,14 +283,14 @@ enum ClosetKind {
 }
 
 model Closet {
-  id         String     @id @default(cuid())
+  id         String       @id @default(cuid())
   name       String
-  kind       ClosetKind @default(custom)
+  kind       ClosetKind   @default(custom)
   ownerId    String?
-  sortOrder  Int        @default(0)
-  isArchived Boolean    @default(false)
-  createdAt  DateTime   @default(now())
-  owner      Person?    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  sortOrder  Int          @default(0)
+  isArchived Boolean      @default(false)
+  createdAt  DateTime     @default(now())
+  owner      Person?      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   items      ItemCloset[]
 
   @@index([ownerId])
@@ -228,6 +303,7 @@ model CheckInScale {
   isArchived Boolean         @default(false)
   createdAt  DateTime        @default(now())
   options    CheckInOption[]
+  answers    CheckInAnswer[]
 }
 
 model CheckInOption {
@@ -238,6 +314,7 @@ model CheckInOption {
   isArchived Boolean      @default(false)
   createdAt  DateTime     @default(now())
   scale      CheckInScale @relation(fields: [scaleId], references: [id], onDelete: Cascade)
+  answers    CheckInAnswer[]
 
   @@unique([scaleId, name])
 }
@@ -250,21 +327,69 @@ model Rule {
   updatedAt   DateTime @updatedAt
 }
 
-// ---------- Items (Phase 0 stub; expanded in Phase 1) ----------
+// ---------- Items ----------
+
+enum LaundryStatus {
+  clean
+  dirty
+  cleaners
+}
 
 model Item {
-  id            String       @id @default(cuid())
+  id            String        @id @default(cuid())
   ownerId       String
   categoryId    String?
   subcategoryId String?
+  brandId       String?
+  storeId       String?
   name          String?
-  createdAt     DateTime     @default(now())
-  owner         Person       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  category      Category?    @relation(fields: [categoryId], references: [id])
-  subcategory   Subcategory? @relation(fields: [subcategoryId], references: [id])
+  size          String?
+  fitNotes      String?
+  purchasePrice Decimal?      @db.Decimal(10, 2)
+  purchaseDate  DateTime?
+  purchaseUrl   String?
+  isFavorite    Boolean       @default(false)
+  laundryStatus LaundryStatus @default(clean)
+  neverSuggest  Boolean       @default(false)
+  wearCount     Int           @default(0)
+  /// The photo of record is the store product shot, not the person own photo.
+  storePhoto    Boolean       @default(false)
+  /// wearCount when the person last answered a photo nudge (add one / not now).
+  photoNudgedAt Int?
+  lastWornAt    DateTime?
+  phash         String?
+  aiConfidence  Json?
+  /** Retired from the closet by the clean-out (donated / sold); kept for history. */
+  retiredAt     DateTime?
+  retiredReason String?
+  /** KEEP on the clean-out screen hides the item from the list until this date. */
+  cleanOutSnoozedUntil DateTime?
+  /** How the piece is made, from the tagger or the person: button_front, zip_front, long_sleeve, hood, collar (src/lib/tryon/styling.ts). The mirror's "how clothes show" chips key off these. */
+  features      String[]      @default([])
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  owner         Person           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  category      Category?        @relation(fields: [categoryId], references: [id])
+  subcategory   Subcategory?     @relation(fields: [subcategoryId], references: [id])
+  brand         Brand?           @relation(fields: [brandId], references: [id])
+  store         Store?           @relation(fields: [storeId], references: [id])
+  colors        Color[]
+  patterns      Pattern[]
+  fabrics       Fabric[]
+  seasons       Season[]
+  formalities   FormalityLevel[]
+  occasions     Occasion[]
+  tags          Tag[]
+  photos        ItemPhoto[]
   closets       ItemCloset[]
+  shares        ItemShare[]
+  importEntries ImportEntry[]
+  wearLogs      WearLog[]
+  fitItems      FitItem[]
 
   @@index([ownerId])
+  @@index([ownerId, phash])
 }
 
 model ItemCloset {
@@ -274,4 +399,528 @@ model ItemCloset {
   closet   Closet @relation(fields: [closetId], references: [id], onDelete: Cascade)
 
   @@id([itemId, closetId])
+}
+
+enum PhotoKind {
+  alone
+  worn
+  label
+  cutout
+  thumb
+  back
+  /// A store's product photo found by the style match: shown behind the person's own photos, never the main one when a real photo exists.
+  retail
+}
+
+model ItemPhoto {
+  id        String    @id @default(cuid())
+  itemId    String
+  kind      PhotoKind
+  bucketKey String    @unique
+  width     Int?
+  height    Int?
+  isPrimary Boolean   @default(false)
+  /** The person chose this photo for the mirror (try-on and mannequin), over whatever the app would pick. */
+  forMirror Boolean   @default(false)
+  /** The whole-garment check (src/lib/tryon/garment-check.ts): true = the full piece shows, false = cut off / folded / partial; null = not checked yet. */
+  wholeGarment Boolean?
+  createdAt DateTime  @default(now())
+  item      Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId])
+}
+
+/**
+ * Item shared with a specific person outside the Family closet.
+ */
+model ItemShare {
+  itemId   String
+  personId String
+  item     Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, personId])
+}
+
+// ---------- Import batches (add-clothes queue) ----------
+
+enum BatchStatus {
+  open
+  done
+}
+
+enum EntryStatus {
+  queued
+  uploaded
+  processing
+  needs_confirm
+  done
+  failed
+  skipped
+}
+
+model ImportBatch {
+  id        String        @id @default(cuid())
+  personId  String
+  status    BatchStatus   @default(open)
+  total     Int           @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  person    Person        @relation(fields: [personId], references: [id], onDelete: Cascade)
+  entries   ImportEntry[]
+
+  @@index([personId, status])
+}
+
+model ImportEntry {
+  id          String      @id @default(cuid())
+  batchId     String
+  order       Int
+  originalKey String
+  status      EntryStatus @default(queued)
+  cutoutKey   String?
+  thumbKey    String?
+  labelKey    String?
+  wornKey     String?
+  backKey     String?
+  /// Store product photos from the style match on the card, copied onto the item as `retail` photos.
+  retailKeys  String[]    @default([])
+  /// Set when the piece came from a store link or a receipt: name, brand, price, url, store, color, size, purchaseDate.
+  storeMeta   Json?
+  phash       String?
+  aiResult    Json?
+  error       String?
+  itemId      String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  batch       ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  item        Item?       @relation(fields: [itemId], references: [id], onDelete: SetNull)
+
+  @@index([batchId, status])
+}
+
+// ---------- Profiles & privacy (Phase 2) ----------
+
+/**
+ * Editable list: what a body profile measures (Height, Waist, Shoe size…).
+ */
+model MeasurementKind {
+  id           String            @id @default(cuid())
+  name         String            @unique
+  unit         String            @default("")
+  sortOrder    Int               @default(0)
+  isArchived   Boolean           @default(false)
+  createdAt    DateTime          @default(now())
+  measurements BodyMeasurement[]
+}
+
+/**
+ * Editable list: style words a person picks for their style profile.
+ */
+model StyleWord {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  sortOrder  Int      @default(0)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  people     Person[]
+}
+
+model BodyProfile {
+  personId  String   @id
+  fitNotes  String?
+  updatedAt DateTime @updatedAt
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+}
+
+model BodyMeasurement {
+  personId  String
+  kindId    String
+  value     String
+  updatedAt DateTime        @updatedAt
+  person    Person          @relation(fields: [personId], references: [id], onDelete: Cascade)
+  kind      MeasurementKind @relation(fields: [kindId], references: [id], onDelete: Cascade)
+
+  @@id([personId, kindId])
+}
+
+model BodySizeByBrand {
+  id         String   @id @default(cuid())
+  personId   String
+  brandId    String
+  categoryId String?
+  size       String
+  updatedAt  DateTime @updatedAt
+  person     Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  brand      Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@index([personId])
+}
+
+/// Which way the person faces in a body photo: front for the mirror, side for shape, back for how a piece fits from behind.
+enum BodyView {
+  front
+  back
+  left
+  right
+  /// older photos taken before left and right were separate
+  side
+}
+
+model BodyPhoto {
+  id        String   @id @default(cuid())
+  personId  String
+  bucketKey String   @unique
+  view      BodyView @default(front)
+  /** Locked to the owner: nobody else sees it, the AI may still use it to dress the owner. */
+  onlyMe    Boolean  @default(false)
+  takenAt   DateTime @default(now())
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([personId])
+}
+
+/**
+ * Owner lets a viewer see their body profile.
+ */
+model BodyDataGrant {
+  ownerId  String
+  viewerId String
+  owner    Person @relation("bodyGrantOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  viewer   Person @relation("bodyGrantViewer", fields: [viewerId], references: [id], onDelete: Cascade)
+
+  @@id([ownerId, viewerId])
+}
+
+/**
+ * Owner lets a shopper shop on their behalf. Parents are implicit shoppers for minors.
+ */
+model ShopForGrant {
+  ownerId   String
+  shopperId String
+  owner     Person @relation("shopGrantOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  shopper   Person @relation("shopGrantShopper", fields: [shopperId], references: [id], onDelete: Cascade)
+
+  @@id([ownerId, shopperId])
+}
+
+/**
+ * A parent admin approved body photos for a minor.
+ */
+model MinorBodyImageApproval {
+  minorId      String   @id
+  approvedById String
+  approvedAt   DateTime @default(now())
+  minor        Person   @relation("approvalMinor", fields: [minorId], references: [id], onDelete: Cascade)
+  approvedBy   Person   @relation("approvalParent", fields: [approvedById], references: [id], onDelete: Cascade)
+}
+
+// ---------- Daily (Phase 3) ----------
+
+enum CheckInSource {
+  taps
+  selfie
+}
+
+/** One check-in per person per local day (YYYY-MM-DD). Answers reference the editable scales/options. */
+model CheckIn {
+  id        String        @id @default(cuid())
+  personId  String
+  date      String
+  source    CheckInSource @default(taps)
+  /** `checkins/<personId>/…` — seen by the owner (and a minor's parents) only. */
+  selfieKey String?       @unique
+  createdAt DateTime      @default(now())
+  person    Person        @relation(fields: [personId], references: [id], onDelete: Cascade)
+  answers   CheckInAnswer[]
+
+  @@unique([personId, date])
+}
+
+model CheckInAnswer {
+  checkInId String
+  scaleId   String
+  optionId  String
+  checkIn   CheckIn       @relation(fields: [checkInId], references: [id], onDelete: Cascade)
+  scale     CheckInScale  @relation(fields: [scaleId], references: [id], onDelete: Cascade)
+  option    CheckInOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@id([checkInId, scaleId])
+}
+
+enum TogetherMode {
+  coordinate
+  match
+  contrast
+}
+
+model TogetherSession {
+  id           String       @id @default(cuid())
+  mode         TogetherMode
+  occasionId   String?
+  occasionText String?
+  createdById  String
+  date         String
+  createdAt    DateTime     @default(now())
+  createdBy    Person       @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  occasion     Occasion?    @relation(fields: [occasionId], references: [id])
+  people       TogetherPerson[]
+  suggestions  OutfitSuggestion[]
+}
+
+model TogetherPerson {
+  sessionId String
+  personId  String
+  session   TogetherSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  person    Person          @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@id([sessionId, personId])
+}
+
+/** The looks shown to one person for one day: inputs (weather, plan, check-in) and the boards with reasons. */
+model OutfitSuggestion {
+  id                String           @id @default(cuid())
+  personId          String
+  date              String
+  inputs            Json
+  outfits           Json
+  togetherSessionId String?
+  createdAt         DateTime         @default(now())
+  person            Person           @relation(fields: [personId], references: [id], onDelete: Cascade)
+  togetherSession   TogetherSession? @relation(fields: [togetherSessionId], references: [id], onDelete: SetNull)
+  fits              Fit[]
+
+  @@index([personId, date])
+}
+
+enum FitRating {
+  loved
+  fine
+  never_again
+}
+
+/// Inspiration board: looks a person saved as "this is how I want to look". Claude reads each one into style DNA.
+model InspirationLook {
+  id        String   @id @default(cuid())
+  personId  String
+  /** `inspo/<personId>/…` */
+  bucketKey String   @unique
+  notes     Json
+  createdAt DateTime @default(now())
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([personId, createdAt])
+}
+
+/// A generated picture of the person wearing a look. Owner-only; adults only. Cached per person + pieces + body photo.
+model TryOn {
+  id           String   @id @default(cuid())
+  personId     String
+  /** `tryon/<personId>/…` */
+  bucketKey    String   @unique
+  itemIds      String[] @default([])
+  bodyPhotoKey String
+  source       String
+  /** Who dressed it: google or fashn on a body photo, gemini for the mannequin. Pictures are cached per engine. */
+  engine       String   @default("google")
+  /** The pose and wear choices this picture was styled with (src/lib/tryon/styling.ts stylingKey); null is the raw try-on before any styling. */
+  styling      String?
+  /** What the render check still saw wrong after a second dressing (src/lib/tryon/garment-check.ts), shown under the picture; null when the picture passed. */
+  note         String?
+  createdAt    DateTime @default(now())
+  person       Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([personId, createdAt])
+}
+
+/// Taste memory: what a person actually chose when looks were offered. Feeds every later suggestion.
+enum LookFeedbackKind {
+  worn
+  passed
+  swapped_out
+  swapped_in
+}
+
+model LookFeedback {
+  id        String           @id @default(cuid())
+  personId  String
+  date      String
+  kind      LookFeedbackKind
+  itemIds   String[]         @default([])
+  itemId    String?
+  createdAt DateTime         @default(now())
+  person    Person           @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([personId, createdAt])
+}
+
+model WearLog {
+  id        String   @id @default(cuid())
+  personId  String
+  itemId    String
+  wornOn    String
+  fitId     String?
+  createdAt DateTime @default(now())
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  fit       Fit?     @relation(fields: [fitId], references: [id], onDelete: SetNull)
+
+  @@index([personId, wornOn])
+  @@index([itemId, wornOn])
+}
+
+/** A worn look on the Fits calendar: pieces, optional photo of the night, who may see it. */
+model Fit {
+  id                 String   @id @default(cuid())
+  personId           String
+  date               String
+  title              String
+  occasionId         String?
+  /** `fits/<personId>/…` */
+  photoKey           String?  @unique
+  outfitSuggestionId String?
+  /** "How did it go?" the day after: feeds taste memory. */
+  rating             FitRating?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  person             Person            @relation(fields: [personId], references: [id], onDelete: Cascade)
+  occasion           Occasion?         @relation(fields: [occasionId], references: [id])
+  outfitSuggestion   OutfitSuggestion? @relation(fields: [outfitSuggestionId], references: [id], onDelete: SetNull)
+  items              FitItem[]
+  viewers            FitViewer[]
+  wearLogs           WearLog[]
+
+  @@index([personId, date])
+}
+
+model FitItem {
+  fitId     String
+  itemId    String
+  sortOrder Int    @default(0)
+  fit       Fit    @relation(fields: [fitId], references: [id], onDelete: Cascade)
+  item      Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@id([fitId, itemId])
+}
+
+/** People tagged on a fit; they (plus the owner and a minor's parents) can see it. */
+model FitViewer {
+  fitId    String
+  personId String
+  fit      Fit    @relation(fields: [fitId], references: [id], onDelete: Cascade)
+  person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@id([fitId, personId])
+}
+
+model GoogleCalendarConnection {
+  personId     String   @id
+  email        String?
+  /** Encrypted with SESSION_SECRET; never shown. */
+  refreshToken String
+  calendarIds  String[] @default([])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  person       Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+}
+
+model WeatherCache {
+  key       String   @id
+  payload   Json
+  fetchedAt DateTime @default(now())
+}
+
+/** The plan a person picked for a day (overrides the calendar): an occasion from the list, or free text. */
+model DayPlan {
+  personId   String
+  date       String
+  occasionId String?
+  text       String?
+  updatedAt  DateTime  @updatedAt
+  person     Person    @relation(fields: [personId], references: [id], onDelete: Cascade)
+  occasion   Occasion? @relation(fields: [occasionId], references: [id], onDelete: SetNull)
+
+  @@id([personId, date])
+}
+
+// ---------- Shopping (Phase 4) ----------
+
+enum ShopSource {
+  link
+  screenshot
+  photo
+}
+
+/** One "should I buy this?" lookup: the candidate piece, who it is for, and what the app said. */
+model ShoppingLookup {
+  id              String     @id @default(cuid())
+  shopperId       String
+  forPersonId     String
+  source          ShopSource
+  inputUrl        String?
+  /** `shop/<shopperId>/…` — the screenshot / dressing-room photo, or the store image we fetched. */
+  imageKey        String?
+  title           String?
+  priceText       String?
+  brandText       String?
+  verdict         Json
+  similarItemIds  String[]   @default([])
+  pairings        Json
+  recommendations Json
+  products        Json       @default("[]")
+  createdAt       DateTime   @default(now())
+  shopper         Person     @relation("shopper", fields: [shopperId], references: [id], onDelete: Cascade)
+  forPerson       Person     @relation("shopTarget", fields: [forPersonId], references: [id], onDelete: Cascade)
+
+  @@index([shopperId, createdAt])
+  @@index([forPersonId, createdAt])
+}
+
+/// Additive seed sets (size options, measurement kinds, tips…) applied once per database, so a list
+/// that grew after the family started still fills in, and a row an admin later deleted is never re-created.
+model SeedSet {
+  name      String   @id
+  appliedAt DateTime @default(now())
+}
+
+/**
+ * Editable lists behind the mirror's styling chips (Jeff, 19 Oct 2026: "don't default to tucking it in;
+ * give me options on pose and how the clothes will show"). The first active entry in each list is the
+ * default. `prompt` is what the artist is told; blank means nothing needs changing.
+ */
+model MirrorPose {
+  id         String   @id @default(cuid())
+  name       String
+  prompt     String   @default("")
+  sortOrder  Int      @default(0)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@unique([name])
+}
+
+/** A way clothes can show (Tuck, Buttons, Sleeves…). `needs` lists the item features every look must have for the group to be offered, space-separated; blank = always. */
+model WearGroup {
+  id         String       @id @default(cuid())
+  name       String
+  needs      String       @default("")
+  sortOrder  Int          @default(0)
+  isArchived Boolean      @default(false)
+  createdAt  DateTime     @default(now())
+  options    WearOption[]
+
+  @@unique([name])
+}
+
+model WearOption {
+  id         String    @id @default(cuid())
+  name       String
+  prompt     String    @default("")
+  groupId    String
+  sortOrder  Int       @default(0)
+  isArchived Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  group      WearGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, name])
 }

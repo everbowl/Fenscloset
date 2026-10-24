@@ -1,11 +1,10 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { getPerson, listPeople } from "@/lib/people/service";
 import { smsConfigured } from "@/lib/sms";
 import { requireAdmin } from "@/lib/auth/current";
 import { PersonEditor } from "./person-editor";
+import { bodyPhotosAllowed } from "@/lib/people/visibility";
 
 export default async function PersonPage({ params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin();
@@ -13,11 +12,11 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
   const person = await getPerson(id);
   if (!person || person.status === "removed") notFound();
   const admins = (await listPeople()).filter((p) => p.role === "admin").map((p) => ({ id: p.id, name: p.name }));
+  const bodyPhotos = person.role === "minor" ? await bodyPhotosAllowed(person.id) : null;
   return (
     <div>
-      <Link href="/admin/people" className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-foreground"><ChevronLeft className="size-4" /> People</Link>
       <PageHeader title={person.name} />
-      <PersonEditor person={person} admins={admins} smsReady={smsConfigured()} isSelf={person.id === admin.id} />
+      <PersonEditor person={person} admins={admins} smsReady={smsConfigured()} isSelf={person.id === admin.id} bodyPhotos={bodyPhotos ? { allowed: bodyPhotos.allowed, approvedBy: bodyPhotos.approvedBy ?? null, isParent: person.guardianIds.includes(admin.id) } : null} />
     </div>
   );
 }

@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Item" ADD COLUMN     "lastWornAt" TIMESTAMP(3),
+ADD COLUMN     "wearCount" INTEGER NOT NULL DEFAULT 0;
+

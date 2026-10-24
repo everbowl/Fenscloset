@@ -1,14 +1,13 @@
-import { PageHeader } from "@/components/ui/page-header";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Camera } from "lucide-react";
+import { AddScreen } from "./add-screen";
+import { PhotoTips } from "./photo-tips";
+import { isAdmin, requirePerson } from "@/lib/auth/current";
+import { getAddTips } from "@/lib/tips";
 
-export const metadata = { title: "Add" };
+export const metadata = { title: "Add clothes" };
+export const dynamic = "force-dynamic";
 
-export default function AddPage() {
-  return (
-    <div>
-      <PageHeader title="Add clothes" />
-      <EmptyState icon={<Camera className="size-8" />} title="Coming in Phase 1" body="Pick a batch of photos, and the app will cut out backgrounds and tag each item for you." />
-    </div>
-  );
+export default async function AddPage() {
+  const me = await requirePerson();
+  const tips = await getAddTips(me.id);
+  return <AddScreen tips={<PhotoTips tips={tips} isAdmin={isAdmin(me)} />} />;
 }

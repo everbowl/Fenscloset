@@ -1,8 +1,8 @@
 "use client";
 
-import { Archive, ArchiveRestore, ArrowDown, ArrowUp, Check, Pencil, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowDown, ArrowUp, GripVertical, Pencil, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Banner } from "@/components/ui/banner";
@@ -26,6 +26,45 @@ export function ListEditor({ kind, entries: initial, parentId }: { kind: ListKin
 
   const active = entries.filter((e) => !e.isArchived);
   const archived = entries.filter((e) => e.isArchived);
+  // Find in a long list (the brand catalog is ~190 rows); moving is off while a filter is on, since positions would not line up.
+  const [q, setQ] = useState("");
+  const filtering = q.trim().length > 0;
+  const shown = filtering ? active.filter((e) => e.name.toLowerCase().includes(q.trim().toLowerCase())) : active;
+
+  // Drag to reorder (Jeff, 19 Oct 2026): press the grip, move, let go. Pointer events, so it works with a finger too.
+  const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const [drag, setDrag] = useState<{ from: number; to: number; dy: number; h: number } | null>(null);
+  const dragStart = useRef<{ y: number; from: number; h: number; to: number } | null>(null); // `to` lives in the ref too: pointerup can land before React re-renders with the latest state
+  function onGripDown(e: React.PointerEvent<HTMLButtonElement>, i: number) {
+    if (filtering) return;
+    const h = rowRefs.current[i]?.getBoundingClientRect().height ?? 48;
+    dragStart.current = { y: e.clientY, from: i, h, to: i };
+    (e.currentTarget as HTMLButtonElement).setPointerCapture(e.pointerId);
+    setDrag({ from: i, to: i, dy: 0, h });
+  }
+  function onGripMove(e: React.PointerEvent<HTMLButtonElement>) {
+    const st = dragStart.current; if (!st) return;
+    const dy = e.clientY - st.y;
+    const to = Math.max(0, Math.min(active.length - 1, st.from + Math.round(dy / st.h)));
+    st.to = to;
+    setDrag({ from: st.from, to, dy, h: st.h });
+  }
+  function onGripUp() {
+    const st = dragStart.current; dragStart.current = null; setDrag(null);
+    if (!st || st.to === st.from) return;
+    const next = [...active]; const [row] = next.splice(st.from, 1); next.splice(st.to, 0, row);
+    const reordered = next.map((e, i) => ({ ...e, sortOrder: i }));
+    setEntries([...reordered, ...archived]);
+    start(async () => { const res = await reorderEntriesAction(kind, reordered.map((e) => e.id)); if (!res.ok) setError(res.error); });
+  }
+  /** Where a row sits while something is being dragged: the dragged row follows the finger, the rows it passes slide out of the way. */
+  function dragStyle(i: number): React.CSSProperties | undefined {
+    if (!drag) return undefined;
+    if (i === drag.from) return { transform: `translateY(${drag.dy}px)`, zIndex: 10, position: "relative", background: "var(--color-paper)", boxShadow: "0 0 0 1px var(--color-ink)" };
+    if (drag.to > drag.from && i > drag.from && i <= drag.to) return { transform: `translateY(-${drag.h}px)`, transition: "transform 120ms" };
+    if (drag.to < drag.from && i >= drag.to && i < drag.from) return { transform: `translateY(${drag.h}px)`, transition: "transform 120ms" };
+    return { transition: "transform 120ms" };
+  }
 
   function patch(updated: ListEntry) {
     setEntries((list) => list.map((e) => (e.id === updated.id ? updated : e)));
@@ -53,7 +92,7 @@ export function ListEditor({ kind, entries: initial, parentId }: { kind: ListKin
     });
   }
 
-  function saveEdit(values: { name: string; hex?: string; url?: string }) {
+  function saveEdit(values: { name: string; hex?: string; url?: string; photoTip?: string; prompt?: string; needs?: string }) {
     if (!editing) return;
     start(async () => {
       const res = await updateEntryAction(kind, editing.id, values);
@@ -78,28 +117,37 @@ export function ListEditor({ kind, entries: initial, parentId }: { kind: ListKin
     <div className="space-y-4">
       {error ? <Banner tone="danger">{error}</Banner> : null}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted">{active.length} {active.length === 1 ? def.singular : def.label.toLowerCase()}</p>
+        <p className="mono mono-11 text-graphite">{active.length} {active.length === 1 ? def.singular : def.label.toLowerCase()}</p>
         <InlineAdd kind={kind} parentId={parentId} variant="primary" size="sm" onCreated={(e) => { setEntries((l) => [...l, e]); router.refresh(); }} />
       </div>
 
-      <Card className="divide-y divide-border p-0">
-        {active.length === 0 ? <p className="px-4 py-6 text-center text-sm text-muted">Nothing here yet. Add the first one.</p> : null}
-        {active.map((entry, i) => (
-          <div key={entry.id} className={cn("flex items-center gap-2 px-3 py-2", pending && "opacity-70")}>
-            {entry.hex ? <span className="size-6 shrink-0 rounded-full border border-border" style={{ background: entry.hex }} aria-hidden /> : null}
+      {active.length > 12 ? <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Find a ${def.singular}…`} aria-label={`Find a ${def.singular}`} data-testid="list-filter" /> : null}
+      {filtering ? <p className="mono text-graphite">{shown.length} of {active.length} · clear the search to move rows</p> : null}
+
+      <Card className="divide-y divide-line border-x-0 border-b-0 border-t border-ink p-0">
+        {active.length === 0 ? <p className="mono py-6 text-center text-graphite">Nothing here yet · add the first one</p> : null}
+        {shown.map((entry, i) => (
+          <div key={entry.id} ref={(el) => { rowRefs.current[i] = el; }} style={dragStyle(i)} className={cn("flex items-center gap-1 py-1", pending && "opacity-70")} data-testid={`list-row-${entry.id}`}>
+            {!filtering ? (
+              <button type="button" aria-label={`Drag ${entry.name}`} title="Drag to reorder" onPointerDown={(e) => onGripDown(e, i)} onPointerMove={onGripMove} onPointerUp={onGripUp} onPointerCancel={onGripUp}
+                className="flex size-10 shrink-0 cursor-grab touch-none items-center justify-center text-graphite active:cursor-grabbing" data-testid={`grip-${entry.id}`}>
+                <GripVertical className="size-4" strokeWidth={1.6} />
+              </button>
+            ) : null}
+            {entry.hex ? <span className="size-6 shrink-0 border border-line" style={{ background: entry.hex }} aria-hidden /> : null}
             <button type="button" onClick={() => setEditing(entry)} className="flex min-w-0 flex-1 items-center gap-2 py-2 text-left">
               <span className="truncate text-[15px]">{entry.name}</span>
-              {entry.closetKind && entry.closetKind !== "custom" ? <span className="rounded-md bg-stone-100 px-1.5 py-0.5 text-[11px] uppercase tracking-wide text-muted">{entry.closetKind}</span> : null}
-              {entry.url ? <span className="truncate text-xs text-muted">{entry.url.replace(/^https?:\/\//, "")}</span> : null}
-              <Pencil className="ml-auto size-4 shrink-0 text-stone-400" aria-hidden />
+              {entry.closetKind && entry.closetKind !== "custom" ? <span className="mono text-graphite">{entry.closetKind}</span> : null}
+              {entry.url ? <span className="mono truncate normal-case text-graphite">{entry.url.replace(/^https?:\/\//, "")}</span> : null}
+              <Pencil className="ml-auto size-3.5 shrink-0 text-graphite" strokeWidth={1.6} aria-hidden />
             </button>
             <div className="flex shrink-0 items-center">
-              <IconBtn label="Move up" disabled={i === 0} onClick={() => move(entry, -1)}><ArrowUp className="size-4" /></IconBtn>
-              <IconBtn label="Move down" disabled={i === active.length - 1} onClick={() => move(entry, 1)}><ArrowDown className="size-4" /></IconBtn>
+              <IconBtn label="Move up" disabled={filtering || i === 0} onClick={() => move(entry, -1)}><ArrowUp className="size-4" strokeWidth={1.6} /></IconBtn>
+              <IconBtn label="Move down" disabled={filtering || i === active.length - 1} onClick={() => move(entry, 1)}><ArrowDown className="size-4" strokeWidth={1.6} /></IconBtn>
               {!protectedCloset(entry) ? (
                 <>
-                  <IconBtn label="Archive" onClick={() => toggleArchive(entry)}><Archive className="size-4" /></IconBtn>
-                  <IconBtn label="Delete" onClick={() => setConfirmDelete(entry)} danger><Trash2 className="size-4" /></IconBtn>
+                  <IconBtn label="Archive" onClick={() => toggleArchive(entry)}><Archive className="size-4" strokeWidth={1.6} /></IconBtn>
+                  <IconBtn label="Delete" onClick={() => setConfirmDelete(entry)} danger><Trash2 className="size-4" strokeWidth={1.6} /></IconBtn>
                 </>
               ) : null}
             </div>
@@ -109,13 +157,13 @@ export function ListEditor({ kind, entries: initial, parentId }: { kind: ListKin
 
       {archived.length > 0 ? (
         <details className="group">
-          <summary className="cursor-pointer select-none text-sm font-medium text-muted">Archived ({archived.length})</summary>
-          <Card className="mt-2 divide-y divide-border p-0">
+          <summary className="mono mono-11 cursor-pointer select-none text-graphite">Archived ({archived.length})</summary>
+          <Card className="mt-2 divide-y divide-line border-x-0 border-b-0 border-t border-ink p-0">
             {archived.map((entry) => (
-              <div key={entry.id} className="flex items-center gap-2 px-3 py-2 text-muted">
+              <div key={entry.id} className="flex items-center gap-2 py-1 text-graphite">
                 <span className="flex-1 truncate py-2 text-[15px] line-through">{entry.name}</span>
                 <IconBtn label="Restore" onClick={() => toggleArchive(entry)}><ArchiveRestore className="size-4" /></IconBtn>
-                <IconBtn label="Delete" onClick={() => setConfirmDelete(entry)} danger><Trash2 className="size-4" /></IconBtn>
+                <IconBtn label="Delete" onClick={() => setConfirmDelete(entry)} danger><Trash2 className="size-4" strokeWidth={1.6} /></IconBtn>
               </div>
             ))}
           </Card>
@@ -127,10 +175,10 @@ export function ListEditor({ kind, entries: initial, parentId }: { kind: ListKin
       </Sheet>
 
       <Sheet open={!!confirmDelete} onClose={() => setConfirmDelete(null)} title={`Delete “${confirmDelete?.name}”?`}>
-        <p className="text-sm text-muted">This can&apos;t be undone. If anything still uses it, the app will stop you and suggest archiving instead.</p>
+        <p className="text-[14px] leading-snug text-graphite">This can&apos;t be undone. If anything still uses it, the app will stop you and suggest archiving instead.</p>
         <div className="mt-5 flex gap-2">
-          <Button variant="secondary" className="flex-1" onClick={() => setConfirmDelete(null)}><X className="size-4" /> Keep</Button>
-          <Button variant="danger" className="flex-1" onClick={doDelete} disabled={pending}><Trash2 className="size-4" /> Delete</Button>
+          <Button variant="secondary" className="flex-1" onClick={() => setConfirmDelete(null)}>Keep</Button>
+          <Button variant="danger" className="flex-1" onClick={doDelete} disabled={pending}><Trash2 className="size-4" strokeWidth={1.6} /> Delete</Button>
         </div>
       </Sheet>
     </div>
@@ -140,24 +188,24 @@ export function ListEditor({ kind, entries: initial, parentId }: { kind: ListKin
 function IconBtn({ label, onClick, disabled, danger, children }: { label: string; onClick: () => void; disabled?: boolean; danger?: boolean; children: React.ReactNode }) {
   return (
     <button type="button" aria-label={label} title={label} onClick={onClick} disabled={disabled}
-      className={cn("flex size-10 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-100 disabled:opacity-30", danger && "hover:bg-red-50 hover:text-danger")}>
+      className={cn("flex size-10 items-center justify-center text-graphite hover:text-ink disabled:opacity-30", danger && "hover:text-ink")}>
       {children}
     </button>
   );
 }
 
-function EditForm({ entry, kind, onSave, pending }: { entry: ListEntry; kind: ListKind; onSave: (v: { name: string; hex?: string; url?: string }) => void; pending: boolean }) {
+function EditForm({ entry, kind, onSave, pending }: { entry: ListEntry; kind: ListKind; onSave: (v: { name: string; hex?: string; url?: string; photoTip?: string; prompt?: string; needs?: string }) => void; pending: boolean }) {
   const def = LIST_DEFS[kind];
   const [name, setName] = useState(entry.name);
-  const [extra, setExtra] = useState<{ hex?: string; url?: string }>({ hex: entry.hex, url: entry.url ?? "" });
+  const [extra, setExtra] = useState<{ hex?: string; url?: string; photoTip?: string; prompt?: string; needs?: string }>({ hex: entry.hex, url: entry.url ?? "", photoTip: entry.photoTip ?? "", prompt: entry.prompt ?? "", needs: entry.needs ?? "" });
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSave({ name, ...extra }); }} className="space-y-4">
       <div className="space-y-1.5">
-        <label htmlFor="edit-name" className="block text-sm font-medium">Name</label>
+        <label htmlFor="edit-name" className="mono tracking-[0.14em] text-graphite">Name</label>
         <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} autoFocus required maxLength={60} />
       </div>
       <EntryExtraFields fields={def.extraFields} values={extra} onChange={(p) => setExtra((x) => ({ ...x, ...p }))} />
-      <Button type="submit" className="w-full" disabled={pending}><Check className="size-4" /> Save</Button>
+      <Button type="submit" className="w-full" disabled={pending}>Save</Button>
     </form>
   );
 }

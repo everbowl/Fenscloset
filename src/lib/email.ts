@@ -30,9 +30,9 @@ export function appUrl(path: string): string {
 /** Minimal, mobile-friendly transactional template. */
 export function renderEmail({ heading, body, cta }: { heading: string; body: string; cta?: { label: string; url: string } }) {
   const button = cta
-    ? `<p style="margin:24px 0"><a href="${cta.url}" style="display:inline-block;background:#b45309;color:#fff;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600">${cta.label}</a></p><p style="color:#78716c;font-size:13px">Or copy this link: ${cta.url}</p>`
+    ? `<p style="margin:24px 0"><a href="${cta.url}" style="display:inline-block;background:#000;color:#fff;text-decoration:none;padding:14px 22px;font-family:Menlo,Consolas,monospace;font-size:12px;letter-spacing:0.16em;text-transform:uppercase">${cta.label}</a></p><p style="color:#6b6b6b;font-size:12px">Or copy this link: ${cta.url}</p>`
     : "";
-  const html = `<!doctype html><html><body style="margin:0;background:#faf8f5;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#1c1917"><div style="max-width:480px;margin:0 auto;padding:32px 20px"><p style="font-size:14px;color:#78716c;margin:0 0 16px">Fen's Closet</p><h1 style="font-size:22px;margin:0 0 12px">${heading}</h1><p style="font-size:16px;line-height:1.5;margin:0">${body}</p>${button}</div></body></html>`;
+  const html = `<!doctype html><html><body style="margin:0;background:#f2f0eb;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#000"><div style="max-width:480px;margin:0 auto;padding:32px 20px"><p style="font-family:Menlo,Consolas,monospace;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#000;margin:0 0 20px">Fen's Closet</p><h1 style="font-family:Georgia,serif;font-weight:400;font-size:28px;margin:0 0 12px">${heading}</h1><p style="font-size:16px;line-height:1.5;margin:0">${body}</p>${button}</div></body></html>`;
   const text = `${heading}\n\n${body}${cta ? `\n\n${cta.label}: ${cta.url}` : ""}`;
   return { html, text };
 }

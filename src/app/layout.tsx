@@ -1,19 +1,23 @@
 import type { Metadata, Viewport } from "next";
-import { Geist } from "next/font/google";
+import "@fontsource-variable/archivo/wdth.css";
+import "@fontsource/instrument-serif/400.css";
+import "@fontsource/instrument-serif/400-italic.css";
+import "@fontsource/ibm-plex-mono/400.css";
+import "@fontsource/ibm-plex-mono/500.css";
 import "./globals.css";
-
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
+import { ImportQueueProvider } from "@/components/import-queue-provider";
 
 export const metadata: Metadata = {
   title: { default: "Fen's Closet", template: "%s · Fen's Closet" },
-  description: "Our family closet.",
+  description: "The family wardrobe.",
   applicationName: "Fen's Closet",
   appleWebApp: { capable: true, statusBarStyle: "default", title: "Fen's Closet" },
   manifest: "/manifest.webmanifest",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#faf8f5",
+  colorScheme: "light",
+  themeColor: "#ffffff",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -21,8 +25,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geistSans.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="en" className="h-full antialiased">
+      <body className="min-h-full flex flex-col"><ImportQueueProvider>{children}</ImportQueueProvider></body>
     </html>
   );
 }

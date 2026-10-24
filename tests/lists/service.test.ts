@@ -10,7 +10,7 @@ describe("editable lists", () => {
 
   it("creates, renames, archives and deletes entries of every simple kind", async () => {
     for (const kind of LIST_KINDS) {
-      const parentId = kind === "subcategory" ? (await listEntries("category"))[0].id : kind === "checkInOption" ? (await listEntries("checkInScale"))[0].id : undefined;
+      const parentId = kind === "subcategory" || kind === "size" ? (await listEntries("category"))[0].id : kind === "checkInOption" ? (await listEntries("checkInScale"))[0].id : kind === "wearOption" ? (await listEntries("wearGroup"))[0].id : undefined;
       const made = await createEntry(kind, { name: "  Zed  thing ", parentId, hex: "#123abc" });
       expect(made.name).toBe("Zed thing");
       if (kind === "color") expect(made.hex).toBe("#123ABC");
@@ -23,6 +23,20 @@ describe("editable lists", () => {
       await deleteEntry(kind, made.id);
       expect((await listEntries(kind, { parentId, includeArchived: true })).some((e) => e.id === made.id)).toBe(false);
     }
+  });
+
+  it("mirror lists carry a note for the artist and what a group needs, tidied", async () => {
+    const pose = await createEntry("mirrorPose", { name: "Leaning", prompt: "  leaning  against\n the wall " });
+    expect(pose.prompt).toBe("leaning against the wall");
+    expect((await updateEntry("mirrorPose", pose.id, { prompt: "" })).prompt).toBe("");
+    const group = await createEntry("wearGroup", { name: "Zip", needs: " Zip_Front, OUTER! " });
+    expect(group.needs).toBe("zip_front outer");
+    const option = await createEntry("wearOption", { name: "Half zipped", parentId: group.id, prompt: "zipped halfway" });
+    expect(option).toMatchObject({ parentId: group.id, prompt: "zipped halfway" });
+    await expect(deleteEntry("wearGroup", group.id)).rejects.toMatchObject({ name: "InUseError", count: 1 }); // its option still uses it
+    await deleteEntry("wearOption", option.id);
+    await deleteEntry("wearGroup", group.id);
+    expect((await countAll()).wearGroup).toBe(7);
   });
 
   it("rejects blanks, duplicates, bad swatches and missing parents", async () => {
@@ -42,6 +56,23 @@ describe("editable lists", () => {
     await expect(deleteEntry("closet", custom.id)).rejects.toBeInstanceOf(InUseError);
     await db.itemCloset.deleteMany();
     await deleteEntry("closet", custom.id);
+  });
+
+  it("blocks deleting a color, brand, season or tag an item wears", async () => {
+    const jeff = await db.person.findUniqueOrThrow({ where: { email: "jeff@everbowl.com" } });
+    const black = (await listEntries("color")).find((c) => c.name === "Black")!;
+    const nike = (await listEntries("brand")).find((b) => b.name === "Nike")!;
+    const summer = (await listEntries("season")).find((s) => s.name === "Summer")!;
+    const tag = await createEntry("tag", { name: "Beach" });
+    const item = await db.item.create({
+      data: { ownerId: jeff.id, name: "Black tee", brandId: nike.id, colors: { connect: { id: black.id } }, seasons: { connect: { id: summer.id } }, tags: { connect: { id: tag.id } } },
+    });
+    await expect(deleteEntry("color", black.id)).rejects.toMatchObject({ name: "InUseError", count: 1 });
+    await expect(deleteEntry("brand", nike.id)).rejects.toBeInstanceOf(InUseError);
+    await expect(deleteEntry("season", summer.id)).rejects.toBeInstanceOf(InUseError);
+    await expect(deleteEntry("tag", tag.id)).rejects.toBeInstanceOf(InUseError);
+    await db.item.delete({ where: { id: item.id } });
+    await deleteEntry("tag", tag.id);
   });
 
   it("protects personal and Family closets from delete/archive", async () => {

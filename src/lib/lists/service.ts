@@ -9,12 +9,19 @@ export type ListEntry = {
   parentId?: string | null;
   hex?: string;
   url?: string | null;
+  unit?: string;
+  /** categories only: how to photograph this kind of piece */
+  photoTip?: string | null;
+  /** mirror poses and wear options: what the artist is told to change */
+  prompt?: string;
+  /** wear groups: the item features a look must have for the group to show */
+  needs?: string;
   /** closets only */
   closetKind?: "personal" | "family" | "custom";
   ownerId?: string | null;
 };
 
-export type EntryInput = { name: string; parentId?: string | null; hex?: string; url?: string | null };
+export type EntryInput = { name: string; parentId?: string | null; hex?: string; url?: string | null; unit?: string; photoTip?: string | null; prompt?: string; needs?: string };
 
 export class InUseError extends Error {
   constructor(public readonly count: number, public readonly what: string) {
@@ -59,7 +66,11 @@ function toEntry(kind: ListKind, row: AnyRow): ListEntry {
     isArchived: row.isArchived as boolean,
     parentId: def.parent ? (row[def.parent.field] as string) : undefined,
     hex: typeof row.hex === "string" ? row.hex : undefined,
+    photoTip: kind === "category" ? ((row.photoTip as string | null) ?? null) : undefined,
     url: kind === "store" ? ((row.url as string | null) ?? null) : undefined,
+    unit: kind === "measurementKind" ? ((row.unit as string) ?? "") : undefined,
+    prompt: kind === "mirrorPose" || kind === "wearOption" ? ((row.prompt as string) ?? "") : undefined,
+    needs: kind === "wearGroup" ? ((row.needs as string) ?? "") : undefined,
     closetKind: kind === "closet" ? (row.kind as ListEntry["closetKind"]) : undefined,
     ownerId: kind === "closet" ? ((row.ownerId as string | null) ?? null) : undefined,
   };
@@ -81,6 +92,10 @@ function extraData(kind: ListKind, input: EntryInput, forCreate: boolean): AnyRo
       data.hex = hex.toUpperCase();
     }
   }
+  if (kind === "measurementKind" && input.unit !== undefined) data.unit = (input.unit ?? "").trim().slice(0, 12);
+  if ((kind === "mirrorPose" || kind === "wearOption") && input.prompt !== undefined) data.prompt = (input.prompt ?? "").trim().replace(/\s+/g, " ").slice(0, 300);
+  if (kind === "wearGroup" && input.needs !== undefined) data.needs = (input.needs ?? "").trim().toLowerCase().replace(/[^a-z_ ]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+  if (kind === "category" && input.photoTip !== undefined) { const tip = (input.photoTip ?? "").trim().slice(0, 160); data.photoTip = tip || null; }
   if (kind === "store" && input.url !== undefined) {
     const url = (input.url ?? "").trim();
     data.url = url ? (url.startsWith("http") ? url : `https://${url}`) : null;
@@ -93,8 +108,21 @@ export async function inUseCount(kind: ListKind, id: string): Promise<{ count: n
   switch (kind) {
     case "category": return { count: await db.item.count({ where: { categoryId: id } }), what: "items" };
     case "subcategory": return { count: await db.item.count({ where: { subcategoryId: id } }), what: "items" };
+    case "brand": return { count: await db.item.count({ where: { brandId: id } }), what: "items" };
+    case "store": return { count: await db.item.count({ where: { storeId: id } }), what: "items" };
+    case "color": return { count: await db.item.count({ where: { colors: { some: { id } } } }), what: "items" };
+    case "pattern": return { count: await db.item.count({ where: { patterns: { some: { id } } } }), what: "items" };
+    case "fabric": return { count: await db.item.count({ where: { fabrics: { some: { id } } } }), what: "items" };
+    case "season": return { count: await db.item.count({ where: { seasons: { some: { id } } } }), what: "items" };
+    case "formality": return { count: await db.item.count({ where: { formalities: { some: { id } } } }), what: "items" };
+    case "occasion": return { count: await db.item.count({ where: { occasions: { some: { id } } } }), what: "items" };
+    case "tag": return { count: await db.item.count({ where: { tags: { some: { id } } } }), what: "items" };
+    case "measurementKind": return { count: await db.bodyMeasurement.count({ where: { kindId: id } }), what: "profiles" };
+    case "styleWord": return { count: await db.person.count({ where: { styleWords: { some: { id } } } }), what: "profiles" };
     case "closet": return { count: await db.itemCloset.count({ where: { closetId: id } }), what: "items" };
     case "checkInScale": return { count: await db.checkInOption.count({ where: { scaleId: id } }), what: "options" };
+    case "wearGroup": return { count: await db.wearOption.count({ where: { groupId: id } }), what: "options" };
+    case "size": { const o = await db.sizeOption.findUnique({ where: { id } }); return { count: o ? await db.bodySizeByBrand.count({ where: { categoryId: o.categoryId, size: o.name } }) : 0, what: "profiles" }; }
     default: return { count: 0, what: "items" };
   }
 }
