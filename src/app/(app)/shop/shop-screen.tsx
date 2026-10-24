@@ -19,7 +19,7 @@ const CALL_WORD = { FITS: "Fits · buy it", RISKY: "Risky · maybe", PASS: "Pass
 /** How often the screen asks after a lookup that is still running. */
 const POLL_MS = 2000;
 
-export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn, mannequin, autoLink = null }: { meId: string; people: { id: string; name: string }[]; forPersonId: string; selected: LookupView | null; recent: LookupView[]; tryOn: TryOnState; /** SEE IT ON dresses the shared mannequin when the person's own try-on is not ready. */ mannequin: boolean; /** A store link to judge as soon as the page opens ("Judge it" from a piece's go-with page). */ autoLink?: string | null }) {
+export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn, mannequin, autoLink = null, lookingFor }: { meId: string; people: { id: string; name: string }[]; forPersonId: string; selected: LookupView | null; recent: LookupView[]; tryOn: TryOnState; /** SEE IT ON dresses the shared mannequin when the person's own try-on is not ready. */ mannequin: boolean; /** A store link to judge as soon as the page opens ("Judge it" from a piece's go-with page). */ autoLink?: string | null; /** The person's Looking-for list: how many lines are open and how many matches are new. */ lookingFor: { wants: number; newMatches: number } }) {
   const router = useRouter();
   const [, start] = useTransition();
   const [busy, setBusy] = useState<"link" | "photo" | "delete" | "tryon" | null>(null);
@@ -105,6 +105,14 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
           <Button variant="secondary" className="h-[54px] px-2 text-[11px]" disabled={thinking} onClick={() => { setSource("photo"); file.current?.setAttribute("capture", "environment"); file.current?.click(); }} data-testid="take-photo">Take a photo</Button>
         </div>
         <input ref={file} type="file" accept="image/*" className="hidden" onChange={onFile} data-testid="shop-file" />
+        {/* Shop v2 item 2 (Jeff, 23 Oct 2026): "state what I'm looking for so the shopping tool lets me know". */}
+        <Link href={`/shop/looking-for?for=${forPersonId}`} className="mt-2 flex items-center justify-between border border-ink px-4 py-3 hover:bg-bone" data-testid="looking-for-link">
+          <span className="flex min-w-0 flex-col gap-0.5">
+            <span className="serif text-[22px]">Looking for <em>something?</em></span>
+            <span className={cn("mono", lookingFor.newMatches ? "text-ink" : "text-graphite")} data-testid="looking-for-line">{lookingFor.newMatches ? `${lookingFor.newMatches} new ${lookingFor.newMatches === 1 ? "match" : "matches"} · ${lookingFor.wants} on the list` : lookingFor.wants ? `${lookingFor.wants} on the list · nothing new yet` : "Tell the Shop what to find; it checks the stores every day"}</span>
+          </span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden className="shrink-0"><path d="M4 12h16M14 6l6 6-6 6" /></svg>
+        </Link>
         {thinking ? (
           <div className="mt-3" data-testid="shop-thinking" aria-live="polite">
             <p className="mono flex items-center justify-between gap-3 text-ink"><span>{progress?.step ?? "Looking at it…"}</span><span className="shrink-0 text-graphite">{secs}s</span></p>

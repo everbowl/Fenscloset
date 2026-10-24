@@ -84,6 +84,8 @@ model Person {
   shopLookupsFor     ShoppingLookup[] @relation("shopTarget")
   goWithFor          GoWith[]         @relation("goWithFor")
   goWithAsked        GoWith[]         @relation("goWithAskedBy")
+  wantsFor           Want[]           @relation("wantFor")
+  wantsAsked         Want[]           @relation("wantAskedBy")
 }
 
 model Session {
@@ -879,6 +881,40 @@ model GoWith {
 
   @@index([itemId, createdAt])
   @@index([forPersonId, createdAt])
+}
+
+/**
+ * "Looking for" (Jeff, 23 Oct 2026, Shop v2 item 2): one line a person typed about something they want to buy.
+ * Claude turns it into store searches; the stores are searched when it is added and again on a schedule
+ * (Admin → Rules, wantSweepHours); every product not seen before is a match, counted as new until the person
+ * opens the list. "Found it" keeps the row but retires it.
+ */
+model Want {
+  id             String    @id @default(cuid())
+  /** Whose list it is on: their stores and brands rank the matches. */
+  forPersonId    String
+  askedById      String
+  /** What the person typed, as they typed it. */
+  text           String
+  /** The searches Claude wrote for it; never sizes or measurements. */
+  queries        String[]  @default([])
+  /** Claude's read of the category, for the row. */
+  category       String?
+  /** A price cap the person stated, in whole dollars; matches above it are left out. */
+  maxPrice       Int?
+  /** Products found so far, newest first: Product & { firstSeenAt }. */
+  matches        Json      @default("[]")
+  /** Matches found since the person last opened this want. */
+  newCount       Int       @default(0)
+  lastSearchedAt DateTime?
+  seenAt         DateTime?
+  foundAt        DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  forPerson      Person    @relation("wantFor", fields: [forPersonId], references: [id], onDelete: Cascade)
+  askedBy        Person    @relation("wantAskedBy", fields: [askedById], references: [id], onDelete: Cascade)
+
+  @@index([forPersonId, foundAt, createdAt])
 }
 
 /** One "should I buy this?" lookup: the candidate piece, who it is for, and what the app said. */

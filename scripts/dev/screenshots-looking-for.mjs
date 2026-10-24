@@ -1,0 +1,28 @@
+/** Dev-only: the Looking-for list (Shop v2 item 2): the Shop's link, the empty list, a line added and searched, Today's strip, the matches page, found. App on :3100 with the mock env (WANTS_ON_START=false). */
+import { chromium, devices } from "@playwright/test";
+import { execSync } from "node:child_process";
+const out = process.argv[2];
+const env = { ...process.env, DATABASE_URL: "postgresql://postgres@localhost:5433/fenscloset_e2e", DEV_MODE: "true", SEED_FORCE: "true", MOCK_S3: "true" };
+execSync(`psql -h localhost -p 5433 -U postgres -d fenscloset_e2e -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'`, { stdio: "ignore" });
+execSync("npx prisma migrate deploy && npx tsx prisma/seed.ts && npx tsx e2e/set-password.ts jeff@everbowl.com closet-rocks-2026 && npx tsx e2e/seed-closets.ts Jeff", { stdio: "ignore", env });
+const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || undefined });
+const ctx = await browser.newContext({ ...devices["iPhone 15"] });
+const page = await ctx.newPage();
+const base = "http://localhost:3100";
+const shot = async (name, full = false) => { await page.waitForTimeout(500); await page.screenshot({ path: `${out}/${name}.png`, fullPage: full }); };
+await page.goto(base + "/login");
+await page.getByLabel("Email").fill("jeff@everbowl.com"); await page.getByLabel("Password").fill("closet-rocks-2026");
+await page.getByRole("button", { name: "Sign in" }).click(); await page.waitForURL(/today/);
+await page.goto(base + "/shop"); await page.getByTestId("looking-for-link").waitFor(); await shot("01-shop-looking-for-link");
+await page.getByTestId("looking-for-link").click(); await page.getByTestId("looking-for-empty").waitFor(); await shot("02-looking-for-empty");
+await page.getByTestId("want-add").click(); await page.getByTestId("want-text").fill("navy cashmere crewneck under $100"); await shot("03-add-sheet");
+await page.getByTestId("want-save").click(); await page.getByTestId("want-new").waitFor({ timeout: 30000 });
+await page.getByTestId("want-add").click(); await page.getByTestId("want-text").fill("white leather sneakers"); await page.getByTestId("want-save").click();
+await page.getByTestId("want-row").nth(1).waitFor({ timeout: 30000 }); await page.waitForTimeout(2500); await shot("04-list-two-lines");
+await page.goto(base + "/shop"); await page.getByTestId("looking-for-line").waitFor(); await shot("05-shop-line");
+await page.goto(base + "/today"); await page.getByTestId("looking-for-strip").waitFor(); await page.getByTestId("looking-for-strip").scrollIntoViewIfNeeded(); await shot("06-today-strip");
+await page.goto(base + "/shop/looking-for"); await page.getByTestId("want-row").first().click(); await page.getByTestId("want-matches").waitFor(); await shot("07-matches-new", true);
+await page.getByTestId("want-found").click(); await page.getByTestId("want-unfound").waitFor(); await shot("08-found");
+await page.getByTestId("want-back").click(); await page.getByTestId("found-row").waitFor(); await shot("09-list-with-found");
+await browser.close();
+console.log("shots done");

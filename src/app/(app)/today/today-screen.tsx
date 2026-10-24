@@ -31,6 +31,8 @@ type Props = {
   /** No looks for today yet: the screen asks for them in the background as soon as it opens. */
   needsLooks: boolean;
   enoughClothes: boolean; cleanOutCount: number;
+  /** New matches waiting on the person's Looking-for list (Shop v2 item 2); 0 keeps Today quiet. */
+  lookingForNew: number;
   /** The most recent fit (last 7 days) with no "how did it go?" answer yet. */
   unrated: { id: string; date: string; title: string } | null;
   /** Whether TRY IT ON is offered: ready, or why not (off → Settings link; no_photo → Body page link). Hidden for minors and others' closets. */
@@ -274,6 +276,16 @@ export function TodayScreen(p: Props) {
         </span>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden><path d="M4 12h16M14 6l6 6-6 6" /></svg>
       </Link>
+
+      {p.lookingForNew > 0 ? (
+        <Link href={`/shop/looking-for?for=${p.personId}`} className="mt-3 flex items-center justify-between border border-ink px-4 py-3.5 hover:bg-bone lg:col-start-2" data-testid="looking-for-strip">
+          <span className="flex flex-col gap-0.5">
+            <span className="serif text-[22px]">Something <em>turned up</em></span>
+            <span className="mono text-ink">{p.lookingForNew} new {p.lookingForNew === 1 ? "match" : "matches"} for what {p.mine ? "you’re" : `${p.personName} is`} looking for</span>
+          </span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden><path d="M4 12h16M14 6l6 6-6 6" /></svg>
+        </Link>
+      ) : null}
 
       {p.cleanOutCount > 0 && p.canDress ? (
         <Link href="/closet/clean-out" className="mt-3 flex items-center justify-between border border-ink px-4 py-3.5 hover:bg-bone lg:col-start-2" data-testid="clean-out-link">

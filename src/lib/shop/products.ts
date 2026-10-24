@@ -42,12 +42,12 @@ export function mockProducts(query: string): RawShopping[] {
   }));
 }
 
-/** One Serper Shopping call (or the mock), cached for a day per query. */
-async function fetchQuery(query: string, fetchImpl: typeof fetch): Promise<RawShopping[]> {
+/** One Serper Shopping call (or the mock), cached per query for a day, or for `maxAgeHours` when the caller wants it fresher. */
+async function fetchQuery(query: string, fetchImpl: typeof fetch, maxAgeHours = CACHE_HOURS): Promise<RawShopping[]> {
   if (process.env.MOCK_SERPER === "true") return mockProducts(query);
   const key = `shop:q:${createHash("sha1").update(query.toLowerCase()).digest("hex")}`;
   const hit = await db.weatherCache.findUnique({ where: { key } });
-  if (hit && Date.now() - hit.fetchedAt.getTime() < CACHE_HOURS * 3600 * 1000) return hit.payload as RawShopping[];
+  if (hit && Date.now() - hit.fetchedAt.getTime() < maxAgeHours * 3600 * 1000) return hit.payload as RawShopping[];
   const res = await fetchImpl("https://google.serper.dev/shopping", {
     method: "POST",
     headers: { "X-API-KEY": process.env.SERPER_API_KEY ?? "", "Content-Type": "application/json" },
@@ -80,15 +80,22 @@ export function rankProducts(products: Product[], prefs: ProductPrefs): Product[
   return products.map((p, i) => ({ p, i, s: score(p) })).sort((a, b) => b.s - a.s || a.i - b.i).map((x) => x.p);
 }
 
+export type SearchOptions = {
+  /** Reuse a cached answer up to this old (default a day). The Looking-for sweep asks for fresher so a new arrival is seen. */
+  maxAgeHours?: number;
+  /** Return up to this many (default MAX_PRODUCTS). */
+  limit?: number;
+};
+
 /**
  * Run each query, interleave the results so every query (and so several retailers) gets a turn,
  * drop duplicates, rank by the person's preferences, and cap the row.
  */
-export async function searchProducts(queries: string[], prefs: ProductPrefs, fetchImpl: typeof fetch = fetch): Promise<Product[]> {
+export async function searchProducts(queries: string[], prefs: ProductPrefs, fetchImpl: typeof fetch = fetch, opts: SearchOptions = {}): Promise<Product[]> {
   const qs = [...new Set(queries.map((q) => q.replace(/\s+/g, " ").trim()).filter(Boolean))].slice(0, 3);
   if (!qs.length || !isProductSearchConfigured()) return [];
   const lists = await Promise.all(qs.map(async (q) => {
-    try { return (await fetchQuery(q, fetchImpl)).map((r) => normalizeProduct(r, q)).filter((p): p is Product => Boolean(p)); }
+    try { return (await fetchQuery(q, fetchImpl, opts.maxAgeHours)).map((r) => normalizeProduct(r, q)).filter((p): p is Product => Boolean(p)); }
     catch (e) { console.error("product search failed", q, e); return []; }
   }));
   const merged: Product[] = [];
@@ -99,7 +106,14 @@ export async function searchProducts(queries: string[], prefs: ProductPrefs, fet
       if (p && !seen.has(p.url)) { seen.add(p.url); merged.push(p); }
     }
   }
-  return rankProducts(merged, prefs).slice(0, MAX_PRODUCTS);
+  return rankProducts(merged, prefs).slice(0, opts.limit ?? MAX_PRODUCTS);
+}
+
+/** The dollars in a price label ("$128.00", "128 USD"), or null when there is no number. */
+export function priceDollars(priceText: string | null | undefined): number | null {
+  if (!priceText) return null;
+  const m = priceText.replace(/,/g, "").match(/(\d+(?:\.\d+)?)/);
+  return m ? Number(m[1]) : null;
 }
 
 export type WebHit = { title: string; link: string };
