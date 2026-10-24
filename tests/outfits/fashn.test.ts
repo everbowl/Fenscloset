@@ -36,7 +36,7 @@ describe("FASHN try-on client", () => {
     expect(out.mimeType).toBe("image/jpeg");
     expect(calls[0].method).toBe("POST");
     expect(calls[0].headers.Authorization).toBe("Bearer test-key");
-    expect(calls[0].body).toMatchObject({ model_name: "tryon-v1.6", inputs: { category: "tops", mode: "balanced", garment_photo_type: "auto", moderation_level: "permissive", segmentation_free: true, output_format: "jpeg", return_base64: true } });
+    expect(calls[0].body).toMatchObject({ model_name: "tryon-v1.6", inputs: { category: "tops", mode: "quality", garment_photo_type: "auto", moderation_level: "permissive", segmentation_free: true, output_format: "jpeg", return_base64: true } });
     expect((calls[0].body!.inputs as { model_image: string }).model_image).toMatch(/^data:image\/jpeg;base64,/);
     expect(calls.filter((c) => c.url.endsWith("/status/job-1")).length).toBe(3);
   });

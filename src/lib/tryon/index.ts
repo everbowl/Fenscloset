@@ -5,7 +5,7 @@ import { googleTryOn, isGoogleTryOnConfigured, TryOnModelError } from "@/lib/try
 import { fashnCategory, fashnTryOn, FashnError, isFashnConfigured } from "@/lib/tryon/fashn";
 import { ENGINE_RULE_KEY, ENGINE_WORD, engineRuleOf, resolveEngines, type Engine, type EngineRule } from "@/lib/tryon/engines";
 import { getRuleText } from "@/lib/rules";
-import { googleImage } from "@/lib/images/google-image";
+import { googleImage, googleImageOnHold } from "@/lib/images/google-image";
 import { checkRender, checkWholeGarment, isGarmentCheckAvailable } from "@/lib/tryon/garment-check";
 import { loadPrefs, loadStylingLists, lookFeatures, resolveStyling, savePrefs, stylingPrompt, type Styling, type StylingChoice, type StylingLists } from "@/lib/tryon/styling";
 import { MIRROR_CATEGORIES } from "@/lib/tryon/features";
@@ -250,7 +250,11 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
     let note: string | null = null;
     step("Checking the picture…");
     const verdict = await renderVerdict(person, dressed);
-    if (!verdict.ok) {
+    if (!verdict.ok && process.env.MOCK_TRYON !== "true" && googleImageOnHold()) {
+      // Google's image model is out of quota: no second dressing, the try-on's picture stays with the check's word under it.
+      note = `The mirror isn’t sure about this one: ${verdict.problem}`;
+      console.log(`tryon: render check: ${verdict.problem}; Google’s image model is out of quota, no second dressing`);
+    } else if (!verdict.ok) {
       console.log(`tryon: render check: ${verdict.problem}; dressing again with the image model`);
       step("Dressing again…");
       try {
@@ -269,6 +273,7 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
   }
   if (!styling.instructions.length) return pack(raw, rawCached);
   // The styling pass: pose and wear choices on the dressed picture. If it fails, the plain try-on is shown.
+  if (process.env.MOCK_TRYON !== "true" && googleImageOnHold()) { console.log("tryon: styling skipped, Google’s image model is out of quota"); return pack(raw, rawCached, true); }
   let styledBuf: Buffer;
   step(`Styling · ${styling.summary}`);
   try {

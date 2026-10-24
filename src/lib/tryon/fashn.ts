@@ -9,7 +9,7 @@ import { fetchWithBackoff } from "@/lib/tryon/google";
  * line as Google's. Minors never reach this call (src/lib/tryon/index.ts assertReady). Env, all in Railway:
  *   FASHN_API_KEY            the key from https://app.fashn.ai (API)
  *   FASHN_MODEL              default tryon-v1.6
- *   FASHN_MODE               performance | balanced | quality, default balanced
+ *   FASHN_MODE               performance | balanced | quality, default quality (Jeff, 23 Oct 2026: quality over speed)
  *   FASHN_MODERATION         conservative | permissive | none, default permissive
  *   FASHN_SEGMENTATION_FREE  default true; "false" dresses by detected clothing only, like Google
  * MOCK_FASHN=true pastes the garment on instead, warmer than Google's mock so a comparison shows two pictures.
@@ -82,7 +82,7 @@ export async function fashnTryOn(person: Buffer, garment: Buffer, category: Fash
       model_image: dataUri(person, "image/jpeg"),
       garment_image: dataUri(garment, "image/jpeg"),
       category,
-      mode: process.env.FASHN_MODE || "balanced",
+      mode: process.env.FASHN_MODE || "quality",
       garment_photo_type: "auto",
       moderation_level: process.env.FASHN_MODERATION || "permissive",
       segmentation_free: process.env.FASHN_SEGMENTATION_FREE !== "false",
