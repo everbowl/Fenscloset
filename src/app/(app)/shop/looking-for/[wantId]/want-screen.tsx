@@ -90,7 +90,7 @@ export function WantScreen({ meId, want }: { meId: string; want: WantView }) {
                 <p className="mt-2 line-clamp-2 text-[13px] font-medium leading-snug">{p.title}</p>
                 <p className="mono mt-1 text-graphite">{[p.priceText, p.storeName].filter(Boolean).join(" · ")}</p>
                 <div className="mt-2 flex flex-col gap-1.5">
-                  <a href={p.url} target="_blank" rel="noreferrer" className="pill pill-sm w-full">Buy →</a>
+                  <a href={p.url} target="_blank" rel="noreferrer" className="pill pill-sm w-full" aria-label={`Buy ${p.title} at ${p.storeName}`}>Buy ↗</a>
                   <button type="button" onClick={() => router.push(`/shop?for=${want.forPersonId}&link=${encodeURIComponent(p.url)}`)} className="pill pill-sm pill-solid w-full" data-testid="want-judge">Judge it</button>
                 </div>
               </div>

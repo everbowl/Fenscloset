@@ -67,14 +67,20 @@ html, body {
   background: var(--paper); color: var(--black); white-space: nowrap; cursor: pointer;
   font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.12em; font-size: 12px; font-weight: 500; line-height: 1;
 }
-.pill:hover { background: var(--bone); }
+/* Hover only where there is a pointer: on a phone a :hover sticks after the tap. The press is the feedback. */
+@media (hover: hover) { .pill:hover { background: var(--bone); } .pill-solid:hover { background: var(--graphite); } }
 .pill:active { background: var(--line); transform: translateY(1px); }
 .pill:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 .pill-solid { background: var(--black); color: var(--paper); }
-.pill-solid:hover { background: var(--graphite); }
 .pill-solid:active { background: var(--black); }
 .pill-quiet { border-color: var(--graphite); color: var(--graphite); }
-.pill-sm { height: 2.25rem; padding: 0 0.75rem; font-size: 11px; }
+/* Small pills stay 36px to the eye and 44px to the finger: the hit area reaches 4px past each edge. */
+.pill-sm { position: relative; height: 2.25rem; padding: 0 0.75rem; font-size: 11px; }
+.pill-sm::after { content: ""; position: absolute; inset: -4px; }
+/* A tappable row, card or cell: a touch of bone while pressed. */
+.tap { -webkit-tap-highlight-color: transparent; }
+@media (hover: hover) { .tap:hover { background: var(--bone); } }
+.tap:active { background: var(--line); }
 
 /* Editorial serif heading; wrap the accent word in <em>. */
 .serif {
@@ -99,9 +105,16 @@ html, body {
 .safe-top { padding-top: env(safe-area-inset-top); }
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
 
-/* Native <dialog> as a bottom sheet. */
-dialog.sheet { border: 0; padding: 0; }
+/* Native <dialog> as a bottom sheet: it slides up in a beat, the page behind it stays put. */
+dialog.sheet { border: 0; padding: 0; overscroll-behavior: contain; }
 dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.45); }
+@keyframes sheet-up { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes sheet-backdrop { from { opacity: 0; } to { opacity: 1; } }
+dialog.sheet[open] { animation: sheet-up 0.2s cubic-bezier(0.2, 0.7, 0.2, 1); }
+dialog.sheet[open]::backdrop { animation: sheet-backdrop 0.2s ease-out; }
+@media (prefers-reduced-motion: reduce) { dialog.sheet[open], dialog.sheet[open]::backdrop { animation: none; } }
+/* While a sheet is open the page behind it does not scroll (iOS scrolls the page through the backdrop). */
+html.sheet-open, html.sheet-open body { overflow: hidden; }
 
 /* Motion for the main buttons (Q11): the big button rises in a beat after the page; the press sinks it onto its base. */
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }

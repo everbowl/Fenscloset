@@ -12,6 +12,7 @@ const tabs = [
   { href: "/shop", label: "Shop" },
   { href: "/fits", label: "Fits" },
 ];
+/* Phones keep the drawn order with + in the middle; on desktop the four tabs sit together and + goes to the far right. */
 
 export function AppNav() {
   const pathname = usePathname();
@@ -22,7 +23,7 @@ export function AppNav() {
           const active = pathname === href || pathname.startsWith(href + "/");
           if (plus) {
             return (
-              <Link key={href} href={href} aria-label={label} className={cn("flex size-[46px] items-center justify-center justify-self-center bg-ink text-paper lg:ml-auto lg:h-auto lg:w-auto lg:gap-2 lg:bg-transparent lg:px-0 lg:text-ink", active && "ring-2 ring-ink ring-offset-2 lg:ring-0")}>
+              <Link key={href} href={href} aria-label={label} className={cn("flex size-[46px] items-center justify-center justify-self-center bg-ink text-paper active:bg-graphite lg:order-last lg:ml-auto lg:h-auto lg:w-auto lg:gap-2 lg:bg-transparent lg:px-0 lg:text-ink", active && "ring-2 ring-ink ring-offset-2 lg:ring-0")}>
                 <span className="flex size-[46px] items-center justify-center lg:size-8 lg:bg-ink lg:text-paper"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><path d="M12 4v16M4 12h16" /></svg></span>
                 <span className={cn("mono hidden lg:inline", active ? "text-ink" : "text-graphite")}>Add clothes</span>
               </Link>
@@ -30,8 +31,8 @@ export function AppNav() {
           }
           return (
             <Link key={href} href={href} aria-current={active ? "page" : undefined}
-              className={cn("mono justify-self-center px-1 py-3.5 lg:flex lg:items-center lg:px-0", active ? "border-b-[1.5px] border-ink text-ink" : "text-graphite")}>
-              {label}
+              className={cn("mono flex h-full w-full items-center justify-center self-stretch text-center active:text-ink lg:w-auto lg:px-0", active ? "text-ink" : "text-graphite")}>
+              <span className={cn("py-1", active && "border-b-[1.5px] border-ink")}>{label}</span>
             </Link>
           );
         })}

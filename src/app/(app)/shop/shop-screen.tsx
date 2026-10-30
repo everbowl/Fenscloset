@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
-import { Banner } from "@/components/ui/banner";
+import { toast } from "@/components/ui/toast";
 import { Sheet } from "@/components/ui/sheet";
 import { TextSheet } from "@/components/items/row-editor";
 import { shrinkPhoto } from "@/lib/import/client-queue";
@@ -28,7 +28,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
   const [progress, setProgress] = useState<{ step: string; startedAt: number } | null>(null);
   const [secs, setSecs] = useState(0);
   const [onMe, setOnMe] = useState<TryOnView | null>(null);
-  const [error, setError] = useState<string>();
+  const setError = (e?: string) => { if (e) toast.error(e); };
   const [sheet, setSheet] = useState<"for" | "link" | null>(null);
   const [compare, setCompare] = useState<SimilarItem | null>(null);
   const [source, setSource] = useState<"screenshot" | "photo">("screenshot");
@@ -143,8 +143,6 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
           eyebrow={<button type="button" onClick={() => setSheet("for")} className="mono text-ink" data-testid="shop-for">Shopping for · {forPersonId === meId ? "me" : forName} ⌄</button>}
           title="Should I" accent="buy it?" />
       </div>
-      {error ? <Banner tone="danger" title={error} className="mb-3 lg:col-span-2" /> : null}
-
       <div className="lg:col-start-2 lg:row-start-3">
         <div className="grid grid-cols-3 gap-2">
           <Button variant="secondary" className="h-[54px] px-2 text-[11px]" disabled={thinking} onClick={() => setSheet("link")} data-testid="paste-link">Paste a link</Button>
@@ -198,7 +196,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
           {selected.similar.length ? (
             // Jeff, 23 Oct 2026 (Shop v2, A): bigger, with a tap to see the two side by side.
             <div className="mt-5" data-testid="own-similar">
-              <p className="mono border-b border-ink pb-2 text-graphite">{forMe ? "You already own" : `${forName} already owns`} similar · tap to compare</p>
+              <h2 className="mono border-b border-ink pb-2 text-graphite">{forMe ? "You already own" : `${forName} already owns`} similar · tap to compare</h2>
               <div className="-mx-5 mt-3 flex gap-2.5 overflow-x-auto px-5 pb-1 lg:mx-0 lg:px-0">
                 {selected.similar.map((s) => (
                   <button key={s.id} type="button" onClick={() => setCompare(s)} className="w-[110px] shrink-0 text-left" data-testid="own-similar-piece" aria-label={`Compare with ${s.name}`}>
@@ -211,7 +209,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
           ) : null}
           {selected.pairings.length ? (
             <div className="mt-6 space-y-6" data-testid="pairings">
-              <p className="mono border-b border-ink pb-2 text-graphite">Wear it with</p>
+              <h2 className="mono border-b border-ink pb-2 text-graphite">Wear it with</h2>
               {selected.pairings.map((b, i) => (
                 <div key={i}>
                   <div className="grid grid-cols-4 gap-1.5">
@@ -226,7 +224,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
           {selected.products.length ? (
             <div className="mt-6" data-testid="products">
               <div className="flex items-end justify-between border-b border-ink pb-2">
-                <p className="mono text-graphite">{selected.verdict.missingCategory ? `${selected.verdict.missingCategory} to go with it` : "Instead of this"}</p>
+                <h2 className="mono text-graphite">{selected.verdict.missingCategory ? `${selected.verdict.missingCategory} to go with it` : "Instead of this"}</h2>
                 <p className="mono text-graphite">{selected.products.length} from {new Set(selected.products.map((p) => p.storeName)).size} {new Set(selected.products.map((p) => p.storeName)).size === 1 ? "store" : "stores"}</p>
               </div>
               <div className="-mx-5 mt-3 flex snap-x gap-2.5 overflow-x-auto px-5 pb-2 lg:mx-0 lg:px-0" data-testid="product-row">
@@ -238,8 +236,8 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
                     <p className="mt-2 line-clamp-2 text-[13px] font-medium leading-snug">{p.title}</p>
                     <p className="mono mt-1 text-graphite">{[p.priceText, p.storeName].filter(Boolean).join(" · ")}</p>
                     <div className="mt-2 flex flex-col gap-1.5">
-                      <a href={p.url} target="_blank" rel="noreferrer" className="pill pill-sm w-full">Buy →</a>
-                      <button type="button" disabled={thinking} onClick={() => run("link", () => lookupLinkAction(forPersonId, p.url))} className="pill pill-sm pill-solid w-full" data-testid="judge-product">Judge it</button>
+                      <a href={p.url} target="_blank" rel="noreferrer" className="pill pill-sm w-full" aria-label={`Buy ${p.title} at ${p.storeName}`}>Buy ↗</a>
+                      <button type="button" disabled={thinking} onClick={() => run("link", () => lookupLinkAction(forPersonId, p.url))} className="pill pill-sm pill-solid w-full" aria-label={`Judge ${p.title}`} data-testid="judge-product">Judge it</button>
                     </div>
                   </div>
                 ))}
@@ -248,7 +246,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
           ) : null}
           {selected.recommendations.length && !selected.products.length ? (
             <div className="mt-6" data-testid="picks">
-              <p className="mono border-b border-ink pb-2 text-graphite">You might like</p>
+              <h2 className="mono border-b border-ink pb-2 text-graphite">You might like</h2>
               {selected.recommendations.map((r, i) => (
                 <a key={i} href={r.url} target="_blank" rel="noreferrer" className="flex h-[42px] items-center border-b border-line">
                   <span className="mono w-[120px] shrink-0 text-graphite">{r.storeName}</span>
@@ -269,8 +267,8 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
 
       <section className="mt-8 lg:col-start-1 lg:row-start-6" data-testid="brand-feed">
         <div className="flex items-end justify-between gap-3 border-b border-ink pb-2">
-          <p className="mono text-graphite">New from {forPersonId === meId ? "your" : `${forName}’s`} brands</p>
-          {feedBusy ? <p className="mono shrink-0 text-ink" data-testid="brand-feed-thinking" aria-live="polite">{feedBusy.step} · {feedSecs}s</p>
+          <h2 className="mono text-graphite">New from {forPersonId === meId ? "your" : `${forName}’s`} brands</h2>
+          {feedBusy ? <p className="mono shrink-0 text-ink" data-testid="brand-feed-thinking"><span aria-live="polite">{feedBusy.step}</span><span aria-hidden> · {feedSecs}s</span></p>
             : brandFeed.newCount ? <p className="mono shrink-0 text-ink" data-testid="brand-feed-new">{brandFeed.newCount} new</p>
             : brandFeed.brands.length ? <button type="button" onClick={() => void runFeed()} className="pill pill-sm shrink-0" data-testid="brand-feed-refresh">Refresh</button> : null}
         </div>
@@ -291,8 +289,8 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
                 <p className="mt-2 line-clamp-2 text-[13px] font-medium leading-snug">{p.title}</p>
                 <p className="mono mt-1 text-graphite">{[p.priceText, p.storeName].filter(Boolean).join(" · ")}</p>
                 <div className="mt-2 flex flex-col gap-1.5">
-                  <a href={p.url} target="_blank" rel="noreferrer" className="pill pill-sm w-full">Buy →</a>
-                  <button type="button" disabled={thinking} onClick={() => run("link", () => lookupLinkAction(forPersonId, p.url))} className="pill pill-sm pill-solid w-full" data-testid="brand-feed-judge">Judge it</button>
+                  <a href={p.url} target="_blank" rel="noreferrer" className="pill pill-sm w-full" aria-label={`Buy ${p.title} at ${p.storeName}`}>Buy ↗</a>
+                  <button type="button" disabled={thinking} onClick={() => run("link", () => lookupLinkAction(forPersonId, p.url))} className="pill pill-sm pill-solid w-full" aria-label={`Judge ${p.title}`} data-testid="brand-feed-judge">Judge it</button>
                 </div>
               </div>
             ))}
@@ -302,7 +300,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
 
       {recent.length > 1 || (recent.length === 1 && recent[0].id !== selected?.id) ? (
         <section className="mt-8 lg:col-start-2 lg:row-start-4">
-          <p className="mono border-b border-ink pb-2 text-graphite">Recent</p>
+          <h2 className="mono border-b border-ink pb-2 text-graphite">Recent</h2>
           {recent.map((r) => (
             <Link key={r.id} href={`/shop?for=${forPersonId}&l=${r.id}`} className={cn("flex h-[52px] items-center gap-3 border-b border-line", r.id === selected?.id && "bg-bone")} data-testid="recent-row">
               <span className="size-10 shrink-0 bg-bone">{r.imageKey ? <img src={`/api/photo/${r.imageKey}`} alt="" className="size-full object-cover" /> : null}</span>

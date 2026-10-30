@@ -73,7 +73,7 @@ export function TogetherScreen({ meId, people, canDressIds, occasions, isAdmin, 
             <button type="button" onClick={() => setSheet("occasion")} className="flex h-[42px] w-full items-center border-b border-line text-left" data-testid="together-plan">
               <span className="mono w-[120px] shrink-0 text-graphite">Occasion</span>
               <span className={cn("flex-1 truncate text-[14px]", !planLabel && "text-graphite")}>{planLabel ?? "Pick one"}</span>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6B6B6B" strokeWidth="2" aria-hidden><path d="m9 6 6 6-6 6" /></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="m9 6 6 6-6 6" /></svg>
             </button>
             <button type="button" onClick={() => setSheet("text")} className="pill pill-sm mt-2">Something else…</button>
           </section>

@@ -72,7 +72,7 @@ export function LookingForScreen({ meId, people, forPersonId, wants }: { meId: s
                 </span>
               </span>
               {w.newCount > 0 ? <span className="mono shrink-0 border border-ink px-2 py-1 text-ink" data-testid="want-new">{w.newCount} new</span>
-                : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6B6B6B" strokeWidth="2" aria-hidden className="shrink-0"><path d="m9 6 6 6-6 6" /></svg>}
+                : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden className="shrink-0 text-graphite"><path d="m9 6 6 6-6 6" /></svg>}
             </Link>
           );
         })}

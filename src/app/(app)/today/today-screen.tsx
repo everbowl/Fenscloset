@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { HeaderAction } from "@/components/header-action";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button, buttonClass, Icons, Shelf } from "@/components/ui/button";
-import { Banner } from "@/components/ui/banner";
+import { toast } from "@/components/ui/toast";
 import { Sheet } from "@/components/ui/sheet";
 import { PickSheet, TextSheet } from "@/components/items/row-editor";
 import { cn } from "@/lib/cn";
@@ -59,7 +59,7 @@ export function TodayScreen(p: Props) {
   const [, start] = useTransition();
   // No looks yet: the screen opens already building (the build starts below), never on an error it has not had.
   const [busy, setBusy] = useState<string | null>(p.needsLooks ? "regen" : null);
-  const [error, setError] = useState<string>();
+  const setError = (e?: string) => { if (e) toast.error(e); };
   const [sheet, setSheet] = useState<"checkin" | "plan" | "planText" | "swap" | "zip" | null>(null);
   const [index, setIndex] = useState(Math.max(0, p.suggestion?.wornIndex ?? 0));
   const scroller = useRef<HTMLDivElement>(null);
@@ -165,7 +165,6 @@ export function TodayScreen(p: Props) {
   return (
     <div data-testid="today" className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-14">
       {p.canDress ? <HeaderAction><button type="button" onClick={() => setSheet("checkin")} className="pill pill-sm" data-testid="check-in">Check-in</button></HeaderAction> : null}
-      {error ? <Banner tone="danger" title={error} className="mb-3 lg:col-start-2" /> : null}
       <div className="lg:col-start-2">
       <PageHeader
         eyebrow={
@@ -240,7 +239,7 @@ export function TodayScreen(p: Props) {
           {p.canDress ? (
             <div className="mt-4 flex flex-col gap-2 lg:col-start-2">
               {worn && !flashWorn ? (
-                <Shelf><Link href="/fits" className={buttonClass({ size: "lg", className: "w-full" })}><Icons.calendar /><span className="flex flex-col items-start gap-0.5 text-left"><span>Wearing this · see Fits</span><span className="mono text-[9px] tracking-[0.12em] opacity-75">It is on your calendar</span></span><span aria-hidden className="ml-1 transition-transform duration-100 group-active:translate-x-1">→</span></Link></Shelf>
+                <Shelf><Link href="/fits" className={buttonClass({ size: "lg", className: "w-full" })}><Icons.calendar /><span className="flex flex-col items-start gap-0.5 text-left"><span>Wearing this · see Fits</span><span className="mono text-[11px] tracking-[0.12em]">It is on your calendar</span></span><span aria-hidden className="ml-1 transition-transform duration-100 group-active:translate-x-1">→</span></Link></Shelf>
               ) : (
                 <Button size="lg" className="w-full" icon={<Icons.shirt />} sub="Lands on your Fits calendar" flash={flashWorn ? "✓ Worn" : null} disabled={busy !== null}
                   onClick={() => run("wear", () => wearAction(p.personId, p.suggestion!.id, index), () => { setFlashWorn(true); setTimeout(() => setFlashWorn(false), 900); })} data-testid="wear-this">{busy === "wear" ? "Saving…" : "Wear this"}</Button>
@@ -341,7 +340,7 @@ export function TodayScreen(p: Props) {
       {/* See it on: the look on your own body photo (yours alone), or on the shared mannequin (no body in it). */}
       <MirrorSheet m={m} pieces={board?.pieces.map((x) => x.label).join(" · ") ?? ""} mine={p.mine} personId={p.personId} personName={p.personName} tryOnState={p.tryOn} backPhoto={p.backPhoto} mannequinAvailable={p.mannequinAvailable} />
 
-      <TextSheet open={sheet === "zip"} onClose={() => setSheet(null)} title="Weather for your zip" label="Zip code" value={p.savedZip ?? ""} placeholder="92101" onSave={(v) => run("zip", () => setZipAction(v))} />
+      <TextSheet open={sheet === "zip"} onClose={() => setSheet(null)} title="Weather for your zip" label="Zip code" kind="zip" value={p.savedZip ?? ""} placeholder="92101" onSave={(v) => run("zip", () => setZipAction(v))} />
     </div>
   );
 }

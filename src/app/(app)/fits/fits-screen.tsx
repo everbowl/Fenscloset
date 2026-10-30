@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
-import { Banner } from "@/components/ui/banner";
+import { toast } from "@/components/ui/toast";
 import { Sheet } from "@/components/ui/sheet";
 import { PickSheet, TextSheet } from "@/components/items/row-editor";
 import { shrinkPhoto } from "@/lib/import/client-queue";
@@ -32,7 +32,7 @@ export function FitsScreen(p: {
   const router = useRouter();
   const [, start] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string>();
+  const setError = (e?: string) => { if (e) toast.error(e); };
   const [sheet, setSheet] = useState<{ kind: "share" | "title" | "pick" | "remove"; fitId?: string } | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const [pickTitle, setPickTitle] = useState("");
@@ -80,7 +80,6 @@ export function FitsScreen(p: {
           {p.selected !== p.today ? <Link href={`/fits?d=${p.today}`} replace className="pill pill-sm ml-2" data-testid="fits-today">Today</Link> : null}
         </span>
       } /></div>
-      {error ? <Banner tone="danger" title={error} className="mb-3 lg:col-span-2" /> : null}
       <div className="lg:col-start-1">
       <div className="mono grid grid-cols-7 border-b border-ink pb-2 text-graphite">{["S", "M", "T", "W", "T", "F", "S"].map((d, i) => <div key={i}>{d}</div>)}</div>
       <div className="grid grid-cols-7 gap-0.5 pt-1" data-testid="calendar">
@@ -167,7 +166,7 @@ export function FitsScreen(p: {
           })}
         </div>
         {p.closet.length === 0 ? <p className="mono py-4 text-graphite">Nothing in the closet yet</p> : null}
-        <Button className="mt-4 w-full" disabled={busy !== null || picked.length === 0} onClick={() => run("save", () => saveFitAction(p.personId, p.selected, picked, pickTitle), () => setSheet(null))} data-testid="confirm-save-fit">{busy === "save" ? "Saving…" : "Save the fit"}</Button>
+        <Button className="mt-4 w-full" disabled={busy !== null || picked.length === 0} busy={busy === "save"} onClick={() => run("save", () => saveFitAction(p.personId, p.selected, picked, pickTitle), () => { setSheet(null); toast.ok("Saved to Fits"); })} data-testid="confirm-save-fit">{busy === "save" ? "Saving…" : "Save the fit"}</Button>
       </Sheet>
 
       <PickSheet open={sheet?.kind === "share"} onClose={() => setSheet(null)} title="Who can see this fit" kind="tag" options={p.people} selected={selectedFits.find((f) => f.id === sheet?.fitId)?.viewerIds ?? []} multi canAdd={false} onChange={(ids) => run("share", () => setFitViewersAction(sheet!.fitId!, ids))} />

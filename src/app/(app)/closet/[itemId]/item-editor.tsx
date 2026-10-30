@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Sheet } from "@/components/ui/sheet";
 import { cn } from "@/lib/cn";
-import { Banner } from "@/components/ui/banner";
+import { toast } from "@/components/ui/toast";
 import { Button, buttonClass } from "@/components/ui/button";
 import { PickSheet, PriceDateSheet, Row, TextSheet } from "@/components/items/row-editor";
 import { BrandSearch } from "@/components/items/brand-search";
@@ -64,7 +64,7 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
   const [lists, setLists] = useState(initialLists);
   const [sheet, setSheet] = useState<SheetKind>(null);
   const [photoIdx, setPhotoIdx] = useState(0);
-  const [error, setError] = useState<string>();
+  const setError = (e?: string) => { if (e) toast.error(e); };
   const [pending, start] = useTransition();
   // Take the server's copy once nothing is in flight (a tap in a multi-pick sheet while an earlier save is still saving must not be undone).
   useEffect(() => { if (!pending) setIt(item); }, [version, pending]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -229,8 +229,7 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
         ) : null}
       </div>
 
-      {error ? <div className="pt-3"><Banner tone="danger" title={error} /></div> : null}
-      {uploading ? <p className="mono pt-3 text-graphite">Saving the photo…</p> : null}
+      {uploading ? <p className="mono pt-3 text-graphite" role="status">Saving the photo…</p> : null}
 
       {canEdit ? (
         <div className="flex gap-2.5 pt-5">

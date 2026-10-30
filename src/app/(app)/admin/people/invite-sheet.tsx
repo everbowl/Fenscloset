@@ -93,7 +93,7 @@ export function InviteSheet({ admins, smsReady, existing, trigger }: {
               <fieldset className="space-y-2">
                 <legend className="mono tracking-[0.14em] text-graphite">Parent admins</legend>
                 {admins.map((a) => (
-                  <label key={a.id} className="flex h-10 items-center gap-3 text-[15px]">
+                  <label key={a.id} className="flex h-11 items-center gap-3 text-[15px]">
                     <input type="checkbox" className="size-5 accent-black" checked={guardianIds.includes(a.id)}
                       onChange={(e) => setGuardianIds((g) => (e.target.checked ? [...g, a.id] : g.filter((x) => x !== a.id)))} />
                     {a.name}
@@ -103,8 +103,8 @@ export function InviteSheet({ admins, smsReady, existing, trigger }: {
             ) : null}
             <fieldset className="space-y-2">
               <legend className="mono tracking-[0.14em] text-graphite">Send the invite by</legend>
-              <label className="flex h-10 items-center gap-3 text-[15px]"><input type="checkbox" className="size-5 accent-black" checked={sendEmail && Boolean(email)} onChange={(e) => setSendEmail(e.target.checked)} disabled={!email} /> Email{email ? "" : <span className="mono ml-2 text-graphite">add an email above</span>}</label>
-              <label className="flex h-10 items-center gap-3 text-[15px]"><input type="checkbox" className="size-5 accent-black" checked={sendSms} onChange={(e) => setSendSms(e.target.checked)} disabled={!phone || !smsReady} /> Text message{!smsReady ? <span className="mono ml-2 text-graphite">texting isn’t set up yet</span> : phone ? "" : <span className="mono ml-2 text-graphite">add a number above</span>}</label>
+              <label className="flex h-11 items-center gap-3 text-[15px]"><input type="checkbox" className="size-5 accent-black" checked={sendEmail && Boolean(email)} onChange={(e) => setSendEmail(e.target.checked)} disabled={!email} /> Email{email ? "" : <span className="mono ml-2 text-graphite">add an email above</span>}</label>
+              <label className="flex h-11 items-center gap-3 text-[15px]"><input type="checkbox" className="size-5 accent-black" checked={sendSms} onChange={(e) => setSendSms(e.target.checked)} disabled={!phone || !smsReady} /> Text message{!smsReady ? <span className="mono ml-2 text-graphite">texting isn’t set up yet</span> : phone ? "" : <span className="mono ml-2 text-graphite">add a number above</span>}</label>
               <p className="text-[13px] leading-snug text-graphite">You&apos;ll always get a link to copy or share yourself.</p>
             </fieldset>
             <Button type="submit" className="w-full" disabled={pending || !name}>{pending ? "Creating…" : "Create invite"}</Button>

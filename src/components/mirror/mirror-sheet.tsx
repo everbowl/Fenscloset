@@ -101,7 +101,7 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
             {m.busy && m.progress ? (
               <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-paper/95 px-3 py-2.5" data-testid="mirror-progress" aria-live="polite">
                 <span className="mono text-[11px] uppercase tracking-[0.18em]">{m.progress.step}</span>
-                <span className="mono shrink-0 text-graphite">{secs}s</span>
+                <span className="mono shrink-0 text-graphite" aria-hidden>{secs}s</span>
               </div>
             ) : null}
           </div>
@@ -123,7 +123,7 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
               {views.map(([v, word]) => {
                 const current = v === "mannequin" ? m.on === "mannequin" : m.on === "me" && m.view === v;
                 return (
-                  <button key={v} type="button" disabled={m.busy} aria-pressed={current} onClick={() => { if (!current) m.switchTo(v as "front" | "back" | "mannequin"); }} className={`mono mono-11 h-9 px-4 ${current ? "bg-ink text-paper" : "border border-ink"}`} data-testid={`mirror-${v}`}>{word}</button>
+                  <button key={v} type="button" disabled={m.busy} aria-pressed={current} onClick={() => { if (!current) m.switchTo(v as "front" | "back" | "mannequin"); }} className={`pill pill-sm ${current ? "pill-solid" : ""}`} data-testid={`mirror-${v}`}>{word}</button>
                 );
               })}
             </div>

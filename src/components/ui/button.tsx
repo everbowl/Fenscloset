@@ -45,9 +45,10 @@ export function buttonClass(opts: { variant?: Variant; size?: Size; className?: 
 }
 
 export function Button({
-  className, variant = "primary", size = "md", type = "button", shelf, arrow, icon, sub, flash, children, ...props
+  className, variant = "primary", size = "md", type = "button", shelf, arrow, icon, sub, flash, busy, disabled, children, ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant; size?: Size;
+  /** Working on it: the button waits (no second tap) but keeps its color, with a moving dot; disabled gray is for "can't", not "saving". */ busy?: boolean;
   /** bone band behind the button; default on for large primaries */ shelf?: boolean;
   /** "→" after the label; default on for large primaries without a sub line */ arrow?: boolean;
   /** a line icon at the left (Q11 C) */ icon?: ReactNode;
@@ -64,23 +65,28 @@ export function Button({
     return () => clearTimeout(t);
   }, [flash]);
   const withShelf = shelf ?? big;
+  // Width and flex classes belong to the outermost box: on the shelf when there is one, so `flex-1` and `w-full` still work.
+  const parts = (className ?? "").split(/\s+/).filter(Boolean);
+  const layout = parts.filter((c) => /^(flex-1|w-full|grow|shrink-0|self-\w+|mt-\d+|mb-\d+|lg:col-start-\d|lg:w-\w+)$/.test(c));
+  const own = parts.filter((c) => !layout.includes(c));
   const inner = (
-    <button type={type} className={cn(buttonClass({ variant, size, className }), showFlash && "bg-ink text-paper hover:brightness-100")} {...props}>
+    <button type={type} disabled={disabled || busy} aria-busy={busy || undefined}
+      className={cn(buttonClass({ variant, size, className: cn(own.join(" "), withShelf && layout.length ? "w-full" : layout.join(" ")) }), showFlash && "bg-ink text-paper hover:brightness-100", busy && "disabled:opacity-100 disabled:bg-accent disabled:text-paper disabled:shadow-[0_6px_0_0_var(--color-stone)] disabled:translate-y-0 disabled:cursor-progress", busy && variant === "secondary" && "disabled:bg-ink")} {...props}>
       {showFlash ? <span data-testid="button-flash">{flash}</span> : (
         <>
-          {icon ? <span aria-hidden className="shrink-0">{icon}</span> : null}
+          {busy ? <span aria-hidden className="size-2 shrink-0 animate-pulse rounded-full bg-current" /> : icon ? <span aria-hidden className="shrink-0">{icon}</span> : null}
           {sub ? (
             <span className="flex min-w-0 flex-col items-start gap-0.5 text-left normal-case tracking-normal">
               <span className="font-mono uppercase tracking-[0.16em]">{children}</span>
-              <span className="mono text-[9px] tracking-[0.12em] opacity-75">{sub}</span>
+              <span className="mono text-[11px] tracking-[0.12em]">{sub}</span>
             </span>
           ) : children}
-          {withArrow ? <span aria-hidden className="ml-1 transition-transform duration-100 group-active:translate-x-1">→</span> : null}
+          {withArrow && !busy ? <span aria-hidden className="ml-1 transition-transform duration-100 group-active:translate-x-1">→</span> : null}
         </>
       )}
     </button>
   );
-  return withShelf ? <Shelf>{inner}</Shelf> : inner;
+  return withShelf ? <Shelf className={layout.join(" ")}>{inner}</Shelf> : inner;
 }
 
 /** Line icons for the big buttons: the same stroke as the rest of the app. */

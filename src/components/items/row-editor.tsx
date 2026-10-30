@@ -13,7 +13,7 @@ import type { Named } from "@/lib/ai/tag-item";
 /** One tappable row: KEY · value · chevron. The whole confirm screen is a stack of these. `trailing` sits before the chevron (an "Open ↗" link next to a saved URL). */
 export function Row({ label, value, muted, onClick, testId, trailing }: { label: string; value: string; muted?: boolean; onClick: () => void; testId?: string; trailing?: ReactNode }) {
   const button = (
-    <button type="button" onClick={onClick} data-testid={testId} className={cn("flex h-[42px] w-full min-w-0 items-center text-left", !trailing && "border-b border-line")}>
+    <button type="button" onClick={onClick} data-testid={testId} className={cn("tap flex h-12 w-full min-w-0 items-center text-left", !trailing && "border-b border-line")}>
       <span className="mono w-[120px] shrink-0 text-graphite">{label}</span>
       <span className={cn("flex-1 truncate text-[14px]", muted && "text-graphite")}>{value}</span>
       {!trailing ? <Chevron /> : null}
@@ -48,7 +48,7 @@ export function PickSheet({ open, onClose, title, kind, options, selected, multi
         {options.map((o) => {
           const on = selected.includes(o.id);
           return (
-            <button key={o.id} type="button" role="option" aria-selected={on} onClick={() => toggle(o.id)} className="flex h-12 items-center justify-between border-b border-line text-[15px] active:bg-bone">
+            <button key={o.id} type="button" role="option" aria-selected={on} onClick={() => toggle(o.id)} className="tap flex h-12 items-center justify-between border-b border-line text-[15px]">
               <span>{o.name}</span>
               <span className={cn("mono", on ? "text-ink" : "text-transparent")}>{on ? "✓" : "·"}</span>
             </button>

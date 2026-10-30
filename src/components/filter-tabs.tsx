@@ -20,8 +20,8 @@ export function FilterTabs({ categories, active, basePath, keep = {}, canEdit }:
   };
   const tab = (label: string, cat: string | undefined) => (
     <Link key={cat ?? "all"} href={href(cat)} aria-current={active === cat || (!active && !cat) ? "page" : undefined}
-      className={cn("mono mono-11 shrink-0 py-2", active === cat || (!active && !cat) ? "border-b-[1.5px] border-ink text-ink" : "text-graphite")}>
-      {label}
+      className={cn("mono mono-11 flex min-h-11 shrink-0 items-center", active === cat || (!active && !cat) ? "text-ink" : "text-graphite")}>
+      <span className={cn("py-1", (active === cat || (!active && !cat)) && "border-b-[1.5px] border-ink")}>{label}</span>
     </Link>
   );
   return (
