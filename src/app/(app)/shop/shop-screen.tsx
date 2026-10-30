@@ -35,7 +35,11 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
   const file = useRef<HTMLInputElement>(null);
   const seq = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const forName = people.find((p) => p.id === forPersonId)?.name ?? "me";
+  const forMe = forPersonId === meId;
+  const forName = forMe ? "me" : people.find((p) => p.id === forPersonId)?.name ?? "them";
+  /** "you" or the person's name, for sentences about them. */
+  const who = forMe ? "you" : forName;
+  const pendingRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => () => { seq.current++; if (timer.current) clearTimeout(timer.current); }, []);
   const startedAt = progress?.startedAt ?? null;
@@ -80,6 +84,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
     if (auto.current || !autoLink) return;
     auto.current = true;
     run("link", () => lookupLinkAction(forPersonId, autoLink));
+    router.replace(`/shop?for=${forPersonId}`); // drop ?link= so Back never judges it again
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoLink, forPersonId]);
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -90,6 +95,8 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
     run("photo", () => lookupPhotoAction(forPersonId, fd));
   }
   const thinking = busy === "link" || busy === "photo";
+  // The answer takes the result's place: scroll it into view (Judge it on a card can be far below).
+  useEffect(() => { if (thinking) pendingRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }); }, [thinking]);
 
   // Shop v2 item 3 (Jeff, 23 Oct 2026): "suggest items from my favorite brands". The feed is refreshed in the
   // background when it is stale (never fetched, a day old, or the brand list changed) and on Refresh.
@@ -153,15 +160,20 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
           </span>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden className="shrink-0"><path d="M4 12h16M14 6l6 6-6 6" /></svg>
         </Link>
-        {thinking ? (
-          <div className="mt-3" data-testid="shop-thinking" aria-live="polite">
-            <p className="mono flex items-center justify-between gap-3 text-ink"><span>{progress?.step ?? "Looking at it…"}</span><span className="shrink-0 text-graphite">{secs}s</span></p>
-            <p className="mono mt-1 text-graphite">Usually 15 to 40 seconds. You can leave this screen; the answer is kept under Recent.</p>
-          </div>
-        ) : null}
       </div>
 
-      {selected ? (
+      {thinking ? (
+        <section ref={pendingRef} className="mt-6 scroll-mt-24 lg:col-start-1 lg:row-start-3 lg:row-span-3 lg:mt-0" data-testid="shop-thinking">
+          <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-4">
+            <div className="h-[160px] animate-pulse bg-bone" />
+            <div className="flex min-w-0 flex-col gap-2 pt-1"><div className="h-3 w-24 bg-bone" /><div className="h-7 w-40 bg-bone" /><div className="h-3 w-16 bg-bone" /></div>
+          </div>
+          <div className="mt-4 border-y border-ink py-2.5" aria-live="polite">
+            <p className="mono flex items-center justify-between gap-3 text-ink"><span>{progress?.step ?? "Looking at it…"}</span><span className="shrink-0 text-graphite" aria-hidden>{secs}s</span></p>
+            <p className="mono mt-1 text-graphite">Usually 15 to 40 seconds. You can leave this screen; the answer is kept under Recent.</p>
+          </div>
+        </section>
+      ) : selected ? (
         <section className="mt-6 lg:col-start-1 lg:row-start-3 lg:row-span-3 lg:mt-0" data-testid="shop-result">
           <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-4">
             <div className="h-[160px] overflow-hidden bg-bone">{selected.imageKey ? <img src={`/api/photo/${selected.imageKey}`} alt={selected.title ?? ""} className="size-full object-cover" /> : null}</div>
@@ -179,14 +191,14 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
           </div>
           {selected.imageKey && (tryOn === "ready" || mannequin) ? (
             <div className="mt-3">
-              <Button variant="secondary" className="w-full" disabled={busy !== null} onClick={() => { setBusy("tryon"); setError(undefined); start(async () => { const r = await tryOnLookupAction(selected.id); setBusy(null); if (!r.ok) setError(r.error); else if (r.tryOn) setOnMe(r.tryOn); }); }} data-testid={tryOn === "ready" ? "see-it-on-me" : "see-on-mannequin"}>{busy === "tryon" ? (tryOn === "ready" ? "Dressing you…" : "Dressing the mannequin…") : "See it on"}</Button>
+              <Button variant="secondary" className="w-full" disabled={busy !== null} onClick={() => { setBusy("tryon"); setError(undefined); start(async () => { const r = await tryOnLookupAction(selected.id); setBusy(null); if (!r.ok) setError(r.error); else if (r.tryOn) setOnMe(r.tryOn); }); }} data-testid={tryOn === "ready" ? "see-it-on-me" : "see-on-mannequin"}>{busy === "tryon" ? (tryOn === "ready" ? `Dressing ${who}…` : "Dressing the mannequin…") : tryOn === "ready" ? (forMe ? "See it on me" : `See it on ${forName}`) : "See it on the mannequin"}</Button>
               {tryOn === "off" || tryOn === "no_photo" ? <Link href={tryOn === "off" ? "/profile/settings" : "/profile/body"} className="mono flex h-[38px] items-center justify-center text-graphite" data-testid={tryOn === "off" ? "try-on-off" : "try-on-photo"}>{tryOn === "off" ? "Want it on you? Turn on try-on in Settings" : "Want it on you? Add a body photo first"}</Link> : null}
             </div>
           ) : null}
           {selected.similar.length ? (
             // Jeff, 23 Oct 2026 (Shop v2, A): bigger, with a tap to see the two side by side.
             <div className="mt-5" data-testid="own-similar">
-              <p className="mono border-b border-ink pb-2 text-graphite">You already own similar · tap to compare</p>
+              <p className="mono border-b border-ink pb-2 text-graphite">{forMe ? "You already own" : `${forName} already owns`} similar · tap to compare</p>
               <div className="-mx-5 mt-3 flex gap-2.5 overflow-x-auto px-5 pb-1 lg:mx-0 lg:px-0">
                 {selected.similar.map((s) => (
                   <button key={s.id} type="button" onClick={() => setCompare(s)} className="w-[110px] shrink-0 text-left" data-testid="own-similar-piece" aria-label={`Compare with ${s.name}`}>
@@ -210,12 +222,12 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
                 </div>
               ))}
             </div>
-          ) : <p className="mono mt-6 text-graphite">Nothing in {selected.forName === "me" ? "your" : `${selected.forName}’s`} closet to pair it with yet.</p>}
+          ) : <p className="mono mt-6 text-graphite">Nothing in {selected.forPersonId === meId ? "your" : `${selected.forName}’s`} closet to pair it with yet.</p>}
           {selected.products.length ? (
             <div className="mt-6" data-testid="products">
               <div className="flex items-end justify-between border-b border-ink pb-2">
                 <p className="mono text-graphite">{selected.verdict.missingCategory ? `${selected.verdict.missingCategory} to go with it` : "Instead of this"}</p>
-                <p className="mono text-graphite">{selected.products.length} from {new Set(selected.products.map((p) => p.storeName)).size} stores</p>
+                <p className="mono text-graphite">{selected.products.length} from {new Set(selected.products.map((p) => p.storeName)).size} {new Set(selected.products.map((p) => p.storeName)).size === 1 ? "store" : "stores"}</p>
               </div>
               <div className="-mx-5 mt-3 flex snap-x gap-2.5 overflow-x-auto px-5 pb-2 lg:mx-0 lg:px-0" data-testid="product-row">
                 {selected.products.map((p) => (
@@ -260,7 +272,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
           <p className="mono text-graphite">New from {forPersonId === meId ? "your" : `${forName}’s`} brands</p>
           {feedBusy ? <p className="mono shrink-0 text-ink" data-testid="brand-feed-thinking" aria-live="polite">{feedBusy.step} · {feedSecs}s</p>
             : brandFeed.newCount ? <p className="mono shrink-0 text-ink" data-testid="brand-feed-new">{brandFeed.newCount} new</p>
-            : brandFeed.brands.length ? <button type="button" onClick={() => void runFeed()} className="mono shrink-0 text-ink underline underline-offset-4" data-testid="brand-feed-refresh">Refresh</button> : null}
+            : brandFeed.brands.length ? <button type="button" onClick={() => void runFeed()} className="pill pill-sm shrink-0" data-testid="brand-feed-refresh">Refresh</button> : null}
         </div>
         {brandFeed.brands.length ? <p className="mono mt-1.5 text-graphite" data-testid="brand-feed-brands" suppressHydrationWarning>{brandFeed.brands.join(" · ")}{brandFeed.lastFetchedAt ? ` · checked ${ago(brandFeed.lastFetchedAt)}` : ""}</p> : null}
         {!brandFeed.brands.length ? (
@@ -300,11 +312,11 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
         </section>
       ) : null}
 
-      <Sheet open={onMe !== null} onClose={() => setOnMe(null)} title={onMe?.mannequin ? "On a mannequin" : "On you"}>
+      <Sheet open={onMe !== null} onClose={() => setOnMe(null)} title={onMe?.mannequin ? "On a mannequin" : forMe ? "On you" : `On ${forName}`}>
         {onMe ? (
           <div className="flex flex-col gap-3" data-testid="see-it-on-me-sheet">
             <div className="h-[460px] overflow-hidden bg-bone"><img src={`/api/photo/${onMe.key}`} alt={onMe.mannequin ? "This piece on a mannequin" : "You wearing this piece"} className="size-full object-contain" /></div>
-            <p className="mono text-graphite">{onMe.mannequin ? "No body photo used" : "Only you can see this picture"}{onMe.cached ? " · saved from before" : ""}</p>
+            <p className="mono text-graphite">{onMe.mannequin ? "No body photo used" : forMe ? "Only you can see this picture" : `Only ${forName} and you can see this picture`}{onMe.cached ? " · saved from before" : ""}</p>
           </div>
         ) : null}
       </Sheet>

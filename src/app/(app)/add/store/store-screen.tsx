@@ -79,6 +79,7 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
   const [picks, setPicks] = useState<Product[] | null>(null);
   const [error, setError] = useState<string>();
   const [added, setAdded] = useState<number>(0);
+  const [batchId, setBatchId] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [busy, setBusy] = useState<"lookup" | "photos" | "add" | null>(null);
   /** Linear (Jeff, 18 Oct 2026): one question at a time. Color is asked only when the store lists colors, size likewise. */
@@ -119,17 +120,20 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
       const r = await addFromStoreAction({ product: { url: product.url, name: product.name, brandText: product.brandText, storeName: product.storeName, priceText: product.priceText }, imageUrl, color: color || null, size: size || null, quantity: qty });
       setBusy(null);
       if (!r.ok) { setError(r.error); return; }
-      setAdded((n) => n + r.value.count);
+      setAdded((n) => n + r.value.count); setBatchId(r.value.batchId);
       router.refresh();
     });
   }
 
   return (
     <div className="mt-5 flex flex-col gap-5">
-      <Field label="Product link" htmlFor="store-url" hint="Paste the page of the piece you own. Most stores work; some block it, and then you can pick a photo from a search instead.">
-        <Input id="store-url" inputMode="url" autoCapitalize="off" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://shop.lululemon.com/…" data-testid="store-url" />
-      </Field>
-      <Button size="lg" onClick={lookup} disabled={pending || !url.trim()} data-testid="lookup">{busy === "lookup" ? "Looking it up…" : "Look it up"}</Button>
+      <form onSubmit={(e) => { e.preventDefault(); if (url.trim() && !pending) lookup(); }} className="flex flex-col gap-5">
+        <Field label="Product link" htmlFor="store-url" hint="Paste the page of the piece you own. Most stores work; some block it, and then you can pick a photo from a search instead.">
+          <Input id="store-url" type="url" inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} enterKeyHint="go" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://shop.lululemon.com/…" data-testid="store-url" />
+        </Field>
+        {product ? <button type="submit" className="pill self-start" disabled={pending || !url.trim()} data-testid="lookup">{busy === "lookup" ? "Looking it up…" : "Look up another"}</button>
+          : <Button type="submit" size="lg" disabled={pending || !url.trim()} data-testid="lookup">{busy === "lookup" ? "Looking it up…" : "Look it up"}</Button>}
+      </form>
       {error ? <Banner tone="danger" title={error} /> : null}
 
       {product ? (
@@ -167,8 +171,8 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
           {step === "qty" && added === 0 ? <Button size="lg" onClick={add} disabled={pending || !imageUrl} data-testid="add-to-closet">{busy === "add" ? "Adding…" : `Add ${qty > 1 ? `${qty} ` : ""}to closet`}</Button> : null}
           {added > 0 ? (
             <div className="flex items-center justify-between border-y border-ink py-2.5" data-testid="added-strip">
-              <span className="mono tracking-[0.1em]">{added} added</span>
-              <div className="flex gap-4"><button type="button" onClick={again} className="pill" data-testid="add-another-color">Another color or size</button><Link href="/add" className="pill pill-solid">Confirm →</Link></div>
+              <span className="mono tracking-[0.1em]">{added} ready to check</span>
+              <div className="flex gap-4"><button type="button" onClick={again} className="pill" data-testid="add-another-color">Another color or size</button><Link href={batchId ? `/add/${batchId}` : "/add"} className="pill pill-solid" data-testid="check-it">Check it →</Link></div>
             </div>
           ) : null}
         </div>

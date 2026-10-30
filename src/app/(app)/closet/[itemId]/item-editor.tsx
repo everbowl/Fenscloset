@@ -3,12 +3,12 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Sheet } from "@/components/ui/sheet";
 import { cn } from "@/lib/cn";
 import { Banner } from "@/components/ui/banner";
 import { Button, buttonClass } from "@/components/ui/button";
-import { PickSheet, Row, TextSheet } from "@/components/items/row-editor";
+import { PickSheet, PriceDateSheet, Row, TextSheet } from "@/components/items/row-editor";
 import { BrandSearch } from "@/components/items/brand-search";
 import { MatchSheet } from "@/components/items/match-sheet";
 import { matchItemAction } from "@/lib/brands/actions";
@@ -19,7 +19,8 @@ import type { ItemDetailEdits } from "@/lib/items/service";
 import type { LaundryStatus, PhotoKind } from "@/generated/prisma/client";
 import { addItemPhotoAction, cycleLaundryAction, deleteItemAction, mirrorPhotoAction, notNowPhotoAction, removeItemPhotoAction, rotateItemPhotoAction, updateItemAction } from "./actions";
 import { unretireAction } from "../clean-out/actions";
-import { monoDate } from "@/lib/dates";
+import { monoDate, prettyDate } from "@/lib/dates";
+import { lastClosetUrl, markClosetRestore } from "@/lib/closet-memory";
 import { FEATURE_KEYS, FEATURE_LABELS, isFeatureKey, mirrorCanPlace } from "@/lib/tryon/features";
 import { MirrorSheet } from "@/components/mirror/mirror-sheet";
 import { useMirror } from "@/components/mirror/use-mirror";
@@ -42,10 +43,12 @@ export type ItemView = {
   photoNudge: "first" | "refresh" | null;
 };
 
-type SheetKind = "category" | "subcategory" | "color" | "pattern" | "fabric" | "season" | "formality" | "occasion" | "tag" | "brand" | "match" | "store" | "size" | "price" | "date" | "url" | "notes" | "made" | "closets" | "share" | "rename" | "photo" | "delete" | null;
+type SheetKind = "category" | "subcategory" | "color" | "pattern" | "fabric" | "season" | "formality" | "occasion" | "tag" | "brand" | "match" | "store" | "size" | "price" | "url" | "notes" | "made" | "closets" | "share" | "rename" | "photo" | "delete" | null;
 
 const LAUNDRY_WORD: Record<LaundryStatus, string> = { clean: "Clean", dirty: "Laundry", cleaners: "At cleaners" };
 const KIND_WORD: Record<PhotoKind, string> = { alone: "Photo", worn: "Worn", label: "Label", cutout: "Cutout", thumb: "Thumb", back: "Back", retail: "Store" };
+
+const hostOf = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; } };
 
 function Title({ name }: { name: string }) {
   const words = name.trim().split(" ");
@@ -54,7 +57,7 @@ function Title({ name }: { name: string }) {
 }
 
 /** Item detail: photo, serif title, mono meta, then every tag as a 42px row that edits in place. */
-export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists, mirror = null }: { item: ItemView; lists: ItemLists; canEdit: boolean; canEditLists: boolean; /** The signed-in person's mirror: "See it on me" dresses them in this one piece. */ mirror?: MirrorConfig | null }) {
+export function ItemEditor({ item, version, lists: initialLists, canEdit, canEditLists, mirror = null }: { item: ItemView; /** The server's updatedAt: when it changes (a save came back, a photo landed) the local copy takes the server's truth, without a remount that would close an open sheet. */ version: string; lists: ItemLists; canEdit: boolean; canEditLists: boolean; /** The signed-in person's mirror: "See it on me" dresses them in this one piece. */ mirror?: MirrorConfig | null }) {
   const router = useRouter();
   const [it, setIt] = useState(item);
   const m = useMirror(mirror?.personId ?? "", mirror?.wardrobe, mirror?.engine);
@@ -63,6 +66,8 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists, m
   const [photoIdx, setPhotoIdx] = useState(0);
   const [error, setError] = useState<string>();
   const [pending, start] = useTransition();
+  // Take the server's copy once nothing is in flight (a tap in a multi-pick sheet while an earlier save is still saving must not be undone).
+  useEffect(() => { if (!pending) setIt(item); }, [version, pending]); // eslint-disable-line react-hooks/exhaustive-deps
   const photoRef = useRef<HTMLInputElement>(null);
   const [photoKind, setPhotoKind] = useState<"alone" | "worn" | "label" | "back">("alone");
   const [uploading, setUploading] = useState(false);
@@ -194,8 +199,9 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists, m
         <Row label="Tags" value={names(lists.tags, it.tagIds) || "None"} muted={!it.tagIds.length} onClick={() => open("tag")} />
         <Row label="Brand · Size" value={[brandName, it.size].filter(Boolean).join(" · ") || "Not set"} muted={!brandName && !it.size} onClick={() => open("brand")} />
         <Row label="Store" value={name(lists.stores, it.storeId) ?? "Not set"} muted={!it.storeId} onClick={() => open("store")} />
-        <Row label="Price · Date" value={[price, it.purchaseDate].filter(Boolean).join(" · ") || "Not set"} muted={!price && !it.purchaseDate} onClick={() => open("price")} />
-        <Row label="Link" value={it.purchaseUrl ?? "Not set"} muted={!it.purchaseUrl} onClick={() => open("url")} />
+        <Row label="Price · Date" value={[price, it.purchaseDate ? prettyDate(it.purchaseDate) : null].filter(Boolean).join(" · ") || "Not set"} muted={!price && !it.purchaseDate} onClick={() => open("price")} testId="row-price" />
+        <Row label="Link" value={it.purchaseUrl ? hostOf(it.purchaseUrl) : "Not set"} muted={!it.purchaseUrl} onClick={() => open("url")} testId="row-link"
+          trailing={it.purchaseUrl ? <a href={it.purchaseUrl} target="_blank" rel="noreferrer" className="pill pill-sm shrink-0" data-testid="open-link">Open ↗</a> : undefined} />
         <Row label="Fit notes" value={it.fitNotes ?? "None"} muted={!it.fitNotes} onClick={() => open("notes")} />
         <Row label="Made with" value={it.features.filter(isFeatureKey).map((f) => FEATURE_LABELS[f]).join(" · ") || "Nothing special"} muted={!it.features.length} onClick={() => open("made")} testId="row-made" />
         <div className="flex min-h-[42px] items-center border-b border-line" data-testid="row-worn">
@@ -237,14 +243,14 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists, m
       <PickSheet open={sheet === "category"} onClose={() => setSheet(null)} title="Category" kind="category" options={lists.categories} selected={it.categoryId ? [it.categoryId] : []} canAdd={canEditLists}
         onChange={(ids) => { save({ categoryId: ids[0] ?? null, subcategoryId: null }, { categoryId: ids[0] ?? null, subcategoryId: null }); if (ids[0] && (lists.categories.find((c) => c.id === ids[0])?.subcategories.length ?? 0) > 0) setSheet("subcategory"); }}
         onAdded={(e) => setLists((l) => ({ ...l, categories: [...l.categories, { ...e, subcategories: [] }] }))} />
-      <PickSheet open={sheet === "subcategory"} onClose={() => setSheet(null)} title={category ? `${category.name} · type` : "Type"} kind="subcategory" parentId={category?.id} options={category?.subcategories ?? []} selected={it.subcategoryId ? [it.subcategoryId] : []} canAdd={canEditLists}
+      <PickSheet clearable open={sheet === "subcategory"} onClose={() => setSheet(null)} title={category ? `${category.name} · type` : "Type"} kind="subcategory" parentId={category?.id} options={category?.subcategories ?? []} selected={it.subcategoryId ? [it.subcategoryId] : []} canAdd={canEditLists}
         onChange={(ids) => save({ subcategoryId: ids[0] ?? null }, { subcategoryId: ids[0] ?? null })}
         onAdded={(e) => setLists((l) => ({ ...l, categories: l.categories.map((c) => (c.id === category?.id ? { ...c, subcategories: [...c.subcategories, e] } : c)) }))} />
       <PickSheet open={sheet === "color"} onClose={() => setSheet(null)} title="Color" kind="color" options={lists.colors} selected={it.colorIds} multi canAdd={canEditLists} onChange={(ids) => save({ colorIds: ids }, { colorIds: ids })} onAdded={(e) => setLists((l) => ({ ...l, colors: [...l.colors, e] }))} />
-      <PickSheet open={sheet === "pattern"} onClose={() => setSheet(null)} title="Pattern" kind="pattern" options={lists.patterns} selected={it.patternId ? [it.patternId] : []} canAdd={canEditLists} onChange={(ids) => save({ patternId: ids[0] ?? null }, { patternId: ids[0] ?? null })} onAdded={(e) => setLists((l) => ({ ...l, patterns: [...l.patterns, e] }))} />
-      <PickSheet open={sheet === "fabric"} onClose={() => setSheet(null)} title="Fabric" kind="fabric" options={lists.fabrics} selected={it.fabricId ? [it.fabricId] : []} canAdd={canEditLists} onChange={(ids) => save({ fabricId: ids[0] ?? null }, { fabricId: ids[0] ?? null })} onAdded={(e) => setLists((l) => ({ ...l, fabrics: [...l.fabrics, e] }))} />
+      <PickSheet clearable open={sheet === "pattern"} onClose={() => setSheet(null)} title="Pattern" kind="pattern" options={lists.patterns} selected={it.patternId ? [it.patternId] : []} canAdd={canEditLists} onChange={(ids) => save({ patternId: ids[0] ?? null }, { patternId: ids[0] ?? null })} onAdded={(e) => setLists((l) => ({ ...l, patterns: [...l.patterns, e] }))} />
+      <PickSheet clearable open={sheet === "fabric"} onClose={() => setSheet(null)} title="Fabric" kind="fabric" options={lists.fabrics} selected={it.fabricId ? [it.fabricId] : []} canAdd={canEditLists} onChange={(ids) => save({ fabricId: ids[0] ?? null }, { fabricId: ids[0] ?? null })} onAdded={(e) => setLists((l) => ({ ...l, fabrics: [...l.fabrics, e] }))} />
       <PickSheet open={sheet === "season"} onClose={() => setSheet(null)} title="Season" kind="season" options={lists.seasons} selected={it.seasonIds} multi canAdd={canEditLists} onChange={(ids) => save({ seasonIds: ids }, { seasonIds: ids })} onAdded={(e) => setLists((l) => ({ ...l, seasons: [...l.seasons, e] }))} />
-      <PickSheet open={sheet === "formality"} onClose={() => setSheet(null)} title="Dress code" kind="formality" options={lists.formalities} selected={it.formalityId ? [it.formalityId] : []} canAdd={canEditLists} onChange={(ids) => save({ formalityId: ids[0] ?? null }, { formalityId: ids[0] ?? null })} onAdded={(e) => setLists((l) => ({ ...l, formalities: [...l.formalities, e] }))} />
+      <PickSheet clearable open={sheet === "formality"} onClose={() => setSheet(null)} title="Dress code" kind="formality" options={lists.formalities} selected={it.formalityId ? [it.formalityId] : []} canAdd={canEditLists} onChange={(ids) => save({ formalityId: ids[0] ?? null }, { formalityId: ids[0] ?? null })} onAdded={(e) => setLists((l) => ({ ...l, formalities: [...l.formalities, e] }))} />
       <PickSheet open={sheet === "occasion"} onClose={() => setSheet(null)} title="Occasions" kind="occasion" options={lists.occasions} selected={it.occasionIds} multi canAdd={canEditLists} onChange={(ids) => save({ occasionIds: ids }, { occasionIds: ids })} onAdded={(e) => setLists((l) => ({ ...l, occasions: [...l.occasions, e] }))} />
       <PickSheet open={sheet === "tag"} onClose={() => setSheet(null)} title="Tags" kind="tag" options={lists.tags} selected={it.tagIds} multi canAdd={canEditLists} onChange={(ids) => save({ tagIds: ids }, { tagIds: ids })} onAdded={(e) => setLists((l) => ({ ...l, tags: [...l.tags, e] }))} />
       <Sheet open={sheet === "brand"} onClose={() => setSheet(null)} title="Brand · Size">
@@ -255,16 +261,16 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists, m
           <button type="button" onClick={() => { setPhotoKind("label"); photoRef.current?.click(); }} className="pill mt-4 h-[50px]">Add a label photo</button>
         </div>
       </Sheet>
-      <PickSheet open={sheet === "store"} onClose={() => setSheet(null)} title="Store" kind="store" options={lists.stores} selected={it.storeId ? [it.storeId] : []} canAdd={canEditLists} onChange={(ids) => save({ storeId: ids[0] ?? null }, { storeId: ids[0] ?? null })} onAdded={(e) => setLists((l) => ({ ...l, stores: [...l.stores, e] }))} />
+      <PickSheet clearable open={sheet === "store"} onClose={() => setSheet(null)} title="Store" kind="store" options={lists.stores} selected={it.storeId ? [it.storeId] : []} canAdd={canEditLists} onChange={(ids) => save({ storeId: ids[0] ?? null }, { storeId: ids[0] ?? null })} onAdded={(e) => setLists((l) => ({ ...l, stores: [...l.stores, e] }))} />
       <PickSheet open={sheet === "closets"} onClose={() => setSheet(null)} title="Closets" kind="closet" options={lists.closets.map((c) => ({ id: c.id, name: c.kind === "family" ? `${c.name} (everyone)` : c.name }))} selected={it.closetIds} multi canAdd={canEditLists} onChange={(ids) => save({ closetIds: ids }, { closetIds: ids })} onAdded={(e) => setLists((l) => ({ ...l, closets: [...l.closets, { ...e, kind: "custom" }] }))} />
       <PickSheet open={sheet === "share"} onClose={() => setSheet(null)} title="Share with" kind="tag" options={lists.people} selected={it.sharedWithIds} multi canAdd={false} onChange={(ids) => save({ sharedWithIds: ids }, { sharedWithIds: ids })} />
       <TextSheet open={sheet === "size"} onClose={() => setSheet("brand")} title="Size" label="Size" value={it.size ?? ""} placeholder="M · 28 · 8 · EU 38" onSave={(v) => save({ sizeText: v }, { size: v.trim() || null })} />
       <MatchSheet open={sheet === "match"} onClose={() => setSheet("brand")} busy={matching || pending} onPick={pickMatch}
         probe={{ brand: brandName ?? "", name: it.name, category: category?.name ?? null, color: it.colorIds[0] ? name(lists.colors, it.colorIds[0]) : null }} />
       <TextSheet open={sheet === "rename"} onClose={() => setSheet(null)} title="Rename" label="Name" value={it.name} onSave={(v) => save({ name: v }, { name: v.trim() || it.name })} />
-      <TextSheet open={sheet === "price"} onClose={() => setSheet(null)} title="Price" label="Price" value={it.purchasePrice ?? ""} placeholder="48.50" onSave={(v) => { save({ purchasePrice: v }, { purchasePrice: v.replace(/[$,\s]/g, "") || null }); setSheet("date"); }} />
-      <TextSheet open={sheet === "date"} onClose={() => setSheet(null)} title="Bought on" label="Date (YYYY-MM-DD)" value={it.purchaseDate ?? ""} placeholder="2026-10-18" onSave={(v) => save({ purchaseDate: v }, { purchaseDate: v.trim() || null })} />
-      <TextSheet open={sheet === "url"} onClose={() => setSheet(null)} title="Link" label="Where you bought it" value={it.purchaseUrl ?? ""} placeholder="https://" onSave={(v) => save({ purchaseUrl: v }, { purchaseUrl: v.trim() || null })} />
+      <PriceDateSheet open={sheet === "price"} onClose={() => setSheet(null)} price={it.purchasePrice ?? ""} date={it.purchaseDate ?? ""}
+        onSave={({ price: pr, date }) => save({ purchasePrice: pr, purchaseDate: date }, { purchasePrice: pr.replace(/[$,\s]/g, "") || null, purchaseDate: date.trim() || null })} />
+      <TextSheet open={sheet === "url"} onClose={() => setSheet(null)} title="Link" label="Where you bought it" kind="url" value={it.purchaseUrl ?? ""} placeholder="https://" onSave={(v) => save({ purchaseUrl: v }, { purchaseUrl: v.trim() || null })} />
       {/* How the piece is made: the mirror offers Buttons / Sleeves / Hood chips only when a piece in the look has them. */}
       <Sheet open={sheet === "made"} onClose={() => setSheet(null)} title="Made with">
         <p className="mono mb-3 text-graphite">The mirror asks how to show these: buttons open, sleeves rolled, hood up.</p>
@@ -281,7 +287,7 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists, m
         </div>
         <div className="mt-4 flex justify-end"><Button type="button" size="md" onClick={() => setSheet(null)}>Done</Button></div>
       </Sheet>
-      <TextSheet open={sheet === "notes"} onClose={() => setSheet(null)} title="Fit notes" label="How it fits" value={it.fitNotes ?? ""} placeholder="Runs small · long in the arms" onSave={(v) => save({ fitNotes: v }, { fitNotes: v.trim() || null })} />
+      <TextSheet open={sheet === "notes"} onClose={() => setSheet(null)} title="Fit notes" label="How it fits" kind="multiline" value={it.fitNotes ?? ""} placeholder="Runs small · long in the arms" onSave={(v) => save({ fitNotes: v }, { fitNotes: v.trim() || null })} />
       <Sheet open={sheet === "photo"} onClose={() => setSheet(null)} title="Add a photo">
         <div className="flex flex-col">
           {([["alone", "Another photo", "Hanger or flat-lay"], ["back", "Back of the piece", "Graphic · cut"], ["worn", "Worn photo", "How it fits"], ["label", "Label", "Brand · size"]] as const).map(([k, l, m]) => (
@@ -296,7 +302,7 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists, m
         <p className="text-[14px] leading-snug">It leaves every closet and its photos are removed. This can&apos;t be undone.</p>
         <div className="mt-5 flex gap-2.5">
           <Button variant="secondary" className="flex-1" onClick={() => setSheet(null)}>Keep it</Button>
-          <Button className="flex-1" disabled={pending} data-testid="confirm-delete" onClick={() => start(async () => { const r = await deleteItemAction(it.id); if (!r.ok) { setError(r.error); setSheet(null); return; } router.push("/closet"); router.refresh(); })}>Delete</Button>
+          <Button className="flex-1" disabled={pending} data-testid="confirm-delete" onClick={() => start(async () => { const r = await deleteItemAction(it.id); if (!r.ok) { setError(r.error); setSheet(null); return; } markClosetRestore(); router.push(lastClosetUrl() ?? "/closet"); router.refresh(); })}>Delete</Button>
         </div>
       </Sheet>
     </div>

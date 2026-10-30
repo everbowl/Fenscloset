@@ -22,6 +22,11 @@ export function monoDate(key: string): string {
   return `${f({ weekday: "short" })} ${f({ day: "2-digit" })} ${f({ month: "short" })}`;
 }
 
+/** `Oct 18, 2026` for sentences and rows. */
+export function prettyDate(key: string): string {
+  return fromDayKey(key).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+}
+
 /** `OCT 2026` */
 export function monoMonth(year: number, month0: number): string {
   return new Date(Date.UTC(year, month0, 1)).toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" }).toUpperCase();

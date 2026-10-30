@@ -74,9 +74,10 @@ export function FitsScreen(p: {
     <div data-testid="fits" className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-14">
       <div className="lg:col-span-2"><PageHeader title="Fits" aside={
         <span className="flex items-center gap-0.5 text-ink">
-          <Link href={`/fits?m=${monthKey(-1)}&d=${p.selected}`} aria-label="Previous month" className="flex size-9 items-center justify-center"><ChevronLeft className="size-3" strokeWidth={2} /></Link>
+          <Link href={`/fits?m=${monthKey(-1)}`} aria-label="Previous month" className="flex size-11 items-center justify-center active:bg-bone"><ChevronLeft className="size-4" strokeWidth={2} /></Link>
           <span data-testid="month-label">{monoMonth(p.year, p.month0)}</span>
-          <Link href={`/fits?m=${monthKey(1)}&d=${p.selected}`} aria-label="Next month" className="flex size-9 items-center justify-center"><ChevronRight className="size-3" strokeWidth={2} /></Link>
+          <Link href={`/fits?m=${monthKey(1)}`} aria-label="Next month" className="flex size-11 items-center justify-center active:bg-bone"><ChevronRight className="size-4" strokeWidth={2} /></Link>
+          {p.selected !== p.today ? <Link href={`/fits?d=${p.today}`} replace className="pill pill-sm ml-2" data-testid="fits-today">Today</Link> : null}
         </span>
       } /></div>
       {error ? <Banner tone="danger" title={error} className="mb-3 lg:col-span-2" /> : null}
@@ -86,12 +87,12 @@ export function FitsScreen(p: {
         {cells.map((day, i) => {
           if (!day) return <div key={i} className="h-[46px]" />;
           const fitsOn = byDay.get(day) ?? [];
-          const img = fitsOn[0]?.photoKey ?? fitsOn[0]?.thumbKey ?? null;
+          const img = fitsOn[0]?.thumbKey ?? fitsOn[0]?.photoKey ?? null; // the small cutout, not the full photo of the night, in a 46px cell
           const isToday = day === p.today, isSel = day === p.selected;
           return (
-            <Link key={i} href={`/fits?m=${monthKey(0)}&d=${day}`} aria-label={day} aria-current={isSel ? "date" : undefined}
+            <Link key={i} href={`/fits?m=${monthKey(0)}&d=${day}`} replace scroll={false} aria-label={day} aria-current={isSel ? "date" : undefined}
               className={cn("relative h-[46px] overflow-hidden lg:h-[84px]", fitsOn.length ? "bg-bone" : "bg-paper", isSel && "outline outline-2 -outline-offset-2 outline-ink")} data-testid={fitsOn.length ? "day-with-fit" : undefined}>
-              {img ? <img src={`/api/photo/${img}`} alt="" className="absolute inset-0 size-full object-cover" /> : null}
+              {img ? <img src={`/api/photo/${img}`} alt="" loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover" /> : null}
               <span className={cn("mono absolute left-1 top-[3px] px-[3px] py-px", isToday ? "bg-ink text-paper" : fitsOn.length ? "bg-paper text-ink" : "text-ink")}>{Number(day.slice(8))}</span>
             </Link>
           );

@@ -4,8 +4,7 @@ import { isAdmin, requirePerson } from "@/lib/auth/current";
 import { PageHeader } from "@/components/ui/page-header";
 import { findTopic, HELP_TOPICS } from "../content";
 import { CueTile } from "../cues";
-import { getAddTips } from "@/lib/tips";
-import type { HelpStep } from "../content";
+import { stepsFor } from "../steps";
 
 export const dynamic = "force-dynamic";
 
@@ -19,14 +18,7 @@ export default async function HelpTopicPage({ params }: { params: Promise<{ slug
   const person = await requirePerson();
   const topic = findTopic((await params).slug);
   if (!topic || (topic.adminOnly && !isAdmin(person))) notFound();
-  let steps: HelpStep[] = topic.steps;
-  if (topic.slug === "add") {
-    // Photo rules live with the app, not the Help copy: the general list plus one tip per category (admins edit under Lists).
-    const tips = await getAddTips(person.id);
-    const before: HelpStep[] = [{ text: `Before you start: ${tips.general.join(" ")}`, cue: { kind: "icon", name: "camera" } }];
-    const perPiece: HelpStep[] = tips.categories.map((c) => ({ text: `${c.name}: ${c.tip}`, cue: { kind: "tabs", active: c.name, others: [] } }));
-    steps = [...before, ...topic.steps, ...perPiece];
-  }
+  const steps = await stepsFor(topic, person.id);
   const visible = HELP_TOPICS.filter((t) => !t.adminOnly || isAdmin(person));
   const i = visible.findIndex((t) => t.slug === topic.slug);
   const next = visible[i + 1];

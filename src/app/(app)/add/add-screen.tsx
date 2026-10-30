@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Button, Icons } from "@/components/ui/button";
 import { Banner } from "@/components/ui/banner";
 import { useImportQueue } from "@/components/import-queue-provider";
+import { abandonBatchAction } from "@/app/(flow)/add/[batchId]/actions";
 
 const pad = (n: number) => String(n).padStart(3, "0");
 
@@ -22,7 +23,7 @@ function CameraIcon() {
  * background (and survive closing the app); the counter follows the mockup's `042 / 150` chip.
  */
 export function AddScreen({ tips }: { tips?: ReactNode }) {
-  const { batch, upload, loaded, addFiles, retryFailedUploads } = useImportQueue();
+  const { batch, upload, loaded, addFiles, retryFailedUploads, dropFailedUploads, retryHeld } = useImportQueue();
   const pickRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   /** Linear (Jeff, 18 Oct 2026): first pick the door, then the photo panel opens. */
@@ -46,7 +47,7 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
   const ready = c?.needs_confirm ?? 0;
   const settled = c ? c.done + c.skipped : 0;
   const total = batch ? Math.max(batch.total, settled + ready + working + (c?.failed ?? 0)) : 0;
-  const hasBatch = Boolean(batch) || upload.active || upload.pending > 0;
+  const hasBatch = Boolean(batch) || upload.active || upload.pending > 0 || upload.held > 0;
   const progress = total ? Math.round(((settled + ready) / total) * 100) : 0;
 
   if (!loaded) return <div><PageHeader title="Add" accent="clothes" /><div className="h-[380px] bg-bone" /></div>;
@@ -109,16 +110,28 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
         <div className="absolute inset-x-0 bottom-0 h-[3px] bg-black/[0.12]"><div className="h-[3px] bg-ink transition-[width] duration-150" style={{ width: `${progress}%` }} /></div>
       </div>
 
+      {upload.held > 0 ? (
+        <Banner tone="danger" title={`No connection · ${upload.held} photo${upload.held > 1 ? "s" : ""} waiting`} className="mt-4" data-testid="held-banner">
+          <p className="text-[13px]">They’ll be added the moment you’re back online.</p>
+          <button type="button" onClick={() => void retryHeld()} className="pill mt-3">Try now</button>
+        </Banner>
+      ) : null}
       {upload.failed.length > 0 ? (
         <Banner tone="danger" title={`${upload.failed.length} photo${upload.failed.length > 1 ? "s" : ""} did not upload`} className="mt-4">
-          <p className="text-[13px]">{upload.failed[0].error}</p>
-          <button type="button" onClick={retryFailedUploads} className="pill mt-3">Try again</button>
+          <p className="text-[13px]">{plainError(upload.failed[0].error)}</p>
+          <div className="mt-3 flex gap-2">
+            <button type="button" onClick={retryFailedUploads} className="pill">Try again</button>
+            <button type="button" onClick={() => void dropFailedUploads()} className="pill pill-quiet" data-testid="drop-failed">Remove these</button>
+          </div>
         </Banner>
       ) : null}
       {batch && batch.failed.length > 0 ? (
         <Banner tone="danger" title={`${batch.failed.length} photo${batch.failed.length > 1 ? "s" : ""} could not be tagged`} className="mt-4">
-          <p className="text-[13px]">{batch.failed[0].error ?? "Something went wrong."}</p>
-          <RetryAll ids={batch.failed.map((f) => f.id)} />
+          <p className="text-[13px]">{plainError(batch.failed[0].error)}</p>
+          <div className="mt-3 flex gap-2">
+            <RetryAll ids={batch.failed.map((f) => f.id)} />
+            {ready === 0 && working === 0 && !upload.active ? <LetThemGo batchId={batch.id} /> : null}
+          </div>
         </Banner>
       ) : null}
 
@@ -147,8 +160,30 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
 function RetryAll({ ids }: { ids: string[] }) {
   const { refresh } = useImportQueue();
   return (
-    <button type="button" className="pill mt-3" onClick={async () => { await Promise.all(ids.map((id) => fetch(`/api/import/entries/${id}/process`, { method: "POST" }))); await refresh(); }}>
+    <button type="button" className="pill" onClick={async () => { await Promise.all(ids.map((id) => fetch(`/api/import/entries/${id}/process`, { method: "POST" }))); await refresh(); }}>
       Try again
     </button>
   );
+}
+
+/** Only failed photos are left in the batch: let them go and the pile is clear. */
+function LetThemGo({ batchId }: { batchId: string }) {
+  const { refresh } = useImportQueue();
+  return (
+    <button type="button" className="pill pill-quiet" data-testid="let-them-go" onClick={async () => { await abandonBatchAction(batchId); await refresh(); }}>
+      Let them go
+    </button>
+  );
+}
+
+/** Raw errors stay in the log; the family reads plain words. */
+export function plainError(raw: string | null | undefined): string {
+  const e = (raw ?? "").toLowerCase();
+  if (!e) return "Something went wrong.";
+  if (e.includes("unsupported image") || e.includes("heic") || e.includes("decode")) return "This photo is in a format the app can’t read. A screenshot of it works.";
+  if (e.includes("413") || e.includes("too large") || e.includes("entity too large")) return "This photo is too big to upload.";
+  if (e.includes("api_key") || e.includes("api key") || e.includes("not configured")) return "Tagging isn’t set up on the site yet. Jeff has been told.";
+  if (e.includes("failed to fetch") || e.includes("network") || e.includes("load failed")) return "The connection dropped. It will try again.";
+  if (/\b5\d\d\b/.test(e)) return "The site hiccuped. Try again in a moment.";
+  return "Something went wrong. Try again in a moment.";
 }

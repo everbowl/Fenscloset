@@ -79,7 +79,12 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
   return (
     <Sheet open={m.open} onClose={() => m.setOpen(false)} title={m.pending ? "Complete the look" : "In the mirror"}>
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPhoto} data-testid="mirror-body-photo" />
-      {m.error ? <Banner tone="danger" title={m.error} className="mb-3" /> : null}
+      {m.error ? (
+        <div className="mb-3 flex flex-col gap-2">
+          <Banner tone="danger" title={m.error} />
+          {!m.busy && m.look ? <button type="button" onClick={() => void m.dress({ look: m.look!, on: m.on, view: m.view })} className="pill self-start" data-testid="mirror-retry">Try again</button> : null}
+        </div>
+      ) : null}
       {m.pending ? <CompletePanel m={m} /> : t || m.busy ? (
         <div className="flex flex-col gap-3" {...(t ? { "data-testid": "try-on-sheet" } : {})}>
           <div className="relative h-[460px] overflow-hidden bg-bone">

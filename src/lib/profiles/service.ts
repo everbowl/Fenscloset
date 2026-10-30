@@ -2,6 +2,8 @@ import { db } from "@/lib/db";
 import type { BodyView } from "@/generated/prisma/client";
 import { forgetTaste } from "@/lib/outfits/taste";
 import { isTryOnConfigured } from "@/lib/tryon";
+import { mirrorEngines } from "@/lib/tryon";
+import { type Engine } from "@/lib/tryon/engines";
 import { deleteObject, parseKey } from "@/lib/storage";
 import { bodyPhotosAllowed, canGrantBodyAccess, canSeeBodyData, type Viewer } from "@/lib/people/visibility";
 
@@ -33,7 +35,7 @@ export type PrivacyView = {
   parentIds: string[];
   canGrant: boolean;
   /** Virtual try-on (adults only): opted in, and whether the site has a provider. */
-  tryOn: { enabled: boolean; adult: boolean; configured: boolean; hasBodyPhoto: boolean };
+  tryOn: { enabled: boolean; adult: boolean; configured: boolean; hasBodyPhoto: boolean; /** Who receives the body photo to make the picture (the household's mirror rule). */ engines: Engine[] };
 };
 
 /** Only the owner (or a parent of a minor owner) edits a profile. */
@@ -174,16 +176,17 @@ export async function updateFavorites(viewer: Viewer, ownerId: string, patch: { 
 // ---------- Privacy grants ----------
 
 export async function getPrivacy(ownerId: string): Promise<PrivacyView> {
-  const [p, body, shop, parents, canGrant, photo] = await Promise.all([
+  const [p, body, shop, parents, canGrant, photo, mirror] = await Promise.all([
     db.person.findUniqueOrThrow({ where: { id: ownerId }, select: { savedZip: true, role: true, tryOnEnabled: true } }),
     db.bodyDataGrant.findMany({ where: { ownerId }, select: { viewerId: true } }),
     db.shopForGrant.findMany({ where: { ownerId }, select: { shopperId: true } }),
     db.guardianLink.findMany({ where: { minorId: ownerId }, select: { parentId: true } }),
     canGrantBodyAccess(ownerId),
     db.bodyPhoto.findFirst({ where: { personId: ownerId }, select: { id: true } }),
+    mirrorEngines(),
   ]);
   return { savedZip: p.savedZip, bodyViewerIds: body.map((b) => b.viewerId), shopperIds: shop.map((s) => s.shopperId), parentIds: parents.map((g) => g.parentId), canGrant,
-    tryOn: { enabled: p.tryOnEnabled, adult: p.role !== "minor", configured: isTryOnConfigured(), hasBodyPhoto: Boolean(photo) } };
+    tryOn: { enabled: p.tryOnEnabled, adult: p.role !== "minor", configured: isTryOnConfigured(), hasBodyPhoto: Boolean(photo), engines: mirror.engines } };
 }
 
 /** Only the owner changes grants (a parent does not hand out a minor's data). Minors cannot grant at all. */

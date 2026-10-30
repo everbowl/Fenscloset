@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Sheet } from "@/components/ui/sheet";
 import { Button, Icons } from "@/components/ui/button";
 import { Banner } from "@/components/ui/banner";
@@ -57,6 +57,8 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
     start(async () => { const r = await mirrorEntryAction(entry.id, duplicate.itemId); if (!r.ok) { setError(r.error); return; } setTags(r.value); setMirrored(true); });
   }
   const router = useRouter();
+  // Each piece starts at the top (router.refresh keeps the old scroll, which left the next photo above the fold).
+  useEffect(() => { window.scrollTo({ top: 0 }); }, []);
   const [tags, setTags] = useState(initial);
   const [lists, setLists] = useState(initialLists);
   const [sheet, setSheet] = useState<SheetKind>(null);
@@ -196,7 +198,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
           <span className="mono tracking-[0.1em]">{mirrored ? `Details copied from ${duplicate.name ?? "it"} · check the color` : "Looks like one you own"}</span>
           <div className="flex items-center gap-2.5">
             <div className="h-9 w-[30px] overflow-hidden bg-bone">{duplicate.thumbKey ? <img src={`/api/photo/${duplicate.thumbKey}`} alt={duplicate.name ?? "Item you own"} className="size-full object-cover" /> : null}</div>
-            <button type="button" onClick={merge} disabled={pending} className="pill pill-sm">Same?</button>
+            <button type="button" onClick={() => setAskLike(true)} disabled={pending} className="pill pill-sm" data-testid="same-piece">Same?</button>
           </div>
         </div>
       ) : null}
@@ -247,11 +249,12 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
       {uploading ? <p className="mono px-5 pt-3 text-graphite">{uploading === "label" ? "Reading the label…" : uploading === "back" ? "Reading front and back…" : "Saving the photo…"}</p> : null}
       {labelKey || wornKey || backKey ? <p className="mono px-5 pt-3 text-graphite" data-testid="photo-status">{[backKey ? "Back photo added" : null, labelKey ? "Label photo added" : null, wornKey ? "Worn photo added" : null].filter(Boolean).join(" · ")}</p> : null}
 
-      <div className="mt-auto flex gap-2.5 px-5 pb-[26px] pt-5">
+      {/* The one action stays in reach: pinned to the bottom of the screen, above the home bar. */}
+      <div className="sticky bottom-0 z-10 mt-auto flex items-center gap-2.5 border-t border-line bg-paper px-5 pb-[calc(16px+env(safe-area-inset-bottom))] pt-3" data-testid="confirm-bar">
         <Button size="lg" className="flex-1 justify-start" shelf={false} icon={<Icons.check />} sub={readyCount > 1 ? "Saves it · next photo" : "Saves it to your closet"} onClick={confirm} disabled={pending || Boolean(uploading)} data-testid="confirm-next">
           {pending ? "Saving…" : readyCount > 1 ? "Looks right · Next" : "Looks right · Done"}
         </Button>
-        <button type="button" onClick={() => setSheet("camera")} aria-label="Add a label or worn photo" className="flex size-[54px] items-center justify-center border border-ink bg-paper text-ink">
+        <button type="button" onClick={() => setSheet("camera")} aria-label="Add a label or worn photo" className="flex size-[60px] shrink-0 items-center justify-center rounded-full border-2 border-ink bg-paper text-ink active:bg-bone">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden><path d="M3 8h4l2-3h6l2 3h4v12H3z" /><circle cx="12" cy="13.5" r="3.5" /></svg>
         </button>
       </div>
@@ -291,13 +294,13 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
       <Sheet open={askLike && Boolean(duplicate)} onClose={dismissLike} title="Another one like this?">
         {duplicate ? (
           <div className="flex flex-col gap-4" data-testid="like-sheet">
-            <div className="flex items-center gap-3">
-              <div className="h-[72px] w-[60px] overflow-hidden bg-bone">{duplicate.thumbKey ? <img src={`/api/photo/${duplicate.thumbKey}`} alt="" className="size-full object-cover" /> : null}</div>
-              <p className="text-[15px] leading-snug">You own <strong>{duplicate.name ?? "a piece like this"}</strong>. Is this another one of the same?</p>
+            <div className="grid grid-cols-2 gap-3">
+              <figure><div className="h-[150px] overflow-hidden bg-bone"><img src={`/api/photo/${photoKey}`} alt="" className="size-full object-contain" /></div><figcaption className="mono mt-1.5 text-graphite">This photo</figcaption></figure>
+              <figure><div className="h-[150px] overflow-hidden bg-bone">{duplicate.thumbKey ? <img src={`/api/photo/${duplicate.thumbKey}`} alt="" className="size-full object-contain" /> : null}</div><figcaption className="mono mt-1.5 truncate text-graphite">{duplicate.name ?? "What you own"}</figcaption></figure>
             </div>
-            <Button size="lg" className="w-full justify-start" shelf={false} icon={<Icons.copy />} sub="Copies its details · you check the color" onClick={mirror} data-testid="like-mirror">Yes · same piece</Button>
-            <button type="button" onClick={() => { dismissLike(); merge(); }} className="pill pill-solid h-[50px] w-full" data-testid="like-merge">It&apos;s this exact one · add the photo to it</button>
-            <button type="button" onClick={dismissLike} className="pill pill-quiet h-[50px] w-full" data-testid="like-new">No · a new piece</button>
+            <Button size="lg" className="w-full justify-start" shelf={false} icon={<Icons.copy />} sub="Copies its details · you check the color" onClick={mirror} data-testid="like-mirror">Another one of these</Button>
+            <button type="button" onClick={() => { dismissLike(); merge(); }} className="pill pill-solid h-[50px] w-full" data-testid="like-merge">It&apos;s the one I have · add this photo</button>
+            <button type="button" onClick={dismissLike} className="pill pill-quiet h-[50px] w-full" data-testid="like-new">No · something new</button>
           </div>
         ) : null}
       </Sheet>

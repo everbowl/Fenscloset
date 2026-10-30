@@ -10,6 +10,7 @@ import { activeFilterCount, closetQuery, parseClosetParams } from "@/lib/items/v
 import { mirrorConfig } from "@/lib/tryon/config";
 import { FilterTabs } from "@/components/filter-tabs";
 import { ClosetSearch } from "@/components/closet-search";
+import { RememberCloset } from "@/components/remember-closet";
 import { ClosetGrid } from "./closet-grid";
 import { ClosetTools } from "./closet-tools";
 
@@ -36,7 +37,7 @@ export default async function ClosetPage({ searchParams }: { searchParams: Promi
 
   return (
     <div>
-      <Suspense><ClosetSearch basePath="/closet" /></Suspense>
+      <Suspense><ClosetSearch basePath="/closet" /><RememberCloset /></Suspense>
       <PageHeader title={view.kind === "family" ? "Family" : mine ? "Closet" : view.name} accent={view.kind === "family" ? "closet" : mine ? undefined : "closet"}
         aside={narrowed ? `${shown} of ${total} ${total === 1 ? "piece" : "pieces"}` : `${total} ${total === 1 ? "piece" : "pieces"}`} />
       <FilterTabs categories={categories} active={categoryId} basePath="/closet" keep={keep} canEdit={isAdmin(person)} />
@@ -51,7 +52,9 @@ export default async function ClosetPage({ searchParams }: { searchParams: Promi
           <p className="mono mt-6 text-center text-graphite" data-testid="closet-empty">
             {q ? `Nothing matches “${q}”` : filtered ? "Nothing matches these filters" : total === 0 ? (mine ? "Nothing here yet · tap + to add clothes" : "Nothing here yet") : "Nothing in this category"}
           </p>
-          {filtered ? <div className="mt-4 text-center"><Link href={`/closet${closetQuery({ sort, cat: categoryId, q })}`} className="pill" data-testid="empty-clear-filters">Clear filters</Link></div> : null}
+          {q ? <div className="mt-4 text-center"><Link href={`/closet${closetQuery({ sort, cat: categoryId, filters })}`} className="pill" data-testid="empty-clear-search">Clear search</Link></div>
+            : filtered ? <div className="mt-4 text-center"><Link href={`/closet${closetQuery({ sort, cat: categoryId, q })}`} className="pill" data-testid="empty-clear-filters">Clear filters</Link></div>
+            : categoryId && total > 0 ? <div className="mt-4 text-center"><Link href={`/closet${closetQuery({ sort, q, filters })}`} className="pill" data-testid="empty-see-all">See all {total}</Link></div> : null}
           {mine && total === 0 ? <div className="mt-4 text-center"><Link href="/add" className="pill pill-solid h-[50px] px-6">Add clothes</Link></div> : null}
         </div>
       )}

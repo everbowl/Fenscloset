@@ -57,7 +57,8 @@ const pad = (n: number) => String(n).padStart(2, "0");
 export function TodayScreen(p: Props) {
   const router = useRouter();
   const [, start] = useTransition();
-  const [busy, setBusy] = useState<string | null>(null);
+  // No looks yet: the screen opens already building (the build starts below), never on an error it has not had.
+  const [busy, setBusy] = useState<string | null>(p.needsLooks ? "regen" : null);
   const [error, setError] = useState<string>();
   const [sheet, setSheet] = useState<"checkin" | "plan" | "planText" | "swap" | "zip" | null>(null);
   const [index, setIndex] = useState(Math.max(0, p.suggestion?.wornIndex ?? 0));
@@ -174,7 +175,7 @@ export function TodayScreen(p: Props) {
           </div>
         }
         title={title} accent="look"
-        aside={boards.length ? `${pad(index + 1)} / ${pad(boards.length)}` : "00 / 03"}
+        aside={boards.length ? `${pad(index + 1)} / ${pad(boards.length)}` : undefined}
       />
       </div>
 
@@ -263,6 +264,7 @@ export function TodayScreen(p: Props) {
               {busy === "regen" ? "Three looks for today are on their way. About half a minute." : p.enoughClothes ? (p.canDress ? "Something went wrong building today’s looks." : `${p.personName} hasn’t opened Today yet.`) : p.mine ? "Add clothes with the + button and your first three looks will appear here." : `${p.personName}’s closet needs a few more pieces first.`}
             </p>
             {busy === "regen" ? <p className="mono text-graphite" data-testid="refreshing">Building today’s looks…</p> : null}
+            {!p.enoughClothes && p.mine && busy !== "regen" ? <Link href="/add" className="pill mt-3 self-start" data-testid="empty-add-clothes">+ Add clothes</Link> : null}
           </div>
           {p.enoughClothes && p.canDress && busy !== "regen" ? <Button variant="secondary" className="mt-4 w-full lg:col-start-2" disabled={busy !== null} onClick={() => buildLooks("regen", () => regenerateAction(p.personId))}>Try again</Button> : null}
         </>
@@ -294,7 +296,7 @@ export function TodayScreen(p: Props) {
       ) : null}
 
       {p.cleanOutCount > 0 && p.canDress ? (
-        <Link href="/closet/clean-out" className="mt-3 flex items-center justify-between border border-ink px-4 py-3.5 hover:bg-bone lg:col-start-2" data-testid="clean-out-link">
+        <Link href="/closet/clean-out?from=today" className="mt-3 flex items-center justify-between border border-ink px-4 py-3.5 hover:bg-bone lg:col-start-2" data-testid="clean-out-link">
           <span className="flex flex-col gap-0.5">
             <span className="serif text-[22px]">Time for a <em>clean-out?</em></span>
             <span className="mono text-ink">{p.cleanOutCount} {p.cleanOutCount === 1 ? "piece" : "pieces"} not worn in a while</span>
@@ -306,13 +308,13 @@ export function TodayScreen(p: Props) {
       {p.weather ? <p className="mono mt-5 text-graphite lg:col-start-2">Weather by Open-Meteo{p.weather.source === "mock" ? " · mock" : ""}</p> : null}
 
       {/* Check-in: taps on each scale, or a selfie read by Claude. */}
-      <CheckInSheet open={sheet === "checkin"} onClose={() => setSheet(null)} scales={p.scales} current={p.checkIn} busy={busy}
+      <CheckInSheet open={sheet === "checkin"} onClose={() => setSheet(null)} scales={p.scales} current={p.checkIn} busy={busy} isAdmin={p.isAdmin}
         onTaps={(answers) => saveThenRefresh(() => checkInTapsAction(p.personId, answers))}
         onSelfie={(file) => { const fd = new FormData(); fd.set("selfie", file); saveThenRefresh(() => checkInSelfieAction(p.personId, fd)); }} />
 
       {/* Plan: the occasion list (admins add right here), free text, or back to the calendar. */}
       <Sheet open={sheet === "plan"} onClose={() => setSheet(null)} title="Today’s plan">
-        <p className="mono mb-3 text-graphite">{p.plan.source === "calendar" ? `From your calendar: ${p.plan.label}` : p.plan.source === "pick" ? `Picked: ${p.plan.label}` : p.calendarConnected ? "Nothing on your calendar today" : p.calendarConfigured ? "Connect Google Calendar in Settings, or pick a plan" : "Pick a plan"}</p>
+        <p className="mono mb-3 text-graphite">{p.plan.source === "calendar" ? `From your calendar: ${p.plan.label}` : p.plan.source === "pick" ? `Picked: ${p.plan.label}` : p.calendarConnected ? "Nothing on your calendar today" : p.calendarConfigured ? <>Pick a plan, or <Link href="/profile/settings" className="text-ink underline underline-offset-4">connect Google Calendar</Link></> : "Pick a plan"}</p>
         <PlanPicker occasions={p.occasions} selected={p.plan.occasionId} isAdmin={p.isAdmin} busy={busy !== null}
           onPick={(id) => saveThenRefresh(() => setPlanAction(p.personId, { occasionId: id }))}
           onText={() => setSheet("planText")}
@@ -413,8 +415,8 @@ function WhyList({ why }: { why: NonNullable<BoardView["why"]> }) {
   );
 }
 
-function CheckInSheet({ open, onClose, scales, current, busy, onTaps, onSelfie }: {
-  open: boolean; onClose: () => void; scales: Scale[]; current: Props["checkIn"]; busy: string | null;
+function CheckInSheet({ open, onClose, scales, current, busy, isAdmin, onTaps, onSelfie }: {
+  open: boolean; onClose: () => void; scales: Scale[]; current: Props["checkIn"]; busy: string | null; isAdmin: boolean;
   onTaps: (answers: { scaleId: string; optionId: string }[]) => void; onSelfie: (file: File) => void;
 }) {
   const [answers, setAnswers] = useState<Record<string, string>>(() => Object.fromEntries((current?.answers ?? []).map((a) => [a.scaleId, a.optionId])));
@@ -435,7 +437,12 @@ function CheckInSheet({ open, onClose, scales, current, busy, onTaps, onSelfie }
             </div>
           </div>
         ))}
-        {scales.length === 0 ? <p className="mono text-graphite">No check-in scales yet. Admins add them under Admin → Lists.</p> : null}
+        {scales.length === 0 ? (
+          <div className="flex flex-col gap-3">
+            <p className="mono text-graphite">No check-in questions yet.</p>
+            {isAdmin ? <Link href="/admin/lists/checkInScale" className="pill self-start">+ Add a question</Link> : <p className="mono text-graphite">A parent admin can add them under Lists.</p>}
+          </div>
+        ) : null}
       </div>
       <div className="mt-6 flex flex-col gap-2">
         <Button className="w-full" disabled={busy !== null} onClick={() => onTaps(Object.entries(answers).filter(([, v]) => v).map(([scaleId, optionId]) => ({ scaleId, optionId })))} data-testid="save-check-in">{busy === "checkin" ? "Saving…" : "Save check-in"}</Button>

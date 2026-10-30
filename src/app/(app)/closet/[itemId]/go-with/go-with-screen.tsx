@@ -65,7 +65,7 @@ export function GoWithScreen({ itemId, name, thumbKey, fresh, initial }: { itemI
   return (
     <div data-testid="go-with" className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-14">
       <div className="lg:col-span-2">
-        <PageHeader eyebrow={<Link href={`/closet/${itemId}`} className="mono text-ink" data-testid="go-with-back">← {name}</Link>} title="Something to go" accent="with it" />
+        <PageHeader eyebrow={<span className="text-ink" data-testid="go-with-piece">{name}</span>} title="Something to go" accent="with it" />
       </div>
       {error ? <Banner tone="danger" title={error} className="mb-3 lg:col-span-2" /> : null}
 
@@ -82,6 +82,8 @@ export function GoWithScreen({ itemId, name, thumbKey, fresh, initial }: { itemI
             <p className="mono flex items-center justify-between gap-3 text-ink"><span>{progress?.step ?? "Looking at the closet…"}</span><span className="shrink-0 text-graphite">{secs}s</span></p>
             <p className="mono mt-1 text-graphite">Usually 15 to 40 seconds. You can leave this screen; the answer is kept on this page.</p>
           </div>
+        ) : error ? (
+          <button type="button" onClick={() => void run(Boolean(view))} className="pill mt-4" data-testid="go-with-retry">Try again</button>
         ) : view ? (
           <button type="button" onClick={() => void run(true)} className="pill pill-sm mt-4" data-testid="go-with-again">Look again</button>
         ) : null}

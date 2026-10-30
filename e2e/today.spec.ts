@@ -93,7 +93,8 @@ test("morning flow: Jeff gets three looks, checks in, sets the plan, swaps, wear
   await page.getByTestId("clean-out-link").click();
   await expect(page.getByTestId("clean-out-row")).toHaveCount(1);
   await page.locator("[data-testid^=keep-]").click();
-  await expect(page.getByText("Everything in this closet has been worn recently")).toBeVisible();
+  await expect(page.getByTestId("clean-out-undo")).toContainText("Kept");
+  await expect(page.getByTestId("clean-out-row")).toHaveCount(0);
 });
 
 test("Brittney sees Jeff's shared fit in the family calendar and gets her own looks; together mode for three", async ({ page }) => {

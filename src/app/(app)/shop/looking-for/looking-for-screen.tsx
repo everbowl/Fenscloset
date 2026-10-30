@@ -20,6 +20,7 @@ import { ago } from "./ago";
  */
 export function LookingForScreen({ meId, people, forPersonId, wants }: { meId: string; people: { id: string; name: string }[]; forPersonId: string; wants: WantView[] }) {
   const [sheet, setSheet] = useState<"add" | "for" | null>(null);
+  const [pendingText, setPendingText] = useState("");
   const { searching, error, run, secondsOf } = useWantSearch();
   const forName = people.find((p) => p.id === forPersonId)?.name ?? "me";
   const open = wants.filter((w) => !w.foundAt);
@@ -32,7 +33,7 @@ export function LookingForScreen({ meId, people, forPersonId, wants }: { meId: s
     <div data-testid="looking-for" className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-14">
       <div className="lg:col-span-2">
         <PageHeader
-          eyebrow={<span className="flex items-center gap-3"><Link href={`/shop?for=${forPersonId}`} className="mono text-ink" data-testid="looking-for-back">← Shop</Link><button type="button" onClick={() => setSheet("for")} className="mono text-ink" data-testid="looking-for-for">For · {forPersonId === meId ? "me" : forName} ⌄</button></span>}
+          eyebrow={<button type="button" onClick={() => setSheet("for")} className="pill pill-sm" aria-haspopup="dialog" data-testid="looking-for-for">For {forPersonId === meId ? "me" : forName} <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden><path d="m6 9 6 6 6-6" /></svg></button>}
           title="Looking" accent="for" aside={open.length ? `${open.length} open` : undefined} />
       </div>
       {error ? <Banner tone="danger" title={error} className="mb-3 lg:col-span-2" /> : null}
@@ -44,8 +45,11 @@ export function LookingForScreen({ meId, people, forPersonId, wants }: { meId: s
 
       <section className="mt-6 lg:col-start-1 lg:row-start-3 lg:row-span-3 lg:mt-0">
         {pendingNew ? (
-          <div className="flex min-h-[64px] items-center justify-between gap-3 border-b border-line py-3" data-testid="want-row-pending" aria-live="polite">
-            <span className="mono text-ink">{pendingNew.step}</span><span className="mono shrink-0 text-graphite">{secondsOf(pendingNew)}s</span>
+          <div className="flex min-h-[64px] items-center justify-between gap-3 border-b border-line py-3" data-testid="want-row-pending">
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[16px] font-medium">{pendingText || "New line"}</span>
+              <span className="mono block text-graphite" aria-live="polite">{pendingNew.step} <span aria-hidden>· {secondsOf(pendingNew)}s</span></span>
+            </span>
           </div>
         ) : null}
         {open.length === 0 && !pendingNew ? (
@@ -85,7 +89,7 @@ export function LookingForScreen({ meId, people, forPersonId, wants }: { meId: s
         ) : null}
       </section>
 
-      <WantSheet open={sheet === "add"} onClose={() => setSheet(null)} title="Looking for…" value="" onSave={(text) => void run("new", () => addWantAction(forPersonId, text))} />
+      <WantSheet open={sheet === "add"} onClose={() => setSheet(null)} title="Looking for…" value="" onSave={(text) => { setPendingText(text); void run("new", () => addWantAction(forPersonId, text)); }} />
       <Sheet open={sheet === "for"} onClose={() => setSheet(null)} title="Whose list">
         <div className="flex flex-col" role="listbox">
           {people.map((p) => <Link key={p.id} href={`/shop/looking-for?for=${p.id}`} role="option" aria-selected={p.id === forPersonId} onClick={() => setSheet(null)} className="flex h-12 items-center justify-between border-b border-line text-[15px]"><span>{p.id === meId ? `${p.name} (me)` : p.name}</span><span className={cn("mono", p.id === forPersonId ? "text-ink" : "text-transparent")}>✓</span></Link>)}

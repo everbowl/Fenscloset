@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { requirePerson, isAdmin } from "@/lib/auth/current";
 import { resolveView, viewableClosets, VIEW_COOKIE } from "@/lib/people/visibility";
@@ -24,7 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <style>{`:root{--accent:${accent}}`}</style>
       <ServiceWorkerRegistrar />
       <DevModeBanner />
-      <AppHeader left={<div className="flex items-center"><HeaderBack /><PersonMenu views={views} current={current} isAdmin={isAdmin(person)} logout={logoutAction} setView={setViewAction} /></div>} right={<HeaderActionSlot />} />
+      <AppHeader left={<div className="flex items-center"><Suspense><HeaderBack /></Suspense><PersonMenu views={views} current={current} isAdmin={isAdmin(person)} logout={logoutAction} setView={setViewAction} /></div>} right={<HeaderActionSlot />} />
       {/* Desktop (Q17): the tab row sits under the header; on phones it is the pinned bottom bar. */}
       <AppNav />
       <main className="mx-auto w-full max-w-[480px] px-5 pb-28 pt-5 lg:max-w-[1040px] lg:px-10 lg:pb-16 lg:pt-8">{children}</main>
