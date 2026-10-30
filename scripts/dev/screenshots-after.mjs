@@ -55,7 +55,7 @@ await step("c03-closet-family", async () => { await page.getByRole("button", { n
 try { await page.getByRole("button", { name: /Family menu/ }).click(); await page.getByRole("option", { name: /^Jeff\b/ }).click(); await page.getByRole("button", { name: /Jeff menu/ }).waitFor(); } catch (e) { fails.push("back-to-jeff: " + String(e).split("\n")[0]); await esc(); }
 await step("c04-item", async () => { await page.goto(base + "/closet"); await page.getByTestId("item-card").filter({ hasText: "Black crew tee" }).click(); await page.waitForURL(/\/closet\/.+/); await page.getByRole("heading", { level: 1 }).waitFor(); });
 const itemUrl = page.url();
-await step("c05-item-color-sheet", async () => { await page.getByTestId("row-color").click(); await sheet().waitFor(); }, false); await esc();
+await step("c05-item-pattern-sheet", async () => { await page.getByTestId("row-pattern").click(); await sheet().waitFor(); }, false); await esc();
 await step("c06-item-closets-sheet", async () => { await page.getByTestId("row-closets").click(); await sheet().waitFor(); }, false); await esc();
 await step("c07-go-with", async () => { await page.getByTestId("go-with").click(); await page.getByTestId("go-with-result").waitFor({ timeout: 45000 }); });
 await step("c08-clean-out", async () => { await page.goto(base + "/closet/clean-out"); await page.waitForTimeout(500); });

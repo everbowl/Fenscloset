@@ -363,7 +363,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
         </div>
         <p className="mono mt-4 text-graphite">You can shop for yourself, your kids, and anyone who allowed it in their Settings.</p>
       </Sheet>
-      <TextSheet open={sheet === "link"} onClose={() => setSheet(null)} title="Paste a link" label="Store link" value="" placeholder="https://www.everlane.com/products/…" onSave={(v) => run("link", () => lookupLinkAction(forPersonId, v))} />
+      <TextSheet open={sheet === "link"} onClose={() => setSheet(null)} title="Paste a link" label="Store link" kind="url" submitLabel="Judge it" value="" placeholder="https://www.everlane.com/products/…" onSave={(v) => run("link", () => lookupLinkAction(forPersonId, v))} />
     </div>
   );
 }
