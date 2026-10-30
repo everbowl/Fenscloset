@@ -151,7 +151,7 @@ test("my brands & sizes: add Lululemon with a size per item type and a link, the
   await page.getByTestId("pick-photos").setInputFiles({ name: "tee2.jpg", mimeType: "image/jpeg", buffer });
   await expect(page.getByRole("link", { name: /Confirm 1 ready/ })).toBeVisible({ timeout: 30_000 });
   await page.getByRole("link", { name: /Confirm 1 ready/ }).click();
-  await expect(page.getByTestId("like-sheet")).toContainText("Is this another one of the same?");
+  await expect(page.getByTestId("like-sheet")).toContainText("Another one of these");
   await page.getByTestId("like-mirror").click();
   await expect(page.getByTestId("row-brand")).toContainText("Lululemon · L");
   await expect(page.getByTestId("duplicate-row")).toContainText("Details copied");

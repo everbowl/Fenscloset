@@ -105,7 +105,7 @@ test.describe("add clothes", () => {
     await page.getByRole("button", { name: "Skip" }).click();
 
     await expect(page.getByRole("heading", { name: /All done/ })).toBeVisible();
-    await expect(page.getByText(/002 added/)).toBeVisible();
+    await expect(page.getByText(/2 added to your closet/)).toBeVisible();
     await page.getByRole("link", { name: "Go to closet" }).click();
     await expect(page).toHaveURL(/\/closet$/);
   });

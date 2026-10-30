@@ -25,8 +25,8 @@ test.describe("closet", () => {
     // search by brand
     await page.goto("/closet");
     await page.getByRole("button", { name: "Search" }).click();
-    await page.getByRole("textbox", { name: "Search" }).fill("levi");
-    await page.getByRole("textbox", { name: "Search" }).press("Enter");
+    await page.getByRole("searchbox", { name: "Search" }).fill("levi");
+    await page.getByRole("searchbox", { name: "Search" }).press("Enter");
     await expect(page.getByTestId("item-card")).toHaveCount(1);
 
     // item detail: laundry word changes with one tap and shows in the grid

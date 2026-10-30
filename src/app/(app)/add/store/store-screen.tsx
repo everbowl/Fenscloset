@@ -191,7 +191,7 @@ function ReceiptTab() {
   const [openPicks, setOpenPicks] = useState<number | null>(null);
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState<"read" | "add" | null>(null);
-  const [done, setDone] = useState<{ count: number; skipped: number } | null>(null);
+  const [done, setDone] = useState<{ count: number; skipped: number; batchId: string | null } | null>(null);
   const [pending, start] = useTransition();
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -221,7 +221,7 @@ function ReceiptTab() {
       const r = await addReceiptLinesAction(receipt.storeName ?? "", receipt.orderDate, lines.map((l) => ({ name: l.name, color: l.color, size: l.size, quantity: l.quantity, priceText: l.priceText, pick: l.pick })));
       setBusy(null);
       if (!r.ok) { setError(r.error); return; }
-      setDone({ count: r.value.count, skipped: r.value.skipped });
+      setDone({ count: r.value.count, skipped: r.value.skipped, batchId: r.value.batchId });
       router.refresh();
     });
   }
@@ -255,8 +255,8 @@ function ReceiptTab() {
           ))}
           {done ? (
             <div className="mt-4 flex items-center justify-between border-y border-ink py-2.5" data-testid="added-strip">
-              <span className="mono tracking-[0.1em]">{done.count} added{done.skipped ? ` · ${done.skipped} skipped` : ""}</span>
-              <Link href="/add" className="pill pill-solid">Confirm →</Link>
+              <span className="mono tracking-[0.1em]">{done.count} ready to check{done.skipped ? ` · ${done.skipped} skipped` : ""}</span>
+              <Link href={done.batchId ? `/add/${done.batchId}` : "/add"} className="pill pill-solid" data-testid="check-it">Check it →</Link>
             </div>
           ) : (
             <Button size="lg" className="mt-4" onClick={add} disabled={pending || !total} data-testid="add-receipt">{busy === "add" ? "Adding…" : `Add ${total} piece${total === 1 ? "" : "s"}`}</Button>

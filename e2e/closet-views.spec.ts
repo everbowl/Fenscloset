@@ -81,8 +81,8 @@ test.describe("closet views", () => {
 
     // the search keeps the filters and the sort
     await page.getByRole("button", { name: "Search" }).click();
-    await page.getByRole("textbox", { name: "Search" }).fill("nike");
-    await page.getByRole("textbox", { name: "Search" }).press("Enter");
+    await page.getByRole("searchbox", { name: "Search" }).fill("nike");
+    await page.getByRole("searchbox", { name: "Search" }).press("Enter");
     await expect(page).toHaveURL(/q=nike/);
     await expect(page).toHaveURL(/status=cleaners/);
     await expect(cards).toHaveCount(1);
