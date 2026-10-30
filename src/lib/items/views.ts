@@ -14,7 +14,7 @@ export const FACET_LABEL: Record<FacetKey, string> = {
 };
 /** The laundry words, keyed by the status the piece carries. */
 export const STATUS_OPTIONS: { id: LaundryStatus; name: string }[] = [
-  { id: "clean", name: "Clean" }, { id: "dirty", name: "In the laundry" }, { id: "cleaners", name: "At the cleaners" },
+  { id: "clean", name: "Clean" }, { id: "dirty", name: "In the wash" }, { id: "cleaners", name: "At cleaners" },
 ];
 
 export type ClosetFilters = Record<FacetKey, string[]> & { favorites: boolean; unworn: boolean };

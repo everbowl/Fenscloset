@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { cn } from "@/lib/cn";
+import { LinkPending } from "@/components/link-pending";
 import type { ItemCardData } from "@/lib/items/query";
 
 /** In the closet's pick mode a card is a toggle, not a link: picked, or why it can't be. */
@@ -32,8 +33,8 @@ export function ItemCard({ item, showOwner, pick }: { item: ItemCardData; showOw
     );
   }
   return (
-    <Link href={`/closet/${item.id}`} className="flex flex-col gap-2" data-testid="item-card">
-      {body}
+    <Link href={`/closet/${item.id}`} className="tap block" data-testid="item-card">
+      <LinkPending className="flex flex-col gap-2">{body}</LinkPending>
     </Link>
   );
 }

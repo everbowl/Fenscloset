@@ -22,7 +22,7 @@ import type { Mirror } from "./use-mirror";
 /** "Google, FASHN and Kling" for the line under a comparison. */
 const engineList = (v: TryOnView) => [v, ...(v.alts ?? [])].map((p) => ENGINE_WORD[p.engine ?? "google"]).join(", ").replace(/, ([^,]*)$/, " and $1");
 
-export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState, backPhoto, mannequinAvailable }: {
+export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState, backPhoto, mannequinAvailable , admin = false }: { /** Engine names and notes show for admins only. */ admin?: boolean;
   m: Mirror;
   /** The pieces in the look, for the line under the picture ("White tee · Dark jeans"). */
   pieces: string;
@@ -92,8 +92,8 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
               <div className={`grid h-full gap-1 ${t.alts.length >= 2 ? "grid-cols-3" : "grid-cols-2"}`} data-testid="mirror-compare">
                 {[t, ...t.alts].map((p) => (
                   <figure key={p.id} className="flex h-full flex-col">
-                    <figcaption className="mono px-2 pt-2 text-[11px] uppercase tracking-[0.18em]">{ENGINE_WORD[p.engine ?? "google"]}</figcaption>
-                    <img src={`/api/photo/${p.key}`} alt={`You wearing this look, by ${ENGINE_WORD[p.engine ?? "google"]}`} className={`min-h-0 flex-1 object-contain ${m.busy ? "opacity-40" : ""}`} />
+                    <figcaption className="mono px-2 pt-2 text-[11px] uppercase tracking-[0.18em]">{admin ? ENGINE_WORD[p.engine ?? "google"] : `Option ${[t, ...(t.alts ?? [])].indexOf(p) + 1}`}</figcaption>
+                    <img src={`/api/photo/${p.key}`} alt={admin ? `You wearing this look, by ${ENGINE_WORD[p.engine ?? "google"]}` : "You wearing this look"} className={`min-h-0 flex-1 object-contain ${m.busy ? "opacity-40" : ""}`} />
                   </figure>
                 ))}
               </div>
@@ -108,10 +108,10 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
           {m.busy ? <p className="mono text-graphite">Usually 20 to 60 seconds. You can leave this screen; the picture is kept and waits for you.</p> : null}
           <p className="mono text-graphite" data-testid="mirror-pieces">{line}</p>
           {t?.styling?.summary ? <p className="mono text-ink" data-testid="styling-summary">{t.styling.summary}{t.stylingFailed ? " · didn’t take this time, showing the plain try-on" : ""}</p> : null}
-          {t ? <p className="mono text-ink">{t.mannequin ? `On a mannequin · No body photo used${mine ? "" : ` · ${personName}’s look`}` : t.alts?.length ? `On you${t.view === "back" ? " · from behind" : ""} · ${engineList(t)} side by side · Only you can see these pictures · pick the winner under Admin → Rules` : `On you${t.view === "back" ? " · from behind" : ""}${t.engine && t.engine !== "google" ? ` · dressed by ${ENGINE_WORD[t.engine]}` : ""} · Only you can see this picture`}{t.cached ? " · saved from before" : ""}</p> : null}
-          {t?.note ? <p className="mono text-graphite" data-testid="mirror-note">{t.alts?.length ? `${ENGINE_WORD[t.engine ?? "google"]} · ` : ""}{t.note}</p> : null}
-          {t?.alts?.filter((a) => a.note).map((a) => <p key={a.id} className="mono text-graphite" data-testid="mirror-alt-note">{ENGINE_WORD[a.engine ?? "fashn"]} · {a.note}</p>)}
-          {t?.engineNote ? <p className="mono text-graphite" data-testid="mirror-engine-note">{t.engineNote}</p> : null}
+          {t ? <p className="mono text-ink">{t.mannequin ? `On a mannequin · No body photo used${mine ? "" : ` · ${personName}’s look`}` : t.alts?.length ? `On you${t.view === "back" ? " · from behind" : ""} · ${admin ? `${engineList(t)} side by side · pick the winner under Admin → Rules` : "side by side"} · Only you can see these pictures` : `On you${t.view === "back" ? " · from behind" : ""}${admin && t.engine && t.engine !== "google" ? ` · dressed by ${ENGINE_WORD[t.engine]}` : ""} · Only you can see this picture`}{t.cached ? " · saved from before" : ""}</p> : null}
+          {t?.note ? <p className="mono text-graphite" data-testid="mirror-note">{t.alts?.length && admin ? `${ENGINE_WORD[t.engine ?? "google"]} · ` : ""}{t.note}</p> : null}
+          {t?.alts?.filter((a) => a.note).map((a) => <p key={a.id} className="mono text-graphite" data-testid="mirror-alt-note">{admin ? `${ENGINE_WORD[a.engine ?? "fashn"]} · ` : ""}{a.note}</p>)}
+          {t?.engineNote && admin ? <p className="mono text-graphite" data-testid="mirror-engine-note">{t.engineNote}</p> : null}
           {t ? (
             <div className="flex items-center justify-between gap-3">
               <button type="button" disabled={m.busy} onClick={m.redo} className="pill pill-sm shrink-0" data-testid="redo-tryon" title="Throw away the saved pictures of this look and dress it from scratch">{m.busy ? "Dressing…" : "Dress again"}</button>
@@ -193,7 +193,7 @@ function CompletePanel({ m }: { m: Mirror }) {
         <button type="button" onClick={() => m.choose(null)} className="pill pill-sm shrink-0" data-testid="complete-skip">{SLOT_WORD[slot].skip(chosen)}</button>
         <span className="mono text-right text-graphite">{next.length ? `Then: ${next.map((s) => (s === "shoes" ? "shoes" : `a ${s}`)).join(", ")}` : p.on === "me" ? "Then the mirror dresses you" : "Then the mannequin wears it"}</span>
       </div>
-      {shoesLeftOut ? <p className="mono text-graphite" data-testid="complete-shoes-note">Shoes stay off this picture: FASHN can’t put them on yet. The mannequin can.</p> : null}
+      {shoesLeftOut ? <p className="mono text-graphite" data-testid="complete-shoes-note">Shoes can’t go in this picture yet. The mannequin can show them.</p> : null}
     </div>
   );
 }

@@ -28,7 +28,7 @@ export function Sheet({ open, onClose, title, children, footer }: { open: boolea
   return (
     <dialog
       ref={ref}
-      aria-labelledby={titleId}
+      aria-labelledby={open ? titleId : undefined}
       // The native close event also fires when we close programmatically; only report user dismissals (Esc).
       onClose={() => { if (openRef.current) onClose(); }}
       onClick={(e) => { if (e.target === ref.current) onClose(); }}

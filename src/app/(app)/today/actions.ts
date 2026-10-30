@@ -112,7 +112,7 @@ export async function regenerateAction(personId: string): Promise<LooksResult> {
 export async function looksStatusAction(jobId: string): Promise<LooksResult> {
   const me = await requirePerson();
   const status = jobStatus<void>(jobId, me.id);
-  if (!status) return { ok: false, error: "That build is gone. Try again." };
+  if (!status) return { ok: false, error: "Those looks got lost on the way. Try again." };
   return looksAnswer(status, jobId);
 }
 

@@ -95,7 +95,7 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, brands, categor
           <Row key={s.id} label={s.brandName} value={`${s.size}${s.categoryName ? ` · ${s.categoryName}` : ""}`} onClick={() => canEdit && setSize({ id: s.id, brandId: s.brandId, categoryId: s.categoryId, size: s.size })} />
         ))}
         {body.sizes.length === 0 ? <p className="mono py-3 text-graphite">No sizes yet</p> : null}
-        {canEdit ? <button type="button" onClick={() => setSize({ brandId: brandList[0]?.id ?? "", categoryId: null, size: "" })} className="pill mt-2 h-[50px] w-full" data-testid="add-size">Add a size</button> : null}
+        {canEdit ? <button type="button" onClick={() => setSize({ brandId: "", categoryId: null, size: "" })} className="pill mt-2 h-[50px] w-full" data-testid="add-size">Add a size</button> : null}
       </section>
 
       <section>
@@ -119,18 +119,18 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, brands, categor
                 const p = body.photos.find((x) => x.view === v) ?? (v === "left" ? body.photos.find((x) => x.view === "side") : undefined); // newest first from the server
                 const word = v[0].toUpperCase() + v.slice(1);
                 return p ? (
-                  <button key={v} type="button" onClick={() => canEdit && setPhotoSheet(p.id)} className="relative h-[150px] overflow-hidden bg-bone" data-testid={p.onlyMe ? "body-photo-locked" : "body-photo-shared"} data-view={v}>
+                  <button key={v} type="button" onClick={() => canEdit && setPhotoSheet(p.id)} className="relative aspect-[3/4] overflow-hidden bg-bone" data-testid={p.onlyMe ? "body-photo-locked" : "body-photo-shared"} data-view={v}>
                     <img src={`/api/photo/${p.key}`} alt={`${word} full-body photo`} className="size-full object-cover" />
                     <span className="mono absolute bottom-1.5 left-1.5 bg-paper px-1.5 py-1">{word} · {monoDate(p.takenAt.slice(0, 10))}</span>
                     {p.onlyMe ? <span className="mono absolute left-1.5 top-1.5 bg-paper px-1.5 py-1">Only me</span> : null}
                   </button>
                 ) : canEdit ? (
-                  <button key={v} type="button" onClick={() => { setNextView(v); setAskPrivacy(true); }} disabled={uploading} className="flex h-[150px] flex-col items-center justify-center gap-2 border border-dashed border-ink bg-paper" data-testid={`add-body-photo-${v}`}>
+                  <button key={v} type="button" onClick={() => { setNextView(v); setAskPrivacy(true); }} disabled={uploading} className="flex aspect-[3/4] flex-col items-center justify-center gap-2 border border-dashed border-ink bg-paper" data-testid={`add-body-photo-${v}`}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden><path d="M3 8h4l2-3h6l2 3h4v12H3z" /><circle cx="12" cy="13.5" r="3.5" /></svg>
                     <span className="mono">{uploading && nextView === v ? "Saving…" : word}</span>
                   </button>
                 ) : (
-                  <div key={v} className="flex h-[150px] items-center justify-center bg-bone"><span className="mono text-graphite">No {v}</span></div>
+                  <div key={v} className="flex aspect-[3/4] items-center justify-center bg-bone"><span className="mono text-graphite">No {v}</span></div>
                 );
               })}
             </div>
@@ -162,17 +162,17 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, brands, categor
       <SizeSheet open={pickSize} onClose={() => setPickSize(false)} title={size ? `${brandName(size.brandId)} · ${categoryName(size.categoryId)}` : ""} options={sizeOptions.find((c) => c.categoryId === size?.categoryId)?.options ?? []} value={size?.size || null} suggested={size?.categoryId ? likelyFor(likely, categoryName(size.categoryId)) : null}
         onPick={(v) => size && setSize({ ...size, size: v ?? "" })} />
       <TextSheet open={notes} onClose={() => setNotes(false)} title="Fit notes" label="Notes" value={body.fitNotes ?? ""} placeholder="Long arms · short torso · size up in jackets" onSave={(v) => run(() => setFitNotesAction(ownerId, v))} />
-      <Sheet open={Boolean(size)} onClose={() => setSize(null)} title={size?.id ? "Edit size" : "Add a size"}>
+      <Sheet open={Boolean(size) && !pickBrand && !pickCategory && !pickSize} onClose={() => setSize(null)} title={size?.id ? "Edit size" : "Add a size"}>
         {size ? (
           <form onSubmit={(e) => { e.preventDefault(); const s = size; setSize(null); run(() => upsertSizeAction(ownerId, s)); }} className="space-y-4">
-            <Row label="Brand" value={brandName(size.brandId)} onClick={() => setPickBrand(true)} />
+            <Row label="Brand" value={size.brandId ? brandName(size.brandId) : "Pick a brand"} muted={!size.brandId} onClick={() => setPickBrand(true)} testId="size-brand" />
             <Row label="For" value={categoryName(size.categoryId)} onClick={() => setPickCategory(true)} />
             {sizeOptions.some((c) => c.categoryId === size.categoryId)
               ? <Row label="Size" value={size.size || "Tap to pick"} muted={!size.size} onClick={() => setPickSize(true)} testId="size-pick" />
               : <Field label="Size" htmlFor="size-value"><Input id="size-value" value={size.size} onChange={(e) => setSize({ ...size, size: e.target.value })} placeholder="M · 32 · 8 · EU 38" maxLength={20} autoFocus /></Field>}
             <div className="flex gap-2.5">
               <Button type="submit" className="flex-1" disabled={pending || !size.brandId}>Save</Button>
-              {size.id ? <Button type="button" variant="secondary" onClick={() => { const id = size.id!; setSize(null); run(() => removeSizeAction(ownerId, id)); }}>Remove</Button> : null}
+              {size.id ? <button type="button" className="pill pill-quiet h-[50px]" onClick={() => { const id = size.id!; setSize(null); run(() => removeSizeAction(ownerId, id)); }}>Remove</button> : null}
             </div>
           </form>
         ) : null}
@@ -193,9 +193,9 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, brands, categor
         {(() => { const p = body.photos.find((x) => x.id === photoSheet); return p ? (
           <div className="space-y-2.5">
             <p className="mono text-graphite">{p.onlyMe ? "Locked · only you can see it" : `Seen by ${visibleTo.join(", ")}`}</p>
-            <Button variant="secondary" className="w-full" disabled={pending} data-testid="toggle-photo-lock" onClick={() => { setPhotoSheet(null); run(() => setBodyPhotoPrivacyAction(ownerId, p.id, !p.onlyMe)); }}>{p.onlyMe ? "Unlock for my body-profile viewers" : "Lock to only me"}</Button>
             <Button variant="secondary" className="w-full" disabled={pending} data-testid="retake-photo" onClick={() => { setPhotoSheet(null); setNextView(p.view === "side" ? "left" : p.view); setAskPrivacy(true); }}>Retake ({p.view === "side" ? "left" : p.view})</Button>
-            <Button variant="secondary" className="w-full" disabled={pending} onClick={() => { setPhotoSheet(null); run(() => removeBodyPhotoAction(ownerId, p.id)); }}>Remove photo</Button>
+            <button type="button" className="pill h-[50px] w-full" disabled={pending} data-testid="toggle-photo-lock" onClick={() => { setPhotoSheet(null); run(() => setBodyPhotoPrivacyAction(ownerId, p.id, !p.onlyMe)); }}>{p.onlyMe ? "Unlock for my body-profile viewers" : "Lock to only me"}</button>
+            <button type="button" className="pill pill-quiet h-[50px] w-full" disabled={pending} onClick={() => { setPhotoSheet(null); run(() => removeBodyPhotoAction(ownerId, p.id)); }}>Remove photo</button>
           </div>
         ) : null; })()}
       </Sheet>

@@ -64,8 +64,8 @@ test("morning flow: Jeff gets three looks, checks in, sets the plan, swaps, wear
 
   // wear it
   await page.getByTestId("wear-this").click();
-  await expect(page.getByRole("link", { name: /Wearing this/ })).toBeVisible();
-  await page.getByRole("link", { name: /Wearing this/ }).click();
+  await expect(page.getByTestId("wearing-this")).toBeVisible();
+  await page.getByTestId("see-fits").click();
   await expect(page).toHaveURL(/\/fits/);
   await expect(page.getByTestId("fit-panel")).toBeVisible();
   await expect(page.getByTestId("visibility")).toContainText("Visible to Jeff only");
@@ -73,7 +73,7 @@ test("morning flow: Jeff gets three looks, checks in, sets the plan, swaps, wear
 
   // how did it go? three taps on the fit panel; the chosen one goes solid
   await page.getByTestId("rate-loved").click();
-  await expect(page.getByTestId("rate-loved")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("rate-loved")).toHaveAttribute("aria-checked", "true");
   await expect(page.getByTestId("rating-row")).toContainText("It went");
 
   // taste memory section exists on the Style page (one wear is not enough for a learned line yet)
@@ -102,7 +102,7 @@ test("Brittney sees Jeff's shared fit in the family calendar and gets her own lo
   await page.goto("/today");
   await expect(page.getByTestId("board")).toHaveCount(3);
   await page.getByTestId("wear-this").click();
-  await expect(page.getByRole("link", { name: /Wearing this/ })).toBeVisible();
+  await expect(page.getByTestId("wearing-this")).toBeVisible();
 
   await page.getByRole("button", { name: /Brittney menu/ }).click();
   await page.getByRole("option", { name: "Family" }).click();

@@ -88,8 +88,7 @@ test("try-on: on by default, needs a body photo, then a picture of the look on y
   await page.keyboard.press("Escape");
   await page.goto("/admin/rules");
   await page.getByLabel("Mirror engine").selectOption("compare");
-  await page.getByTestId("rule-mirrorEngine").getByRole("button", { name: "Save" }).click();
-  await expect(page.getByTestId("rule-mirrorEngine").getByRole("button", { name: "Saved" })).toBeVisible();
+  await expect(page.getByTestId("rule-saved-mirrorEngine")).toHaveText("✓ Saved");
   await page.goto("/today");
   await page.getByTestId("try-on").click();
   await expect(page.getByTestId("mirror-compare")).toBeVisible({ timeout: 30_000 });

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePerson } from "@/lib/auth/current";
-import { addItemPhoto, answerPhotoNudge, cycleLaundry, deleteItem, ItemError, removeItemPhoto, rotateItemPhoto, setMirrorPhoto, updateItem, type ItemDetailEdits } from "@/lib/items/service";
+import { addItemPhoto, answerPhotoNudge, cycleLaundry, setLaundry, deleteItem, ItemError, removeItemPhoto, rotateItemPhoto, setMirrorPhoto, updateItem, type ItemDetailEdits } from "@/lib/items/service";
 import type { LaundryStatus } from "@/generated/prisma/client";
 
 export type Result<T = undefined> = { ok: true; value: T } | { ok: false; error: string };
@@ -17,6 +17,11 @@ const bust = (itemId: string) => { revalidatePath(`/closet/${itemId}`); revalida
 export async function updateItemAction(itemId: string, edits: ItemDetailEdits): Promise<Result> {
   const person = await requirePerson();
   try { await updateItem(person, itemId, edits); bust(itemId); return { ok: true, value: undefined }; } catch (e) { return fail(e); }
+}
+
+export async function setLaundryAction(itemId: string, status: LaundryStatus): Promise<Result<LaundryStatus>> {
+  const person = await requirePerson();
+  try { const s = await setLaundry(person, itemId, status); bust(itemId); return { ok: true, value: s }; } catch (e) { return fail(e); }
 }
 
 export async function cycleLaundryAction(itemId: string): Promise<Result<LaundryStatus>> {

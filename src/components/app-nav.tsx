@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
+import { LinkPending } from "@/components/link-pending";
 
 /* Five-slot bar from the mockups: TODAY · CLOSET · [+] · SHOP · FITS. 76px, black top rule, mono 10px. */
 const tabs = [
@@ -32,7 +33,7 @@ export function AppNav() {
           return (
             <Link key={href} href={href} aria-current={active ? "page" : undefined}
               className={cn("mono flex h-full w-full items-center justify-center self-stretch text-center active:text-ink lg:w-auto lg:px-0", active ? "text-ink" : "text-graphite")}>
-              <span className={cn("py-1", active && "border-b-[1.5px] border-ink")}>{label}</span>
+              <LinkPending className={cn("py-1", active && "border-b-[1.5px] border-ink")}>{label}</LinkPending>
             </Link>
           );
         })}

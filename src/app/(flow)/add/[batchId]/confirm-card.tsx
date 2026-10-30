@@ -62,6 +62,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
   const [tags, setTags] = useState(initial);
   const [lists, setLists] = useState(initialLists);
   const [sheet, setSheet] = useState<SheetKind>(null);
+  const [brandPicking, setBrandPicking] = useState(false); // the brand search takes the Brand · Size sheet's place, never stacks on it
   const [error, setError] = useState<string>();
   const [pending, start] = useTransition();
   const labelRef = useRef<HTMLInputElement>(null);
@@ -156,7 +157,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
 
   return (
     <div className="flex flex-1 flex-col">
-      <input ref={labelRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPhoto("label", e)} data-testid="label-photo" />
+      <input ref={labelRef} type="file" accept="image/*" className="hidden" onChange={(e) => onPhoto("label", e)} data-testid="label-photo" />
       <input ref={wornRef} type="file" accept="image/*" className="hidden" onChange={(e) => onPhoto("worn", e)} data-testid="worn-photo" />
       <input ref={backRef} type="file" accept="image/*" className="hidden" onChange={(e) => onPhoto("back", e)} data-testid="back-photo" />
 
@@ -210,14 +211,14 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
           <div className="flex items-center justify-between gap-3">
             <span className="text-[15px] leading-snug">Now the back<span className="mono block text-graphite">So the mirror can show the fit from behind</span></span>
             <div className="flex shrink-0 gap-1.5">
-              <button type="button" onClick={() => backRef.current?.click()} className="pill pill-sm pill-solid" data-testid="more-back">Take it</button>
+              <button type="button" onClick={() => backRef.current?.click()} className="pill pill-sm" data-testid="more-back">Add the back</button>
               <button type="button" onClick={() => setAskMore(false)} className="pill pill-sm pill-quiet" data-testid="more-no">Not now</button>
             </div>
           </div>
-          <div className="mono mt-2 flex items-center gap-3 text-graphite">
-            <span>Also:</span>
-            <button type="button" onClick={() => labelRef.current?.click()} className="py-1 text-ink" data-testid="more-label">Label</button>
-            <button type="button" onClick={() => wornRef.current?.click()} className="py-1 text-ink" data-testid="more-worn">Worn</button>
+          <div className="mt-2 flex items-center gap-2">
+            <span className="mono text-graphite">Also:</span>
+            <button type="button" onClick={() => labelRef.current?.click()} className="pill pill-sm pill-quiet" data-testid="more-label">Label</button>
+            <button type="button" onClick={() => wornRef.current?.click()} className="pill pill-sm pill-quiet" data-testid="more-worn">Worn</button>
           </div>
         </div>
       ) : null}
@@ -274,12 +275,13 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
         onChange={(ids) => edit({ seasonIds: ids })} onAdded={(e) => setLists((l) => ({ ...l, seasons: [...l.seasons, e] }))} />
       <PickSheet open={sheet === "formality"} onClose={() => setSheet(null)} title="Dress code" kind="formality" options={lists.formalities} selected={tags.formalityId ? [tags.formalityId] : []} canAdd={canEditLists}
         onChange={(ids) => edit({ formalityId: ids[0] ?? null })} onAdded={(e) => setLists((l) => ({ ...l, formalities: [...l.formalities, e] }))} />
-      <Sheet open={sheet === "brand"} onClose={() => setSheet(null)} title="Brand · Size">
+      <Sheet open={sheet === "brand" && !brandPicking} onClose={() => setSheet(null)} title="Brand · Size">
         <div className="flex flex-col">
-          <BrandRows lists={lists} tags={tags} canAdd={canEditLists} onBrand={(id, text) => edit({ brandId: id, brandText: text })} onSize={() => setSheet("size")} onScan={() => labelRef.current?.click()} onAdded={(e) => setLists((l) => ({ ...l, brands: [...l.brands, e] }))} />
+          <BrandRows lists={lists} tags={tags} canAdd={canEditLists} picking={brandPicking} setPicking={setBrandPicking} onBrand={(id, text) => edit({ brandId: id, brandText: text })} onSize={() => setSheet("size")} onScan={() => labelRef.current?.click()} onAdded={(e) => setLists((l) => ({ ...l, brands: [...l.brands, e] }))} />
         </div>
       </Sheet>
       <TextSheet open={sheet === "size"} onClose={() => setSheet("brand")} title="Size" label="Size" value={tags.sizeText ?? ""} placeholder="M · 28 · 8 · EU 38" onSave={(v) => edit({ sizeText: v })} />
+      <BrandSearch open={sheet === "brand" && brandPicking} onClose={() => setBrandPicking(false)} brands={lists.brands} selectedId={tags.brandId} onPick={(b) => edit({ brandId: b.id, brandText: b.name })} onAdded={(e) => setLists((l) => ({ ...l, brands: [...l.brands, e] }))} />
       <MatchSheet open={sheet === "match"} onClose={() => setSheet(null)} busy={matching || pending} onPick={pickMatch}
         probe={{ brand: brandName ?? "", name: tags.name, category: nameOf(lists.categories, tags.categoryId), color: tags.colorIds[0] ? nameOf(lists.colors, tags.colorIds[0]) : null }} />
       <TextSheet open={sheet === "rename"} onClose={() => setSheet(null)} title="Rename" label="Name" value={tags.name} onSave={(v) => edit({ name: v })} />
@@ -308,17 +310,15 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
   );
 }
 
-function BrandRows({ lists, tags, canAdd, onBrand, onSize, onScan, onAdded }: {
-  lists: TagLists; tags: TagResult; canAdd: boolean; onBrand: (id: string | null, text: string | null) => void; onSize: () => void; onScan: () => void; onAdded: (e: Named) => void;
+function BrandRows({ lists, tags, canAdd, picking, setPicking, onBrand, onSize, onScan, onAdded }: {
+  lists: TagLists; tags: TagResult; canAdd: boolean; picking: boolean; setPicking: (v: boolean) => void; onBrand: (id: string | null, text: string | null) => void; onSize: () => void; onScan: () => void; onAdded: (e: Named) => void;
 }) {
-  const [picking, setPicking] = useState(false);
   const brandName = nameOf(lists.brands, tags.brandId) ?? tags.brandText;
   return (
     <>
       <Row label="Brand" value={brandName ?? "Pick a brand"} muted={!brandName} onClick={() => setPicking(true)} />
       <Row label="Size" value={tags.sizeText ?? "Add a size"} muted={!tags.sizeText} onClick={onSize} />
       <button type="button" onClick={onScan} className="pill mt-4 h-[50px]">Scan the label</button>
-      <BrandSearch open={picking} onClose={() => setPicking(false)} brands={lists.brands} selectedId={tags.brandId} onPick={(b) => onBrand(b.id, b.name)} onAdded={onAdded} />
     </>
   );
 }

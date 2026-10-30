@@ -20,9 +20,9 @@ export function LoginForm({ next, prefillEmail }: { next?: string; prefillEmail?
         <PasswordInput id="password" name="password" autoComplete="current-password" required />
       </Field>
       <Button type="submit" size="lg" className="mt-1 w-full tracking-[0.2em]" disabled={pending}>{pending ? "Signing in…" : "Sign in"}</Button>
-      <div className="mono mono-11 flex justify-between tracking-[0.1em]">
-        <Link href="/forgot-password" className="py-2.5 underline underline-offset-4 decoration-1">Forgot password?</Link>
-        <Link href="/invite" className="py-2.5 underline underline-offset-4 decoration-1">I have an invite</Link>
+      <div className="flex justify-between gap-2">
+        <Link href="/forgot-password" className="pill pill-sm pill-quiet">Forgot password?</Link>
+        <Link href="/invite" className="pill pill-sm pill-quiet">I have an invite</Link>
       </div>
     </form>
   );

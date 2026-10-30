@@ -28,7 +28,7 @@ export default async function BodyProfilePage() {
     likelySizes(owner.id),
   ]);
   return (
-    <div>
+    <div className="lg:max-w-[640px]">
       <PageHeader title={mine ? "Body" : owner.first} accent="profile" />
       <BodyEditor ownerId={owner.id} ownerFirst={owner.first} isMinor={owner.role === "minor"} body={{ ...body, photos: body.photos.map((p) => ({ ...p, takenAt: p.takenAt.toISOString() })) }} brands={brands} categories={categories} sizeOptions={sizeOptions} likely={likely} canEdit={canEdit} canEditLists={viewer.role === "admin"} visibleTo={viewers} />
     </div>

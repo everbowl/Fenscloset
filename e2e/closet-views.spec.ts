@@ -34,7 +34,7 @@ test.describe("closet views", () => {
     await expect(sheet).toBeVisible();
     await expect(sheet.getByTestId("filter-count")).toHaveText("5 of 5 pieces");
     await expect(sheet.getByRole("button", { name: /^Black 3$/ })).toBeVisible();
-    await expect(sheet.getByRole("button", { name: /^In the laundry 1$/ })).toBeVisible();
+    await expect(sheet.getByRole("button", { name: /^In the wash 1$/ })).toBeVisible();
     await sheet.getByRole("button", { name: /^Black 3$/ }).click();
     await expect(sheet.getByTestId("filter-count")).toHaveText("3 of 5 pieces");
     await expect(cards).toHaveCount(3);

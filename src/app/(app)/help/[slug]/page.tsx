@@ -24,7 +24,7 @@ export default async function HelpTopicPage({ params }: { params: Promise<{ slug
   const next = visible[i + 1];
   return (
     <div className="lg:max-w-[640px]" data-testid="help-topic">
-      <PageHeader title={topic.title} accent={topic.accent} action={<Link href={topic.link.href} className="mono mono-11 inline-flex h-11 items-center whitespace-nowrap">{topic.link.label}</Link>} />
+      <PageHeader title={topic.title} accent={topic.accent} action={<Link href={topic.link.href} className="pill pill-sm whitespace-nowrap">{topic.link.label}</Link>} />
       <ol className="border-t border-ink">
         {steps.map((step, n) => (
           <li key={n} className="flex items-center gap-4 border-b border-line py-4">
@@ -37,8 +37,8 @@ export default async function HelpTopicPage({ params }: { params: Promise<{ slug
         ))}
       </ol>
       <div className="mt-6 flex items-center justify-between">
-        <Link href="/help" className="mono mono-11 inline-flex h-11 items-center text-graphite">All topics</Link>
-        {next ? <Link href={`/help/${next.slug}`} className="mono mono-11 inline-flex h-11 items-center">Next: {next.title} {next.accent} →</Link> : null}
+        <Link href="/help" className="pill pill-sm pill-quiet">All topics</Link>
+        {next ? <Link href={`/help/${next.slug}`} className="pill pill-sm">Next: {next.title} {next.accent} →</Link> : null}
       </div>
     </div>
   );

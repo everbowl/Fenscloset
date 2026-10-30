@@ -50,12 +50,13 @@ export function FavoritesEditor({ ownerId, favs, brands, stores, myBrands, sizeO
   function save(patch: { brandIds?: string[]; storeIds?: string[] }) {
     start(async () => { const r = await updateFavoritesAction(ownerId, patch); if (!r.ok) setError(r.error); router.refresh(); });
   }
-  const List = ({ title, items, ids, onEdit, testId }: { title: string; items: Named[]; ids: string[]; onEdit: () => void; testId: string }) => (
+  const List = ({ title, blurb, items, ids, onEdit, testId }: { title: string; blurb?: string; items: Named[]; ids: string[]; onEdit: () => void; testId: string }) => (
     <section>
       <div className="flex items-center justify-between border-b border-ink pb-2">
-        <p className="mono text-graphite">{title}</p>
-        {canEdit ? <button type="button" onClick={onEdit} className="pill pill-sm" data-testid={testId}>Edit</button> : null}
+        <h2 className="mono text-graphite">{title}</h2>
+        {canEdit ? <button type="button" onClick={onEdit} className="pill pill-sm" data-testid={testId}>{ids.length ? "Edit" : "+ Add"}</button> : null}
       </div>
+      {blurb ? <p className="mt-2 text-[13px] leading-snug text-graphite">{blurb}</p> : null}
       {ids.length === 0 ? <p className="mono py-3 text-graphite">None yet</p> : null}
       {ids.map((id) => <div key={id} className="flex h-[42px] items-center border-b border-line text-[14px]">{items.find((x) => x.id === id)?.name}</div>)}
     </section>
@@ -66,10 +67,10 @@ export function FavoritesEditor({ ownerId, favs, brands, stores, myBrands, sizeO
       {error ? <Banner tone="danger" title={error} /> : null}
       <section data-testid="my-brands">
         <div className="flex items-center justify-between border-b border-ink pb-2">
-          <p className="mono text-graphite">My brands &amp; sizes</p>
-          {canEdit ? <button type="button" onClick={() => setSheet("pickMine")} className="pill pill-sm" data-testid="add-my-brand">Add</button> : null}
+          <h2 className="mono text-graphite">My sizes by brand</h2>
+          {canEdit ? <button type="button" onClick={() => setSheet("pickMine")} className="pill pill-sm" data-testid="add-my-brand">+ Add brand</button> : null}
         </div>
-        <p className="mono mt-2 normal-case text-graphite">Your size per item type in each brand. Pick them with one tap when you add clothes: the right size and the store link come along.</p>
+        <p className="mt-2 text-[13px] leading-snug text-graphite">Your size per item type in each brand. One tap when you add clothes brings the right size and the store link along.</p>
         {myBrands.length === 0 ? <p className="mono py-3 text-graphite">None yet</p> : null}
         {myBrands.map((b) => (
           <div key={b.brandId} className="flex min-h-[46px] items-center gap-3 border-b border-line py-1.5 text-[14px]" data-testid={`my-brand-row-${b.brandId}`}>
@@ -81,8 +82,8 @@ export function FavoritesEditor({ ownerId, favs, brands, stores, myBrands, sizeO
           </div>
         ))}
       </section>
-      <List title="Favorite brands" items={brandList} ids={favs.brandIds} onEdit={() => setSheet("brands")} testId="edit-brands" />
-      <List title="Favorite stores" items={storeList} ids={favs.storeIds} onEdit={() => setSheet("stores")} testId="edit-stores" />
+      <List title="Brands to watch" blurb="The Shop shows what is new from these every day." items={brandList} ids={favs.brandIds} onEdit={() => setSheet("brands")} testId="edit-brands" />
+      <List title="Favorite stores" blurb="Where you like to buy; the Shop leans on these." items={storeList} ids={favs.storeIds} onEdit={() => setSheet("stores")} testId="edit-stores" />
       <BrandSearch open={sheet === "brands"} onClose={() => setSheet(null)} title="Favorite brands" brands={brandList} multi selectedIds={favs.brandIds}
         onPick={(b) => save({ brandIds: favs.brandIds.includes(b.id) ? favs.brandIds.filter((x) => x !== b.id) : [...favs.brandIds, b.id] })} onAdded={(e) => setBrandList((l) => [...l, e])} />
       <BrandSearch open={sheet === "pickMine"} onClose={() => setSheet(null)} title="Which brand?" brands={brandList} selectedId={null}

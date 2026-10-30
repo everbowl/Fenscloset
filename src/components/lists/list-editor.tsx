@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, ArchiveRestore, ArrowDown, ArrowUp, GripVertical, Pencil, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, GripVertical, Pencil, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
@@ -131,8 +131,9 @@ export function ListEditor({ kind, entries: initial, parentId }: { kind: ListKin
         {shown.map((entry, i) => (
           <div key={entry.id} ref={(el) => { rowRefs.current[i] = el; }} style={dragStyle(i)} className={cn("flex items-center gap-1 py-1", pending && "opacity-70")} data-testid={`list-row-${entry.id}`}>
             {!filtering ? (
-              <button type="button" aria-label={`Drag ${entry.name}`} title="Drag to reorder" onPointerDown={(e) => onGripDown(e, i)} onPointerMove={onGripMove} onPointerUp={onGripUp} onPointerCancel={onGripUp}
-                className="flex size-10 shrink-0 cursor-grab touch-none items-center justify-center text-graphite active:cursor-grabbing" data-testid={`grip-${entry.id}`}>
+              <button type="button" aria-label={`Move ${entry.name} (drag, or the arrow keys)`} title="Drag to reorder · arrow keys move it too" onPointerDown={(e) => onGripDown(e, i)} onPointerMove={onGripMove} onPointerUp={onGripUp} onPointerCancel={onGripUp}
+                onKeyDown={(e) => { if (e.key === "ArrowUp") { e.preventDefault(); move(entry, -1); } if (e.key === "ArrowDown") { e.preventDefault(); move(entry, 1); } }}
+                className="flex size-11 shrink-0 cursor-grab touch-none items-center justify-center text-graphite active:cursor-grabbing" data-testid={`grip-${entry.id}`}>
                 <GripVertical className="size-4" strokeWidth={1.6} />
               </button>
             ) : null}
@@ -144,8 +145,6 @@ export function ListEditor({ kind, entries: initial, parentId }: { kind: ListKin
               <Pencil className="ml-auto size-3.5 shrink-0 text-graphite" strokeWidth={1.6} aria-hidden />
             </button>
             <div className="flex shrink-0 items-center">
-              <IconBtn label="Move up" disabled={filtering || i === 0} onClick={() => move(entry, -1)}><ArrowUp className="size-4" strokeWidth={1.6} /></IconBtn>
-              <IconBtn label="Move down" disabled={filtering || i === active.length - 1} onClick={() => move(entry, 1)}><ArrowDown className="size-4" strokeWidth={1.6} /></IconBtn>
               {!protectedCloset(entry) ? (
                 <>
                   <IconBtn label="Archive" onClick={() => toggleArchive(entry)}><Archive className="size-4" strokeWidth={1.6} /></IconBtn>
@@ -173,7 +172,17 @@ export function ListEditor({ kind, entries: initial, parentId }: { kind: ListKin
       ) : null}
 
       <Sheet open={!!editing} onClose={() => setEditing(null)} title={`Edit ${def.singular}`}>
-        {editing ? <EditForm key={editing.id} entry={editing} kind={kind} onSave={saveEdit} pending={pending} /> : null}
+        {editing ? (
+          <>
+            <EditForm key={editing.id} entry={editing} kind={kind} onSave={saveEdit} pending={pending} />
+            {!protectedCloset(editing) ? (
+              <div className="mt-6 flex gap-2 border-t border-line pt-4">
+                <button type="button" className="pill pill-sm pill-quiet" disabled={pending} onClick={() => { const e = editing; setEditing(null); toggleArchive(e); }} data-testid="edit-archive">{editing.isArchived ? "Restore" : "Archive"}</button>
+                <button type="button" className="pill pill-sm pill-quiet" disabled={pending} onClick={() => { const e = editing; setEditing(null); setConfirmDelete(e); }} data-testid="edit-delete">Delete</button>
+              </div>
+            ) : null}
+          </>
+        ) : null}
       </Sheet>
 
       <Sheet open={!!confirmDelete} onClose={() => { setConfirmDelete(null); setDeleteError(undefined); }} title={`Delete “${confirmDelete?.name}”?`}>

@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { Sheet } from "@/components/ui/sheet";
 import { cn } from "@/lib/cn";
 import { toast } from "@/components/ui/toast";
-import { Button, buttonClass } from "@/components/ui/button";
+import { Button, buttonClass, Icons } from "@/components/ui/button";
 import { PickSheet, PriceDateSheet, Row, TextSheet } from "@/components/items/row-editor";
 import { BrandSearch } from "@/components/items/brand-search";
 import { MatchSheet } from "@/components/items/match-sheet";
@@ -17,7 +17,7 @@ import { shrinkPhoto } from "@/lib/import/client-queue";
 import type { ItemLists } from "@/lib/items/query";
 import type { ItemDetailEdits } from "@/lib/items/service";
 import type { LaundryStatus, PhotoKind } from "@/generated/prisma/client";
-import { addItemPhotoAction, cycleLaundryAction, deleteItemAction, mirrorPhotoAction, notNowPhotoAction, removeItemPhotoAction, rotateItemPhotoAction, updateItemAction } from "./actions";
+import { addItemPhotoAction, setLaundryAction, deleteItemAction, mirrorPhotoAction, notNowPhotoAction, removeItemPhotoAction, rotateItemPhotoAction, updateItemAction } from "./actions";
 import { unretireAction } from "../clean-out/actions";
 import { monoDate, prettyDate } from "@/lib/dates";
 import { lastClosetUrl, markClosetRestore } from "@/lib/closet-memory";
@@ -45,8 +45,19 @@ export type ItemView = {
 
 type SheetKind = "category" | "subcategory" | "color" | "pattern" | "fabric" | "season" | "formality" | "occasion" | "tag" | "brand" | "match" | "store" | "size" | "price" | "url" | "notes" | "made" | "closets" | "share" | "rename" | "photo" | "delete" | null;
 
-const LAUNDRY_WORD: Record<LaundryStatus, string> = { clean: "Clean", dirty: "Laundry", cleaners: "At cleaners" };
+const LAUNDRY_WORD: Record<LaundryStatus, string> = { clean: "Clean", dirty: "In the wash", cleaners: "At cleaners" };
 const KIND_WORD: Record<PhotoKind, string> = { alone: "Photo", worn: "Worn", label: "Label", cutout: "Cutout", thumb: "Thumb", back: "Back", retail: "Store" };
+
+/** A yes/no row that reads as a switch: the word says the state, the pill flips it. */
+function ToggleRow({ label, on, onWord, offWord, onChange, testId }: { label: string; on: boolean; onWord: string; offWord: string; onChange: (v: boolean) => void; testId?: string }) {
+  return (
+    <div className="flex h-12 items-center border-b border-line">
+      <span className="mono w-[120px] shrink-0 text-graphite">{label}</span>
+      <span className="flex-1 text-[14px]">{on ? onWord : offWord}</span>
+      <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)} className={cn("pill pill-sm", on && "pill-solid")} data-testid={testId}>{on ? "On" : "Off"}</button>
+    </div>
+  );
+}
 
 const hostOf = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; } };
 
@@ -63,6 +74,7 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
   const m = useMirror(mirror?.personId ?? "", mirror?.wardrobe, mirror?.engine);
   const [lists, setLists] = useState(initialLists);
   const [sheet, setSheet] = useState<SheetKind>(null);
+  const [brandPicking, setBrandPicking] = useState(false); // the brand search takes the sheet's place, never stacks on it
   const [photoIdx, setPhotoIdx] = useState(0);
   const setError = (e?: string) => { if (e) toast.error(e); };
   const [pending, start] = useTransition();
@@ -97,8 +109,11 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
     setError(undefined);
     start(async () => { const r = await updateItemAction(it.id, patch); if (!r.ok) { setError(r.error); router.refresh(); } });
   }
-  function laundry() {
-    start(async () => { const r = await cycleLaundryAction(it.id); if (r.ok) setIt((x) => ({ ...x, laundryStatus: r.value, status: r.value === "dirty" ? "Laundry" : r.value === "cleaners" ? "At cleaners" : x.wearCount > 0 ? `Worn ${x.wearCount}×` : "New" })); else setError(r.error); });
+  /** Laundry is three states, one tap each (it used to be a button that cycled through them). */
+  function setLaundry(st: LaundryStatus) {
+    const statusWordOf = (s: LaundryStatus, wearCount: number) => (s === "dirty" ? "In the wash" : s === "cleaners" ? "At cleaners" : wearCount > 0 ? `Worn ${wearCount}×` : "New");
+    setIt((x) => ({ ...x, laundryStatus: st, status: statusWordOf(st, x.wearCount) }));
+    start(async () => { const r = await setLaundryAction(it.id, st); if (!r.ok) { setError(r.error); router.refresh(); } });
   }
   async function onPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; e.target.value = "";
@@ -126,7 +141,7 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
   return (
     <div className="-mt-5 lg:mt-0 lg:grid lg:grid-cols-[440px_minmax(0,1fr)] lg:gap-x-12 lg:gap-y-0">
       <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={onPhoto} data-testid="item-photo" />
-      {mirror ? <MirrorSheet m={m} pieces={it.name} mine personId={mirror.personId} personName={mirror.personName} tryOnState={mirror.tryOn} backPhoto={mirror.backPhoto} mannequinAvailable={mirror.mannequinAvailable} /> : null}
+      {mirror ? <MirrorSheet m={m} pieces={it.name} mine personId={mirror.personId} personName={mirror.personName} tryOnState={mirror.tryOn} backPhoto={mirror.backPhoto} mannequinAvailable={mirror.mannequinAvailable} admin={mirror.admin} /> : null}
       <div className="relative -mx-5 h-[380px] bg-bone lg:mx-0 lg:h-[560px] lg:self-start lg:[grid-row:1/span_80]">
         {photo ? <img src={`/api/photo/${photo.key}`} alt={it.name} className="size-full object-contain" data-testid="item-hero" /> : null}
         {canEdit && photo ? (<>
@@ -180,30 +195,32 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
         </div>
       ) : null}
       {canEdit && !it.retired ? (
-        <div className="mt-3 flex items-center justify-between border-y border-ink py-2.5">
-          <span className="mono tracking-[0.1em]">Laundry · {LAUNDRY_WORD[it.laundryStatus]}</span>
-          <button type="button" onClick={laundry} disabled={pending} data-testid="laundry-cycle" className="pill">
-            {it.laundryStatus === "clean" ? "In the wash?" : it.laundryStatus === "dirty" ? "At cleaners?" : "Back & clean?"}
-          </button>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-y border-ink py-2.5" data-testid="laundry-row">
+          <span className="mono tracking-[0.1em]">Laundry</span>
+          <div className="flex gap-1.5" role="radiogroup" aria-label="Laundry">
+            {(["clean", "dirty", "cleaners"] as const).map((st) => (
+              <button key={st} type="button" role="radio" aria-checked={it.laundryStatus === st} disabled={pending || it.laundryStatus === st} onClick={() => setLaundry(st)} className={cn("pill pill-sm", it.laundryStatus === st && "pill-solid disabled:opacity-100")} data-testid={`laundry-${st}`}>{LAUNDRY_WORD[st]}</button>
+            ))}
+          </div>
         </div>
       ) : null}
 
       <div className="flex flex-col">
         <Row label="Category" value={category ? `${category.name}${sub ? ` · ${sub}` : ""}` : "Pick a category"} muted={!category} onClick={() => open("category")} testId="row-category" />
         <Row label="Color" value={names(lists.colors, it.colorIds) || "Pick a color"} muted={!it.colorIds.length} onClick={() => open("color")} />
-        <Row label="Pattern" value={name(lists.patterns, it.patternId) ?? "Not set"} muted={!it.patternId} onClick={() => open("pattern")} />
+        <Row label="Pattern" value={name(lists.patterns, it.patternId) ?? "Not set"} muted={!it.patternId} onClick={() => open("pattern")} testId="row-pattern" />
         <Row label="Fabric" value={name(lists.fabrics, it.fabricId) ?? "Not set"} muted={!it.fabricId} onClick={() => open("fabric")} />
         <Row label="Season" value={names(lists.seasons, it.seasonIds) || "Any"} onClick={() => open("season")} />
         <Row label="Dress code" value={name(lists.formalities, it.formalityId) ?? "Not set"} muted={!it.formalityId} onClick={() => open("formality")} />
         <Row label="Occasions" value={names(lists.occasions, it.occasionIds) || "Any"} onClick={() => open("occasion")} />
-        <Row label="Tags" value={names(lists.tags, it.tagIds) || "None"} muted={!it.tagIds.length} onClick={() => open("tag")} />
+        <Row label="Tags" value={names(lists.tags, it.tagIds) || "Not set"} muted={!it.tagIds.length} onClick={() => open("tag")} />
         <Row label="Brand · Size" value={[brandName, it.size].filter(Boolean).join(" · ") || "Not set"} muted={!brandName && !it.size} onClick={() => open("brand")} />
         <Row label="Store" value={name(lists.stores, it.storeId) ?? "Not set"} muted={!it.storeId} onClick={() => open("store")} />
         <Row label="Price · Date" value={[price, it.purchaseDate ? prettyDate(it.purchaseDate) : null].filter(Boolean).join(" · ") || "Not set"} muted={!price && !it.purchaseDate} onClick={() => open("price")} testId="row-price" />
         <Row label="Link" value={it.purchaseUrl ? hostOf(it.purchaseUrl) : "Not set"} muted={!it.purchaseUrl} onClick={() => open("url")} testId="row-link"
           trailing={it.purchaseUrl ? <a href={it.purchaseUrl} target="_blank" rel="noreferrer" className="pill pill-sm shrink-0" data-testid="open-link">Open ↗</a> : undefined} />
-        <Row label="Fit notes" value={it.fitNotes ?? "None"} muted={!it.fitNotes} onClick={() => open("notes")} />
-        <Row label="Made with" value={it.features.filter(isFeatureKey).map((f) => FEATURE_LABELS[f]).join(" · ") || "Nothing special"} muted={!it.features.length} onClick={() => open("made")} testId="row-made" />
+        <Row label="Fit notes" value={it.fitNotes ?? "Not set"} muted={!it.fitNotes} onClick={() => open("notes")} />
+        <Row label="Made with" value={it.features.filter(isFeatureKey).map((f) => FEATURE_LABELS[f]).join(" · ") || "Not set"} muted={!it.features.length} onClick={() => open("made")} testId="row-made" />
         <div className="flex min-h-[42px] items-center border-b border-line" data-testid="row-worn">
           <span className="mono w-[120px] shrink-0 text-graphite">Worn</span>
           <span className="flex-1 text-[14px]">{it.wearHistory.length ? `${it.wearCount}× · last ${monoDate(it.wearHistory[0].wornOn)}` : "Not yet"}</span>
@@ -216,25 +233,21 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
           </Link>
         ))}
         <Row label="Closets" value={["Personal", ...it.closetIds.map((id) => name(lists.closets, id))].filter(Boolean).join(", ")} onClick={() => open("closets")} testId="row-closets" />
-        <Row label="Shared with" value={names(lists.people, it.sharedWithIds) || "Nobody extra"} muted={!it.sharedWithIds.length} onClick={() => open("share")} />
+        <Row label="Shared with" value={names(lists.people, it.sharedWithIds) || "No one else"} muted={!it.sharedWithIds.length} onClick={() => open("share")} />
         {canEdit ? (
           <>
-            <button type="button" onClick={() => save({ isFavorite: !it.isFavorite }, { isFavorite: !it.isFavorite })} className="flex h-[42px] items-center border-b border-line text-left">
-              <span className="mono w-[120px] shrink-0 text-graphite">Favorite</span><span className="flex-1 text-[14px]">{it.isFavorite ? "Yes" : "No"}</span><span className="mono text-graphite">Tap to change</span>
-            </button>
-            <button type="button" onClick={() => save({ neverSuggest: !it.neverSuggest }, { neverSuggest: !it.neverSuggest })} className="flex h-[42px] items-center border-b border-line text-left">
-              <span className="mono w-[120px] shrink-0 text-graphite">Suggest it</span><span className="flex-1 text-[14px]">{it.neverSuggest ? "Never" : "Yes"}</span><span className="mono text-graphite">Tap to change</span>
-            </button>
+            <ToggleRow label="Favorite" on={it.isFavorite} onWord="Yes" offWord="No" onChange={(v) => save({ isFavorite: v }, { isFavorite: v })} testId="toggle-favorite" />
+            <ToggleRow label="Suggest it" on={!it.neverSuggest} onWord="Yes" offWord="Never" onChange={(v) => save({ neverSuggest: !v }, { neverSuggest: !v })} testId="toggle-suggest" />
           </>
         ) : null}
       </div>
+      {canEdit && !it.retired ? <div className="pt-6"><button type="button" onClick={() => setSheet("delete")} className="pill pill-sm pill-quiet" data-testid="delete-piece">Delete this piece</button></div> : null}
 
       {uploading ? <p className="mono pt-3 text-graphite" role="status">Saving the photo…</p> : null}
 
       {canEdit ? (
-        <div className="flex gap-2.5 pt-5">
-          <Button size="lg" className="flex-1" onClick={() => setSheet("photo")} disabled={uploading}>Add photo</Button>
-          <Button size="lg" variant="secondary" onClick={() => setSheet("delete")}>Delete</Button>
+        <div className="pt-5">
+          <Button size="lg" className="w-full" onClick={() => setSheet("photo")} busy={uploading} icon={<Icons.camera />} sub={it.photos.length ? "Back, label, worn, or another shot" : "A hanger or flat-lay shot is enough"}>{uploading ? "Saving the photo…" : "Add photo"}</Button>
         </div>
       ) : null}
 
@@ -252,9 +265,9 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
       <PickSheet clearable open={sheet === "formality"} onClose={() => setSheet(null)} title="Dress code" kind="formality" options={lists.formalities} selected={it.formalityId ? [it.formalityId] : []} canAdd={canEditLists} onChange={(ids) => save({ formalityId: ids[0] ?? null }, { formalityId: ids[0] ?? null })} onAdded={(e) => setLists((l) => ({ ...l, formalities: [...l.formalities, e] }))} />
       <PickSheet open={sheet === "occasion"} onClose={() => setSheet(null)} title="Occasions" kind="occasion" options={lists.occasions} selected={it.occasionIds} multi canAdd={canEditLists} onChange={(ids) => save({ occasionIds: ids }, { occasionIds: ids })} onAdded={(e) => setLists((l) => ({ ...l, occasions: [...l.occasions, e] }))} />
       <PickSheet open={sheet === "tag"} onClose={() => setSheet(null)} title="Tags" kind="tag" options={lists.tags} selected={it.tagIds} multi canAdd={canEditLists} onChange={(ids) => save({ tagIds: ids }, { tagIds: ids })} onAdded={(e) => setLists((l) => ({ ...l, tags: [...l.tags, e] }))} />
-      <Sheet open={sheet === "brand"} onClose={() => setSheet(null)} title="Brand · Size">
+      <Sheet open={sheet === "brand" && !brandPicking} onClose={() => setSheet(null)} title="Brand · Size">
         <div className="flex flex-col">
-          <BrandPick lists={lists} brandId={it.brandId} canAdd={canEditLists} onChange={(id) => save({ brandId: id }, { brandId: id })} onAdded={(e) => setLists((l) => ({ ...l, brands: [...l.brands, e] }))} />
+          <Row label="Brand" value={brandName ?? "Pick a brand"} muted={!brandName} onClick={() => setBrandPicking(true)} />
           {brandName ? <Row label="Find it online" value={it.photos.some((p) => p.kind === "retail") ? "Store photos added · match again" : `Match the style at ${brandName} · details + store photos`} muted={!it.photos.some((p) => p.kind === "retail")} onClick={() => setSheet("match")} testId="match-style" /> : null}
           <Row label="Size" value={it.size ?? "Add a size"} muted={!it.size} onClick={() => setSheet("size")} />
           <button type="button" onClick={() => { setPhotoKind("label"); photoRef.current?.click(); }} className="pill mt-4 h-[50px]">Add a label photo</button>
@@ -264,6 +277,7 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
       <PickSheet open={sheet === "closets"} onClose={() => setSheet(null)} title="Closets" kind="closet" options={lists.closets.map((c) => ({ id: c.id, name: c.kind === "family" ? `${c.name} (everyone)` : c.name }))} selected={it.closetIds} multi canAdd={canEditLists} onChange={(ids) => save({ closetIds: ids }, { closetIds: ids })} onAdded={(e) => setLists((l) => ({ ...l, closets: [...l.closets, { ...e, kind: "custom" }] }))} />
       <PickSheet open={sheet === "share"} onClose={() => setSheet(null)} title="Share with" kind="tag" options={lists.people} selected={it.sharedWithIds} multi canAdd={false} onChange={(ids) => save({ sharedWithIds: ids }, { sharedWithIds: ids })} />
       <TextSheet open={sheet === "size"} onClose={() => setSheet("brand")} title="Size" label="Size" value={it.size ?? ""} placeholder="M · 28 · 8 · EU 38" onSave={(v) => save({ sizeText: v }, { size: v.trim() || null })} />
+      <BrandSearch open={sheet === "brand" && brandPicking} onClose={() => setBrandPicking(false)} brands={lists.brands} selectedId={it.brandId} onPick={(b) => save({ brandId: b.id }, { brandId: b.id })} onAdded={(e) => setLists((l) => ({ ...l, brands: [...l.brands, e] }))} />
       <MatchSheet open={sheet === "match"} onClose={() => setSheet("brand")} busy={matching || pending} onPick={pickMatch}
         probe={{ brand: brandName ?? "", name: it.name, category: category?.name ?? null, color: it.colorIds[0] ? name(lists.colors, it.colorIds[0]) : null }} />
       <TextSheet open={sheet === "rename"} onClose={() => setSheet(null)} title="Rename" label="Name" value={it.name} onSave={(v) => save({ name: v }, { name: v.trim() || it.name })} />
@@ -300,21 +314,11 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
       <Sheet open={sheet === "delete"} onClose={() => setSheet(null)} title="Delete this piece?">
         <p className="text-[14px] leading-snug">It leaves every closet and its photos are removed. This can&apos;t be undone.</p>
         <div className="mt-5 flex gap-2.5">
-          <Button variant="secondary" className="flex-1" onClick={() => setSheet(null)}>Keep it</Button>
-          <Button className="flex-1" disabled={pending} data-testid="confirm-delete" onClick={() => start(async () => { const r = await deleteItemAction(it.id); if (!r.ok) { setError(r.error); setSheet(null); return; } markClosetRestore(); router.push(lastClosetUrl() ?? "/closet"); router.refresh(); })}>Delete</Button>
+          <button type="button" className="pill pill-quiet h-[50px] flex-1" onClick={() => setSheet(null)}>Keep it</button>
+          <Button variant="danger" className="flex-1" disabled={pending} data-testid="confirm-delete" onClick={() => start(async () => { const r = await deleteItemAction(it.id); if (!r.ok) { setError(r.error); setSheet(null); return; } markClosetRestore(); router.push(lastClosetUrl() ?? "/closet"); router.refresh(); })}>Delete</Button>
         </div>
       </Sheet>
     </div>
   );
 }
 
-function BrandPick({ lists, brandId, canAdd, onChange, onAdded }: { lists: ItemLists; brandId: string | null; canAdd: boolean; onChange: (id: string | null) => void; onAdded: (e: { id: string; name: string }) => void }) {
-  const [open, setOpen] = useState(false);
-  const brand = lists.brands.find((b) => b.id === brandId)?.name ?? null;
-  return (
-    <>
-      <Row label="Brand" value={brand ?? "Pick a brand"} muted={!brand} onClick={() => setOpen(true)} />
-      <BrandSearch open={open} onClose={() => setOpen(false)} brands={lists.brands} selectedId={brandId} onPick={(b) => onChange(b.id)} onAdded={onAdded} />
-    </>
-  );
-}

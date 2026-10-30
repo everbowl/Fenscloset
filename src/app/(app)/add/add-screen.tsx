@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRef, useState, type ReactNode } from "react";
 import { PageHeader } from "@/components/ui/page-header";
-import { Button, Icons } from "@/components/ui/button";
+import { Button, buttonClass, Icons } from "@/components/ui/button";
 import { Banner } from "@/components/ui/banner";
 import { useImportQueue } from "@/components/import-queue-provider";
 import { abandonBatchAction } from "@/app/(flow)/add/[batchId]/actions";
@@ -34,6 +34,13 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
     e.target.value = "";
     await addFiles(files);
   }
+  // On a computer, photos can be dropped on the tile.
+  const [over, setOver] = useState(false);
+  const drop = {
+    onDragOver: (e: React.DragEvent) => { e.preventDefault(); setOver(true); },
+    onDragLeave: () => setOver(false),
+    onDrop: async (e: React.DragEvent) => { e.preventDefault(); setOver(false); const files = Array.from(e.dataTransfer.files ?? []); if (files.length) await addFiles(files); },
+  };
 
   const inputs = (
     <>
@@ -50,12 +57,12 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
   const hasBatch = Boolean(batch) || upload.active || upload.pending > 0 || upload.held > 0;
   const progress = total ? Math.round(((settled + ready) / total) * 100) : 0;
 
-  if (!loaded) return <div><PageHeader title="Add" accent="clothes" /><div className="h-[380px] bg-bone" /></div>;
+  if (!loaded) return <div className="lg:max-w-[560px]"><PageHeader title="Add" accent="clothes" /><div className="h-[380px] bg-bone" /></div>;
 
   if (!hasBatch) {
     if (door !== "photo") {
       return (
-        <div>
+        <div className="lg:max-w-[560px]">
           {inputs}
           <PageHeader title="Add" accent="clothes" />
           <p className="mono text-graphite">How are you adding?</p>
@@ -74,13 +81,13 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
       );
     }
     return (
-      <div>
+      <div className="lg:max-w-[560px]">
         {inputs}
         <PageHeader title="Add" accent="clothes" aside={<button type="button" onClick={() => setDoor(null)} className="pill pill-sm" data-testid="door-back">Other ways</button>} />
         <p className="mono text-graphite">Hanger or flat-lay photos · one piece per photo</p>
-        <button type="button" onClick={() => pickRef.current?.click()} className="mt-4 flex h-[380px] w-full flex-col items-center justify-center gap-3 bg-bone">
+        <button type="button" onClick={() => pickRef.current?.click()} {...drop} className={`tap mt-4 flex h-[380px] w-full flex-col items-center justify-center gap-3 bg-bone ${over ? "outline outline-2 -outline-offset-4 outline-dashed outline-ink" : ""}`}>
           <CameraIcon />
-          <span className="mono mono-11">Pick photos from your camera roll</span>
+          <span className="mono mono-11"><span className="lg:hidden">Pick photos from your camera roll</span><span className="hidden lg:inline">Pick photos, or drop them here</span></span>
           <span className="mono text-graphite">The app cuts the background and tags each piece</span>
         </button>
         <div className="mt-5 flex gap-2.5">
@@ -94,18 +101,13 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
   }
 
   return (
-    <div>
+    <div className="lg:max-w-[560px]">
       {inputs}
       <PageHeader title="Add" accent="clothes" aside={<span data-testid="batch-counter">{pad(settled + ready)} / {pad(total)}</span>} />
-      <div className="relative h-[380px] bg-bone">
-        <div className="absolute inset-x-0 top-0 flex h-14 items-center justify-between px-2">
-          <span />
-          <span className="mono mono-11 bg-paper px-2.5 py-1.5">{pad(settled + ready)} / {pad(total)}</span>
-          <span />
-        </div>
-        <div className="flex h-full flex-col items-center justify-center gap-2.5 text-center">
-          <span className="mono mono-11">{upload.pending > 0 ? `Uploading ${upload.pending} left` : working > 0 ? `Tagging ${working}` : ready > 0 ? `${ready} ready to confirm` : "All done"}</span>
-          <span className="mono text-graphite">{ready > 0 ? `${ready} ready · ${working} tagging · ${settled} confirmed` : working > 0 ? "Keep this open or come back later" : "Nothing waiting"}</span>
+      <div {...drop} className={`relative h-[300px] bg-bone ${over ? "outline outline-2 -outline-offset-4 outline-dashed outline-ink" : ""}`}>
+        <div className="flex h-full flex-col items-center justify-center gap-2.5 px-6 text-center">
+          <span className="mono mono-11" aria-live="polite">{upload.pending > 0 ? `Uploading · ${upload.pending} left` : working > 0 ? `Tagging · ${working} left` : ready > 0 ? `${ready} ready to confirm` : "All done"}</span>
+          <span className="mono text-graphite">{ready > 0 && working > 0 ? `${working} still tagging · start confirming` : working > 0 || upload.pending > 0 ? "Keep this open or come back later" : ready > 0 ? "One tap each" : "Nothing waiting"}</span>
         </div>
         <div className="absolute inset-x-0 bottom-0 h-[3px] bg-black/[0.12]"><div className="h-[3px] bg-ink transition-[width] duration-150" style={{ width: `${progress}%` }} /></div>
       </div>
@@ -135,15 +137,16 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
         </Banner>
       ) : null}
 
-      <div className="mt-5 flex gap-2.5">
+      <div className="mt-5 flex items-center gap-2.5">
         {batch && ready > 0 ? (
-          <Link href={`/add/${batch.id}`} className="flex h-[54px] flex-1 items-center justify-center bg-ink font-mono text-[12px] uppercase tracking-[0.16em] text-paper">Confirm {ready} ready</Link>
+          <Link href={`/add/${batch.id}`} className={buttonClass({ size: "lg", className: "flex-1" })} data-testid="confirm-ready"><Icons.check /><span className="flex flex-col items-start gap-0.5 text-left"><span>Confirm {ready} ready</span><span className="mono text-[11px] tracking-[0.12em]">One tap each</span></span></Link>
         ) : (
-          <Button size="lg" className="flex-1" disabled>{working > 0 || upload.active ? "Tagging…" : "Nothing to confirm"}</Button>
+          <Button size="lg" className="flex-1" busy={working > 0 || upload.active} disabled>{working > 0 || upload.active ? "Tagging…" : "Nothing to confirm"}</Button>
         )}
-        <Button size="lg" variant="secondary" aria-label="Add more photos" className="w-[54px] px-0" onClick={() => pickRef.current?.click()}>
+        <button type="button" aria-label="Add more photos" className="flex size-[60px] shrink-0 items-center justify-center rounded-full border-2 border-ink bg-paper text-ink active:bg-bone" onClick={() => pickRef.current?.click()}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><path d="M12 4v16M4 12h16" /></svg>
-        </Button>
+        </button>
+        <button type="button" aria-label="Take a photo" className="flex size-[60px] shrink-0 items-center justify-center rounded-full border-2 border-ink bg-paper text-ink active:bg-bone lg:hidden" onClick={() => cameraRef.current?.click()}><CameraIcon /></button>
       </div>
       <p className="mono mt-4 text-center text-graphite">Progress is saved · you can leave and come back</p>
       <div className="mt-5 border-t border-ink pt-4" data-testid="add-from-store">

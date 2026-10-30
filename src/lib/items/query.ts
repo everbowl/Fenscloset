@@ -14,7 +14,7 @@ export type ItemCardData = {
 };
 
 export function statusWord(it: { laundryStatus: LaundryStatus; wearCount: number }): string {
-  if (it.laundryStatus === "dirty") return "Laundry";
+  if (it.laundryStatus === "dirty") return "In the wash";
   if (it.laundryStatus === "cleaners") return "At cleaners";
   if (it.wearCount > 0) return `Worn ${it.wearCount}×`;
   return "New";

@@ -62,7 +62,7 @@ export function ClosetGrid({ items, showOwner, mirror }: { items: ItemCardData[]
           </div>
         </div>
       ) : null}
-      {mirror ? <MirrorSheet m={m} pieces={names} mine personId={mirror.personId} personName={mirror.personName} tryOnState={mirror.tryOn} backPhoto={mirror.backPhoto} mannequinAvailable={mirror.mannequinAvailable} /> : null}
+      {mirror ? <MirrorSheet m={m} pieces={names} mine personId={mirror.personId} personName={mirror.personName} tryOnState={mirror.tryOn} backPhoto={mirror.backPhoto} mannequinAvailable={mirror.mannequinAvailable} admin={mirror.admin} /> : null}
     </>
   );
 }

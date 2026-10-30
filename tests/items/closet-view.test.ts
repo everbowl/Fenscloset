@@ -52,7 +52,7 @@ describe("loadClosetView", () => {
     expect(facet("season").options.map((o) => [o.name, o.count])).toEqual([["Summer", 1], ["Winter", 1]]);
     expect(facet("occasion").options.map((o) => [o.name, o.count])).toEqual([["Gym", 1]]);
     expect(facet("tag").options.map((o) => [o.name, o.count])).toEqual([["Comfy", 1]]);
-    expect(facet("status").options.map((o) => [o.id, o.name, o.count])).toEqual([["clean", "Clean", 3], ["dirty", "In the laundry", 1]]);
+    expect(facet("status").options.map((o) => [o.id, o.name, o.count])).toEqual([["clean", "Clean", 3], ["dirty", "In the wash", 1]]);
     expect(facet("closet").options.map((o) => [o.name, o.count])).toEqual([["Family", 1]]);
     expect(v.facets.map((f) => f.key)).not.toContain("fabric"); // nothing tagged with one: no section
     expect(v.toggles).toEqual({ favorites: 1, unworn: 1 });

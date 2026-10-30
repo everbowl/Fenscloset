@@ -10,6 +10,7 @@ import type { EntryAiResult } from "@/lib/import/process";
 import { emptyTags } from "@/lib/items/service";
 import { ConfirmCard } from "./confirm-card";
 import { Waiting } from "./waiting";
+import { buttonClass } from "@/components/ui/button";
 import { FailedActions } from "./failed-actions";
 
 export const metadata = { title: "Confirm" };
@@ -45,8 +46,8 @@ export default async function ConfirmPage({ params, searchParams }: { params: Pr
         <p className="mono mt-3 text-graphite">{added} added to your closet</p>
         {summary && summary.counts.failed > 0 ? <FailedActions batchId={batchId} ids={summary.failed.map((f) => f.id)} error={summary.failed[0].error} /> : null}
         <div className="mt-auto flex flex-col gap-2.5">
-          <Link href="/closet" className="flex h-[54px] items-center justify-center bg-ink font-mono text-[12px] uppercase tracking-[0.16em] text-paper">Go to closet</Link>
-          <Link href="/add" className="flex h-[50px] items-center justify-center border border-ink font-mono text-[11px] uppercase tracking-[0.14em] text-ink">Add more photos</Link>
+          <Link href="/closet" className={buttonClass({ size: "lg", className: "w-full" })}>Go to closet <span aria-hidden>→</span></Link>
+          <Link href="/add" className="pill h-[50px] w-full">Add more photos</Link>
         </div>
       </div>
     );

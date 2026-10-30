@@ -269,6 +269,14 @@ export async function cycleLaundry(viewer: { id: string; role: string }, itemId:
   return next;
 }
 
+/** Laundry as three states, one tap each on the piece page. */
+export async function setLaundry(viewer: { id: string; role: string }, itemId: string, status: LaundryStatus): Promise<LaundryStatus> {
+  await ownedItem(viewer, itemId);
+  if (!LAUNDRY_CYCLE.includes(status)) throw new ItemError("Pick clean, in the wash, or at the cleaners.");
+  await db.item.update({ where: { id: itemId }, data: { laundryStatus: status } });
+  return status;
+}
+
 export async function addItemPhoto(viewer: { id: string; role: string }, itemId: string, kind: "alone" | "worn" | "label" | "back", key: string): Promise<void> {
   const item = await ownedItem(viewer, itemId);
   const parsed = parseKeyOwner(key);

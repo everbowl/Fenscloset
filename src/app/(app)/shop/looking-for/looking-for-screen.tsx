@@ -21,6 +21,7 @@ import { ago } from "./ago";
 export function LookingForScreen({ meId, people, forPersonId, wants }: { meId: string; people: { id: string; name: string }[]; forPersonId: string; wants: WantView[] }) {
   const [sheet, setSheet] = useState<"add" | "for" | null>(null);
   const [pendingText, setPendingText] = useState("");
+  const [prefill, setPrefill] = useState("");
   const { searching, error, run, secondsOf } = useWantSearch();
   const forName = people.find((p) => p.id === forPersonId)?.name ?? "me";
   const open = wants.filter((w) => !w.foundAt);
@@ -30,20 +31,20 @@ export function LookingForScreen({ meId, people, forPersonId, wants }: { meId: s
   useRefreshWhile(open.some((w) => !w.lastSearchedAt && !searching[w.id]));
 
   return (
-    <div data-testid="looking-for" className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-14">
-      <div className="lg:col-span-2">
+    <div data-testid="looking-for" className="flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-14">
+      <div className="order-1 lg:col-span-2">
         <PageHeader
           eyebrow={<button type="button" onClick={() => setSheet("for")} className="pill pill-sm" aria-haspopup="dialog" data-testid="looking-for-for">For {forPersonId === meId ? "me" : forName} <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden><path d="m6 9 6 6 6-6" /></svg></button>}
           title="Looking" accent="for" aside={open.length ? `${open.length} open` : undefined} />
       </div>
       {error ? <Banner tone="danger" title={error} className="mb-3 lg:col-span-2" /> : null}
 
-      <div className="lg:col-start-2 lg:row-start-3">
-        <Button variant="secondary" className="w-full" onClick={() => setSheet("add")} data-testid="want-add">Add something to find</Button>
-        <p className="mono mt-2 text-graphite">Type it the way you’d say it: “navy cashmere crewneck under $200”. The Shop searches the stores now, then again every day, and says here and on Today when something new turns up.</p>
+      <div className="order-2 lg:col-start-2 lg:row-start-2 lg:self-start lg:sticky lg:top-24">
+        <Button size="lg" className="w-full" sub="Searched now, then every day" onClick={() => { setPrefill(""); setSheet("add"); }} data-testid="want-add">Add something to find</Button>
+        <p className="mt-4 text-[14px] leading-snug text-graphite">Say it the way you would to a friend, like “navy cashmere crewneck under $200”. The Shop searches the stores now and again every day, and says here and on Today when something new turns up.</p>
       </div>
 
-      <section className="mt-6 lg:col-start-1 lg:row-start-3 lg:row-span-3 lg:mt-0">
+      <section className="order-3 mt-6 lg:col-start-1 lg:row-start-2 lg:mt-0">
         {pendingNew ? (
           <div className="flex min-h-[64px] items-center justify-between gap-3 border-b border-line py-3" data-testid="want-row-pending">
             <span className="min-w-0 flex-1">
@@ -54,14 +55,18 @@ export function LookingForScreen({ meId, people, forPersonId, wants }: { meId: s
         ) : null}
         {open.length === 0 && !pendingNew ? (
           <div data-testid="looking-for-empty">
-            <div className="h-[200px] bg-bone" />
-            <p className="serif mt-3.5 text-[21px] italic leading-[1.3]">Nothing on {forPersonId === meId ? "your" : `${forName}’s`} list yet. Add the piece you keep meaning to find and let the Shop keep an eye out.</p>
+            <p className="serif text-[21px] italic leading-[1.3]">Nothing on {forPersonId === meId ? "your" : `${forName}’s`} list yet. Tap one to start from it, or add your own.</p>
+            <ul className="mt-4 flex flex-col gap-2">
+              {["navy cashmere crewneck under $200", "white leather sneakers, size 10", "a rain jacket that packs small"].map((ex) => (
+                <li key={ex}><button type="button" onClick={() => { setPrefill(ex); setSheet("add"); }} className="tap flex h-12 w-full items-center justify-between border-b border-line text-left text-[15px]" data-testid="want-example"><span>“{ex}”</span><span className="mono text-graphite">Use it</span></button></li>
+              ))}
+            </ul>
           </div>
         ) : open.map((w) => {
           const s = searching[w.id];
           const stores = new Set(w.matches.map((m) => m.storeName)).size;
           return (
-            <Link key={w.id} href={`/shop/looking-for/${w.id}`} className="flex min-h-[64px] items-center justify-between gap-3 border-b border-line py-3 hover:bg-bone" data-testid="want-row">
+            <Link key={w.id} href={`/shop/looking-for/${w.id}`} className="tap flex min-h-[64px] items-center justify-between gap-3 border-b border-line py-3" data-testid="want-row">
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[16px] font-medium">{w.text}</span>
                 <span className="mono block text-graphite" data-testid="want-row-line" suppressHydrationWarning>
@@ -89,7 +94,7 @@ export function LookingForScreen({ meId, people, forPersonId, wants }: { meId: s
         ) : null}
       </section>
 
-      <WantSheet open={sheet === "add"} onClose={() => setSheet(null)} title="Looking for…" value="" onSave={(text) => { setPendingText(text); void run("new", () => addWantAction(forPersonId, text)); }} />
+      <WantSheet open={sheet === "add"} onClose={() => setSheet(null)} title="Looking for…" value={prefill} onSave={(text) => { setPendingText(text); void run("new", () => addWantAction(forPersonId, text)); }} />
       <Sheet open={sheet === "for"} onClose={() => setSheet(null)} title="Whose list">
         <div className="flex flex-col" role="listbox">
           {people.map((p) => <Link key={p.id} href={`/shop/looking-for?for=${p.id}`} role="option" aria-selected={p.id === forPersonId} onClick={() => setSheet(null)} className="flex h-12 items-center justify-between border-b border-line text-[15px]"><span>{p.id === meId ? `${p.name} (me)` : p.name}</span><span className={cn("mono", p.id === forPersonId ? "text-ink" : "text-transparent")}>✓</span></Link>)}

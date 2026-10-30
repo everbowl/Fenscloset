@@ -55,7 +55,7 @@ export function TogetherScreen({ meId, people, canDressIds, occasions, isAdmin, 
             {people.map((p) => {
               const on = ids.includes(p.id);
               return (
-                <button key={p.id} type="button" role="checkbox" aria-checked={on} onClick={() => setIds(on ? ids.filter((x) => x !== p.id) : [...ids, p.id])} className="flex h-[42px] w-full items-center justify-between border-b border-line text-[14px]" data-testid={`together-person-${p.name}`}>
+                <button key={p.id} type="button" role="checkbox" aria-checked={on} onClick={() => setIds(on ? ids.filter((x) => x !== p.id) : [...ids, p.id])} className="tap flex h-12 w-full items-center justify-between border-b border-line text-[15px]" data-testid={`together-person-${p.name}`}>
                   <span>{p.name}{p.id === meId ? " (me)" : ""}</span><span className={cn("mono", on ? "text-ink" : "text-transparent")}>✓</span>
                 </button>
               );
@@ -64,7 +64,7 @@ export function TogetherScreen({ meId, people, canDressIds, occasions, isAdmin, 
           <section>
             <p className="mono border-b border-ink pb-2 text-graphite">How</p>
             <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Mode">
-              {MODES.map((m) => <button key={m.key} type="button" role="radio" aria-checked={mode === m.key} onClick={() => setMode(m.key)} className={cn("mono mono-11 h-[46px] border border-ink uppercase", mode === m.key ? "bg-ink text-paper" : "bg-paper text-ink")} data-testid={`mode-${m.key}`}>{m.label}</button>)}
+              {MODES.map((m) => <button key={m.key} type="button" role="radio" aria-checked={mode === m.key} onClick={() => setMode(m.key)} className={cn("pill h-[46px]", mode === m.key && "pill-solid")} data-testid={`mode-${m.key}`}>{m.label}</button>)}
             </div>
             <p className="mono mt-2 text-graphite">{MODES.find((m) => m.key === mode)?.blurb}</p>
           </section>
@@ -77,7 +77,7 @@ export function TogetherScreen({ meId, people, canDressIds, occasions, isAdmin, 
             </button>
             <button type="button" onClick={() => setSheet("text")} className="pill pill-sm mt-2">Something else…</button>
           </section>
-          <Button size="lg" className="w-full" disabled={busy !== null || ids.length < 2} onClick={() => run("dress", () => dressTogetherAction({ personIds: ids, mode, occasionId, occasionText: occasionId ? null : text }))} data-testid="dress-us">{busy === "dress" ? "Thinking…" : "Dress us"}</Button>
+          <Button size="lg" className="w-full" busy={busy === "dress"} disabled={busy !== null || ids.length < 2} sub="One look for each person" onClick={() => run("dress", () => dressTogetherAction({ personIds: ids, mode, occasionId, occasionText: occasionId ? null : text }))} data-testid="dress-us">{busy === "dress" ? "Thinking…" : "Dress us"}</Button>
           {ids.length < 2 ? <p className="mono text-center text-graphite">Pick at least two people</p> : null}
         </div>
       ) : null}
@@ -100,13 +100,14 @@ export function TogetherScreen({ meId, people, canDressIds, occasions, isAdmin, 
               </div>
               <p className="mono mt-3 text-graphite">{b.pieces.map((x) => x.label).join(" · ")}</p>
               <p className="mt-1 text-[16px] leading-snug">{b.board.reason}</p>
+              {!canDressIds.includes(b.personId) ? <p className="mono mt-3 text-graphite">{b.wornFitId ? `${b.personName} is wearing this` : `Only ${b.personName} (or a parent) can wear it`}</p> : null}
               {canDressIds.includes(b.personId) ? (
                 b.wornFitId ? <Link href="/fits" className="pill mt-3 h-[50px]">Wearing this · see Fits</Link>
                 : <Button className="mt-3 w-full" disabled={busy !== null} onClick={() => run(`wear-${b.personId}`, () => wearTogetherAction(b.personId, b.suggestionId, session.occasionLabel ?? "Together"))} data-testid={`wear-${b.personName}`}>{busy === `wear-${b.personId}` ? "Saving…" : `Wear this · ${b.personName}`}</Button>
               ) : null}
             </section>
           ))}
-          {session.boards.length === 0 ? <p className="mono text-graphite">Nobody had enough clean pieces for a look. Add clothes or do laundry.</p> : null}
+          {session.boards.length === 0 ? <div className="flex flex-col items-start gap-3"><p className="text-[14px] leading-snug text-graphite">Nobody had enough clean pieces for a look.</p><Link href="/add" className="pill">+ Add clothes</Link></div> : null}
         </div>
       ) : null}
 

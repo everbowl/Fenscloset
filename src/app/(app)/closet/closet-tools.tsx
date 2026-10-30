@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
@@ -20,9 +20,11 @@ export function ClosetTools({ basePath, filters, sort, facets, toggles, shown, t
 }) {
   const router = useRouter();
   const [sheet, setSheet] = useState<null | "sort" | "filter">(null);
+  const [applying, start] = useTransition();
   const n = activeFilterCount(filters);
+  // A pick applies in a transition: the row and the count dim until the new grid is in, so a tap always answers at once.
   const go = (next: { filters?: ClosetFilters; sort?: ClosetSort }, mode: "push" | "replace" = "replace") => {
-    router[mode](`${basePath}${closetQuery({ filters: next.filters ?? filters, sort: next.sort ?? sort, cat, q })}`, { scroll: false });
+    start(() => { router[mode](`${basePath}${closetQuery({ filters: next.filters ?? filters, sort: next.sort ?? sort, cat, q })}`, { scroll: false }); });
   };
   const toggleId = (key: FacetKey, id: string) => go({ filters: { ...filters, [key]: filters[key].includes(id) ? filters[key].filter((x) => x !== id) : [...filters[key], id] } });
   const toggleFlag = (t: Toggle) => go({ filters: { ...filters, [t]: !filters[t] } });
@@ -37,7 +39,7 @@ export function ClosetTools({ basePath, filters, sort, facets, toggles, shown, t
 
   return (
     <>
-      <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="closet-tools">
+      <div className={cn("mt-3 flex flex-wrap items-center gap-2 transition-opacity", applying && "opacity-60")} aria-busy={applying || undefined} data-testid="closet-tools">
         <button type="button" onClick={() => setSheet("sort")} aria-haspopup="dialog" className="pill pill-sm" data-testid="sort-button">Sort · {sortLabel(sort)}</button>
         <button type="button" onClick={() => setSheet("filter")} aria-haspopup="dialog" className={cn("pill pill-sm", n > 0 && "pill-solid")} data-testid="filter-button">{n ? `Filter · ${n}` : "Filter"}</button>
         {chips.map((c) => (
@@ -66,7 +68,7 @@ export function ClosetTools({ basePath, filters, sort, facets, toggles, shown, t
       {/* The sheet's body exists only while it is open: a closed dialog must not leave a second "N of M pieces" in the page. */}
       <Sheet open={sheet === "filter"} onClose={() => setSheet(null)} title="Filter">
         {sheet === "filter" ? <div data-testid="filter-sheet">
-          <p className="mono text-graphite" aria-live="polite" data-testid="filter-count">{pieces}</p>
+          <p className={cn("mono text-graphite transition-opacity", applying && "opacity-50")} aria-live="polite" data-testid="filter-count">{pieces}</p>
           {nothingToFilter ? (
             <p className="mono mt-4 text-graphite">Nothing to filter yet · a piece's page is where its color, season and the rest get set</p>
           ) : null}
