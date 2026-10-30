@@ -113,8 +113,8 @@ test("admin re-invites a seeded family member and removes a person with the item
   await page.goto("/admin/people");
   await page.getByRole("link", { name: /Olivia/ }).click();
   await page.getByLabel("Email").first().fill("olivia@example.com");
-  await page.getByRole("button", { name: "Save details" }).click();
-  await expect(page.getByText("Details saved.")).toBeVisible();
+  await page.getByLabel("Email").first().blur(); // details save when the field is left
+  await expect(page.getByTestId("toast-ok")).toContainText("Details saved");
   await page.getByRole("button", { name: "Send invite" }).click();
   const sheet = page.getByRole("dialog");
   await sheet.getByRole("button", { name: "Create invite" }).click();
@@ -122,8 +122,8 @@ test("admin re-invites a seeded family member and removes a person with the item
   await sheet.getByRole("button", { name: "Done" }).click();
 
   await page.getByRole("button", { name: "Remove person" }).click();
-  await expect(page.getByText("What should happen to the clothes")).toBeVisible();
-  await page.getByRole("button", { name: "Move them to the Family closet" }).click();
+  await expect(page.getByText(/What happens to the pieces in Olivia/)).toBeVisible();
+  await page.getByRole("button", { name: /Move Olivia.s pieces to Family/ }).click();
   await expect(page).toHaveURL(/\/admin\/people$/);
   await expect(page.getByRole("link", { name: /Olivia/ })).toHaveCount(0);
 });

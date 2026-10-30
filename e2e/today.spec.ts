@@ -74,7 +74,7 @@ test("morning flow: Jeff gets three looks, checks in, sets the plan, swaps, wear
   // how did it go? three taps on the fit panel; the chosen one goes solid
   await page.getByTestId("rate-loved").click();
   await expect(page.getByTestId("rate-loved")).toHaveAttribute("aria-checked", "true");
-  await expect(page.getByTestId("rating-row")).toContainText("It went");
+  await expect(page.getByTestId("rating-row")).toContainText("it went");
 
   // taste memory section exists on the Style page (one wear is not enough for a learned line yet)
   await page.goto("/profile/style");

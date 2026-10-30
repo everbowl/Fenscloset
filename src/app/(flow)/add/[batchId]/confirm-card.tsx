@@ -62,7 +62,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
   const [tags, setTags] = useState(initial);
   const [lists, setLists] = useState(initialLists);
   const [sheet, setSheet] = useState<SheetKind>(null);
-  const [brandPicking, setBrandPicking] = useState(false); // the brand search takes the Brand · Size sheet's place, never stacks on it
+  const [brandPicking, setBrandPicking] = useState(false); // the brand search takes the Brand · Size sheet's place, never stacks on it; a pick lands back on the card, Close goes back to the sheet
   const [error, setError] = useState<string>();
   const [pending, start] = useTransition();
   const labelRef = useRef<HTMLInputElement>(null);
@@ -281,7 +281,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
         </div>
       </Sheet>
       <TextSheet open={sheet === "size"} onClose={() => setSheet("brand")} title="Size" label="Size" value={tags.sizeText ?? ""} placeholder="M · 28 · 8 · EU 38" onSave={(v) => edit({ sizeText: v })} />
-      <BrandSearch open={sheet === "brand" && brandPicking} onClose={() => setBrandPicking(false)} brands={lists.brands} selectedId={tags.brandId} onPick={(b) => edit({ brandId: b.id, brandText: b.name })} onAdded={(e) => setLists((l) => ({ ...l, brands: [...l.brands, e] }))} />
+      <BrandSearch open={sheet === "brand" && brandPicking} onClose={() => setBrandPicking(false)} brands={lists.brands} selectedId={tags.brandId} onPick={(b) => { edit({ brandId: b.id, brandText: b.name }); setSheet(null); }} onAdded={(e) => setLists((l) => ({ ...l, brands: [...l.brands, e] }))} />
       <MatchSheet open={sheet === "match"} onClose={() => setSheet(null)} busy={matching || pending} onPick={pickMatch}
         probe={{ brand: brandName ?? "", name: tags.name, category: nameOf(lists.categories, tags.categoryId), color: tags.colorIds[0] ? nameOf(lists.colors, tags.colorIds[0]) : null }} />
       <TextSheet open={sheet === "rename"} onClose={() => setSheet(null)} title="Rename" label="Name" value={tags.name} onSave={(v) => edit({ name: v })} />

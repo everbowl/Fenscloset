@@ -74,7 +74,7 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
   const m = useMirror(mirror?.personId ?? "", mirror?.wardrobe, mirror?.engine);
   const [lists, setLists] = useState(initialLists);
   const [sheet, setSheet] = useState<SheetKind>(null);
-  const [brandPicking, setBrandPicking] = useState(false); // the brand search takes the sheet's place, never stacks on it
+  const [brandPicking, setBrandPicking] = useState(false); // the brand search takes the sheet's place, never stacks on it; a pick lands back on the piece, Close goes back to the sheet
   const [photoIdx, setPhotoIdx] = useState(0);
   const setError = (e?: string) => { if (e) toast.error(e); };
   const [pending, start] = useTransition();
@@ -277,7 +277,7 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
       <PickSheet open={sheet === "closets"} onClose={() => setSheet(null)} title="Closets" kind="closet" options={lists.closets.map((c) => ({ id: c.id, name: c.kind === "family" ? `${c.name} (everyone)` : c.name }))} selected={it.closetIds} multi canAdd={canEditLists} onChange={(ids) => save({ closetIds: ids }, { closetIds: ids })} onAdded={(e) => setLists((l) => ({ ...l, closets: [...l.closets, { ...e, kind: "custom" }] }))} />
       <PickSheet open={sheet === "share"} onClose={() => setSheet(null)} title="Share with" kind="tag" options={lists.people} selected={it.sharedWithIds} multi canAdd={false} onChange={(ids) => save({ sharedWithIds: ids }, { sharedWithIds: ids })} />
       <TextSheet open={sheet === "size"} onClose={() => setSheet("brand")} title="Size" label="Size" value={it.size ?? ""} placeholder="M · 28 · 8 · EU 38" onSave={(v) => save({ sizeText: v }, { size: v.trim() || null })} />
-      <BrandSearch open={sheet === "brand" && brandPicking} onClose={() => setBrandPicking(false)} brands={lists.brands} selectedId={it.brandId} onPick={(b) => save({ brandId: b.id }, { brandId: b.id })} onAdded={(e) => setLists((l) => ({ ...l, brands: [...l.brands, e] }))} />
+      <BrandSearch open={sheet === "brand" && brandPicking} onClose={() => setBrandPicking(false)} brands={lists.brands} selectedId={it.brandId} onPick={(b) => { save({ brandId: b.id }, { brandId: b.id }); setSheet(null); }} onAdded={(e) => setLists((l) => ({ ...l, brands: [...l.brands, e] }))} />
       <MatchSheet open={sheet === "match"} onClose={() => setSheet("brand")} busy={matching || pending} onPick={pickMatch}
         probe={{ brand: brandName ?? "", name: it.name, category: category?.name ?? null, color: it.colorIds[0] ? name(lists.colors, it.colorIds[0]) : null }} />
       <TextSheet open={sheet === "rename"} onClose={() => setSheet(null)} title="Rename" label="Name" value={it.name} onSave={(v) => save({ name: v }, { name: v.trim() || it.name })} />

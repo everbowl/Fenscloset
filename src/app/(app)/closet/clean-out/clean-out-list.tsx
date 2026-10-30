@@ -50,7 +50,8 @@ export function CleanOutList({ items, canDecide }: { items: Row[]; canDecide: bo
   }
 
   const shown = items.filter((it) => !gone.includes(it.id));
-  if (!items.length) return <p className="serif text-[21px] italic leading-[1.3]">Everything in this closet has been worn recently. Nice.</p>;
+  // The action revalidates the page, so the list can come back empty while the strip is still up: the strip stays, with Undo, until its timer runs out.
+  const empty = !items.length;
   return (
     <div>
       {error ? <Banner tone="danger" title={error} className="mb-3" /> : null}
@@ -60,6 +61,7 @@ export function CleanOutList({ items, canDecide }: { items: Row[]; canDecide: bo
           {last.decision !== "keep" ? <button type="button" onClick={undo} className="pill pill-sm shrink-0" data-testid="undo-clean-out">Undo</button> : null}
         </div>
       ) : null}
+      {empty ? <p className="serif text-[21px] italic leading-[1.3]">{last ? "That’s the list. Nice." : "Everything in this closet has been worn recently. Nice."}</p> : (
       <div className="flex flex-col">
         {shown.map((it) => (
           <div key={it.id} className="flex flex-col gap-2.5 border-b border-line py-3 sm:flex-row sm:items-center sm:gap-3" data-testid="clean-out-row">
@@ -81,7 +83,8 @@ export function CleanOutList({ items, canDecide }: { items: Row[]; canDecide: bo
         ))}
         {shown.length === 0 ? <p className="serif mt-4 text-[21px] italic leading-[1.3]">That’s the list. Nice.</p> : null}
       </div>
-      <p className="mt-4 text-[14px] leading-snug text-graphite">Keep hides a piece from this list for 3 months. Donate and Sell retire it from the closet; the wear history stays, and a retired piece can always be brought back from its own page.</p>
+      )}
+      {!empty ? <p className="mt-4 text-[14px] leading-snug text-graphite">Keep hides a piece from this list for 3 months. Donate and Sell retire it from the closet; the wear history stays, and a retired piece can always be brought back from its own page.</p> : null}
     </div>
   );
 }

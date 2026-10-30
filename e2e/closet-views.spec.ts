@@ -73,11 +73,11 @@ test.describe("closet views", () => {
     await page.getByTestId("filter-button").click();
     await sheet.getByTestId("filter-sheet-clear").click();
     await expect(sheet.getByTestId("filter-count")).toHaveText("2 of 5 pieces");
-    await sheet.getByRole("button", { name: /^At the cleaners 1$/ }).click();
+    await sheet.getByRole("button", { name: /^At cleaners 1$/ }).click();
     await expect(cards).toHaveCount(1);
     await expect(cards.first()).toContainText("Running shorts");
     await page.getByTestId("filter-done").click();
-    await expect(page.getByTestId("filter-chip")).toHaveText(["At the cleaners ×"]);
+    await expect(page.getByTestId("filter-chip")).toHaveText(["At cleaners ×"]);
 
     // the search keeps the filters and the sort
     await page.getByRole("button", { name: "Search" }).click();

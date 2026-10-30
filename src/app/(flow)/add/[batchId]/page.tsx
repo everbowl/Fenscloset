@@ -10,7 +10,7 @@ import type { EntryAiResult } from "@/lib/import/process";
 import { emptyTags } from "@/lib/items/service";
 import { ConfirmCard } from "./confirm-card";
 import { Waiting } from "./waiting";
-import { buttonClass } from "@/components/ui/button";
+import { buttonClass } from "@/components/ui/button-class";
 import { FailedActions } from "./failed-actions";
 
 export const metadata = { title: "Confirm" };
