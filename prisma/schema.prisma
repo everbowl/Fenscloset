@@ -62,6 +62,7 @@ model Person {
   styleWords         StyleWord[]
   favoriteBrands     Brand[]                  @relation("favoriteBrands")
   favoriteStores     Store[]                  @relation("favoriteStores")
+  listRequests       ListRequest[]
   bodyGrantsGiven    BodyDataGrant[]          @relation("bodyGrantOwner")
   bodyGrantsReceived BodyDataGrant[]          @relation("bodyGrantViewer")
   shopGrantsGiven    ShopForGrant[]           @relation("shopGrantOwner")
@@ -322,6 +323,21 @@ model CheckInOption {
   answers    CheckInAnswer[]
 
   @@unique([scaleId, name])
+}
+
+/// "Ask Jeff to add it" (J1): a word someone wanted on a list; an admin adds or dismisses it under Lists.
+model ListRequest {
+  id            String   @id @default(cuid())
+  kind          String
+  name          String
+  parentId      String?
+  requestedBy   Person   @relation(fields: [requestedById], references: [id], onDelete: Cascade)
+  requestedById String
+  /// open | added | dismissed
+  status        String   @default("open")
+  createdAt     DateTime @default(now())
+
+  @@index([status, createdAt])
 }
 
 model Rule {

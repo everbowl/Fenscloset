@@ -15,7 +15,7 @@ import { EntryExtraFields } from "./entry-fields";
  * "+ Add <thing>" that works anywhere a list is used, so an admin never has to leave the screen.
  * Opens a small sheet, creates the entry, hands it back through onCreated.
  */
-export function InlineAdd({ kind, parentId, onCreated, label, variant = "ghost", size = "sm", inline }: {
+export function InlineAdd({ kind, parentId, onCreated, label, variant = "ghost", size = "sm", inline, initialName, testId }: {
   kind: ListKind;
   parentId?: string;
   onCreated?: (entry: ListEntry) => void;
@@ -24,10 +24,13 @@ export function InlineAdd({ kind, parentId, onCreated, label, variant = "ghost",
   size?: "sm" | "md" | "lg";
   /** Inside a sheet: the form opens as a row right here instead of a second sheet. */
   inline?: boolean;
+  /** A name already chosen (an ask from the family). */
+  initialName?: string;
+  testId?: string;
 }) {
   const def = LIST_DEFS[kind];
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
+  const [name, setName] = useState(initialName ?? "");
   const [extra, setExtra] = useState<{ hex?: string; url?: string; photoTip?: string; prompt?: string; needs?: string }>({ hex: "#888888" });
   const [error, setError] = useState<string>();
   const [pending, start] = useTransition();
@@ -37,7 +40,7 @@ export function InlineAdd({ kind, parentId, onCreated, label, variant = "ghost",
     start(async () => {
       const res = await createEntryAction(kind, { name, parentId, ...extra });
       if (!res.ok) { setError(res.error); return; }
-      setName(""); setError(undefined); setOpen(false);
+      setName(initialName ?? ""); setError(undefined); setOpen(false);
       onCreated?.(res.entry);
     });
   }
@@ -61,7 +64,7 @@ export function InlineAdd({ kind, parentId, onCreated, label, variant = "ghost",
   return (
     <>
       {variant === "ghost"
-        ? <button type="button" onClick={() => setOpen(true)} className={size === "sm" ? "pill pill-sm" : "pill"} data-testid={`inline-add-${kind}`}><Plus className="size-3.5" strokeWidth={1.8} /> {label ?? `Add ${def.singular}`}</button>
+        ? <button type="button" onClick={() => setOpen(true)} className={size === "sm" ? "pill pill-sm" : "pill"} data-testid={testId ?? `inline-add-${kind}`}><Plus className="size-3.5" strokeWidth={1.8} /> {label ?? `Add ${def.singular}`}</button>
         : <Button type="button" variant={variant} size={size} onClick={() => setOpen(true)} data-testid={`inline-add-${kind}`}><Plus className="size-3.5" strokeWidth={1.8} /> {label ?? `Add ${def.singular}`}</Button>}
       <Sheet open={open} onClose={() => setOpen(false)} title={`New ${def.singular}`}>
         <form onSubmit={submit} className="space-y-4">

@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useClosetPick } from "./pick-context";
 import { useState, useTransition, type ReactNode } from "react";
 import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -15,10 +17,13 @@ const TOGGLES: Toggle[] = ["favorites", "unworn"];
  * be shared and the back button works. A tap in the filter sheet applies at once: the grid behind it and every
  * count in the sheet follow, so nobody has to guess what a pick will leave. The picks show as chips, each with its ×.
  */
-export function ClosetTools({ basePath, filters, sort, facets, toggles, shown, total, cat, q }: {
+export function ClosetTools({ basePath, filters, sort, facets, toggles, shown, total, cat, q, mirror = false, cleanOut = 0 }: {
   basePath: string; filters: ClosetFilters; sort: ClosetSort; facets: Facet[]; toggles: Record<Toggle, number>; shown: number; total: number; cat?: string; q?: string;
+  /** The mirror can dress this closet: a Mirror pill starts pick mode (F1). */ mirror?: boolean;
+  /** Pieces not worn in a while: a "Clean-out · n" pill (H1). */ cleanOut?: number;
 }) {
   const router = useRouter();
+  const pick = useClosetPick();
   const [sheet, setSheet] = useState<null | "sort" | "filter">(null);
   const [applying, start] = useTransition();
   const n = activeFilterCount(filters);
@@ -42,6 +47,8 @@ export function ClosetTools({ basePath, filters, sort, facets, toggles, shown, t
       <div className={cn("mt-3 flex flex-wrap items-center gap-2 transition-opacity", applying && "opacity-60")} aria-busy={applying || undefined} data-testid="closet-tools">
         <button type="button" onClick={() => setSheet("sort")} aria-haspopup="dialog" className="pill pill-sm" data-testid="sort-button">Sort · {sortLabel(sort)}</button>
         <button type="button" onClick={() => setSheet("filter")} aria-haspopup="dialog" className={cn("pill pill-sm", n > 0 && "pill-solid")} data-testid="filter-button">{n ? `Filter · ${n}` : "Filter"}</button>
+        {mirror ? <button type="button" onClick={() => pick.setPicking(!pick.picking)} aria-pressed={pick.picking} className={cn("pill pill-sm", pick.picking && "pill-solid")} data-testid="closet-mirror">Mirror</button> : null}
+        {cleanOut > 0 ? <Link href="/closet/clean-out" className="pill pill-sm" data-testid="closet-clean-out">Clean-out · {cleanOut}</Link> : null}
         {chips.map((c) => (
           <button key={c.label} type="button" onClick={c.off} aria-label={`Remove ${c.label}`} className="pill pill-sm" data-testid="filter-chip">
             {c.label} <span aria-hidden>×</span>

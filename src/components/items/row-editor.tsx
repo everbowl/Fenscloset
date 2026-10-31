@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { InlineAdd } from "@/components/lists/inline-add";
+import { AskToAdd } from "@/components/lists/ask-to-add";
 import { cn } from "@/lib/cn";
 import type { ListKind } from "@/lib/lists/registry";
 import type { Named } from "@/lib/ai/tag-item";
@@ -57,7 +58,7 @@ export function PickSheet({ open, onClose, title, kind, options, selected, multi
         {options.length === 0 ? <p className="mono py-4 text-graphite">Nothing in this list yet</p> : null}
       </div>
       <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
-        {canAdd ? <InlineAdd kind={kind} parentId={parentId} inline onCreated={(e) => { onAdded?.({ id: e.id, name: e.name }); if (!multi) onClose(); onChange(multi ? [...selected, e.id] : [e.id]); }} /> : <span />}
+        {canAdd ? <InlineAdd kind={kind} parentId={parentId} inline onCreated={(e) => { onAdded?.({ id: e.id, name: e.name }); if (!multi) onClose(); onChange(multi ? [...selected, e.id] : [e.id]); }} /> : <AskToAdd kind={kind} parentId={parentId} />}
         <span className="flex items-center gap-2">
           {clearable && !multi && selected.length ? <button type="button" onClick={() => { onClose(); onChange([]); }} className="pill pill-sm pill-quiet" data-testid="pick-clear">Clear</button> : null}
           {multi ? <Button type="button" size="md" onClick={onClose}>Done</Button> : null}

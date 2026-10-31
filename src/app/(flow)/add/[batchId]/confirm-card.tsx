@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import { Sheet } from "@/components/ui/sheet";
 import { Button, Icons } from "@/components/ui/button";
 import { Banner } from "@/components/ui/banner";
@@ -47,7 +47,11 @@ const nameOf = (xs: Named[], id: string | null) => xs.find((x) => x.id === id)?.
 
 /** Design 03: one tap per item when the tags are right. */
 export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists, counter, progress, duplicate, canEditLists, readyCount, myBrands }: Props) {
+  // "Now the back" asks once per batch (Jeff, 31 Oct 2026, K1): "Not now" sticks for the rest of the pile.
+  const askKey = `fc:askmore-no:${batchId}`;
   const [askMore, setAskMore] = useState(true);
+  useLayoutEffect(() => { try { if (window.sessionStorage.getItem(askKey)) setAskMore(false); } catch { /* private mode */ } }, [askKey]);
+  function notNow() { setAskMore(false); try { window.sessionStorage.setItem(askKey, "1"); } catch { /* private mode */ } }
   /** "Another one like X?" asks once per entry (dismissal survives a reload through sessionStorage). */
   const [askLike, setAskLike] = useState<boolean>(() => Boolean(duplicate) && typeof window !== "undefined" && !window.sessionStorage.getItem(`like-asked:${entry.id}`));
   const [mirrored, setMirrored] = useState(false);
@@ -234,7 +238,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
             <span className="text-[15px] leading-snug">Now the back<span className="mono block text-graphite">So the mirror can show the fit from behind</span></span>
             <div className="flex shrink-0 gap-1.5">
               <button type="button" onClick={() => backRef.current?.click()} className="pill pill-sm" data-testid="more-back">Add the back</button>
-              <button type="button" onClick={() => setAskMore(false)} className="pill pill-sm pill-quiet" data-testid="more-no">Not now</button>
+              <button type="button" onClick={notNow} className="pill pill-sm pill-quiet" data-testid="more-no">Not now</button>
             </div>
           </div>
           <div className="mt-2 flex items-center gap-2">

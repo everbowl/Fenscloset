@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { Sheet } from "@/components/ui/sheet";
 import { cn } from "@/lib/cn";
 import { toast } from "@/components/ui/toast";
-import { Button, buttonClass, Icons } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
 import { PickSheet, PriceDateSheet, Row, TextSheet } from "@/components/items/row-editor";
 import { BrandSearch } from "@/components/items/brand-search";
 import { MatchSheet } from "@/components/items/match-sheet";
@@ -155,27 +155,36 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
         {photo?.kind === "retail" ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">Store photo</span> : photo?.kind === "worn" || photo?.kind === "back" ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">{KIND_WORD[photo.kind]}</span> : it.storePhoto && photo?.isPrimary ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">Store photo</span> : null}
       </div>
       {undoable.pending ? <UndoStrip text={undoable.pending.text} onUndo={undoable.undo} testId="photo-undo" className="mt-2" /> : null}
-      {photos.length > 1 ? (
-        <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 pt-1.5 [scrollbar-width:none] lg:mx-0 lg:px-0 lg:pt-0">
+      {photos.length > 1 || (canEdit && !it.retired) ? (
+        <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 pt-1.5 [scrollbar-width:none] lg:mx-0 lg:px-0 lg:pt-0" data-testid="photo-strip">
           {photos.map((p, i) => (
             <button key={p.id} type="button" onClick={() => setPhotoIdx(i)} aria-label={`${KIND_WORD[p.kind]} photo`} aria-pressed={i === photoIdx} className={`h-[62px] w-[48px] shrink-0 overflow-hidden bg-bone ${i === photoIdx ? "outline outline-2 -outline-offset-2 outline-ink" : ""}`}>
               <img src={`/api/photo/${p.key}`} alt="" className="size-full object-contain" />
             </button>
           ))}
+          {/* Add a photo lives here, as a tile at the end of the strip (E1), not as a second orange button. */}
+          {canEdit && !it.retired ? (
+            <button type="button" onClick={() => setSheet("photo")} disabled={uploading} aria-label="Add a photo" aria-busy={uploading || undefined} className="tap flex h-[62px] w-[48px] shrink-0 items-center justify-center border-2 border-dashed border-ink text-[20px] leading-none" data-testid="add-photo">{uploading ? <span aria-hidden className="size-2 animate-pulse rounded-full bg-ink" /> : "+"}</button>
+          ) : null}
         </div>
       ) : null}
 
-      <div className="flex items-end justify-between pt-[18px]">
+      <div className="flex items-end justify-between gap-3 pt-[18px]">
         <Title name={it.name} />
-        {canEdit ? <button type="button" onClick={() => open("rename")} className="pill pill-sm">Rename</button> : null}
+        {canEdit ? (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button type="button" role="switch" aria-checked={it.isFavorite} aria-label="Favorite" onClick={() => save({ isFavorite: !it.isFavorite }, { isFavorite: !it.isFavorite })} className={cn("pill pill-sm px-3 text-[14px]", it.isFavorite && "pill-solid")} data-testid="toggle-favorite">{it.isFavorite ? "♥" : "♡"}</button>
+            <button type="button" onClick={() => open("rename")} className="pill pill-sm">Rename</button>
+          </div>
+        ) : null}
       </div>
       <p className="mono mt-2 text-graphite">{[!it.mine ? it.ownerName : null, category?.name, it.status, it.isFavorite ? "Favorite" : null].filter(Boolean).join(" · ")}</p>
-      {/* This one piece in the mirror (Jeff, 19 Oct 2026, Q2 C): on you, or on the mannequin without a body photo. */}
+      {/* The one orange action on a piece (Jeff, 31 Oct 2026, E1): this piece in the mirror, on you or on the mannequin. */}
       {mirror && (mirror.tryOn === "ready" || mirror.mannequinAvailable) && !it.retired && mirrorCanPlace(category?.name) ? (
-        <Button variant="secondary" className="mt-3 w-full" disabled={m.busy} onClick={() => m.begin({ look: { kind: "closet", itemIds: [it.id] }, on: mirror.tryOn === "ready" ? "me" : "mannequin" })} data-testid="see-on-me">{m.busy ? "Dressing…" : mirror.tryOn === "ready" ? "See it on me" : "See it on a mannequin"}</Button>
+        <div className="mt-4"><Button size="lg" className="w-full" busy={m.busy} sub={mirror.tryOn === "ready" ? "This piece on your photo" : "On the mannequin · no body photo needed"} onClick={() => m.begin({ look: { kind: "closet", itemIds: [it.id] }, on: mirror.tryOn === "ready" ? "me" : "mannequin" })} data-testid="see-on-me">{m.busy ? "Dressing…" : mirror.tryOn === "ready" ? "See it on me" : "See it on a mannequin"}</Button></div>
       ) : null}
-      {/* Shop v2 item 1 (Jeff, 23 Oct 2026): what would complete this piece, products for it, looks from the closet. */}
-      {!it.retired ? <Link href={`/closet/${it.id}/go-with`} className={buttonClass({ variant: "secondary", className: "mt-3 w-full" })} data-testid="go-with">Shop for something to go with it</Link> : null}
+      {/* Shop v2 item 1 (Jeff, 23 Oct 2026): what would complete this piece, products for it, looks from the closet. Outlined next to the orange one (D1). */}
+      {!it.retired ? <Link href={`/closet/${it.id}/go-with`} className={buttonClass({ variant: "outline", className: "mt-3 w-full" })} data-testid="go-with">Shop for something to go with it <span aria-hidden>→</span></Link> : null}
 
       {justAdded ? (
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-y border-line py-2" data-testid="ask-more-photos">
@@ -241,7 +250,6 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
         <Row label="Shared with" value={names(lists.people, it.sharedWithIds) || "No one else"} muted={!it.sharedWithIds.length} onClick={() => open("share")} />
         {canEdit ? (
           <>
-            <ToggleRow label="Favorite" on={it.isFavorite} onWord="Yes" offWord="No" onChange={(v) => save({ isFavorite: v }, { isFavorite: v })} testId="toggle-favorite" />
             <ToggleRow label="Suggest it" on={!it.neverSuggest} onWord="Yes" offWord="Never" onChange={(v) => save({ neverSuggest: !v }, { neverSuggest: !v })} testId="toggle-suggest" />
           </>
         ) : null}
@@ -250,11 +258,6 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
 
       {uploading ? <p className="mono pt-3 text-graphite" role="status">Saving the photo…</p> : null}
 
-      {canEdit ? (
-        <div className="pt-5">
-          <Button size="lg" className="w-full" onClick={() => setSheet("photo")} busy={uploading} icon={<Icons.camera />} sub={photos.length ? "Back, label, worn, or another shot" : "A hanger or flat-lay shot is enough"}>{uploading ? "Saving the photo…" : "Add photo"}</Button>
-        </div>
-      ) : null}
 
       {/* Sheets */}
       <PickSheet open={sheet === "category"} onClose={() => setSheet(null)} title="Category" kind="category" options={lists.categories} selected={it.categoryId ? [it.categoryId] : []} canAdd={canEditLists}

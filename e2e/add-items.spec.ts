@@ -28,7 +28,6 @@ test.describe("add clothes", () => {
     await page.goto("/add");
     // three doors first: photos, a store link, a receipt
     await expect(page.getByTestId("add-doors")).toBeVisible();
-    await page.getByTestId("door-photo").click();
     // photo tips: general rules + a tab per category; hide for this person, bring back
     await expect(page.getByTestId("photo-tips")).toContainText("One piece per photo");
     await page.getByTestId("tip-tab-Shoes").click();
@@ -36,7 +35,6 @@ test.describe("add clothes", () => {
     await page.getByTestId("hide-tips").click();
     await expect(page.getByTestId("show-tips")).toBeVisible();
     await page.reload();
-    await page.getByTestId("door-photo").click();
     await expect(page.getByTestId("photo-tips")).toHaveCount(0);
     await page.getByTestId("show-tips").click();
     await expect(page.getByTestId("photo-tips")).toBeVisible();

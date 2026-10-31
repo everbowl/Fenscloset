@@ -26,8 +26,6 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
   const { batch, upload, loaded, addFiles, retryFailedUploads, dropFailedUploads, retryHeld } = useImportQueue();
   const pickRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
-  /** Linear (Jeff, 18 Oct 2026): first pick the door, then the photo panel opens. */
-  const [door, setDoor] = useState<"photo" | null>(null);
 
   async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -60,39 +58,25 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
   if (!loaded) return <div className="lg:max-w-[560px]"><PageHeader title="Add" accent="clothes" /><div className="h-[380px] bg-bone" /></div>;
 
   if (!hasBatch) {
-    if (door !== "photo") {
-      return (
-        <div className="lg:max-w-[560px]">
-          {inputs}
-          <PageHeader title="Add" accent="clothes" />
-          <p className="mono text-graphite">How are you adding?</p>
-          <div className="mt-4 flex flex-col gap-4" data-testid="add-doors">
-            <Button size="lg" className="w-full min-h-[72px] justify-start" icon={<Icons.camera />} sub="Hanger or flat-lay shots · one piece each" onClick={() => setDoor("photo")} data-testid="door-photo">From photos</Button>
-            <Link href="/add/store?tab=link" className="flex min-h-[64px] w-full items-center justify-between border border-ink px-5 text-left" data-testid="add-by-link">
-              <span><span className="mono block text-[12px] uppercase tracking-[0.16em]">From a store link</span><span className="mono mt-1 block text-[11px] text-graphite">Paste the product page · pick color, size, how many</span></span>
-              <span className="mono">→</span>
-            </Link>
-            <Link href="/add/store?tab=receipt" className="flex min-h-[64px] w-full items-center justify-between border border-ink px-5 text-left" data-testid="add-by-receipt">
-              <span><span className="mono block text-[12px] uppercase tracking-[0.16em]">From a receipt</span><span className="mono mt-1 block text-[11px] text-graphite">A photo of the receipt · the store's own product photos</span></span>
-              <span className="mono">→</span>
-            </Link>
-          </div>
-        </div>
-      );
-    }
+    // Jeff, 31 Oct 2026 (I1): "From photos" opens the camera roll at once; the tips stay right here on the Add screen.
     return (
-      <div className="lg:max-w-[560px]">
+      <div className="lg:max-w-[560px]" {...drop}>
         {inputs}
-        <PageHeader title="Add" accent="clothes" aside={<button type="button" onClick={() => setDoor(null)} className="pill pill-sm" data-testid="door-back">Other ways</button>} />
-        <p className="mono text-graphite">Hanger or flat-lay photos · one piece per photo</p>
-        <button type="button" onClick={() => pickRef.current?.click()} {...drop} className={`tap mt-4 flex h-[380px] w-full flex-col items-center justify-center gap-3 bg-bone ${over ? "outline outline-2 -outline-offset-4 outline-dashed outline-ink" : ""}`}>
-          <CameraIcon />
-          <span className="mono mono-11"><span className="lg:hidden">Pick photos from your camera roll</span><span className="hidden lg:inline">Pick photos, or drop them here</span></span>
-          <span className="mono text-graphite">The app cuts the background and tags each piece</span>
-        </button>
-        <div className="mt-5 flex gap-2.5">
-          <Button size="lg" className="flex-1" onClick={() => pickRef.current?.click()}>Pick photos</Button>
-          <Button size="lg" variant="outline" aria-label="Take a photo" className="w-[54px] px-0" onClick={() => cameraRef.current?.click()}><CameraIcon /></Button>
+        <PageHeader title="Add" accent="clothes" />
+        <p className="mono text-graphite">How are you adding?</p>
+        <div className={`mt-4 flex flex-col gap-4 ${over ? "outline outline-2 -outline-offset-4 outline-dashed outline-ink" : ""}`} data-testid="add-doors">
+          <div className="flex items-stretch gap-2.5">
+            <Button size="lg" className="flex-1 min-h-[72px] justify-start" icon={<Icons.camera />} sub="Hanger or flat-lay shots · one piece each" onClick={() => pickRef.current?.click()} data-testid="door-photo">From photos</Button>
+            <button type="button" aria-label="Take a photo" className="flex w-[64px] shrink-0 items-center justify-center rounded-full border-2 border-ink bg-paper text-ink active:bg-bone lg:hidden" onClick={() => cameraRef.current?.click()}><CameraIcon /></button>
+          </div>
+          <Link href="/add/store?tab=link" className="flex min-h-[64px] w-full items-center justify-between border border-ink px-5 text-left" data-testid="add-by-link">
+            <span><span className="mono block text-[12px] uppercase tracking-[0.16em]">From a store link</span><span className="mono mt-1 block text-[11px] text-graphite">Paste the product page · pick color, size, how many</span></span>
+            <span className="mono">→</span>
+          </Link>
+          <Link href="/add/store?tab=receipt" className="flex min-h-[64px] w-full items-center justify-between border border-ink px-5 text-left" data-testid="add-by-receipt">
+            <span><span className="mono block text-[12px] uppercase tracking-[0.16em]">From a receipt</span><span className="mono mt-1 block text-[11px] text-graphite">A photo of the receipt · the store's own product photos</span></span>
+            <span className="mono">→</span>
+          </Link>
         </div>
         <p className="mono mt-4 text-center text-graphite">Then confirm each piece with one tap</p>
         {tips}

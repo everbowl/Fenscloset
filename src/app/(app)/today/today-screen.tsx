@@ -4,7 +4,6 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { HeaderAction } from "@/components/header-action";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button, Icons } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
@@ -183,15 +182,9 @@ export function TodayScreen(p: Props) {
 
   return (
     <div data-testid="today" className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-14">
-      {p.canDress ? <HeaderAction><button type="button" onClick={() => setSheet("checkin")} className="pill pill-sm" data-testid="check-in">Check in</button></HeaderAction> : null}
       <div className="lg:col-start-2">
       <PageHeader
-        eyebrow={
-          <div className="flex items-start justify-between gap-3">
-            <span className="text-ink" data-testid="context-line">{p.mine ? p.contextLine : `${p.personName.toUpperCase()} · ${p.contextLine}`}</span>
-            {p.canDress ? <button type="button" onClick={() => setSheet("plan")} className="pill pill-sm shrink-0" data-testid="edit-plan">Change plan</button> : null}
-          </div>
-        }
+        eyebrow={<span className="text-ink" data-testid="context-line">{p.mine ? p.contextLine : `${p.personName.toUpperCase()} · ${p.contextLine}`}</span>}
         title={title} accent="look"
         aside={boards.length ? `${pad(index + 1)} / ${pad(boards.length)}` : undefined}
       />
@@ -241,26 +234,6 @@ export function TodayScreen(p: Props) {
               <button type="button" aria-label="Next look" disabled={index >= boards.length - 1} onClick={() => goTo(index + 1)} className="pill pill-sm px-3 disabled:opacity-30">›</button>
             </div>
           ) : null}
-          {p.canDress && (p.tryOn === "ready" || p.mannequin) ? (
-            <div className="mt-4 lg:col-start-1 lg:row-start-5 lg:row-span-4 lg:self-start" data-testid="mirror">
-              <button type="button" disabled={busy !== null} onClick={() => m.show({ look: { kind: "today", suggestionId: p.suggestion!.id, index }, on: p.tryOn === "ready" ? "me" : "mannequin" })}
-                className="flex w-full items-center gap-5 border border-ink p-3 text-left disabled:opacity-60" data-testid={p.tryOn === "ready" ? "try-on" : "see-on-mannequin"}>
-                <span className="relative h-[150px] w-[100px] shrink-0 overflow-hidden rounded-t-[60px] border-2 border-ink bg-paper">
-                  {m.tryOn ? <img src={`/api/photo/${m.tryOn.key}`} alt="" className="size-full object-cover" /> : <MirrorGlyph />}
-                </span>
-                <span className="flex flex-col gap-1">
-                  <span className="mono text-[13px] uppercase tracking-[0.18em] text-ink">{m.busy ? "Dressing…" : "Look in the mirror"}</span>
-                  <span className="text-[15px] leading-snug">{p.tryOn === "ready" ? "This look on you." : `This look on a mannequin${p.mine ? "" : ` for ${p.personName}`}.`}</span>
-                  <span className="mono text-ink">Tap to see it →</span>
-                </span>
-              </button>
-              {p.tryOn === "off" ? (
-                <Link href="/profile/settings" className="mono mt-2 flex h-[42px] items-center justify-between border-b border-ink text-ink" data-testid="try-on-off"><span>Want the mirror to show you? Turn on try-on</span><span>→</span></Link>
-              ) : p.tryOn === "no_photo" ? (
-                <Link href="/profile/body" className="mono mt-2 flex h-[42px] items-center justify-between border-b border-ink text-ink" data-testid="try-on-photo"><span>Want the mirror to show you? Add a body photo</span><span>→</span></Link>
-              ) : null}
-            </div>
-          ) : null}
           {board ? (
             <div className="mt-3.5 flex flex-col gap-2 lg:col-start-2 lg:mt-0">
               <p className="mono text-ink" data-testid="piece-list">{board.pieces.map((x) => x.label).join(" · ")}</p>
@@ -288,6 +261,26 @@ export function TodayScreen(p: Props) {
               </div>
             </div>
           ) : null}
+          {p.canDress && (p.tryOn === "ready" || p.mannequin) ? (
+            <div className="mt-5 lg:col-start-1 lg:row-start-5 lg:row-span-4 lg:mt-4 lg:self-start" data-testid="mirror">
+              <button type="button" disabled={busy !== null} onClick={() => m.show({ look: { kind: "today", suggestionId: p.suggestion!.id, index }, on: p.tryOn === "ready" ? "me" : "mannequin" })}
+                className="flex w-full items-center gap-5 border border-ink p-3 text-left disabled:opacity-60" data-testid={p.tryOn === "ready" ? "try-on" : "see-on-mannequin"}>
+                <span className="relative h-[150px] w-[100px] shrink-0 overflow-hidden rounded-t-[60px] border-2 border-ink bg-paper">
+                  {m.tryOn ? <img src={`/api/photo/${m.tryOn.key}`} alt="" className="size-full object-cover" /> : <MirrorGlyph />}
+                </span>
+                <span className="flex flex-col gap-1">
+                  <span className="mono text-[13px] uppercase tracking-[0.18em] text-ink">{m.busy ? "Dressing…" : "Look in the mirror"}</span>
+                  <span className="text-[15px] leading-snug">{p.tryOn === "ready" ? "This look on you." : `This look on a mannequin${p.mine ? "" : ` for ${p.personName}`}.`}</span>
+                  <span className="mono text-ink">Tap to see it →</span>
+                </span>
+              </button>
+              {p.tryOn === "off" ? (
+                <Link href="/profile/settings" className="mono mt-2 flex h-[42px] items-center justify-between border-b border-ink text-ink" data-testid="try-on-off"><span>Want the mirror to show you? Turn on try-on</span><span>→</span></Link>
+              ) : p.tryOn === "no_photo" ? (
+                <Link href="/profile/body" className="mono mt-2 flex h-[42px] items-center justify-between border-b border-ink text-ink" data-testid="try-on-photo"><span>Want the mirror to show you? Add a body photo</span><span>→</span></Link>
+              ) : null}
+            </div>
+          ) : null}
         </>
       ) : (
         <>
@@ -306,6 +299,19 @@ export function TodayScreen(p: Props) {
           {p.enoughClothes && p.canDress && busy !== "regen" ? <Button variant="secondary" className="mt-4 w-full lg:col-start-2" disabled={busy !== null} onClick={() => buildLooks("regen", () => regenerateAction(p.personId))}>Try again</Button> : null}
         </>
       )}
+
+      {p.canDress ? (
+        <div className="mt-[18px] flex flex-col border-t border-ink lg:col-start-2" data-testid="day-strips">
+          <div className="flex min-h-[56px] items-center justify-between gap-3 border-b border-line py-2">
+            <span className="flex min-w-0 flex-col gap-0.5"><span className="mono text-graphite">Check-in</span><span className="truncate text-[14px]">{p.checkIn ? (p.checkIn.source === "selfie" ? "From a selfie" : `${p.checkIn.answers.length} ${p.checkIn.answers.length === 1 ? "answer" : "answers"} today`) : p.mine ? "How are you looking today?" : `How is ${p.personName} looking today?`}</span></span>
+            <button type="button" onClick={() => setSheet("checkin")} className="pill pill-sm shrink-0" data-testid="check-in">{p.checkIn ? "Change" : "Check in"}</button>
+          </div>
+          <div className="flex min-h-[56px] items-center justify-between gap-3 border-b border-line py-2">
+            <span className="flex min-w-0 flex-col gap-0.5"><span className="mono text-graphite">Plan</span><span className="truncate text-[14px]">{p.plan.label ?? (p.calendarConnected ? "Nothing on the calendar" : "Nothing planned")}</span></span>
+            <button type="button" onClick={() => setSheet("plan")} className="pill pill-sm shrink-0" data-testid="edit-plan">{p.plan.label ? "Change" : "Set a plan"}</button>
+          </div>
+        </div>
+      ) : null}
 
       {p.unrated ? (
         <div className="mt-[18px] border-t border-ink pt-3 lg:col-start-2" data-testid="yesterday-strip">
@@ -438,6 +444,9 @@ function Board({ board, index, active }: { board: BoardView; index: number; acti
 
 /** Plain bullets under the sentence: weather by name with the numbers, then dress code, color, and what the person reaches for. */
 function WhyList({ why }: { why: NonNullable<BoardView["why"]> }) {
+  // Folded on a phone, open on a desktop (A1): the sentence is the reason; this is the receipt.
+  const [open, setOpen] = useState(false);
+  useEffect(() => { setOpen(window.matchMedia("(min-width: 1024px)").matches); }, []);
   const rows: { label: string; lines: string[] }[] = [
     { label: "Weather", lines: why.weather },
     { label: "Dress code", lines: why.dressCode ? [why.dressCode] : [] },
@@ -446,14 +455,17 @@ function WhyList({ why }: { why: NonNullable<BoardView["why"]> }) {
   ].filter((r) => r.lines.length);
   if (!rows.length) return null;
   return (
-    <ul className="flex flex-col gap-1.5 border-t border-line pt-2" data-testid="why">
-      {rows.map((r) => (
-        <li key={r.label} className="grid grid-cols-[86px_minmax(0,1fr)] gap-x-3 text-[14px] leading-snug">
-          <span className="mono pt-0.5 text-graphite">{r.label}</span>
-          <span className="flex flex-col gap-0.5">{r.lines.map((l, i) => <span key={i}>{l}</span>)}</span>
-        </li>
-      ))}
-    </ul>
+    <details open={open} onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)} className="group border-t border-line pt-1" data-testid="why-details">
+      <summary className="mono flex min-h-9 cursor-pointer list-none items-center justify-between text-graphite [&::-webkit-details-marker]:hidden"><span>Why this look</span><span className="group-open:hidden">Show</span><span className="hidden group-open:inline">Hide</span></summary>
+      <ul className="flex flex-col gap-1.5 pb-1 pt-1" data-testid="why">
+        {rows.map((r) => (
+          <li key={r.label} className="grid grid-cols-[86px_minmax(0,1fr)] gap-x-3 text-[14px] leading-snug">
+            <span className="mono pt-0.5 text-graphite">{r.label}</span>
+            <span className="flex flex-col gap-0.5">{r.lines.map((l, i) => <span key={i}>{l}</span>)}</span>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 

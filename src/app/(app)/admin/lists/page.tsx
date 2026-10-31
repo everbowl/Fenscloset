@@ -2,6 +2,8 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { LIST_DEFS, LIST_KINDS, type ListKind } from "@/lib/lists/registry";
 import { countAll } from "@/lib/lists/service";
+import { listOpenRequests } from "@/lib/lists/requests";
+import { ListRequests } from "./list-requests";
 
 export const metadata = { title: "Lists" };
 
@@ -15,7 +17,7 @@ const GROUPS: { title: string; kinds: ListKind[] }[] = [
 ];
 
 export default async function ListsOverviewPage() {
-  const counts = await countAll();
+  const [counts, requests] = await Promise.all([countAll(), listOpenRequests()]);
   const placed = new Set(GROUPS.flatMap((g) => g.kinds));
   const rest = LIST_KINDS.filter((k) => !placed.has(k));
   const groups = rest.length ? [...GROUPS, { title: "Other", kinds: rest }] : GROUPS;
@@ -23,6 +25,7 @@ export default async function ListsOverviewPage() {
     <div className="lg:max-w-[640px]">
       <PageHeader title="Lists" aside={`${LIST_KINDS.length} lists`} />
       <p className="mb-5 text-[14px] leading-snug text-graphite">Every word the app uses. Edit, add, reorder, archive or delete any of it; the change shows everywhere at once.</p>
+      <ListRequests requests={requests} />
       {groups.map((g) => (
         <section key={g.title} className="mb-7" data-testid={`lists-${g.title.toLowerCase().replace(/[^a-z]+/g, "-")}`}>
           <h2 className="mono border-b border-ink pb-2 text-graphite">{g.title}</h2>
