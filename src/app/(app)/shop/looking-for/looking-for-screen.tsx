@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Banner } from "@/components/ui/banner";
@@ -9,6 +10,7 @@ import { Sheet } from "@/components/ui/sheet";
 import { cn } from "@/lib/cn";
 import type { WantView } from "@/lib/shop/wants";
 import { addWantAction } from "./actions";
+import { rememberShopForAction } from "../actions";
 import { WantSheet } from "./want-sheet";
 import { useRefreshWhile, useWantSearch } from "./use-want-search";
 import { ago } from "./ago";
@@ -20,6 +22,8 @@ import { ago } from "./ago";
  */
 export function LookingForScreen({ meId, people, forPersonId, wants }: { meId: string; people: { id: string; name: string }[]; forPersonId: string; wants: WantView[] }) {
   const [sheet, setSheet] = useState<"add" | "for" | null>(null);
+  const router = useRouter();
+  const [, startFor] = useTransition();
   const [pendingText, setPendingText] = useState("");
   const [prefill, setPrefill] = useState("");
   const { searching, error, run, secondsOf } = useWantSearch();
@@ -97,7 +101,7 @@ export function LookingForScreen({ meId, people, forPersonId, wants }: { meId: s
       <WantSheet open={sheet === "add"} onClose={() => setSheet(null)} title="Looking for…" value={prefill} onSave={(text) => { setPendingText(text); void run("new", () => addWantAction(forPersonId, text)); }} />
       <Sheet open={sheet === "for"} onClose={() => setSheet(null)} title="Whose list">
         <div className="flex flex-col" role="listbox">
-          {people.map((p) => <Link key={p.id} href={`/shop/looking-for?for=${p.id}`} role="option" aria-selected={p.id === forPersonId} onClick={() => setSheet(null)} className="flex h-12 items-center justify-between border-b border-line text-[15px]"><span>{p.id === meId ? `${p.name} (me)` : p.name}</span><span className={cn("mono", p.id === forPersonId ? "text-ink" : "text-transparent")}>✓</span></Link>)}
+          {people.map((p) => <button key={p.id} type="button" role="option" aria-selected={p.id === forPersonId} onClick={() => { setSheet(null); startFor(async () => { await rememberShopForAction(p.id); router.push(`/shop/looking-for?for=${p.id}`); }); }} className="tap w-full flex h-12 items-center justify-between border-b border-line text-[15px]"><span>{p.id === meId ? `${p.name} (me)` : p.name}</span><span className={cn("mono", p.id === forPersonId ? "text-ink" : "text-transparent")}>✓</span></button>)}
         </div>
         <p className="mono mt-4 text-graphite">You can keep a list for yourself, your kids, and anyone who allowed it in their Settings.</p>
       </Sheet>

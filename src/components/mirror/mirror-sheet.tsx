@@ -94,6 +94,8 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
                   <figure key={p.id} className="flex h-full flex-col">
                     <figcaption className="mono px-2 pt-2 text-[11px] uppercase tracking-[0.18em]">{admin ? ENGINE_WORD[p.engine ?? "google"] : `Option ${[t, ...(t.alts ?? [])].indexOf(p) + 1}`}</figcaption>
                     <img src={`/api/photo/${p.key}`} alt={admin ? `You wearing this look, by ${ENGINE_WORD[p.engine ?? "google"]}` : "You wearing this look"} className={`min-h-0 flex-1 object-contain ${m.busy ? "opacity-40" : ""}`} />
+                    {/* G1: anyone keeps the column they like; the mirror shows it alone from then on. */}
+                    {mine ? <button type="button" disabled={m.busy} onClick={() => void m.keep(p.id)} className="pill pill-sm mx-2 mb-2 mt-1.5" data-testid="mirror-keep">Keep this one</button> : null}
                   </figure>
                 ))}
               </div>
@@ -108,14 +110,14 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
           {m.busy ? <p className="mono text-graphite">Usually 20 to 60 seconds. You can leave this screen; the picture is kept and waits for you.</p> : null}
           <p className="mono text-graphite" data-testid="mirror-pieces">{line}</p>
           {t?.styling?.summary ? <p className="mono text-ink" data-testid="styling-summary">{t.styling.summary}{t.stylingFailed ? " · didn’t take this time, showing the plain try-on" : ""}</p> : null}
-          {t ? <p className="mono text-ink">{t.mannequin ? `On a mannequin · No body photo used${mine ? "" : ` · ${personName}’s look`}` : t.alts?.length ? `On you${t.view === "back" ? " · from behind" : ""} · ${admin ? `${engineList(t)} side by side · pick the winner under Admin → Rules` : "side by side"} · Only you can see these pictures` : `On you${t.view === "back" ? " · from behind" : ""}${admin && t.engine && t.engine !== "google" ? ` · dressed by ${ENGINE_WORD[t.engine]}` : ""} · Only you can see this picture`}{t.cached ? " · saved from before" : ""}</p> : null}
+          {t ? <p className="mono text-ink">{t.mannequin ? `On a mannequin · No body photo used${mine ? "" : ` · ${personName}’s look`}` : t.alts?.length ? `On you${t.view === "back" ? " · from behind" : ""} · ${admin ? `${engineList(t)} side by side · pick the winner under Admin → Rules` : "side by side"} · Only you can see these pictures` : `On you${t.view === "back" ? " · from behind" : ""}${t.kept ? " · your pick" : ""}${admin && t.engine && t.engine !== "google" ? ` · dressed by ${ENGINE_WORD[t.engine]}` : ""} · Only you can see this picture`}{t.cached ? " · saved from before" : ""}</p> : null}
           {t?.note ? <p className="mono text-graphite" data-testid="mirror-note">{t.alts?.length && admin ? `${ENGINE_WORD[t.engine ?? "google"]} · ` : ""}{t.note}</p> : null}
           {t?.alts?.filter((a) => a.note).map((a) => <p key={a.id} className="mono text-graphite" data-testid="mirror-alt-note">{admin ? `${ENGINE_WORD[a.engine ?? "fashn"]} · ` : ""}{a.note}</p>)}
           {t?.engineNote && admin ? <p className="mono text-graphite" data-testid="mirror-engine-note">{t.engineNote}</p> : null}
           {t ? (
             <div className="flex items-center justify-between gap-3">
               <button type="button" disabled={m.busy} onClick={m.redo} className="pill pill-sm shrink-0" data-testid="redo-tryon" title="Throw away the saved pictures of this look and dress it from scratch">{m.busy ? "Dressing…" : "Dress again"}</button>
-              <span className="mono text-graphite">Not right? Dress it from scratch</span>
+              <span className="mono text-graphite">{t.kept ? "Not right? Dress again compares the engines afresh" : "Not right? Dress it from scratch"}</span>
             </div>
           ) : null}
           {views.length ? (

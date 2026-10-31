@@ -3,7 +3,7 @@
 import { requirePerson } from "@/lib/auth/current";
 import { db } from "@/lib/db";
 import { OutfitError } from "@/lib/outfits/engine";
-import { dressOnMe, mirrorEngines, TryOnError, type TryOnView } from "@/lib/tryon";
+import { dressOnMe, keepTryOn, mirrorEngines, TryOnError, type TryOnView } from "@/lib/tryon";
 import { mannequinLook } from "@/lib/tryon/mannequin";
 import { jobStatus, settled, startJob, type JobStatus } from "@/lib/jobs";
 import type { StylingChoice } from "@/lib/tryon/features";
@@ -86,4 +86,10 @@ export async function dressingStatusAction(jobId: string): Promise<MirrorResult>
   const status = jobStatus<TryOnView>(jobId, me.id);
   if (!status) return { ok: false, error: "That dressing is gone. Try again." };
   return answer(status, jobId);
+}
+
+/** Compare: "Keep this one" under a column (G1). The kept engine's picture comes back alone. */
+export async function keepTryOnAction(req: { personId: string; tryOnId: string }): Promise<MirrorResult> {
+  const me = await requirePerson();
+  try { return { ok: true, tryOn: await keepTryOn(me, req.personId, req.tryOnId) }; } catch (e) { return failed(e); }
 }

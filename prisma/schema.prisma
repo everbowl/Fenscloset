@@ -63,6 +63,7 @@ model Person {
   favoriteBrands     Brand[]                  @relation("favoriteBrands")
   favoriteStores     Store[]                  @relation("favoriteStores")
   listRequests       ListRequest[]
+  tryOnChoices       TryOnChoice[]
   bodyGrantsGiven    BodyDataGrant[]          @relation("bodyGrantOwner")
   bodyGrantsReceived BodyDataGrant[]          @relation("bodyGrantViewer")
   shopGrantsGiven    ShopForGrant[]           @relation("shopGrantOwner")
@@ -753,6 +754,19 @@ model TryOn {
   person       Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
 
   @@index([personId, createdAt])
+}
+
+/// Compare (G1): the engine's picture a person kept for one look; from then on the mirror shows that one alone, until "Dress again".
+model TryOnChoice {
+  id        String   @id @default(cuid())
+  personId  String
+  /// bodyPhotoKey | sorted item ids
+  lookKey   String
+  engine    String
+  createdAt DateTime @default(now())
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([personId, lookKey])
 }
 
 /// Taste memory: what a person actually chose when looks were offered. Feeds every later suggestion.

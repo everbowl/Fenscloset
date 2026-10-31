@@ -5,7 +5,7 @@ import type { TryOnView } from "@/lib/tryon";
 import type { StylingChoice } from "@/lib/tryon/features";
 import type { Engine } from "@/lib/tryon/engines";
 import { candidatesFor, EMPTY_WARDROBE, missingSlots, shoesPlaceable, swapIn, type MirrorPiece, type Slot, type Wardrobe } from "@/lib/tryon/complete";
-import { dressAction, dressingStatusAction, type MirrorLook, type MirrorResult } from "@/app/(app)/mirror/actions";
+import { dressAction, dressingStatusAction, keepTryOnAction, type MirrorLook, type MirrorResult } from "@/app/(app)/mirror/actions";
 
 export type MirrorOn = "me" | "mannequin";
 export type MirrorView = "front" | "back";
@@ -120,8 +120,19 @@ export function useMirror(personId: string, wardrobe: Wardrobe = EMPTY_WARDROBE,
     void dress({ look: { kind: "closet", itemIds: swapIn(ids, piece, wardrobe) }, on, view });
   }, [dress, look, on, tryOn, view, wardrobe]);
 
+  /** Compare: keep one column (G1); the kept picture takes the comparison's place. */
+  const keep = useCallback(async (tryOnId: string) => {
+    seq.current++; if (timer.current) clearTimeout(timer.current);
+    setBusy(true); setError(undefined); setProgress({ step: "Keeping it…", startedAt: Date.now() });
+    let r: MirrorResult;
+    try { r = await keepTryOnAction({ personId, tryOnId }); } catch { r = { ok: false, error: "The mirror didn’t come back. Try again." }; }
+    setBusy(false); setProgress(null);
+    if (!r.ok) { setError(r.error); return; }
+    if ("tryOn" in r) setTryOn(r.tryOn);
+  }, [personId]);
+
   /** The closet's pieces that could fill a slot of the current look (or the pending one), best first. */
   const options = useCallback((slot: Slot, ids: string[]) => candidatesFor(slot, wardrobe, ids), [wardrobe]);
 
-  return { open, setOpen, tryOn, look, on, view, busy, progress, error, setError, dress, restyle, redo, switchTo, show, begin, pending, choose, swap, options, piecesOf, wardrobe, engine };
+  return { open, setOpen, tryOn, look, on, view, busy, progress, error, setError, dress, restyle, redo, switchTo, show, begin, pending, choose, swap, keep, options, piecesOf, wardrobe, engine };
 }

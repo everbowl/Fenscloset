@@ -42,6 +42,7 @@ export type TryOnView = {
   /** Who dressed it. */ engine?: Engine;
   /** Compare (Admin → Rules): the other engines' pictures of the same look, shown beside this one. */ alts?: TryOnView[];
   /** An engine without its key, or one that could not finish in a comparison: said under the picture. */ engineNote?: string;
+  /** Compare: the column the person kept (G1); "Dress again" compares afresh. */ kept?: boolean;
 };
 
 /** The styling for a look as the person last left it (or the defaults), remembering any new picks. */
@@ -296,16 +297,54 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
   return pack(row, false);
 }
 
+/** The body photo a dressing uses for a view: the front (or newest) photo, or the back photo alone. */
+async function bodyPhotoKeyFor(personId: string, view: BodyViewSide): Promise<string | null> {
+  const photo = view === "back"
+    ? await db.bodyPhoto.findFirst({ where: { personId, view: "back" }, orderBy: { takenAt: "desc" } })
+    : (await db.bodyPhoto.findFirst({ where: { personId, view: "front" }, orderBy: { takenAt: "desc" } })) ?? (await db.bodyPhoto.findFirst({ where: { personId }, orderBy: { takenAt: "desc" } }));
+  return photo?.bucketKey ?? null;
+}
+const lookKeyOf = (bodyPhotoKey: string, itemIds: string[]) => `${bodyPhotoKey}|${[...itemIds].sort().join(",")}`;
+
+/**
+ * Compare (Jeff, 31 Oct 2026, G1): "Keep this one" under a column. From then on the mirror shows that engine's picture
+ * alone for this look; "Dress again" clears the choice and compares again.
+ */
+export async function keepTryOn(viewer: Viewer, personId: string, tryOnId: string): Promise<TryOnView> {
+  await assertReady(viewer, personId);
+  const row = await db.tryOn.findFirst({ where: { id: tryOnId, personId } });
+  if (!row) throw new TryOnError("That picture isn’t here anymore.");
+  const engine = row.engine as Engine;
+  await db.tryOnChoice.upsert({ where: { personId_lookKey: { personId, lookKey: lookKeyOf(row.bodyPhotoKey, row.itemIds) } }, create: { personId, lookKey: lookKeyOf(row.bodyPhotoKey, row.itemIds), engine }, update: { engine } });
+  const view: BodyViewSide = (await db.bodyPhoto.findFirst({ where: { bucketKey: row.bodyPhotoKey }, select: { view: true } }))?.view === "back" ? "back" : "front";
+  const ids = row.itemIds.filter((id) => !id.startsWith("extra:"));
+  return { ...(await tryOnLook(viewer, personId, ids, row.source, undefined, view, undefined, [], false, {}, engine)), kept: true };
+}
+
+/** The engine a person kept for this look in Compare, if any. */
+async function keptEngine(personId: string, itemIds: string[], view: BodyViewSide): Promise<Engine | null> {
+  const key = await bodyPhotoKeyFor(personId, view);
+  if (!key) return null;
+  const choice = await db.tryOnChoice.findUnique({ where: { personId_lookKey: { personId, lookKey: lookKeyOf(key, [...new Set(itemIds)]) } } });
+  return (choice?.engine as Engine | undefined) ?? null;
+}
+
 /**
  * The look on the person by the engine(s) the rule names: one picture, or in Compare both engines at once, each
  * reporting its own step, the other pictures carried as `alts`. One engine failing in a comparison leaves the
- * other's picture with the failure said under it; both failing throws the first reason.
+ * other's picture with the failure said under it; both failing throws the first reason. A column the person kept
+ * (G1) is shown alone until "Dress again".
  */
 export async function dressOnMe(viewer: Viewer, personId: string, itemIds: string[], source: string, view: BodyViewSide = "front", pick?: StylingChoice, fresh = false, hooks: DressingHooks = {}): Promise<TryOnView> {
   const { engines, note } = await mirrorEngines();
   if (!engines.length) throw new TryOnError("Try-on isn’t set up on the site yet.");
   const withNote = (v: TryOnView, extra?: string) => { const n = [note, extra].filter(Boolean).join(" · "); return n ? { ...v, engineNote: n } : v; };
   if (engines.length === 1) return withNote(await tryOnLook(viewer, personId, itemIds, source, undefined, view, pick, [], fresh, hooks, engines[0]));
+  if (fresh) { const key = await bodyPhotoKeyFor(personId, view); if (key) await db.tryOnChoice.deleteMany({ where: { personId, lookKey: lookKeyOf(key, [...new Set(itemIds)]) } }); }
+  else {
+    const kept = await keptEngine(personId, itemIds, view);
+    if (kept && engines.includes(kept)) return { ...withNote(await tryOnLook(viewer, personId, itemIds, source, undefined, view, pick, [], false, hooks, kept)), kept: true };
+  }
   if (pick) await stylingFor(personId, [...new Set(itemIds)], pick); // remembered once, before either engine reads it
   const steps: Partial<Record<Engine, string>> = {};
   const report = () => hooks.step?.(engines.map((e) => `${ENGINE_WORD[e]} · ${steps[e] ?? "starting…"}`).join("   "));

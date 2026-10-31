@@ -9,7 +9,7 @@ import { seed } from "../../prisma/seed";
 import { personalClosetId } from "@/lib/items/service";
 import { newKey, putObject } from "@/lib/storage";
 import { canViewKey } from "@/lib/photos/visibility";
-import { dressOnMe, garmentImages, hasBackPhoto, listTryOns, mirrorEngines, setTryOnEnabled, tryOnLook, tryOnState } from "@/lib/tryon";
+import { dressOnMe, garmentImages, hasBackPhoto, keepTryOn, listTryOns, mirrorEngines, setTryOnEnabled, tryOnLook, tryOnState } from "@/lib/tryon";
 import { setRule } from "@/lib/rules";
 import { getPrivacy } from "@/lib/profiles/service";
 
@@ -116,6 +116,19 @@ describe("virtual try-on", () => {
     expect(three.alts?.map((a) => a.engine)).toEqual(["fashn", "kling"]);
     expect(new Set([three.key, ...three.alts!.map((a) => a.key)]).size).toBe(3);
     expect(three.engineNote).toBeUndefined();
+    // G1: keep a column, and the mirror shows that engine alone for this look until "Dress again"
+    const fashnPic = three.alts!.find((a) => a.engine === "fashn")!;
+    const kept = await keepTryOn(jeff, jeff.id, fashnPic.id);
+    expect(kept.engine).toBe("fashn");
+    expect(kept.kept).toBe(true);
+    expect(kept.alts).toBeUndefined();
+    const again = await dressOnMe(jeff, jeff.id, [tee.id], "closet");
+    expect(again.engine).toBe("fashn");
+    expect(again.kept).toBe(true);
+    expect(again.alts).toBeUndefined();
+    const afresh = await dressOnMe(jeff, jeff.id, [tee.id], "closet", "front", undefined, true);
+    expect(afresh.kept).toBeUndefined();
+    expect(afresh.alts?.length).toBe(2);
     delete process.env.MOCK_KLING;
     // FASHN without its key: Google dresses, and the picture says so
     delete process.env.MOCK_FASHN;

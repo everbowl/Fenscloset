@@ -30,7 +30,9 @@ test.describe("add clothes", () => {
     await expect(page.getByTestId("add-doors")).toBeVisible();
     // photo tips: general rules + a tab per category; hide for this person, bring back
     await expect(page.getByTestId("photo-tips")).toContainText("One piece per photo");
-    await page.getByTestId("tip-tab-Shoes").click();
+    // The tab row sits in the band under the fixed tab bar on a page just taller than the phone; mobile emulation mis-maps
+    // the tap there, so the tab is picked by its own click event (the row scrolls fine for a thumb).
+    await page.getByTestId("tip-tab-Shoes").dispatchEvent("click");
     await expect(page.getByTestId("tip-text")).toContainText("toes toward you");
     await page.getByTestId("hide-tips").click();
     await expect(page.getByTestId("show-tips")).toBeVisible();

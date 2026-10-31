@@ -19,14 +19,15 @@ const MODES: { key: TogetherMode; label: string; blurb: string }[] = [
   { key: "contrast", label: "Contrast", blurb: "Deliberately different, still together" },
 ];
 
-export function TogetherScreen({ meId, people, canDressIds, occasions, isAdmin, session }: {
+export function TogetherScreen({ meId, people, canDressIds, occasions, isAdmin, session, remembered = null }: {
   meId: string; people: { id: string; name: string }[]; canDressIds: string[]; occasions: { id: string; name: string }[]; isAdmin: boolean; session: TogetherView | null;
+  /** The last person picked under "Shopping for" (N1): starts picked beside you. */ remembered?: string | null;
 }) {
   const router = useRouter();
   const [, start] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string>();
-  const [ids, setIds] = useState<string[]>(session ? session.boards.map((b) => b.personId) : [meId]);
+  const [ids, setIds] = useState<string[]>(session ? session.boards.map((b) => b.personId) : [meId, ...(remembered && remembered !== meId ? [remembered] : [])]);
   const [mode, setMode] = useState<TogetherMode>(session?.mode ?? "coordinate");
   const [occasionId, setOccasionId] = useState<string | null>(null);
   const [text, setText] = useState<string | null>(session?.occasionLabel ?? null);

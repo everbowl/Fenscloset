@@ -1,8 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
+import { resetDb } from "../helpers";
+import { seed } from "../../prisma/seed";
 import { listOpenRequests, requestListEntry, resolveRequest } from "@/lib/lists/requests";
 
 describe("list requests (J1: Ask Jeff to add it)", () => {
+  beforeEach(async () => { await resetDb(); await seed(); });
   it("records an ask once, names the admins, and an admin resolves it", async () => {
     const jeff = await db.person.findFirstOrThrow({ where: { role: "admin" } });
     const asker = (await db.person.findFirst({ where: { role: { not: "admin" }, status: { not: "removed" } } })) ?? jeff;

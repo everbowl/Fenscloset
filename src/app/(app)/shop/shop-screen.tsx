@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
-import { Button } from "@/components/ui/button";
+import { Button, Icons } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { Sheet } from "@/components/ui/sheet";
 import { TextSheet } from "@/components/items/row-editor";
@@ -14,7 +14,7 @@ import { shrinkPhoto } from "@/lib/import/client-queue";
 import { cn } from "@/lib/cn";
 import type { LookupView, SimilarItem } from "@/lib/shop/engine";
 import type { BrandFeedView } from "@/lib/shop/brand-feed";
-import { brandFeedAction, brandFeedStatusAction, deleteLookupAction, lookupLinkAction, lookupPhotoAction, lookupStatusAction, tryOnLookupAction, type FeedResult, type LookupResult } from "./actions";
+import { brandFeedAction, brandFeedStatusAction, deleteLookupAction, lookupLinkAction, lookupPhotoAction, lookupStatusAction, rememberShopForAction, tryOnLookupAction, type FeedResult, type LookupResult } from "./actions";
 import type { TryOnState, TryOnView } from "@/lib/tryon";
 import { ago } from "./looking-for/ago";
 
@@ -91,13 +91,31 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
     router.replace(`/shop?for=${forPersonId}`); // drop ?link= so Back never judges it again
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoLink, forPersonId]);
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]; e.target.value = "";
-    if (!f) return;
+  async function judgeFile(f: File, from: "screenshot" | "photo") {
     const blob = await shrinkPhoto(f, 1600);
-    const fd = new FormData(); fd.set("photo", new File([blob], "photo.jpg", { type: blob.type || "image/jpeg" })); fd.set("source", source);
+    const fd = new FormData(); fd.set("photo", new File([blob], "photo.jpg", { type: blob.type || "image/jpeg" })); fd.set("source", from);
     run("photo", () => lookupPhotoAction(forPersonId, fd));
   }
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]; e.target.value = "";
+    if (f) await judgeFile(f, source);
+  }
+  // On a computer: drop a picture anywhere on the screen, or paste one (M1).
+  const [over, setOver] = useState(false);
+  const drop = {
+    onDragOver: (e: React.DragEvent) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setOver(true); } },
+    onDragLeave: () => setOver(false),
+    onDrop: async (e: React.DragEvent) => { e.preventDefault(); setOver(false); const f = Array.from(e.dataTransfer.files ?? []).find((x) => x.type.startsWith("image/")); if (f && !thinking) await judgeFile(f, "screenshot"); },
+  };
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      if ((e.target as HTMLElement | null)?.closest("input, textarea, [contenteditable]")) return;
+      const f = Array.from(e.clipboardData?.files ?? []).find((x) => x.type.startsWith("image/"));
+      if (f && !thinking) { e.preventDefault(); void judgeFile(f, "screenshot"); }
+    };
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }); // every render: judgeFile closes over the current person and busy state
   const thinking = busy === "link" || busy === "photo";
   // The answer takes the result's place: scroll it into view (Judge it on a card can be far below).
   useEffect(() => { if (thinking) pendingRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }); }, [thinking]);
@@ -141,7 +159,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
   useEffect(() => { if (brandFeed.stale && !feedStarted.current) { feedStarted.current = true; void runFeed(); } }, [brandFeed.stale, runFeed]);
 
   return (
-    <div data-testid="shop" className="flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-14">
+    <div data-testid="shop" className="flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-14" {...drop}>
       <div className="order-1 lg:col-span-2">
         <PageHeader
           eyebrow={<button type="button" onClick={() => setSheet("for")} className="pill pill-sm" aria-haspopup="dialog" data-testid="shop-for">Shopping for {forPersonId === meId ? "me" : forName} <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden><path d="m6 9 6 6 6-6" /></svg></button>}
@@ -150,11 +168,13 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
       {/* The right column on desktop (the ways in, Recent); on phones its children take their own places in the order. */}
       <div className="contents lg:col-start-2 lg:row-start-2 lg:flex lg:flex-col lg:gap-8 lg:self-start lg:sticky lg:top-24">
       <div className="order-2">
-        <div className="grid grid-cols-3 gap-2">
-          <Button variant="secondary" className="h-[54px] px-2 text-[11px]" disabled={thinking} onClick={() => setSheet("link")} data-testid="paste-link">Paste a link</Button>
-          <Button variant="secondary" className="h-[54px] px-2 text-[11px]" disabled={thinking} onClick={() => { setSource("screenshot"); file.current?.removeAttribute("capture"); file.current?.click(); }} data-testid="upload-screenshot">Screenshot</Button>
-          <Button variant="secondary" className="h-[54px] px-2 text-[11px]" disabled={thinking} onClick={() => { setSource("photo"); file.current?.setAttribute("capture", "environment"); file.current?.click(); }} data-testid="take-photo">Take a photo</Button>
+        {/* Jeff, 31 Oct 2026 (M1): one orange way in, the other two outlined beside it; a computer can also drop or paste a picture. */}
+        <Button size="lg" className="w-full" icon={<Icons.link />} sub="Any store page" disabled={thinking} onClick={() => setSheet("link")} data-testid="paste-link">Paste a link</Button>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <Button variant="outline" className="h-[50px] px-2 text-[11px]" disabled={thinking} onClick={() => { setSource("screenshot"); file.current?.removeAttribute("capture"); file.current?.click(); }} data-testid="upload-screenshot">Screenshot</Button>
+          <Button variant="outline" className="h-[50px] px-2 text-[11px]" disabled={thinking} onClick={() => { setSource("photo"); file.current?.setAttribute("capture", "environment"); file.current?.click(); }} data-testid="take-photo">Take a photo</Button>
         </div>
+        <p className={cn("mono mt-2 hidden text-center lg:block", over ? "text-ink" : "text-graphite")} data-testid="shop-drop-hint">{over ? "Drop it to judge it" : "Or drop a picture here, or paste one"}</p>
         <input ref={file} type="file" accept="image/*" className="hidden" onChange={onFile} data-testid="shop-file" />
       </div>
       {/* Recent verdicts, each with its date. */}
@@ -214,7 +234,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
           </div>
           {selected.imageKey && (tryOn === "ready" || mannequin) ? (
             <div className="mt-3">
-              <Button variant="secondary" className="w-full" disabled={busy !== null} onClick={() => { setBusy("tryon"); setError(undefined); start(async () => { const r = await tryOnLookupAction(selected.id); setBusy(null); if (!r.ok) setError(r.error); else if (r.tryOn) setOnMe(r.tryOn); }); }} data-testid={tryOn === "ready" ? "see-it-on-me" : "see-on-mannequin"}>{busy === "tryon" ? (tryOn === "ready" ? `Dressing ${who}…` : "Dressing the mannequin…") : tryOn === "ready" ? (forMe ? "See it on me" : `See it on ${forName}`) : "See it on the mannequin"}</Button>
+              <Button variant="outline" className="w-full" disabled={busy !== null} onClick={() => { setBusy("tryon"); setError(undefined); start(async () => { const r = await tryOnLookupAction(selected.id); setBusy(null); if (!r.ok) setError(r.error); else if (r.tryOn) setOnMe(r.tryOn); }); }} data-testid={tryOn === "ready" ? "see-it-on-me" : "see-on-mannequin"}>{busy === "tryon" ? (tryOn === "ready" ? `Dressing ${who}…` : "Dressing the mannequin…") : tryOn === "ready" ? (forMe ? "See it on me" : `See it on ${forName}`) : "See it on the mannequin"}</Button>
               {tryOn === "off" || tryOn === "no_photo" ? <Link href={tryOn === "off" ? "/profile/settings" : "/profile/body"} className="mono flex h-[38px] items-center justify-center text-graphite" data-testid={tryOn === "off" ? "try-on-off" : "try-on-photo"}>{tryOn === "off" ? "Want it on you? Turn on try-on in Settings" : "Want it on you? Add a body photo first"}</Link> : null}
             </div>
           ) : null}
@@ -363,9 +383,9 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
       </Sheet>
       <Sheet open={sheet === "for"} onClose={() => setSheet(null)} title="Shopping for">
         <div className="flex flex-col" role="listbox">
-          {people.map((p) => <Link key={p.id} href={`/shop?for=${p.id}`} role="option" aria-selected={p.id === forPersonId} onClick={() => setSheet(null)} className="flex h-12 items-center justify-between border-b border-line text-[15px]"><span>{p.id === meId ? `${p.name} (me)` : p.name}</span><span className={cn("mono", p.id === forPersonId ? "text-ink" : "text-transparent")}>✓</span></Link>)}
+          {people.map((p) => <button key={p.id} type="button" role="option" aria-selected={p.id === forPersonId} onClick={() => { setSheet(null); start(async () => { await rememberShopForAction(p.id); router.push(`/shop?for=${p.id}`); }); }} className="tap flex h-12 w-full items-center justify-between border-b border-line text-[15px]"><span>{p.id === meId ? `${p.name} (me)` : p.name}</span><span className={cn("mono", p.id === forPersonId ? "text-ink" : "text-transparent")}>✓</span></button>)}
         </div>
-        <p className="mono mt-4 text-graphite">You can shop for yourself, your kids, and anyone who allowed it in their Settings.</p>
+        <p className="mono mt-4 text-graphite">You can shop for yourself, your kids, and anyone who allowed it in their Settings. The pick is remembered.</p>
       </Sheet>
       <TextSheet open={sheet === "link"} onClose={() => setSheet(null)} title="Paste a link" label="Store link" kind="url" submitLabel="Judge it" value="" placeholder="https://www.everlane.com/products/…" onSave={(v) => run("link", () => lookupLinkAction(forPersonId, v))} />
     </div>

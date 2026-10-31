@@ -73,4 +73,5 @@ export const Icons = {
   camera: () => <svg {...ICON}><path d="M3 8h4l2-3h6l2 3h4v12H3z" /><circle cx="12" cy="13.5" r="3.5" /></svg>,
   calendar: () => <svg {...ICON}><rect x="3" y="5" width="18" height="16" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>,
   copy: () => <svg {...ICON}><rect x="9" y="9" width="12" height="12" /><path d="M5 15V3h12" /></svg>,
+  link: () => <svg {...ICON}><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1.5 1.5" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.5-1.5" /></svg>,
 };

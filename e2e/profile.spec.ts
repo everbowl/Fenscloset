@@ -15,12 +15,10 @@ test("Jeff fills his body profile and settings; parents edit Mya's; Olivia is in
   await page.getByTestId("measure-waist").click();
   await page.getByTestId("measure-sheet").getByRole("option", { name: "32" }).click();
   await expect(page.getByTestId("measure-waist")).toContainText("32 in");
-  await page.getByTestId("add-size").click();
-  await page.getByTestId("size-brand").click(); // the brand picker takes the sheet's place, then hands back
-  await page.getByRole("dialog").getByRole("option").first().click();
-  await page.getByRole("dialog").getByLabel("Size").fill("L");
-  await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
-  await expect(page.getByText(/^L$|L · /).first()).toBeVisible();
+  // sizes by brand are read here and edited on the Brands page (P1)
+  await expect(page.getByTestId("body-sizes")).toContainText("No sizes yet");
+  await page.getByTestId("edit-sizes").click();
+  await expect(page).toHaveURL(/\/profile\/brands$/);
 
   // settings: zip + privacy rows exist for an adult
   await page.goto("/profile/settings");

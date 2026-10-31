@@ -100,4 +100,8 @@ test("try-on: on by default, needs a body photo, then a picture of the look on y
   expect(pair).toHaveLength(3);
   expect(new Set(pair).size).toBe(3);
   await expect(page.getByTestId("try-on-sheet")).toContainText("side by side");
+  // G1: keep one column and the mirror shows it alone
+  await page.getByTestId("mirror-keep").nth(1).click();
+  await expect(page.getByTestId("mirror-compare")).toHaveCount(0, { timeout: 20_000 });
+  await expect(page.getByTestId("try-on-sheet")).toContainText("your pick");
 });
