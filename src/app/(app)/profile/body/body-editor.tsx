@@ -36,6 +36,7 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, brands, categor
   const [pickCategory, setPickCategory] = useState(false);
   const [pickSize, setPickSize] = useState(false);
   const [photoSheet, setPhotoSheet] = useState<string | null>(null);
+  const [confirmPhoto, setConfirmPhoto] = useState(false); // a body photo asks before it goes (Q1)
   const [askPrivacy, setAskPrivacy] = useState(false);
   const [nextOnlyMe, setNextOnlyMe] = useState(false);
   const [nextView, setNextView] = useState<BodyView>("front");
@@ -189,13 +190,21 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, brands, categor
           </button>
         </div>
       </Sheet>
-      <Sheet open={Boolean(photoSheet)} onClose={() => setPhotoSheet(null)} title="This photo">
-        {(() => { const p = body.photos.find((x) => x.id === photoSheet); return p ? (
+      <Sheet open={Boolean(photoSheet)} onClose={() => { setPhotoSheet(null); setConfirmPhoto(false); }} title={confirmPhoto ? "Remove this photo?" : "This photo"}>
+        {(() => { const p = body.photos.find((x) => x.id === photoSheet); return p && confirmPhoto ? (
+          <div data-testid="body-photo-confirm">
+            <p className="text-[14px] leading-snug text-graphite">The mirror stops using it. This can’t be undone.</p>
+            <div className="mt-5 flex gap-2.5">
+              <button type="button" className="pill pill-quiet h-[50px] flex-1" onClick={() => setConfirmPhoto(false)}>Keep it</button>
+              <Button variant="danger" className="flex-1" disabled={pending} data-testid="body-photo-remove" onClick={() => { setPhotoSheet(null); setConfirmPhoto(false); run(() => removeBodyPhotoAction(ownerId, p.id)); }}>Remove</Button>
+            </div>
+          </div>
+        ) : p ? (
           <div className="space-y-2.5">
             <p className="mono text-graphite">{p.onlyMe ? "Locked · only you can see it" : `Seen by ${visibleTo.join(", ")}`}</p>
             <Button variant="secondary" className="w-full" disabled={pending} data-testid="retake-photo" onClick={() => { setPhotoSheet(null); setNextView(p.view === "side" ? "left" : p.view); setAskPrivacy(true); }}>Retake ({p.view === "side" ? "left" : p.view})</Button>
             <button type="button" className="pill h-[50px] w-full" disabled={pending} data-testid="toggle-photo-lock" onClick={() => { setPhotoSheet(null); run(() => setBodyPhotoPrivacyAction(ownerId, p.id, !p.onlyMe)); }}>{p.onlyMe ? "Unlock for my body-profile viewers" : "Lock to only me"}</button>
-            <button type="button" className="pill pill-quiet h-[50px] w-full" disabled={pending} onClick={() => { setPhotoSheet(null); run(() => removeBodyPhotoAction(ownerId, p.id)); }}>Remove photo</button>
+            <button type="button" className="pill pill-quiet h-[50px] w-full" disabled={pending} onClick={() => setConfirmPhoto(true)}>Remove photo</button>
           </div>
         ) : null; })()}
       </Sheet>

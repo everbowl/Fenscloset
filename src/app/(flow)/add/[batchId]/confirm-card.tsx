@@ -11,7 +11,8 @@ import type { Named, TagLists, TagResult } from "@/lib/ai/tag-item";
 import type { ItemEdits } from "@/lib/items/service";
 import type { DuplicateHint } from "@/lib/items/duplicates";
 import { shrinkPhoto } from "@/lib/import/client-queue";
-import { attachPhotoAction, confirmEntryAction, mergeEntryAction, mirrorEntryAction, rotateEntryAction, saveEditsAction, skipEntryAction } from "./actions";
+import { attachPhotoAction, confirmEntryAction, mergeEntryAction, mirrorEntryAction, rotateEntryAction, saveEditsAction, skipEntryAction, unskipEntryAction } from "./actions";
+import { UndoStrip } from "@/components/ui/undo-strip";
 import { PickSheet, Row, TextSheet } from "@/components/items/row-editor";
 import { BrandSearch } from "@/components/items/brand-search";
 import { MatchSheet } from "@/components/items/match-sheet";
@@ -128,7 +129,27 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
       router.refresh();
     });
   }
-  function skip() { start(async () => { await skipEntryAction(batchId, entry.id); router.refresh(); }); }
+  // Skip goes at once; the next card says "Skipped · Undo" for a few seconds (Q1).
+  const skippedKey = `fc:skipped:${batchId}`;
+  function skip() { try { window.sessionStorage.setItem(skippedKey, JSON.stringify({ id: entry.id, name: tags.name })); } catch { /* private mode */ } start(async () => { await skipEntryAction(batchId, entry.id); router.refresh(); }); }
+  const [skipped, setSkipped] = useState<{ id: string; name: string } | null>(null);
+  useEffect(() => {
+    try {
+      const raw = window.sessionStorage.getItem(skippedKey);
+      if (!raw) return;
+      window.sessionStorage.removeItem(skippedKey);
+      const last = JSON.parse(raw) as { id: string; name: string };
+      if (last.id === entry.id) return;
+      setSkipped(last);
+      const t = setTimeout(() => setSkipped(null), 5000);
+      return () => clearTimeout(t);
+    } catch { /* ignore */ }
+  }, [entry.id, skippedKey]);
+  function unskip() {
+    if (!skipped) return;
+    const id = skipped.id; setSkipped(null);
+    start(async () => { const r = await unskipEntryAction(batchId, id); if (!r.ok) { setError(r.error); return; } router.push(`/add/${batchId}?entry=${id}`); router.refresh(); });
+  }
   function merge() { if (!duplicate) return; start(async () => { const r = await mergeEntryAction(batchId, entry.id, duplicate.itemId); if (!r.ok) { setError(r.error); return; } router.refresh(); }); }
 
   async function onPhoto(kind: "label" | "worn" | "back", e: React.ChangeEvent<HTMLInputElement>) {
@@ -166,7 +187,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden><path d="M5 5l14 14M19 5 5 19" /></svg>
         </Link>
         <span className="mono mono-11 px-2.5 py-1.5" data-testid="confirm-counter">{counter}</span>
-        <button type="button" onClick={skip} disabled={pending} className="pill pill-sm pill-quiet">Skip</button>
+        <button type="button" onClick={skip} disabled={pending} className="pill pill-sm pill-quiet" data-testid="skip-entry">Skip</button>
       </div>
 
       <div className="flex items-end justify-between px-5 pb-3">
@@ -205,6 +226,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
       ) : null}
 
       {bgFailed ? <p className="mono mx-5 mt-3 text-graphite">Background could not be removed · the original photo is used</p> : null}
+      {skipped ? <UndoStrip text={`Skipped · ${skipped.name}`} onUndo={unskip} testId="skipped-undo" className="mx-5 mt-3" /> : null}
 
       {askMore && !backKey && !labelKey && !wornKey ? (
         <div className="mx-5 mt-3 border-y border-ink py-2.5" data-testid="ask-more-photos">
@@ -301,7 +323,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
               <figure><div className="h-[150px] overflow-hidden bg-bone">{duplicate.thumbKey ? <img src={`/api/photo/${duplicate.thumbKey}`} alt="" className="size-full object-contain" /> : null}</div><figcaption className="mono mt-1.5 truncate text-graphite">{duplicate.name ?? "What you own"}</figcaption></figure>
             </div>
             <Button size="lg" className="w-full justify-start" shelf={false} icon={<Icons.copy />} sub="Copies its details · you check the color" onClick={mirror} data-testid="like-mirror">Another one of these</Button>
-            <button type="button" onClick={() => { dismissLike(); merge(); }} className="pill pill-solid h-[50px] w-full" data-testid="like-merge">It&apos;s the one I have · add this photo</button>
+            <button type="button" onClick={() => { dismissLike(); merge(); }} className="pill h-[50px] w-full" data-testid="like-merge">It&apos;s the one I have · add this photo</button>
             <button type="button" onClick={dismissLike} className="pill pill-quiet h-[50px] w-full" data-testid="like-new">No · something new</button>
           </div>
         ) : null}

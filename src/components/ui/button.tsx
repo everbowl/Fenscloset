@@ -47,7 +47,7 @@ export function Button({
   const own = parts.filter((c) => !layout.includes(c));
   const inner = (
     <button type={type} disabled={disabled || busy} aria-busy={busy || undefined}
-      className={cn(buttonClass({ variant, size, className: cn(own.join(" "), withShelf && layout.length ? "w-full" : layout.join(" ")) }), showFlash && "bg-ink text-paper hover:brightness-100", busy && "disabled:opacity-100 disabled:bg-accent disabled:text-paper disabled:shadow-[0_6px_0_0_var(--color-stone)] disabled:translate-y-0 disabled:cursor-progress", busy && variant === "secondary" && "disabled:bg-ink")} {...props}>
+      className={cn(buttonClass({ variant, size, className: cn(own.join(" "), withShelf && layout.length ? "w-full" : layout.join(" ")) }), showFlash && "bg-ink text-paper hover:brightness-100", busy && "disabled:opacity-100 disabled:bg-accent disabled:text-ink disabled:shadow-[0_6px_0_0_var(--color-stone)] disabled:translate-y-0 disabled:cursor-progress", busy && variant === "secondary" && "disabled:bg-ink disabled:text-paper")} {...props}>
       {showFlash ? <span data-testid="button-flash">{flash}</span> : (
         <>
           {busy ? <span aria-hidden className="size-2 shrink-0 animate-pulse rounded-full bg-current" /> : icon ? <span aria-hidden className="shrink-0">{icon}</span> : null}

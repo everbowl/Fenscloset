@@ -82,7 +82,7 @@ export function RuleForm({ rule, compact }: { rule: RuleRow; /** label left, inp
             </label>
           </div>
           <div className="flex items-center gap-3">
-            <span className="pill pill-solid pointer-events-none h-10 px-6" style={{ background: value, borderColor: value, boxShadow: "0 5px 0 0 var(--color-stone)" }} aria-hidden>Wear this</span>
+            <span className="pill pill-solid pointer-events-none h-10 px-6" style={{ background: value, borderColor: value, color: "var(--black)", boxShadow: "0 5px 0 0 var(--color-stone)" }} aria-hidden>Wear this</span>
             <span className="mono text-graphite">{value.toUpperCase()}</span>
           </div>
         </div>

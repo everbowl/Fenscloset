@@ -162,6 +162,13 @@ export async function skipEntry(personId: string, entryId: string): Promise<void
   await finishBatchIfDone(entry.batchId);
 }
 
+/** "Skipped · Undo" on the next card (Q1): the piece comes back to the pile while its batch is still open. */
+export async function unskipEntry(personId: string, entryId: string): Promise<void> {
+  const entry = await ownedEntry(personId, entryId);
+  if (entry.status !== "skipped") throw new ItemError("That one is already back.");
+  await db.importEntry.update({ where: { id: entryId }, data: { status: "needs_confirm" } });
+}
+
 export async function attachEntryPhoto(personId: string, entryId: string, kind: "label" | "worn" | "back", key: string): Promise<void> {
   await ownedEntry(personId, entryId);
   await db.importEntry.update({ where: { id: entryId }, data: kind === "label" ? { labelKey: key } : kind === "worn" ? { wornKey: key } : { backKey: key } });

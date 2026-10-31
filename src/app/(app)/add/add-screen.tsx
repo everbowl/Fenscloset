@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Button, buttonClass, Icons } from "@/components/ui/button";
 import { Banner } from "@/components/ui/banner";
 import { useImportQueue } from "@/components/import-queue-provider";
-import { abandonBatchAction } from "@/app/(flow)/add/[batchId]/actions";
+import { LetThemGo } from "./let-them-go";
 
 const pad = (n: number) => String(n).padStart(3, "0");
 
@@ -92,7 +92,7 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
         </button>
         <div className="mt-5 flex gap-2.5">
           <Button size="lg" className="flex-1" onClick={() => pickRef.current?.click()}>Pick photos</Button>
-          <Button size="lg" variant="secondary" aria-label="Take a photo" className="w-[54px] px-0" onClick={() => cameraRef.current?.click()}><CameraIcon /></Button>
+          <Button size="lg" variant="outline" aria-label="Take a photo" className="w-[54px] px-0" onClick={() => cameraRef.current?.click()}><CameraIcon /></Button>
         </div>
         <p className="mono mt-4 text-center text-graphite">Then confirm each piece with one tap</p>
         {tips}
@@ -132,7 +132,7 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
           <p className="text-[13px]">{plainError(batch.failed[0].error)}</p>
           <div className="mt-3 flex gap-2">
             <RetryAll ids={batch.failed.map((f) => f.id)} />
-            {ready === 0 && working === 0 && !upload.active ? <LetThemGo batchId={batch.id} /> : null}
+            {ready === 0 && working === 0 && !upload.active ? <LetThemGoHere batchId={batch.id} count={batch.failed.length} /> : null}
           </div>
         </Banner>
       ) : null}
@@ -169,14 +169,10 @@ function RetryAll({ ids }: { ids: string[] }) {
   );
 }
 
-/** Only failed photos are left in the batch: let them go and the pile is clear. */
-function LetThemGo({ batchId }: { batchId: string }) {
+/** Only failed photos are left in the batch: let them go (after asking) and the pile is clear. */
+function LetThemGoHere({ batchId, count }: { batchId: string; count: number }) {
   const { refresh } = useImportQueue();
-  return (
-    <button type="button" className="pill pill-quiet" data-testid="let-them-go" onClick={async () => { await abandonBatchAction(batchId); await refresh(); }}>
-      Let them go
-    </button>
-  );
+  return <LetThemGo batchId={batchId} count={count} onDone={() => refresh()} />;
 }
 
 /** Raw errors stay in the log; the family reads plain words. */

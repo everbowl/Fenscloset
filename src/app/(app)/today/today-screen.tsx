@@ -283,8 +283,8 @@ export function TodayScreen(p: Props) {
                   onClick={() => run("wear", () => wearAction(p.personId, p.suggestion!.id, index), () => { setFlashWorn(true); setTimeout(() => setFlashWorn(false), 900); })} data-testid="wear-this">{busy === "wear" ? "Saving…" : "Wear this"}</Button>
               )}
               <div className="grid grid-cols-2 gap-2">
-                <Button variant="secondary" disabled={busy !== null || worn} onClick={() => setSheet("swap")} data-testid="swap">Change a piece</Button>
-                <Button variant="secondary" busy={busy === "more"} disabled={busy !== null} onClick={() => { const next = boards.length; buildLooks("more", () => moreAction(p.personId), () => setIndex(next)); }} data-testid="more-looks">{busy === "more" ? "Thinking…" : "More looks"}</Button>
+                <Button variant="outline" disabled={busy !== null || worn} onClick={() => setSheet("swap")} data-testid="swap">Change a piece</Button>
+                <Button variant="outline" busy={busy === "more"} disabled={busy !== null} onClick={() => { const next = boards.length; buildLooks("more", () => moreAction(p.personId), () => setIndex(next)); }} data-testid="more-looks">{busy === "more" ? "Thinking…" : "More looks"}</Button>
               </div>
             </div>
           ) : null}

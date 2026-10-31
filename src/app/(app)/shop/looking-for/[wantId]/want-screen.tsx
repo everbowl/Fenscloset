@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { Banner } from "@/components/ui/banner";
-import { Sheet } from "@/components/ui/sheet";
+import { UndoStrip, useUndoable } from "@/components/ui/undo-strip";
 import { cn } from "@/lib/cn";
 import type { WantView } from "@/lib/shop/wants";
 import { deleteWantAction, editWantAction, foundWantAction, searchWantAction } from "../actions";
@@ -33,7 +33,7 @@ export function WantScreen({ meId, want }: { meId: string; want: WantView }) {
     if (wasSearching.current && !s) { setJustSearched(true); const t = setTimeout(() => setJustSearched(false), 8000); wasSearching.current = false; return () => clearTimeout(t); }
     wasSearching.current = Boolean(s);
   }, [s]);
-  const [confirmRemove, setConfirmRemove] = useState(false);
+  const undoable = useUndoable(); // Remove: the strip for five seconds, then it really goes (Q1)
   const meta = [want.category ?? null, want.maxPrice ? `under $${want.maxPrice}` : null, `for ${want.forPersonId === meId ? "me" : want.forName}`].filter(Boolean).join(" · ");
 
   function act(kind: "found" | "delete", fn: () => Promise<{ ok: true } | { ok: false; error: string }>, then: () => void) {
@@ -60,7 +60,8 @@ export function WantScreen({ meId, want }: { meId: string; want: WantView }) {
         ) : (
           <p className={cn("mono mt-4", justSearched ? "text-ink" : "text-graphite")} data-testid="want-checked" role={justSearched ? "status" : undefined} suppressHydrationWarning>{justSearched ? (fresh ? `✓ ${fresh} new` : "Nothing new since last time") : want.foundAt ? `Found ${ago(want.foundAt)}` : `Stores checked ${ago(want.lastSearchedAt)} · again every day`}</p>
         )}
-        <div className="mt-4 flex flex-wrap gap-2">
+        {undoable.pending ? <UndoStrip text={`${undoable.pending.text} · ${want.text}`} onUndo={undoable.undo} testId="want-undo" className="mt-4" /> : null}
+        <div className={cn("mt-4 flex flex-wrap gap-2", undoable.pending && "hidden")}>
           {want.foundAt ? (
             <button type="button" disabled={busy !== null} onClick={() => act("found", () => foundWantAction(want.id, false), () => router.refresh())} className="pill pill-solid" data-testid="want-unfound">Put it back on the list</button>
           ) : (
@@ -70,7 +71,7 @@ export function WantScreen({ meId, want }: { meId: string; want: WantView }) {
               <button type="button" disabled={busy !== null || running} onClick={() => act("found", () => foundWantAction(want.id, true), () => router.refresh())} className="pill pill-solid" data-testid="want-found">Found it</button>
             </>
           )}
-          <button type="button" disabled={busy !== null} onClick={() => setConfirmRemove(true)} className="pill pill-quiet" data-testid="want-delete">Remove</button>
+          <button type="button" disabled={busy !== null} onClick={() => undoable.start("Taken off the list", () => act("delete", () => deleteWantAction(want.id), () => router.push(`/shop/looking-for?for=${want.forPersonId}`)))} className="pill pill-quiet" data-testid="want-delete">Remove</button>
         </div>
       </div>
 
@@ -99,17 +100,10 @@ export function WantScreen({ meId, want }: { meId: string; want: WantView }) {
         ) : !running ? (
           <p className="mono mt-4 text-graphite" data-testid="want-none">Nothing in the stores for this yet{want.maxPrice ? ` under $${want.maxPrice}` : ""}. The Shop keeps checking every day; tap Edit to widen the search.</p>
         ) : null}
-        {want.matches.length ? <p className="mono mt-4 text-graphite">Judge it: the Shop says fits, risky or pass, and can show it on you.</p> : null}
+        {want.matches.length ? <p className="mono mt-4 text-graphite">Judge it: the Shop says buy it, maybe or skip it, and can show it on you.</p> : null}
       </section>
 
       <WantSheet open={edit} onClose={() => setEdit(false)} title="Change it" value={want.text} onSave={(text) => void run(want.id, () => editWantAction(want.id, text))} />
-      <Sheet open={confirmRemove} onClose={() => setConfirmRemove(false)} title="Take this off the list?">
-        <p className="text-[14px] leading-snug text-graphite">The Shop stops looking for it. The matches found so far go too.</p>
-        <div className="mt-5 flex gap-2">
-          <button type="button" className="pill pill-quiet h-[50px] flex-1" onClick={() => setConfirmRemove(false)}>Keep it</button>
-          <button type="button" className="pill pill-solid h-[50px] flex-1" disabled={busy !== null} onClick={() => { setConfirmRemove(false); act("delete", () => deleteWantAction(want.id), () => router.push(`/shop/looking-for?for=${want.forPersonId}`)); }} data-testid="want-delete-confirm">Remove</button>
-        </div>
-      </Sheet>
     </div>
   );
 }

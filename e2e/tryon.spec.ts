@@ -87,6 +87,7 @@ test("try-on: on by default, needs a body photo, then a picture of the look on y
   // Compare (Admin → Rules → Mirror engine): Google, FASHN and Kling side by side, so the winner can be picked there
   await page.keyboard.press("Escape");
   await page.goto("/admin/rules");
+  await page.getByTestId("rules-advanced").locator("summary").click(); // Mirror lives under Advanced
   await page.getByLabel("Mirror engine").selectOption("compare");
   await expect(page.getByTestId("rule-saved-mirrorEngine")).toHaveText("✓ Saved");
   await page.goto("/today");

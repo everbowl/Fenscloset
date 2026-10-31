@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { Sheet } from "@/components/ui/sheet";
 import { TextSheet } from "@/components/items/row-editor";
+import { UndoStrip, useUndoable } from "@/components/ui/undo-strip";
 import { shrinkPhoto } from "@/lib/import/client-queue";
 import { cn } from "@/lib/cn";
 import type { LookupView, SimilarItem } from "@/lib/shop/engine";
@@ -17,9 +18,8 @@ import { brandFeedAction, brandFeedStatusAction, deleteLookupAction, lookupLinkA
 import type { TryOnState, TryOnView } from "@/lib/tryon";
 import { ago } from "./looking-for/ago";
 
-const CALL_WORD = { FITS: "Fits · buy it", RISKY: "Risky · maybe", PASS: "Pass · skip it" } as const;
-/** The call as the hero of the result: the word in serif, the gloss in mono. */
-const CALL_HERO = { FITS: { word: "Fits", gloss: "Buy it" }, RISKY: { word: "Risky", gloss: "Maybe" }, PASS: { word: "Pass", gloss: "Skip it" } } as const;
+/** The call in plain words (Jeff, 31 Oct 2026, L1): it answers "Should I buy it?" directly. The hero line is the word alone. */
+const CALL_WORD = { FITS: "Buy it", RISKY: "Maybe", PASS: "Skip it" } as const;
 /** How often the screen asks after a lookup that is still running. */
 const POLL_MS = 2000;
 
@@ -33,6 +33,8 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
   const setError = (e?: string) => { if (e) toast.error(e); };
   const [sheet, setSheet] = useState<"for" | "link" | null>(null);
   const [compare, setCompare] = useState<SimilarItem | null>(null);
+  const undoable = useUndoable();
+  const [hidden, setHidden] = useState<string | null>(null); // a verdict taken away, until its strip runs out (Q1)
   const [source, setSource] = useState<"screenshot" | "photo">("screenshot");
   const file = useRef<HTMLInputElement>(null);
   const seq = useRef(0);
@@ -192,6 +194,8 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
             <p className="mono mt-1 text-graphite">Usually 15 to 40 seconds. You can leave this screen; the answer is kept under Recent.</p>
           </div>
         </section>
+      ) : selected && hidden === selected.id && undoable.pending ? (
+        <section className="order-3 mt-6 lg:mt-0" data-testid="shop-removed"><UndoStrip text={`${undoable.pending.text} · ${selected.title ?? "New piece"}`} onUndo={undoable.undo} testId="shop-undo" /></section>
       ) : selected ? (
         <section className="order-3 mt-6 lg:mt-0" data-testid="shop-result">
           <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-4">
@@ -203,7 +207,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
             </div>
           </div>
           <div className="rise mt-4 border-y-2 border-ink py-3" data-testid="verdict" data-call={selected.verdict.call}>
-            <p className="flex items-baseline gap-3"><span className="serif text-[44px] leading-none">{CALL_HERO[selected.verdict.call].word}</span><span className="mono text-ink">· {CALL_HERO[selected.verdict.call].gloss}</span></p>
+            <p className="serif text-[44px] leading-none" data-testid="verdict-word">{CALL_WORD[selected.verdict.call]}</p>
             <p className="serif mt-2 text-[21px] italic leading-[1.3]">{selected.verdict.reason}</p>
             {selected.verdict.sizeNote ? <p className="mono mt-1.5 text-graphite">{selected.verdict.sizeNote}</p> : null}
             {!selected.verdict.usedBodyData ? <p className="mono mt-1.5 flex flex-wrap items-center gap-2 text-graphite">Judged on style and closet only{forMe ? <Link href="/profile/body" className="pill pill-sm" data-testid="add-my-sizes">Add my sizes</Link> : null}</p> : null}
@@ -282,12 +286,12 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
               ))}
             </div>
           ) : null}
-          {(selected.shopperId === meId || selected.forPersonId === meId) ? <button type="button" disabled={busy === "delete"} onClick={() => remove(selected.id)} className="pill pill-sm pill-quiet mt-5" data-testid="remove-lookup">Remove</button> : null}
+          {(selected.shopperId === meId || selected.forPersonId === meId) ? <button type="button" disabled={busy === "delete"} onClick={() => { const id = selected.id; setHidden(id); undoable.start("Removed", () => { setHidden(null); remove(id); }, () => setHidden(null)); }} className="pill pill-sm pill-quiet mt-5" data-testid="remove-lookup">Remove</button> : null}
         </section>
       ) : (
         <section className="order-3 mt-6 lg:mt-0" data-testid="shop-empty">
           <ol className="grid grid-cols-3 gap-2" aria-label="How it works">
-            {[["01", "Show it", "A store link, a screenshot, or a photo"], ["02", "The verdict", "Fits, risky, or pass, with one reason"], ["03", "Wear it", "What you own that goes with it"]].map(([n, t, d]) => (
+            {[["01", "Show it", "A store link, a screenshot, or a photo"], ["02", "The verdict", "Buy it, maybe, or skip it, with one reason"], ["03", "Wear it", "What you own that goes with it"]].map(([n, t, d]) => (
               <li key={n} className="flex min-h-[150px] flex-col justify-between border border-ink p-3"><span className="mono text-graphite">{n}</span><span><span className="serif block text-[22px] leading-none">{t}</span><span className="mono mt-1.5 block text-graphite">{d}</span></span></li>
             ))}
           </ol>

@@ -21,7 +21,7 @@ test("link lookup for me, photo lookup for Mya as a parent, recent list and remo
   await expect(page.getByTestId("shop-result")).toBeVisible({ timeout: 20000 });
   await expect(page.getByTestId("shop-thinking")).toHaveCount(0);
   await expect(page.getByTestId("shop-result")).toContainText("Linen Blazer");
-  await expect(page.getByTestId("verdict")).toContainText(/Fits|Risky|Pass/);
+  await expect(page.getByTestId("verdict")).toContainText(/Buy it|Maybe|Skip it/);
   await expect(page.getByTestId("pairings")).toBeVisible();
 
   // shop for Mya (parent): the switcher lists her; Olivia is not offered
@@ -40,11 +40,12 @@ test("link lookup for me, photo lookup for Mya as a parent, recent list and remo
   await page.getByTestId("judge-product").first().click();
   await expect(page.getByTestId("shop-result")).toContainText("Linen Blazer");
   await page.getByTestId("remove-lookup").click();
+  await expect(page.getByTestId("shop-undo")).toContainText("Removed"); // five seconds to change your mind, then it goes
   // the screenshot lookup for Mya is what's left, so it is shown; removing it too empties the screen
-  await expect(page.getByTestId("shop-result")).toContainText("For Mya");
+  await expect(page.getByTestId("shop-result")).toContainText("For Mya", { timeout: 15_000 });
   await expect(page.getByTestId("shop-result")).not.toContainText("Linen Blazer");
   await page.getByTestId("remove-lookup").click();
-  await expect(page.getByTestId("shop-empty")).toBeVisible();
+  await expect(page.getByTestId("shop-empty")).toBeVisible({ timeout: 15_000 });
 });
 
 test("from a piece in the closet: what would go with it, products for that, looks from the closet; Judge it lands on the Shop", async ({ page }) => {

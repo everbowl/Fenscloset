@@ -57,7 +57,6 @@ test("Jeff fills his body profile and settings; parents edit Mya's; Olivia is in
   const olivia = await ctx.newPage();
   await olivia.goto(url);
   await olivia.getByLabel("Choose a password").fill("olivia-rules-21");
-  await olivia.getByLabel("Type it again").fill("olivia-rules-21");
   await olivia.getByRole("button", { name: "Open my closet" }).click();
   await expect(olivia).toHaveURL(/\/today$/);
   await olivia.goto("/closet");

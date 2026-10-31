@@ -66,10 +66,9 @@ test("looking for: add a line, the stores are searched, the new count shows on t
   await page.getByTestId("found-row").click();
   await page.getByTestId("want-unfound").click();
   await expect(page.getByTestId("want-found")).toBeVisible();
-  page.once("dialog", (d) => void d.accept());
   await page.getByTestId("want-delete").click();
-  await page.getByTestId("want-delete-confirm").click();
-  await expect(page).toHaveURL(/\/shop\/looking-for\?for=/);
+  await expect(page.getByTestId("want-undo")).toContainText("Taken off the list"); // five seconds to change your mind
+  await expect(page).toHaveURL(/\/shop\/looking-for\?for=/, { timeout: 15_000 });
   await expect(page.getByTestId("looking-for-empty")).toBeVisible();
   await expect(page.getByTestId("want-row")).toHaveCount(0);
 });

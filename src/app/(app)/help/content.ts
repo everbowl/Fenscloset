@@ -40,10 +40,10 @@ export const HELP_TOPICS: HelpTopic[] = [
     { text: "Tap SHARE to pick who can see it. The line under the photo always says who can.", cue: { kind: "link", label: "Share" } },
     { text: "Forgot to tap WEAR THIS? Tap that day, tap SAVE THE FIT, and pick the pieces.", cue: { kind: "button", label: "Save the fit" } },
   ] },
-  { slug: "shop", title: "Should I", accent: "buy it?", blurb: "A verdict before you pay.", link: { href: "/shop", label: "Open Shop" }, cover: { kind: "verdict", word: "FITS" }, steps: [
+  { slug: "shop", title: "Should I", accent: "buy it?", blurb: "A verdict before you pay.", link: { href: "/shop", label: "Open Shop" }, cover: { kind: "verdict", word: "BUY IT" }, steps: [
     { text: "Tap SHOP.", cue: { kind: "nav", tab: "Shop" } },
     { text: "Tap PASTE A LINK and paste the store link, or tap SCREENSHOT, or tap TAKE A PHOTO in the dressing room.", cue: { kind: "button", label: "Paste a link" } },
-    { text: "Read the verdict: FITS, RISKY, or PASS, with one reason.", cue: { kind: "verdict", word: "RISKY" } },
+    { text: "Read the verdict: BUY IT, MAYBE, or SKIP IT, with one reason.", cue: { kind: "verdict", word: "MAYBE" } },
     { text: "Look at WEAR IT WITH to see three ways to wear it with clothes you already own.", cue: { kind: "board" } },
     { text: "Shopping for someone else? Tap SHOPPING FOR at the top. You can shop for your kids, or anyone who allowed it in their Settings.", cue: { kind: "switcher", label: "Shopping for Mya" } },
   ] },

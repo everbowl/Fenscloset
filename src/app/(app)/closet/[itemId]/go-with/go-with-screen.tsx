@@ -116,7 +116,7 @@ export function GoWithScreen({ itemId, name, thumbKey, fresh, initial }: { itemI
                   </div>
                 ))}
               </div>
-              <p className="mono mt-1 text-graphite">Judge it: the Shop says fits, risky or pass, and can show it on you.</p>
+              <p className="mono mt-1 text-graphite">Judge it: the Shop says buy it, maybe or skip it, and can show it on you.</p>
             </div>
           ) : (
             <p className="mono mt-6 text-graphite" data-testid="go-with-no-products">Nothing in the stores right now for this. Try <Link href={`/shop?for=${view.forPersonId}`} className="text-ink underline underline-offset-4">the Shop</Link> with a link or a photo.</p>

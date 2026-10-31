@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { SizeSheet } from "@/components/profile/size-sheet";
+import { UndoStrip, useUndoable } from "@/components/ui/undo-strip";
 import type { MyBrand } from "@/lib/profiles/brands";
 import type { CategorySizes } from "@/lib/profiles/sizes";
 import { likelyFor, type LikelySizes } from "@/lib/profiles/size-options";
@@ -33,6 +34,8 @@ export function FavoritesEditor({ ownerId, favs, brands, stores, myBrands, sizeO
   const [storeList, setStoreList] = useState(stores);
   const [error, setError] = useState<string>();
   const [, start] = useTransition();
+  const undoable = useUndoable();
+  const [gone, setGone] = useState<string[]>([]); // brands taken away, until the strip runs out (Q1)
 
   function openEdit(b: MyBrand) { setEditing(b); setUrl(b.url ?? ""); setPicked({}); }
   const current = (categoryId: string | null) => {
@@ -71,14 +74,15 @@ export function FavoritesEditor({ ownerId, favs, brands, stores, myBrands, sizeO
           {canEdit ? <button type="button" onClick={() => setSheet("pickMine")} className="pill pill-sm" data-testid="add-my-brand">+ Add brand</button> : null}
         </div>
         <p className="mt-2 text-[13px] leading-snug text-graphite">Your size per item type in each brand. One tap when you add clothes brings the right size and the store link along.</p>
-        {myBrands.length === 0 ? <p className="mono py-3 text-graphite">None yet</p> : null}
-        {myBrands.map((b) => (
+        {undoable.pending ? <UndoStrip text={undoable.pending.text} onUndo={undoable.undo} testId="my-brand-undo" className="mt-2" /> : null}
+        {myBrands.length === 0 && !undoable.pending ? <p className="mono py-3 text-graphite">None yet</p> : null}
+        {myBrands.filter((b) => !gone.includes(b.brandId)).map((b) => (
           <div key={b.brandId} className="flex min-h-[46px] items-center gap-3 border-b border-line py-1.5 text-[14px]" data-testid={`my-brand-row-${b.brandId}`}>
             <span className="min-w-0 flex-1">
               <span className="block truncate">{b.name}</span>
               <span className="mono block truncate text-graphite">{[...b.sizes.map((s) => `${s.categoryName ?? "Any"} ${s.size}`), b.url ? shortUrl(b.url) : "No link"].join(" · ") || "No sizes yet"}</span>
             </span>
-            {canEdit ? <><button type="button" onClick={() => openEdit(b)} className="pill pill-sm" data-testid={`edit-my-brand-${b.brandId}`}>Edit</button><button type="button" onClick={() => start(async () => { const r = await removeMyBrandAction(ownerId, b.brandId); if (!r.ok) setError(r.error); router.refresh(); })} className="pill pill-sm pill-quiet">Remove</button></> : null}
+            {canEdit ? <><button type="button" onClick={() => openEdit(b)} className="pill pill-sm" data-testid={`edit-my-brand-${b.brandId}`}>Edit</button><button type="button" onClick={() => { const id = b.brandId; setGone((g) => [...g, id]); undoable.start(`Removed · ${b.name}`, () => start(async () => { const r = await removeMyBrandAction(ownerId, id); if (!r.ok) setError(r.error); router.refresh(); }), () => setGone((g) => g.filter((x) => x !== id))); }} className="pill pill-sm pill-quiet" data-testid={`remove-my-brand-${b.brandId}`}>Remove</button></> : null}
           </div>
         ))}
       </section>

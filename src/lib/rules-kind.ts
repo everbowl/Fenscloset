@@ -35,12 +35,13 @@ export const RULE_COPY: Record<string, { label: string; description: string; uni
 };
 
 /** The order and the headings on the Rules page. Keys not listed here show at the end under Other. */
-export const RULE_GROUPS: { title: string; blurb?: string; keys: string[]; compact?: boolean }[] = [
+/** `advanced` groups fold under one "Advanced" heading on the Rules page (Jeff, 31 Oct 2026, R1). */
+export const RULE_GROUPS: { title: string; blurb?: string; keys: string[]; compact?: boolean; advanced?: boolean }[] = [
   { title: "Outfits", keys: ["noRepeatDays", "notWornMonths"] },
   { title: "Household", keys: ["timezone", "accentColor"] },
-  { title: "Mirror", keys: ["mirrorEngine"] },
+  { title: "Mirror", keys: ["mirrorEngine"], advanced: true },
   { title: "Shop", keys: ["wantSweepHours"] },
-  { title: "Likely sizes", blurb: "A starting point from height and weight, shown on the Body page and offered when someone records a size.", keys: ["sizeBandXsMaxLb", "sizeBandSMaxLb", "sizeBandMMaxLb", "sizeBandLMaxLb", "sizeBandXlMaxLb", "sizeTallIn", "sizeShortIn", "waistDivisorX10"], compact: true },
+  { title: "Likely sizes", blurb: "A starting point from height and weight, shown on the Body page and offered when someone records a size.", keys: ["sizeBandXsMaxLb", "sizeBandSMaxLb", "sizeBandMMaxLb", "sizeBandLMaxLb", "sizeBandXlMaxLb", "sizeTallIn", "sizeShortIn", "waistDivisorX10"], compact: true, advanced: true },
 ];
 
 /** US time zones in plain words; anything else is typed. */

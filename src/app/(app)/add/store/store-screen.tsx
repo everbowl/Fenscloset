@@ -150,7 +150,7 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
           {step === "color" ? (
             <Field label="Which color?" htmlFor="store-color" hint="Tap one, or type it and press Next.">
               <Pills options={product.colors} value={color} onPick={pickColor} testPrefix="color" />
-              <div className="flex gap-2"><Input id="store-color" value={color} onChange={(e) => { setColor(e.target.value); setPicks(null); }} placeholder="Black" data-testid="store-color" /><Button type="button" variant="secondary" onClick={() => pickColor(color.trim())} disabled={!color.trim()} data-testid="color-next">Next</Button></div>
+              <div className="flex gap-2"><Input id="store-color" value={color} onChange={(e) => { setColor(e.target.value); setPicks(null); }} placeholder="Black" data-testid="store-color" /><Button type="button" variant="outline" onClick={() => pickColor(color.trim())} disabled={!color.trim()} data-testid="color-next">Next</Button></div>
             </Field>
           ) : null}
           {step !== "color" && color ? <p className="mono" data-testid="chosen-color">Color · {color} <button type="button" onClick={() => setStep("color")} className="ml-2 text-graphite">change</button></p> : null}
@@ -159,7 +159,7 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
           {step === "size" ? (
             <Field label="Which size?" htmlFor="store-size" hint="Tap one, type it, or skip.">
               <Pills options={product.sizes} value={size} onPick={pickSize} testPrefix="size" />
-              <div className="flex gap-2"><Input id="store-size" value={size} onChange={(e) => setSize(e.target.value)} placeholder="M · 32 · 8" data-testid="store-size" /><Button type="button" variant="secondary" onClick={() => pickSize(size.trim())} data-testid="size-next">{size.trim() ? "Next" : "Skip"}</Button></div>
+              <div className="flex gap-2"><Input id="store-size" value={size} onChange={(e) => setSize(e.target.value)} placeholder="M · 32 · 8" data-testid="store-size" /><Button type="button" variant="outline" onClick={() => pickSize(size.trim())} data-testid="size-next">{size.trim() ? "Next" : "Skip"}</Button></div>
             </Field>
           ) : null}
           {step === "qty" && size ? <p className="mono" data-testid="chosen-size">Size · {size} <button type="button" onClick={() => setStep("size")} className="ml-2 text-graphite">change</button></p> : null}

@@ -23,6 +23,7 @@ import { monoDate, prettyDate } from "@/lib/dates";
 import { lastClosetUrl, markClosetRestore } from "@/lib/closet-memory";
 import { FEATURE_KEYS, FEATURE_LABELS, isFeatureKey, mirrorCanPlace } from "@/lib/tryon/features";
 import { MirrorSheet } from "@/components/mirror/mirror-sheet";
+import { UndoStrip, useUndoable } from "@/components/ui/undo-strip";
 import { useMirror } from "@/components/mirror/use-mirror";
 import type { MirrorConfig } from "@/lib/tryon/config";
 
@@ -97,6 +98,9 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
     });
   }
   const [justAdded, setJustAdded] = useState(false);
+  const undoable = useUndoable();
+  const [hiddenPhoto, setHiddenPhoto] = useState<string | null>(null); // a photo taken away, until its strip runs out (Q1)
+  const photos = it.photos.filter((p) => p.id !== hiddenPhoto);
 
   const name = (xs: { id: string; name: string }[], id: string | null) => xs.find((x) => x.id === id)?.name ?? null;
   const names = (xs: { id: string; name: string }[], ids: string[]) => ids.map((id) => name(xs, id)).filter(Boolean).join(", ");
@@ -134,7 +138,7 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
     } catch (err) { setError((err as Error).message); } finally { setUploading(false); }
   }
 
-  const photo = it.photos[Math.min(photoIdx, it.photos.length - 1)] ?? null;
+  const photo = photos[Math.min(photoIdx, photos.length - 1)] ?? null;
   const brandName = name(lists.brands, it.brandId);
   const price = it.purchasePrice ? `$${Number(it.purchasePrice).toFixed(2).replace(/\.00$/, "")}` : null;
 
@@ -150,9 +154,10 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
         </>) : null}
         {photo?.kind === "retail" ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">Store photo</span> : photo?.kind === "worn" || photo?.kind === "back" ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">{KIND_WORD[photo.kind]}</span> : it.storePhoto && photo?.isPrimary ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">Store photo</span> : null}
       </div>
-      {it.photos.length > 1 ? (
+      {undoable.pending ? <UndoStrip text={undoable.pending.text} onUndo={undoable.undo} testId="photo-undo" className="mt-2" /> : null}
+      {photos.length > 1 ? (
         <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 pt-1.5 [scrollbar-width:none] lg:mx-0 lg:px-0 lg:pt-0">
-          {it.photos.map((p, i) => (
+          {photos.map((p, i) => (
             <button key={p.id} type="button" onClick={() => setPhotoIdx(i)} aria-label={`${KIND_WORD[p.kind]} photo`} aria-pressed={i === photoIdx} className={`h-[62px] w-[48px] shrink-0 overflow-hidden bg-bone ${i === photoIdx ? "outline outline-2 -outline-offset-2 outline-ink" : ""}`}>
               <img src={`/api/photo/${p.key}`} alt="" className="size-full object-contain" />
             </button>
@@ -247,7 +252,7 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
 
       {canEdit ? (
         <div className="pt-5">
-          <Button size="lg" className="w-full" onClick={() => setSheet("photo")} busy={uploading} icon={<Icons.camera />} sub={it.photos.length ? "Back, label, worn, or another shot" : "A hanger or flat-lay shot is enough"}>{uploading ? "Saving the photo…" : "Add photo"}</Button>
+          <Button size="lg" className="w-full" onClick={() => setSheet("photo")} busy={uploading} icon={<Icons.camera />} sub={photos.length ? "Back, label, worn, or another shot" : "A hanger or flat-lay shot is enough"}>{uploading ? "Saving the photo…" : "Add photo"}</Button>
         </div>
       ) : null}
 
@@ -306,8 +311,8 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
           {([["alone", "Another photo", "Hanger or flat-lay"], ["back", "Back of the piece", "Graphic · cut"], ["worn", "Worn photo", "How it fits"], ["label", "Label", "Brand · size"]] as const).map(([k, l, m]) => (
             <button key={k} type="button" onClick={() => { setPhotoKind(k); photoRef.current?.click(); }} className="flex h-12 items-center justify-between border-b border-line text-[15px]">{l}<span className="mono text-graphite">{m}</span></button>
           ))}
-          {it.photos.length > 1 && photo ? (
-            <button type="button" onClick={() => start(async () => { const r = await removeItemPhotoAction(it.id, photo.id); if (!r.ok) setError(r.error); setSheet(null); setPhotoIdx(0); router.refresh(); })} className="pill mt-5 h-[50px]">Remove the photo shown</button>
+          {photos.length > 1 && photo ? (
+            <button type="button" onClick={() => { const id = photo.id; setSheet(null); setPhotoIdx(0); setHiddenPhoto(id); undoable.start("Photo removed", () => start(async () => { const r = await removeItemPhotoAction(it.id, id); if (!r.ok) setError(r.error); setHiddenPhoto(null); router.refresh(); }), () => setHiddenPhoto(null)); }} className="pill mt-5 h-[50px]" data-testid="remove-photo">Remove the photo shown</button>
           ) : null}
         </div>
       </Sheet>
