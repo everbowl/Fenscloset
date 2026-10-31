@@ -64,9 +64,9 @@ await step("c10-mirror-picture", async () => { while (await page.getByTestId("co
 await esc(); await esc();
 
 await step("d01-add", async () => { await page.goto(base + "/add"); await page.getByTestId("add-doors").waitFor(); });
-await step("d02-add-photo-tips", async () => { await page.getByTestId("door-photo").click(); await page.getByTestId("photo-tips").waitFor(); });
+await step("d02-add-photo-tips", async () => { await page.getByTestId("photo-tips").scrollIntoViewIfNeeded(); await page.getByTestId("photo-tips").waitFor(); }); // I1: the tips sit on the Add screen itself
 await step("d03-add-store", async () => { await page.goto(base + "/add/store"); await page.waitForTimeout(500); });
-await step("d04-batch", async () => { await page.goto(base + "/add"); await page.getByTestId("door-photo").click(); await page.getByTestId("pick-photos").setInputFiles(await fixtures()); await page.getByRole("link", { name: /Confirm 3 ready/ }).waitFor({ timeout: 90000 }); });
+await step("d04-batch", async () => { await page.goto(base + "/add"); await page.getByTestId("add-doors").waitFor(); await page.getByTestId("pick-photos").setInputFiles(await fixtures()); await page.getByRole("link", { name: /Confirm 3 ready/ }).waitFor({ timeout: 90000 }); });
 await step("d05-confirm", async () => { await page.getByRole("link", { name: /Confirm 3 ready/ }).click(); await page.getByTestId("confirm-counter").waitFor(); });
 await step("d06-confirm-brand-sheet", async () => { await page.getByTestId("row-brand").click(); await sheet().waitFor(); }, false); await esc();
 
@@ -87,6 +87,8 @@ await step("f02-fits-save-sheet", async () => { await page.getByTestId("save-the
 for (const p of ["profile", "profile/body", "profile/brands", "profile/style", "profile/settings", "admin/people", "admin/lists", "admin/lists/color", "admin/lists/category", "admin/lists/size", "admin/rules", "help", "change-password"]) {
   await step("g-" + p.replace(/\//g, "-"), async () => { await page.goto(base + "/" + p); await page.waitForTimeout(500); });
 }
+await step("g-admin-rules-advanced", async () => { await page.goto(base + "/admin/rules"); await page.getByTestId("rules-advanced").locator("summary").click(); await page.waitForTimeout(300); }); // R1
+await step("g-admin-lists-asked", async () => { await page.goto(base + "/admin/lists"); await page.waitForTimeout(400); }); // J1 (asks show here when the family sends them)
 await step("g-admin-person", async () => { await page.goto(base + "/admin/people"); await page.locator('a[href^="/admin/people/"]').first().click(); await page.waitForURL(/admin\/people\/.+/); });
 await step("g-admin-add-person-sheet", async () => { await page.goto(base + "/admin/people"); await page.getByRole("button", { name: "Add person" }).click(); await sheet().waitFor(); }, false); await esc();
 await step("g-help-topic", async () => { await page.goto(base + "/help"); await page.locator('a[href^="/help/"]').first().click(); await page.waitForURL(/help\/.+/); });

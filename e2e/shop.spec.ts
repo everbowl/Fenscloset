@@ -28,6 +28,7 @@ test("link lookup for me, photo lookup for Mya as a parent, recent list and remo
   await page.getByTestId("shop-for").click();
   await expect(page.getByRole("dialog").getByRole("option", { name: "Olivia" })).toHaveCount(0);
   await page.getByRole("dialog").getByRole("option", { name: "Mya" }).click();
+  await expect(page.getByTestId("shop-for")).toContainText("Shopping for Mya"); // the pick is remembered, then the page is hers (N1)
   await expect(page).toHaveURL(/for=/);
   await page.getByTestId("upload-screenshot").click();
   await page.getByTestId("shop-file").setInputFiles({ name: "shot.jpg", mimeType: "image/jpeg", buffer: Buffer.from(await (await import("sharp")).default({ create: { width: 200, height: 260, channels: 3, background: { r: 40, g: 40, b: 40 } } }).jpeg().toBuffer()) });
