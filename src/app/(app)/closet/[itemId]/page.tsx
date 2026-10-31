@@ -24,7 +24,8 @@ export default async function ItemPage({ params }: { params: Promise<{ itemId: s
   const photos = item.photos.filter((p) => p.kind !== "thumb" && (p.kind !== "worn" || seeWorn));
   return (
     <ItemEditor
-      key={item.updatedAt.toISOString()}
+      key={item.id}
+      version={item.updatedAt.toISOString()}
       item={{
         id: item.id, name: item.name ?? "Untitled piece", ownerId: item.ownerId, ownerName: item.owner.name.split(" ")[0], mine: item.ownerId === person.id,
         status: statusWord(item), laundryStatus: item.laundryStatus, isFavorite: item.isFavorite, neverSuggest: item.neverSuggest, wearCount: item.wearCount,

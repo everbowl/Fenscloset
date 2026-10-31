@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePerson } from "@/lib/auth/current";
-import { attachEntryPhoto, createItemFromEntry, ItemError, mergeIntoItem, saveEntryEdits, skipEntry, type ItemEdits, mirrorFromItem } from "@/lib/items/service";
+import { attachEntryPhoto, createItemFromEntry, ItemError, mergeIntoItem, saveEntryEdits, skipEntry, unskipEntry, type ItemEdits, mirrorFromItem } from "@/lib/items/service";
 import { readBackForEntry, readLabelForEntry } from "@/lib/import/process";
 import { rotateEntry } from "@/lib/import/rotate-entry";
 import { abandonBatch, ImportError } from "@/lib/import/service";
@@ -29,6 +29,11 @@ export async function confirmEntryAction(batchId: string, entryId: string, edits
 export async function skipEntryAction(batchId: string, entryId: string): Promise<ActionResult> {
   const person = await requirePerson();
   try { await skipEntry(person.id, entryId); revalidatePath(`/add/${batchId}`); return { ok: true, value: undefined }; } catch (e) { return fail(e); }
+}
+
+export async function unskipEntryAction(batchId: string, entryId: string): Promise<ActionResult> {
+  const person = await requirePerson();
+  try { await unskipEntry(person.id, entryId); revalidatePath(`/add/${batchId}`); return { ok: true, value: undefined }; } catch (e) { return fail(e); }
 }
 
 export async function mirrorEntryAction(entryId: string, itemId: string): Promise<ActionResult<TagResult>> {

@@ -65,7 +65,7 @@ export function GoWithScreen({ itemId, name, thumbKey, fresh, initial }: { itemI
   return (
     <div data-testid="go-with" className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-14">
       <div className="lg:col-span-2">
-        <PageHeader eyebrow={<Link href={`/closet/${itemId}`} className="mono text-ink" data-testid="go-with-back">← {name}</Link>} title="Something to go" accent="with it" />
+        <PageHeader eyebrow={<span className="text-ink" data-testid="go-with-piece">{name}</span>} title="Something to go" accent="with it" />
       </div>
       {error ? <Banner tone="danger" title={error} className="mb-3 lg:col-span-2" /> : null}
 
@@ -79,9 +79,11 @@ export function GoWithScreen({ itemId, name, thumbKey, fresh, initial }: { itemI
         </div>
         {busy ? (
           <div className="mt-4" data-testid="go-with-thinking" aria-live="polite">
-            <p className="mono flex items-center justify-between gap-3 text-ink"><span>{progress?.step ?? "Looking at the closet…"}</span><span className="shrink-0 text-graphite">{secs}s</span></p>
+            <p className="mono flex items-center justify-between gap-3 text-ink"><span>{progress?.step ?? "Looking at the closet…"}</span><span className="shrink-0 text-graphite" aria-hidden>{secs}s</span></p>
             <p className="mono mt-1 text-graphite">Usually 15 to 40 seconds. You can leave this screen; the answer is kept on this page.</p>
           </div>
+        ) : error ? (
+          <button type="button" onClick={() => void run(Boolean(view))} className="pill mt-4" data-testid="go-with-retry">Try again</button>
         ) : view ? (
           <button type="button" onClick={() => void run(true)} className="pill pill-sm mt-4" data-testid="go-with-again">Look again</button>
         ) : null}
@@ -108,13 +110,13 @@ export function GoWithScreen({ itemId, name, thumbKey, fresh, initial }: { itemI
                     <p className="mt-2 line-clamp-2 text-[13px] font-medium leading-snug">{p.title}</p>
                     <p className="mono mt-1 text-graphite">{[p.priceText, p.storeName].filter(Boolean).join(" · ")}</p>
                     <div className="mt-2 flex flex-col gap-1.5">
-                      <a href={p.url} target="_blank" rel="noreferrer" className="pill pill-sm w-full">Buy →</a>
+                      <a href={p.url} target="_blank" rel="noreferrer" className="pill pill-sm w-full" aria-label={`Buy ${p.title} at ${p.storeName}`}>Buy ↗</a>
                       <button type="button" onClick={() => router.push(`/shop?for=${view.forPersonId}&link=${encodeURIComponent(p.url)}`)} className="pill pill-sm pill-solid w-full" data-testid="go-with-judge">Judge it</button>
                     </div>
                   </div>
                 ))}
               </div>
-              <p className="mono mt-1 text-graphite">Judge it: the Shop says fits, risky or pass, and can show it on you.</p>
+              <p className="mono mt-1 text-graphite">Judge it: the Shop says buy it, maybe or skip it, and can show it on you.</p>
             </div>
           ) : (
             <p className="mono mt-6 text-graphite" data-testid="go-with-no-products">Nothing in the stores right now for this. Try <Link href={`/shop?for=${view.forPersonId}`} className="text-ink underline underline-offset-4">the Shop</Link> with a link or a photo.</p>

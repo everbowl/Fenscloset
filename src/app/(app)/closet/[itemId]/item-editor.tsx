@@ -3,12 +3,12 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Sheet } from "@/components/ui/sheet";
 import { cn } from "@/lib/cn";
-import { Banner } from "@/components/ui/banner";
+import { toast } from "@/components/ui/toast";
 import { Button, buttonClass } from "@/components/ui/button";
-import { PickSheet, Row, TextSheet } from "@/components/items/row-editor";
+import { PickSheet, PriceDateSheet, Row, TextSheet } from "@/components/items/row-editor";
 import { BrandSearch } from "@/components/items/brand-search";
 import { MatchSheet } from "@/components/items/match-sheet";
 import { matchItemAction } from "@/lib/brands/actions";
@@ -17,11 +17,13 @@ import { shrinkPhoto } from "@/lib/import/client-queue";
 import type { ItemLists } from "@/lib/items/query";
 import type { ItemDetailEdits } from "@/lib/items/service";
 import type { LaundryStatus, PhotoKind } from "@/generated/prisma/client";
-import { addItemPhotoAction, cycleLaundryAction, deleteItemAction, mirrorPhotoAction, notNowPhotoAction, removeItemPhotoAction, rotateItemPhotoAction, updateItemAction } from "./actions";
+import { addItemPhotoAction, setLaundryAction, deleteItemAction, mirrorPhotoAction, notNowPhotoAction, removeItemPhotoAction, rotateItemPhotoAction, updateItemAction } from "./actions";
 import { unretireAction } from "../clean-out/actions";
-import { monoDate } from "@/lib/dates";
+import { monoDate, prettyDate } from "@/lib/dates";
+import { lastClosetUrl, markClosetRestore } from "@/lib/closet-memory";
 import { FEATURE_KEYS, FEATURE_LABELS, isFeatureKey, mirrorCanPlace } from "@/lib/tryon/features";
 import { MirrorSheet } from "@/components/mirror/mirror-sheet";
+import { UndoStrip, useUndoable } from "@/components/ui/undo-strip";
 import { useMirror } from "@/components/mirror/use-mirror";
 import type { MirrorConfig } from "@/lib/tryon/config";
 
@@ -42,10 +44,23 @@ export type ItemView = {
   photoNudge: "first" | "refresh" | null;
 };
 
-type SheetKind = "category" | "subcategory" | "color" | "pattern" | "fabric" | "season" | "formality" | "occasion" | "tag" | "brand" | "match" | "store" | "size" | "price" | "date" | "url" | "notes" | "made" | "closets" | "share" | "rename" | "photo" | "delete" | null;
+type SheetKind = "category" | "subcategory" | "color" | "pattern" | "fabric" | "season" | "formality" | "occasion" | "tag" | "brand" | "match" | "store" | "size" | "price" | "url" | "notes" | "made" | "closets" | "share" | "rename" | "photo" | "delete" | null;
 
-const LAUNDRY_WORD: Record<LaundryStatus, string> = { clean: "Clean", dirty: "Laundry", cleaners: "At cleaners" };
+const LAUNDRY_WORD: Record<LaundryStatus, string> = { clean: "Clean", dirty: "In the wash", cleaners: "At cleaners" };
 const KIND_WORD: Record<PhotoKind, string> = { alone: "Photo", worn: "Worn", label: "Label", cutout: "Cutout", thumb: "Thumb", back: "Back", retail: "Store" };
+
+/** A yes/no row that reads as a switch: the word says the state, the pill flips it. */
+function ToggleRow({ label, on, onWord, offWord, onChange, testId }: { label: string; on: boolean; onWord: string; offWord: string; onChange: (v: boolean) => void; testId?: string }) {
+  return (
+    <div className="flex h-12 items-center border-b border-line">
+      <span className="mono w-[120px] shrink-0 text-graphite">{label}</span>
+      <span className="flex-1 text-[14px]">{on ? onWord : offWord}</span>
+      <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)} className={cn("pill pill-sm", on && "pill-solid")} data-testid={testId}>{on ? "On" : "Off"}</button>
+    </div>
+  );
+}
+
+const hostOf = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; } };
 
 function Title({ name }: { name: string }) {
   const words = name.trim().split(" ");
@@ -54,15 +69,18 @@ function Title({ name }: { name: string }) {
 }
 
 /** Item detail: photo, serif title, mono meta, then every tag as a 42px row that edits in place. */
-export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists, mirror = null }: { item: ItemView; lists: ItemLists; canEdit: boolean; canEditLists: boolean; /** The signed-in person's mirror: "See it on me" dresses them in this one piece. */ mirror?: MirrorConfig | null }) {
+export function ItemEditor({ item, version, lists: initialLists, canEdit, canEditLists, mirror = null }: { item: ItemView; /** The server's updatedAt: when it changes (a save came back, a photo landed) the local copy takes the server's truth, without a remount that would close an open sheet. */ version: string; lists: ItemLists; canEdit: boolean; canEditLists: boolean; /** The signed-in person's mirror: "See it on me" dresses them in this one piece. */ mirror?: MirrorConfig | null }) {
   const router = useRouter();
   const [it, setIt] = useState(item);
   const m = useMirror(mirror?.personId ?? "", mirror?.wardrobe, mirror?.engine);
   const [lists, setLists] = useState(initialLists);
   const [sheet, setSheet] = useState<SheetKind>(null);
+  const [brandPicking, setBrandPicking] = useState(false); // the brand search takes the sheet's place, never stacks on it; a pick lands back on the piece, Close goes back to the sheet
   const [photoIdx, setPhotoIdx] = useState(0);
-  const [error, setError] = useState<string>();
+  const setError = (e?: string) => { if (e) toast.error(e); };
   const [pending, start] = useTransition();
+  // Take the server's copy once nothing is in flight (a tap in a multi-pick sheet while an earlier save is still saving must not be undone).
+  useEffect(() => { if (!pending) setIt(item); }, [version, pending]); // eslint-disable-line react-hooks/exhaustive-deps
   const photoRef = useRef<HTMLInputElement>(null);
   const [photoKind, setPhotoKind] = useState<"alone" | "worn" | "label" | "back">("alone");
   const [uploading, setUploading] = useState(false);
@@ -80,6 +98,9 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists, m
     });
   }
   const [justAdded, setJustAdded] = useState(false);
+  const undoable = useUndoable();
+  const [hiddenPhoto, setHiddenPhoto] = useState<string | null>(null); // a photo taken away, until its strip runs out (Q1)
+  const photos = it.photos.filter((p) => p.id !== hiddenPhoto);
 
   const name = (xs: { id: string; name: string }[], id: string | null) => xs.find((x) => x.id === id)?.name ?? null;
   const names = (xs: { id: string; name: string }[], ids: string[]) => ids.map((id) => name(xs, id)).filter(Boolean).join(", ");
@@ -92,8 +113,11 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists, m
     setError(undefined);
     start(async () => { const r = await updateItemAction(it.id, patch); if (!r.ok) { setError(r.error); router.refresh(); } });
   }
-  function laundry() {
-    start(async () => { const r = await cycleLaundryAction(it.id); if (r.ok) setIt((x) => ({ ...x, laundryStatus: r.value, status: r.value === "dirty" ? "Laundry" : r.value === "cleaners" ? "At cleaners" : x.wearCount > 0 ? `Worn ${x.wearCount}×` : "New" })); else setError(r.error); });
+  /** Laundry is three states, one tap each (it used to be a button that cycled through them). */
+  function setLaundry(st: LaundryStatus) {
+    const statusWordOf = (s: LaundryStatus, wearCount: number) => (s === "dirty" ? "In the wash" : s === "cleaners" ? "At cleaners" : wearCount > 0 ? `Worn ${wearCount}×` : "New");
+    setIt((x) => ({ ...x, laundryStatus: st, status: statusWordOf(st, x.wearCount) }));
+    start(async () => { const r = await setLaundryAction(it.id, st); if (!r.ok) { setError(r.error); router.refresh(); } });
   }
   async function onPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; e.target.value = "";
@@ -114,14 +138,14 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists, m
     } catch (err) { setError((err as Error).message); } finally { setUploading(false); }
   }
 
-  const photo = it.photos[Math.min(photoIdx, it.photos.length - 1)] ?? null;
+  const photo = photos[Math.min(photoIdx, photos.length - 1)] ?? null;
   const brandName = name(lists.brands, it.brandId);
   const price = it.purchasePrice ? `$${Number(it.purchasePrice).toFixed(2).replace(/\.00$/, "")}` : null;
 
   return (
     <div className="-mt-5 lg:mt-0 lg:grid lg:grid-cols-[440px_minmax(0,1fr)] lg:gap-x-12 lg:gap-y-0">
       <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={onPhoto} data-testid="item-photo" />
-      {mirror ? <MirrorSheet m={m} pieces={it.name} mine personId={mirror.personId} personName={mirror.personName} tryOnState={mirror.tryOn} backPhoto={mirror.backPhoto} mannequinAvailable={mirror.mannequinAvailable} /> : null}
+      {mirror ? <MirrorSheet m={m} pieces={it.name} mine personId={mirror.personId} personName={mirror.personName} tryOnState={mirror.tryOn} backPhoto={mirror.backPhoto} mannequinAvailable={mirror.mannequinAvailable} admin={mirror.admin} /> : null}
       <div className="relative -mx-5 h-[380px] bg-bone lg:mx-0 lg:h-[560px] lg:self-start lg:[grid-row:1/span_80]">
         {photo ? <img src={`/api/photo/${photo.key}`} alt={it.name} className="size-full object-contain" data-testid="item-hero" /> : null}
         {canEdit && photo ? (<>
@@ -130,27 +154,37 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists, m
         </>) : null}
         {photo?.kind === "retail" ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">Store photo</span> : photo?.kind === "worn" || photo?.kind === "back" ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">{KIND_WORD[photo.kind]}</span> : it.storePhoto && photo?.isPrimary ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">Store photo</span> : null}
       </div>
-      {it.photos.length > 1 ? (
-        <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 pt-1.5 [scrollbar-width:none] lg:mx-0 lg:px-0 lg:pt-0">
-          {it.photos.map((p, i) => (
+      {undoable.pending ? <UndoStrip text={undoable.pending.text} onUndo={undoable.undo} testId="photo-undo" className="mt-2" /> : null}
+      {photos.length > 1 || (canEdit && !it.retired) ? (
+        <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 pt-1.5 [scrollbar-width:none] lg:mx-0 lg:px-0 lg:pt-0" data-testid="photo-strip">
+          {photos.map((p, i) => (
             <button key={p.id} type="button" onClick={() => setPhotoIdx(i)} aria-label={`${KIND_WORD[p.kind]} photo`} aria-pressed={i === photoIdx} className={`h-[62px] w-[48px] shrink-0 overflow-hidden bg-bone ${i === photoIdx ? "outline outline-2 -outline-offset-2 outline-ink" : ""}`}>
               <img src={`/api/photo/${p.key}`} alt="" className="size-full object-contain" />
             </button>
           ))}
+          {/* Add a photo lives here, as a tile at the end of the strip (E1), not as a second orange button. */}
+          {canEdit && !it.retired ? (
+            <button type="button" onClick={() => setSheet("photo")} disabled={uploading} aria-label="Add a photo" aria-busy={uploading || undefined} className="tap flex h-[62px] w-[48px] shrink-0 items-center justify-center border-2 border-dashed border-ink text-[20px] leading-none" data-testid="add-photo">{uploading ? <span aria-hidden className="size-2 animate-pulse rounded-full bg-ink" /> : "+"}</button>
+          ) : null}
         </div>
       ) : null}
 
-      <div className="flex items-end justify-between pt-[18px]">
+      <div className="flex items-end justify-between gap-3 pt-[18px]">
         <Title name={it.name} />
-        {canEdit ? <button type="button" onClick={() => open("rename")} className="pill pill-sm">Rename</button> : null}
+        {canEdit ? (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button type="button" role="switch" aria-checked={it.isFavorite} aria-label="Favorite" onClick={() => save({ isFavorite: !it.isFavorite }, { isFavorite: !it.isFavorite })} className={cn("pill pill-sm px-3 text-[14px]", it.isFavorite && "pill-solid")} data-testid="toggle-favorite">{it.isFavorite ? "♥" : "♡"}</button>
+            <button type="button" onClick={() => open("rename")} className="pill pill-sm">Rename</button>
+          </div>
+        ) : null}
       </div>
       <p className="mono mt-2 text-graphite">{[!it.mine ? it.ownerName : null, category?.name, it.status, it.isFavorite ? "Favorite" : null].filter(Boolean).join(" · ")}</p>
-      {/* This one piece in the mirror (Jeff, 19 Oct 2026, Q2 C): on you, or on the mannequin without a body photo. */}
+      {/* The one orange action on a piece (Jeff, 31 Oct 2026, E1): this piece in the mirror, on you or on the mannequin. */}
       {mirror && (mirror.tryOn === "ready" || mirror.mannequinAvailable) && !it.retired && mirrorCanPlace(category?.name) ? (
-        <Button variant="secondary" className="mt-3 w-full" disabled={m.busy} onClick={() => m.begin({ look: { kind: "closet", itemIds: [it.id] }, on: mirror.tryOn === "ready" ? "me" : "mannequin" })} data-testid="see-on-me">{m.busy ? "Dressing…" : mirror.tryOn === "ready" ? "See it on me" : "See it on a mannequin"}</Button>
+        <div className="mt-4"><Button size="lg" className="w-full" busy={m.busy} sub={mirror.tryOn === "ready" ? "This piece on your photo" : "On the mannequin · no body photo needed"} onClick={() => m.begin({ look: { kind: "closet", itemIds: [it.id] }, on: mirror.tryOn === "ready" ? "me" : "mannequin" })} data-testid="see-on-me">{m.busy ? "Dressing…" : mirror.tryOn === "ready" ? "See it on me" : "See it on a mannequin"}</Button></div>
       ) : null}
-      {/* Shop v2 item 1 (Jeff, 23 Oct 2026): what would complete this piece, products for it, looks from the closet. */}
-      {!it.retired ? <Link href={`/closet/${it.id}/go-with`} className={buttonClass({ variant: "secondary", className: "mt-3 w-full" })} data-testid="go-with">Shop for something to go with it</Link> : null}
+      {/* Shop v2 item 1 (Jeff, 23 Oct 2026): what would complete this piece, products for it, looks from the closet. Outlined next to the orange one (D1). */}
+      {!it.retired ? <Link href={`/closet/${it.id}/go-with`} className={buttonClass({ variant: "outline", className: "mt-3 w-full" })} data-testid="go-with">Shop for something to go with it <span aria-hidden>→</span></Link> : null}
 
       {justAdded ? (
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-y border-line py-2" data-testid="ask-more-photos">
@@ -175,29 +209,32 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists, m
         </div>
       ) : null}
       {canEdit && !it.retired ? (
-        <div className="mt-3 flex items-center justify-between border-y border-ink py-2.5">
-          <span className="mono tracking-[0.1em]">Laundry · {LAUNDRY_WORD[it.laundryStatus]}</span>
-          <button type="button" onClick={laundry} disabled={pending} data-testid="laundry-cycle" className="pill">
-            {it.laundryStatus === "clean" ? "In the wash?" : it.laundryStatus === "dirty" ? "At cleaners?" : "Back & clean?"}
-          </button>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-y border-ink py-2.5" data-testid="laundry-row">
+          <span className="mono tracking-[0.1em]">Laundry</span>
+          <div className="flex gap-1.5" role="radiogroup" aria-label="Laundry">
+            {(["clean", "dirty", "cleaners"] as const).map((st) => (
+              <button key={st} type="button" role="radio" aria-checked={it.laundryStatus === st} disabled={pending || it.laundryStatus === st} onClick={() => setLaundry(st)} className={cn("pill pill-sm", it.laundryStatus === st && "pill-solid disabled:opacity-100")} data-testid={`laundry-${st}`}>{LAUNDRY_WORD[st]}</button>
+            ))}
+          </div>
         </div>
       ) : null}
 
       <div className="flex flex-col">
         <Row label="Category" value={category ? `${category.name}${sub ? ` · ${sub}` : ""}` : "Pick a category"} muted={!category} onClick={() => open("category")} testId="row-category" />
         <Row label="Color" value={names(lists.colors, it.colorIds) || "Pick a color"} muted={!it.colorIds.length} onClick={() => open("color")} />
-        <Row label="Pattern" value={name(lists.patterns, it.patternId) ?? "Not set"} muted={!it.patternId} onClick={() => open("pattern")} />
+        <Row label="Pattern" value={name(lists.patterns, it.patternId) ?? "Not set"} muted={!it.patternId} onClick={() => open("pattern")} testId="row-pattern" />
         <Row label="Fabric" value={name(lists.fabrics, it.fabricId) ?? "Not set"} muted={!it.fabricId} onClick={() => open("fabric")} />
         <Row label="Season" value={names(lists.seasons, it.seasonIds) || "Any"} onClick={() => open("season")} />
         <Row label="Dress code" value={name(lists.formalities, it.formalityId) ?? "Not set"} muted={!it.formalityId} onClick={() => open("formality")} />
         <Row label="Occasions" value={names(lists.occasions, it.occasionIds) || "Any"} onClick={() => open("occasion")} />
-        <Row label="Tags" value={names(lists.tags, it.tagIds) || "None"} muted={!it.tagIds.length} onClick={() => open("tag")} />
+        <Row label="Tags" value={names(lists.tags, it.tagIds) || "Not set"} muted={!it.tagIds.length} onClick={() => open("tag")} />
         <Row label="Brand · Size" value={[brandName, it.size].filter(Boolean).join(" · ") || "Not set"} muted={!brandName && !it.size} onClick={() => open("brand")} />
         <Row label="Store" value={name(lists.stores, it.storeId) ?? "Not set"} muted={!it.storeId} onClick={() => open("store")} />
-        <Row label="Price · Date" value={[price, it.purchaseDate].filter(Boolean).join(" · ") || "Not set"} muted={!price && !it.purchaseDate} onClick={() => open("price")} />
-        <Row label="Link" value={it.purchaseUrl ?? "Not set"} muted={!it.purchaseUrl} onClick={() => open("url")} />
-        <Row label="Fit notes" value={it.fitNotes ?? "None"} muted={!it.fitNotes} onClick={() => open("notes")} />
-        <Row label="Made with" value={it.features.filter(isFeatureKey).map((f) => FEATURE_LABELS[f]).join(" · ") || "Nothing special"} muted={!it.features.length} onClick={() => open("made")} testId="row-made" />
+        <Row label="Price · Date" value={[price, it.purchaseDate ? prettyDate(it.purchaseDate) : null].filter(Boolean).join(" · ") || "Not set"} muted={!price && !it.purchaseDate} onClick={() => open("price")} testId="row-price" />
+        <Row label="Link" value={it.purchaseUrl ? hostOf(it.purchaseUrl) : "Not set"} muted={!it.purchaseUrl} onClick={() => open("url")} testId="row-link"
+          trailing={it.purchaseUrl ? <a href={it.purchaseUrl} target="_blank" rel="noreferrer" className="pill pill-sm shrink-0" data-testid="open-link">Open ↗</a> : undefined} />
+        <Row label="Fit notes" value={it.fitNotes ?? "Not set"} muted={!it.fitNotes} onClick={() => open("notes")} />
+        <Row label="Made with" value={it.features.filter(isFeatureKey).map((f) => FEATURE_LABELS[f]).join(" · ") || "Not set"} muted={!it.features.length} onClick={() => open("made")} testId="row-made" />
         <div className="flex min-h-[42px] items-center border-b border-line" data-testid="row-worn">
           <span className="mono w-[120px] shrink-0 text-graphite">Worn</span>
           <span className="flex-1 text-[14px]">{it.wearHistory.length ? `${it.wearCount}× · last ${monoDate(it.wearHistory[0].wornOn)}` : "Not yet"}</span>
@@ -210,61 +247,51 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists, m
           </Link>
         ))}
         <Row label="Closets" value={["Personal", ...it.closetIds.map((id) => name(lists.closets, id))].filter(Boolean).join(", ")} onClick={() => open("closets")} testId="row-closets" />
-        <Row label="Shared with" value={names(lists.people, it.sharedWithIds) || "Nobody extra"} muted={!it.sharedWithIds.length} onClick={() => open("share")} />
+        <Row label="Shared with" value={names(lists.people, it.sharedWithIds) || "No one else"} muted={!it.sharedWithIds.length} onClick={() => open("share")} />
         {canEdit ? (
           <>
-            <button type="button" onClick={() => save({ isFavorite: !it.isFavorite }, { isFavorite: !it.isFavorite })} className="flex h-[42px] items-center border-b border-line text-left">
-              <span className="mono w-[120px] shrink-0 text-graphite">Favorite</span><span className="flex-1 text-[14px]">{it.isFavorite ? "Yes" : "No"}</span><span className="mono text-graphite">Tap to change</span>
-            </button>
-            <button type="button" onClick={() => save({ neverSuggest: !it.neverSuggest }, { neverSuggest: !it.neverSuggest })} className="flex h-[42px] items-center border-b border-line text-left">
-              <span className="mono w-[120px] shrink-0 text-graphite">Suggest it</span><span className="flex-1 text-[14px]">{it.neverSuggest ? "Never" : "Yes"}</span><span className="mono text-graphite">Tap to change</span>
-            </button>
+            <ToggleRow label="Suggest it" on={!it.neverSuggest} onWord="Yes" offWord="Never" onChange={(v) => save({ neverSuggest: !v }, { neverSuggest: !v })} testId="toggle-suggest" />
           </>
         ) : null}
       </div>
+      {canEdit && !it.retired ? <div className="pt-6"><button type="button" onClick={() => setSheet("delete")} className="pill pill-sm pill-quiet" data-testid="delete-piece">Delete this piece</button></div> : null}
 
-      {error ? <div className="pt-3"><Banner tone="danger" title={error} /></div> : null}
-      {uploading ? <p className="mono pt-3 text-graphite">Saving the photo…</p> : null}
+      {uploading ? <p className="mono pt-3 text-graphite" role="status">Saving the photo…</p> : null}
 
-      {canEdit ? (
-        <div className="flex gap-2.5 pt-5">
-          <Button size="lg" className="flex-1" onClick={() => setSheet("photo")} disabled={uploading}>Add photo</Button>
-          <Button size="lg" variant="secondary" onClick={() => setSheet("delete")}>Delete</Button>
-        </div>
-      ) : null}
 
       {/* Sheets */}
       <PickSheet open={sheet === "category"} onClose={() => setSheet(null)} title="Category" kind="category" options={lists.categories} selected={it.categoryId ? [it.categoryId] : []} canAdd={canEditLists}
         onChange={(ids) => { save({ categoryId: ids[0] ?? null, subcategoryId: null }, { categoryId: ids[0] ?? null, subcategoryId: null }); if (ids[0] && (lists.categories.find((c) => c.id === ids[0])?.subcategories.length ?? 0) > 0) setSheet("subcategory"); }}
         onAdded={(e) => setLists((l) => ({ ...l, categories: [...l.categories, { ...e, subcategories: [] }] }))} />
-      <PickSheet open={sheet === "subcategory"} onClose={() => setSheet(null)} title={category ? `${category.name} · type` : "Type"} kind="subcategory" parentId={category?.id} options={category?.subcategories ?? []} selected={it.subcategoryId ? [it.subcategoryId] : []} canAdd={canEditLists}
+      <PickSheet clearable open={sheet === "subcategory"} onClose={() => setSheet(null)} title={category ? `${category.name} · type` : "Type"} kind="subcategory" parentId={category?.id} options={category?.subcategories ?? []} selected={it.subcategoryId ? [it.subcategoryId] : []} canAdd={canEditLists}
         onChange={(ids) => save({ subcategoryId: ids[0] ?? null }, { subcategoryId: ids[0] ?? null })}
         onAdded={(e) => setLists((l) => ({ ...l, categories: l.categories.map((c) => (c.id === category?.id ? { ...c, subcategories: [...c.subcategories, e] } : c)) }))} />
       <PickSheet open={sheet === "color"} onClose={() => setSheet(null)} title="Color" kind="color" options={lists.colors} selected={it.colorIds} multi canAdd={canEditLists} onChange={(ids) => save({ colorIds: ids }, { colorIds: ids })} onAdded={(e) => setLists((l) => ({ ...l, colors: [...l.colors, e] }))} />
-      <PickSheet open={sheet === "pattern"} onClose={() => setSheet(null)} title="Pattern" kind="pattern" options={lists.patterns} selected={it.patternId ? [it.patternId] : []} canAdd={canEditLists} onChange={(ids) => save({ patternId: ids[0] ?? null }, { patternId: ids[0] ?? null })} onAdded={(e) => setLists((l) => ({ ...l, patterns: [...l.patterns, e] }))} />
-      <PickSheet open={sheet === "fabric"} onClose={() => setSheet(null)} title="Fabric" kind="fabric" options={lists.fabrics} selected={it.fabricId ? [it.fabricId] : []} canAdd={canEditLists} onChange={(ids) => save({ fabricId: ids[0] ?? null }, { fabricId: ids[0] ?? null })} onAdded={(e) => setLists((l) => ({ ...l, fabrics: [...l.fabrics, e] }))} />
+      <PickSheet clearable open={sheet === "pattern"} onClose={() => setSheet(null)} title="Pattern" kind="pattern" options={lists.patterns} selected={it.patternId ? [it.patternId] : []} canAdd={canEditLists} onChange={(ids) => save({ patternId: ids[0] ?? null }, { patternId: ids[0] ?? null })} onAdded={(e) => setLists((l) => ({ ...l, patterns: [...l.patterns, e] }))} />
+      <PickSheet clearable open={sheet === "fabric"} onClose={() => setSheet(null)} title="Fabric" kind="fabric" options={lists.fabrics} selected={it.fabricId ? [it.fabricId] : []} canAdd={canEditLists} onChange={(ids) => save({ fabricId: ids[0] ?? null }, { fabricId: ids[0] ?? null })} onAdded={(e) => setLists((l) => ({ ...l, fabrics: [...l.fabrics, e] }))} />
       <PickSheet open={sheet === "season"} onClose={() => setSheet(null)} title="Season" kind="season" options={lists.seasons} selected={it.seasonIds} multi canAdd={canEditLists} onChange={(ids) => save({ seasonIds: ids }, { seasonIds: ids })} onAdded={(e) => setLists((l) => ({ ...l, seasons: [...l.seasons, e] }))} />
-      <PickSheet open={sheet === "formality"} onClose={() => setSheet(null)} title="Dress code" kind="formality" options={lists.formalities} selected={it.formalityId ? [it.formalityId] : []} canAdd={canEditLists} onChange={(ids) => save({ formalityId: ids[0] ?? null }, { formalityId: ids[0] ?? null })} onAdded={(e) => setLists((l) => ({ ...l, formalities: [...l.formalities, e] }))} />
+      <PickSheet clearable open={sheet === "formality"} onClose={() => setSheet(null)} title="Dress code" kind="formality" options={lists.formalities} selected={it.formalityId ? [it.formalityId] : []} canAdd={canEditLists} onChange={(ids) => save({ formalityId: ids[0] ?? null }, { formalityId: ids[0] ?? null })} onAdded={(e) => setLists((l) => ({ ...l, formalities: [...l.formalities, e] }))} />
       <PickSheet open={sheet === "occasion"} onClose={() => setSheet(null)} title="Occasions" kind="occasion" options={lists.occasions} selected={it.occasionIds} multi canAdd={canEditLists} onChange={(ids) => save({ occasionIds: ids }, { occasionIds: ids })} onAdded={(e) => setLists((l) => ({ ...l, occasions: [...l.occasions, e] }))} />
       <PickSheet open={sheet === "tag"} onClose={() => setSheet(null)} title="Tags" kind="tag" options={lists.tags} selected={it.tagIds} multi canAdd={canEditLists} onChange={(ids) => save({ tagIds: ids }, { tagIds: ids })} onAdded={(e) => setLists((l) => ({ ...l, tags: [...l.tags, e] }))} />
-      <Sheet open={sheet === "brand"} onClose={() => setSheet(null)} title="Brand · Size">
+      <Sheet open={sheet === "brand" && !brandPicking} onClose={() => setSheet(null)} title="Brand · Size">
         <div className="flex flex-col">
-          <BrandPick lists={lists} brandId={it.brandId} canAdd={canEditLists} onChange={(id) => save({ brandId: id }, { brandId: id })} onAdded={(e) => setLists((l) => ({ ...l, brands: [...l.brands, e] }))} />
+          <Row label="Brand" value={brandName ?? "Pick a brand"} muted={!brandName} onClick={() => setBrandPicking(true)} />
           {brandName ? <Row label="Find it online" value={it.photos.some((p) => p.kind === "retail") ? "Store photos added · match again" : `Match the style at ${brandName} · details + store photos`} muted={!it.photos.some((p) => p.kind === "retail")} onClick={() => setSheet("match")} testId="match-style" /> : null}
           <Row label="Size" value={it.size ?? "Add a size"} muted={!it.size} onClick={() => setSheet("size")} />
           <button type="button" onClick={() => { setPhotoKind("label"); photoRef.current?.click(); }} className="pill mt-4 h-[50px]">Add a label photo</button>
         </div>
       </Sheet>
-      <PickSheet open={sheet === "store"} onClose={() => setSheet(null)} title="Store" kind="store" options={lists.stores} selected={it.storeId ? [it.storeId] : []} canAdd={canEditLists} onChange={(ids) => save({ storeId: ids[0] ?? null }, { storeId: ids[0] ?? null })} onAdded={(e) => setLists((l) => ({ ...l, stores: [...l.stores, e] }))} />
+      <PickSheet clearable open={sheet === "store"} onClose={() => setSheet(null)} title="Store" kind="store" options={lists.stores} selected={it.storeId ? [it.storeId] : []} canAdd={canEditLists} onChange={(ids) => save({ storeId: ids[0] ?? null }, { storeId: ids[0] ?? null })} onAdded={(e) => setLists((l) => ({ ...l, stores: [...l.stores, e] }))} />
       <PickSheet open={sheet === "closets"} onClose={() => setSheet(null)} title="Closets" kind="closet" options={lists.closets.map((c) => ({ id: c.id, name: c.kind === "family" ? `${c.name} (everyone)` : c.name }))} selected={it.closetIds} multi canAdd={canEditLists} onChange={(ids) => save({ closetIds: ids }, { closetIds: ids })} onAdded={(e) => setLists((l) => ({ ...l, closets: [...l.closets, { ...e, kind: "custom" }] }))} />
       <PickSheet open={sheet === "share"} onClose={() => setSheet(null)} title="Share with" kind="tag" options={lists.people} selected={it.sharedWithIds} multi canAdd={false} onChange={(ids) => save({ sharedWithIds: ids }, { sharedWithIds: ids })} />
       <TextSheet open={sheet === "size"} onClose={() => setSheet("brand")} title="Size" label="Size" value={it.size ?? ""} placeholder="M · 28 · 8 · EU 38" onSave={(v) => save({ sizeText: v }, { size: v.trim() || null })} />
+      <BrandSearch open={sheet === "brand" && brandPicking} onClose={() => setBrandPicking(false)} brands={lists.brands} selectedId={it.brandId} onPick={(b) => { save({ brandId: b.id }, { brandId: b.id }); setSheet(null); }} onAdded={(e) => setLists((l) => ({ ...l, brands: [...l.brands, e] }))} />
       <MatchSheet open={sheet === "match"} onClose={() => setSheet("brand")} busy={matching || pending} onPick={pickMatch}
         probe={{ brand: brandName ?? "", name: it.name, category: category?.name ?? null, color: it.colorIds[0] ? name(lists.colors, it.colorIds[0]) : null }} />
       <TextSheet open={sheet === "rename"} onClose={() => setSheet(null)} title="Rename" label="Name" value={it.name} onSave={(v) => save({ name: v }, { name: v.trim() || it.name })} />
-      <TextSheet open={sheet === "price"} onClose={() => setSheet(null)} title="Price" label="Price" value={it.purchasePrice ?? ""} placeholder="48.50" onSave={(v) => { save({ purchasePrice: v }, { purchasePrice: v.replace(/[$,\s]/g, "") || null }); setSheet("date"); }} />
-      <TextSheet open={sheet === "date"} onClose={() => setSheet(null)} title="Bought on" label="Date (YYYY-MM-DD)" value={it.purchaseDate ?? ""} placeholder="2026-10-18" onSave={(v) => save({ purchaseDate: v }, { purchaseDate: v.trim() || null })} />
-      <TextSheet open={sheet === "url"} onClose={() => setSheet(null)} title="Link" label="Where you bought it" value={it.purchaseUrl ?? ""} placeholder="https://" onSave={(v) => save({ purchaseUrl: v }, { purchaseUrl: v.trim() || null })} />
+      <PriceDateSheet open={sheet === "price"} onClose={() => setSheet(null)} price={it.purchasePrice ?? ""} date={it.purchaseDate ?? ""}
+        onSave={({ price: pr, date }) => save({ purchasePrice: pr, purchaseDate: date }, { purchasePrice: pr.replace(/[$,\s]/g, "") || null, purchaseDate: date.trim() || null })} />
+      <TextSheet open={sheet === "url"} onClose={() => setSheet(null)} title="Link" label="Where you bought it" kind="url" value={it.purchaseUrl ?? ""} placeholder="https://" onSave={(v) => save({ purchaseUrl: v }, { purchaseUrl: v.trim() || null })} />
       {/* How the piece is made: the mirror offers Buttons / Sleeves / Hood chips only when a piece in the look has them. */}
       <Sheet open={sheet === "made"} onClose={() => setSheet(null)} title="Made with">
         <p className="mono mb-3 text-graphite">The mirror asks how to show these: buttons open, sleeves rolled, hood up.</p>
@@ -281,35 +308,25 @@ export function ItemEditor({ item, lists: initialLists, canEdit, canEditLists, m
         </div>
         <div className="mt-4 flex justify-end"><Button type="button" size="md" onClick={() => setSheet(null)}>Done</Button></div>
       </Sheet>
-      <TextSheet open={sheet === "notes"} onClose={() => setSheet(null)} title="Fit notes" label="How it fits" value={it.fitNotes ?? ""} placeholder="Runs small · long in the arms" onSave={(v) => save({ fitNotes: v }, { fitNotes: v.trim() || null })} />
+      <TextSheet open={sheet === "notes"} onClose={() => setSheet(null)} title="Fit notes" label="How it fits" kind="multiline" value={it.fitNotes ?? ""} placeholder="Runs small · long in the arms" onSave={(v) => save({ fitNotes: v }, { fitNotes: v.trim() || null })} />
       <Sheet open={sheet === "photo"} onClose={() => setSheet(null)} title="Add a photo">
         <div className="flex flex-col">
           {([["alone", "Another photo", "Hanger or flat-lay"], ["back", "Back of the piece", "Graphic · cut"], ["worn", "Worn photo", "How it fits"], ["label", "Label", "Brand · size"]] as const).map(([k, l, m]) => (
             <button key={k} type="button" onClick={() => { setPhotoKind(k); photoRef.current?.click(); }} className="flex h-12 items-center justify-between border-b border-line text-[15px]">{l}<span className="mono text-graphite">{m}</span></button>
           ))}
-          {it.photos.length > 1 && photo ? (
-            <button type="button" onClick={() => start(async () => { const r = await removeItemPhotoAction(it.id, photo.id); if (!r.ok) setError(r.error); setSheet(null); setPhotoIdx(0); router.refresh(); })} className="pill mt-5 h-[50px]">Remove the photo shown</button>
+          {photos.length > 1 && photo ? (
+            <button type="button" onClick={() => { const id = photo.id; setSheet(null); setPhotoIdx(0); setHiddenPhoto(id); undoable.start("Photo removed", () => start(async () => { const r = await removeItemPhotoAction(it.id, id); if (!r.ok) setError(r.error); setHiddenPhoto(null); router.refresh(); }), () => setHiddenPhoto(null)); }} className="pill mt-5 h-[50px]" data-testid="remove-photo">Remove the photo shown</button>
           ) : null}
         </div>
       </Sheet>
       <Sheet open={sheet === "delete"} onClose={() => setSheet(null)} title="Delete this piece?">
         <p className="text-[14px] leading-snug">It leaves every closet and its photos are removed. This can&apos;t be undone.</p>
         <div className="mt-5 flex gap-2.5">
-          <Button variant="secondary" className="flex-1" onClick={() => setSheet(null)}>Keep it</Button>
-          <Button className="flex-1" disabled={pending} data-testid="confirm-delete" onClick={() => start(async () => { const r = await deleteItemAction(it.id); if (!r.ok) { setError(r.error); setSheet(null); return; } router.push("/closet"); router.refresh(); })}>Delete</Button>
+          <button type="button" className="pill pill-quiet h-[50px] flex-1" onClick={() => setSheet(null)}>Keep it</button>
+          <Button variant="danger" className="flex-1" disabled={pending} data-testid="confirm-delete" onClick={() => start(async () => { const r = await deleteItemAction(it.id); if (!r.ok) { setError(r.error); setSheet(null); return; } markClosetRestore(); router.push(lastClosetUrl() ?? "/closet"); router.refresh(); })}>Delete</Button>
         </div>
       </Sheet>
     </div>
   );
 }
 
-function BrandPick({ lists, brandId, canAdd, onChange, onAdded }: { lists: ItemLists; brandId: string | null; canAdd: boolean; onChange: (id: string | null) => void; onAdded: (e: { id: string; name: string }) => void }) {
-  const [open, setOpen] = useState(false);
-  const brand = lists.brands.find((b) => b.id === brandId)?.name ?? null;
-  return (
-    <>
-      <Row label="Brand" value={brand ?? "Pick a brand"} muted={!brand} onClick={() => setOpen(true)} />
-      <BrandSearch open={open} onClose={() => setOpen(false)} brands={lists.brands} selectedId={brandId} onPick={(b) => onChange(b.id)} onAdded={onAdded} />
-    </>
-  );
-}

@@ -4,12 +4,11 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { HeaderAction } from "@/components/header-action";
 import { PageHeader } from "@/components/ui/page-header";
-import { Button, buttonClass, Icons, Shelf } from "@/components/ui/button";
-import { Banner } from "@/components/ui/banner";
+import { Button, Icons } from "@/components/ui/button";
+import { toast } from "@/components/ui/toast";
 import { Sheet } from "@/components/ui/sheet";
-import { PickSheet, TextSheet } from "@/components/items/row-editor";
+import { TextSheet } from "@/components/items/row-editor";
 import { cn } from "@/lib/cn";
 import type { BoardView, Piece } from "@/lib/outfits/engine";
 import type { Scale } from "@/lib/checkins/service";
@@ -20,6 +19,8 @@ import { MirrorGlyph, MirrorSheet } from "@/components/mirror/mirror-sheet";
 import { useMirror } from "@/components/mirror/use-mirror";
 import { checkInSelfieAction, checkInTapsAction, looksStatusAction, moreAction, rateAction, regenerateAction, removeAction, setLocationAction, setPlanAction, setZipAction, swapAction, wearAction, type LooksResult } from "./actions";
 import { RatingRow } from "../fits/rating-row";
+import { deleteFitAction } from "../fits/actions";
+import { InlineAdd } from "@/components/lists/inline-add";
 import { monoDate } from "@/lib/dates";
 
 type Props = {
@@ -57,8 +58,9 @@ const pad = (n: number) => String(n).padStart(2, "0");
 export function TodayScreen(p: Props) {
   const router = useRouter();
   const [, start] = useTransition();
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string>();
+  // No looks yet: the screen opens already building (the build starts below), never on an error it has not had.
+  const [busy, setBusy] = useState<string | null>(p.needsLooks ? "regen" : null);
+  const setError = (e?: string) => { if (e) toast.error(e); };
   const [sheet, setSheet] = useState<"checkin" | "plan" | "planText" | "swap" | "zip" | null>(null);
   const [index, setIndex] = useState(Math.max(0, p.suggestion?.wornIndex ?? 0));
   const scroller = useRef<HTMLDivElement>(null);
@@ -141,7 +143,8 @@ export function TodayScreen(p: Props) {
   }, [boards.length]);
   const goTo = (i: number) => {
     const el = scroller.current;
-    if (el) el.scrollTo({ left: i * el.clientWidth, behavior: "instant" as ScrollBehavior });
+    const child = el?.querySelector<HTMLElement>(`[data-index="${i}"]`);
+    if (el && child) el.scrollTo({ left: child.offsetLeft - (el.clientWidth - child.clientWidth) / 2, behavior: "instant" as ScrollBehavior });
     setIndex(i);
   };
   // After every refresh (new suggestion object) keep the strip on the board the person is looking at.
@@ -157,29 +160,38 @@ export function TodayScreen(p: Props) {
     );
   }
 
+  // Seconds since the build started, for the overlay; after ~90s say so and offer Try again.
+  const [buildStartedAt, setBuildStartedAt] = useState<number | null>(p.needsLooks ? Date.now() : null);
+  const [buildSecs, setBuildSecs] = useState(0);
+  useEffect(() => {
+    if (busy !== "regen" && busy !== "more") { setBuildStartedAt(null); setBuildSecs(0); return; }
+    setBuildStartedAt((t) => t ?? Date.now());
+  }, [busy]);
+  useEffect(() => {
+    if (buildStartedAt === null) return;
+    const tick = () => setBuildSecs(Math.max(0, Math.floor((Date.now() - buildStartedAt) / 1000)));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [buildStartedAt]);
+  const slow = buildSecs >= 90;
+  const whose = p.mine ? "your" : `${p.personName}’s`;
   const worn = Boolean(board?.wornFitId);
   const [flashWorn, setFlashWorn] = useState(false); // "✓ Worn" for a beat before the button turns into the Fits link
   const title = p.evening ? "Tonight’s" : "Today’s";
 
   return (
     <div data-testid="today" className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-14">
-      {p.canDress ? <HeaderAction><button type="button" onClick={() => setSheet("checkin")} className="pill pill-sm" data-testid="check-in">Check-in</button></HeaderAction> : null}
-      {error ? <Banner tone="danger" title={error} className="mb-3 lg:col-start-2" /> : null}
       <div className="lg:col-start-2">
       <PageHeader
-        eyebrow={
-          <div className="flex items-start justify-between gap-3">
-            <span className="text-ink" data-testid="context-line">{p.mine ? p.contextLine : `${p.personName.toUpperCase()} · ${p.contextLine}`}</span>
-            {p.canDress ? <button type="button" onClick={() => setSheet("plan")} className="pill pill-sm shrink-0" data-testid="edit-plan">Edit</button> : null}
-          </div>
-        }
+        eyebrow={<span className="text-ink" data-testid="context-line">{p.mine ? p.contextLine : `${p.personName.toUpperCase()} · ${p.contextLine}`}</span>}
         title={title} accent="look"
-        aside={boards.length ? `${pad(index + 1)} / ${pad(boards.length)}` : "00 / 03"}
+        aside={boards.length ? `${pad(index + 1)} / ${pad(boards.length)}` : undefined}
       />
       </div>
 
       {p.weather ? (
-        <button type="button" onClick={() => p.canDress && setSheet("zip")} className="mb-4 flex w-full items-stretch border border-ink text-left lg:col-start-2" data-testid="weather-block">
+        <WeatherBlock onClick={p.canDress ? () => setSheet("zip") : undefined} className="mb-4 flex w-full items-stretch border border-ink text-left lg:col-start-2">
           <span className="flex flex-col gap-1 border-r border-ink px-4 py-2.5">
             <span className="mono text-ink" data-testid="weather-date">{p.dateLabel}</span>
             <span className="flex items-baseline gap-1"><span className="serif text-[40px] leading-none">{p.weather.nowF}°</span><span className="mono">now</span></span>
@@ -189,12 +201,12 @@ export function TodayScreen(p: Props) {
             <span className="mono">High {p.weather.highF}° · Low {p.weather.lowF}°{p.weather.rainChance >= 20 ? ` · Rain ${p.weather.rainChance}%` : " · No rain"}</span>
           </span>
           {p.canDress ? <span className="mono flex items-center px-3 text-ink">{p.savedZip ?? "Zip"} ›</span> : null}
-        </button>
+        </WeatherBlock>
       ) : null}
       {p.weatherNote && p.canDress ? (
-        <div className="mb-4 flex items-center justify-between border-y border-ink py-2.5 lg:col-start-2">
+        <div className="mb-4 flex flex-col gap-2.5 border-y border-ink py-3 lg:col-start-2">
           <span className="mono">{p.weatherNote === "failed" ? "Weather is unavailable right now" : "Where are you today?"}</span>
-          <span className="flex gap-4">
+          <span className="flex flex-wrap gap-2">
             {p.weatherNote === "none" ? <button type="button" onClick={askLocation} disabled={busy === "location"} className="pill pill-sm">{busy === "location" ? "Finding…" : "Use my location"}</button> : null}
             <button type="button" onClick={() => setSheet("zip")} className="pill pill-sm" data-testid="enter-zip">{p.savedZip ? "Change zip" : "Enter zip"}</button>
           </span>
@@ -204,13 +216,53 @@ export function TodayScreen(p: Props) {
       {boards.length ? (
         <>
           <div className="relative lg:col-start-1 lg:row-start-1 lg:row-span-3">
-            <div ref={scroller} className="-mx-5 flex snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] lg:mx-0" data-testid="boards">
+            <div ref={scroller} tabIndex={0} aria-label="Looks" onKeyDown={(e) => { if (e.key === "ArrowRight" && index < boards.length - 1) goTo(index + 1); if (e.key === "ArrowLeft" && index > 0) goTo(index - 1); }} className="-mx-5 flex snap-x snap-mandatory overflow-x-auto outline-none [scrollbar-width:none] focus-visible:outline-2 focus-visible:outline-ink lg:mx-0" data-testid="boards">
               {boards.map((b, i) => <Board key={i} index={i} board={b} active={i === index} />)}
             </div>
-            {busy === "regen" ? <div className="absolute inset-0 flex items-center justify-center bg-paper/70" data-testid="refreshing"><span className="mono mono-11 bg-paper px-3 py-2">Building fresh looks…</span></div> : null}
+            {busy === "regen" ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-paper/70" data-testid="refreshing">
+                <span className="mono mono-11 bg-paper px-3 py-2" aria-live="polite">{slow ? "Taking longer than usual" : "Building fresh looks"}<span aria-hidden> · {buildSecs}s</span></span>
+                {slow ? <button type="button" onClick={() => buildLooks("regen", () => regenerateAction(p.personId))} className="pill pill-sm" data-testid="build-retry">Try again</button> : null}
+              </div>
+            ) : null}
           </div>
+          {/* The pager: the counter is in the title; these move the strip, and the keyboard does too. */}
+          {boards.length > 1 ? (
+            <div className="mt-2 flex items-center justify-center gap-3 lg:col-start-1 lg:row-start-4" data-testid="board-pager">
+              <button type="button" aria-label="Previous look" disabled={index === 0} onClick={() => goTo(index - 1)} className="pill pill-sm px-3 disabled:opacity-30">‹</button>
+              <span className="mono text-graphite" aria-hidden>{index + 1} of {boards.length}</span>
+              <button type="button" aria-label="Next look" disabled={index >= boards.length - 1} onClick={() => goTo(index + 1)} className="pill pill-sm px-3 disabled:opacity-30">›</button>
+            </div>
+          ) : null}
+          {board ? (
+            <div className="mt-3.5 flex flex-col gap-2 lg:col-start-2 lg:mt-0">
+              <p className="mono text-ink" data-testid="piece-list">{board.pieces.map((x) => x.label).join(" · ")}</p>
+              <p className="text-[17px] leading-snug" data-testid="reason">{board.reason}</p>
+              {board.why ? <WhyList why={board.why} /> : null}
+            </div>
+          ) : null}
+          {p.canDress ? (
+            <div className="mt-4 flex flex-col gap-2 lg:col-start-2">
+              {worn && !flashWorn ? (
+                <div className="flex min-h-[60px] items-center justify-between gap-3 border-y border-ink bg-bone px-4 py-3" data-testid="wearing-this">
+                  <span className="flex min-w-0 flex-col gap-0.5"><span className="mono text-[13px] uppercase tracking-[0.18em]">✓ Wearing this</span><span className="mono text-graphite">On {whose} Fits calendar</span></span>
+                  <span className="flex shrink-0 gap-1.5">
+                    <Link href="/fits" className="pill pill-sm" data-testid="see-fits">See Fits</Link>
+                    <button type="button" disabled={busy !== null} onClick={() => run("unwear", () => deleteFitAction(board!.wornFitId!))} className="pill pill-sm pill-quiet" data-testid="unwear">Undo</button>
+                  </span>
+                </div>
+              ) : (
+                <Button size="lg" className="w-full" icon={<Icons.shirt />} sub={`Lands on ${whose} Fits calendar`} flash={flashWorn ? "✓ Worn" : null} busy={busy === "wear"} disabled={busy !== null}
+                  onClick={() => run("wear", () => wearAction(p.personId, p.suggestion!.id, index), () => { setFlashWorn(true); setTimeout(() => setFlashWorn(false), 900); })} data-testid="wear-this">{busy === "wear" ? "Saving…" : "Wear this"}</Button>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" disabled={busy !== null || worn} onClick={() => setSheet("swap")} data-testid="swap">Change a piece</Button>
+                <Button variant="outline" busy={busy === "more"} disabled={busy !== null} onClick={() => { const next = boards.length; buildLooks("more", () => moreAction(p.personId), () => setIndex(next)); }} data-testid="more-looks">{busy === "more" ? "Thinking…" : "More looks"}</Button>
+              </div>
+            </div>
+          ) : null}
           {p.canDress && (p.tryOn === "ready" || p.mannequin) ? (
-            <div className="mt-4 lg:col-start-1 lg:row-start-4 lg:row-span-4 lg:self-start" data-testid="mirror">
+            <div className="mt-5 lg:col-start-1 lg:row-start-5 lg:row-span-4 lg:mt-4 lg:self-start" data-testid="mirror">
               <button type="button" disabled={busy !== null} onClick={() => m.show({ look: { kind: "today", suggestionId: p.suggestion!.id, index }, on: p.tryOn === "ready" ? "me" : "mannequin" })}
                 className="flex w-full items-center gap-5 border border-ink p-3 text-left disabled:opacity-60" data-testid={p.tryOn === "ready" ? "try-on" : "see-on-mannequin"}>
                 <span className="relative h-[150px] w-[100px] shrink-0 overflow-hidden rounded-t-[60px] border-2 border-ink bg-paper">
@@ -229,27 +281,6 @@ export function TodayScreen(p: Props) {
               ) : null}
             </div>
           ) : null}
-          {board ? (
-            <div className="mt-3.5 flex flex-col gap-2 lg:col-start-2 lg:mt-0">
-              <p className="mono text-ink" data-testid="piece-list">{board.pieces.map((x) => x.label).join(" · ")}</p>
-              <p className="text-[17px] leading-snug" data-testid="reason">{board.reason}</p>
-              {board.why ? <WhyList why={board.why} /> : null}
-            </div>
-          ) : null}
-          {p.canDress ? (
-            <div className="mt-4 flex flex-col gap-2 lg:col-start-2">
-              {worn && !flashWorn ? (
-                <Shelf><Link href="/fits" className={buttonClass({ size: "lg", className: "w-full" })}><Icons.calendar /><span className="flex flex-col items-start gap-0.5 text-left"><span>Wearing this · see Fits</span><span className="mono text-[9px] tracking-[0.12em] opacity-75">It is on your calendar</span></span><span aria-hidden className="ml-1 transition-transform duration-100 group-active:translate-x-1">→</span></Link></Shelf>
-              ) : (
-                <Button size="lg" className="w-full" icon={<Icons.shirt />} sub="Lands on your Fits calendar" flash={flashWorn ? "✓ Worn" : null} disabled={busy !== null}
-                  onClick={() => run("wear", () => wearAction(p.personId, p.suggestion!.id, index), () => { setFlashWorn(true); setTimeout(() => setFlashWorn(false), 900); })} data-testid="wear-this">{busy === "wear" ? "Saving…" : "Wear this"}</Button>
-              )}
-              <div className="grid grid-cols-2 gap-2">
-                <Button variant="secondary" disabled={busy !== null || worn} onClick={() => setSheet("swap")} data-testid="swap">Change a piece</Button>
-                <Button variant="secondary" disabled={busy !== null} onClick={() => { const next = boards.length; buildLooks("more", () => moreAction(p.personId), () => setIndex(next)); }} data-testid="more-looks">{busy === "more" ? "Thinking…" : "More looks"}</Button>
-              </div>
-            </div>
-          ) : null}
         </>
       ) : (
         <>
@@ -263,10 +294,24 @@ export function TodayScreen(p: Props) {
               {busy === "regen" ? "Three looks for today are on their way. About half a minute." : p.enoughClothes ? (p.canDress ? "Something went wrong building today’s looks." : `${p.personName} hasn’t opened Today yet.`) : p.mine ? "Add clothes with the + button and your first three looks will appear here." : `${p.personName}’s closet needs a few more pieces first.`}
             </p>
             {busy === "regen" ? <p className="mono text-graphite" data-testid="refreshing">Building today’s looks…</p> : null}
+            {!p.enoughClothes && p.mine && busy !== "regen" ? <Link href="/add" className="pill mt-3 self-start" data-testid="empty-add-clothes">+ Add clothes</Link> : null}
           </div>
           {p.enoughClothes && p.canDress && busy !== "regen" ? <Button variant="secondary" className="mt-4 w-full lg:col-start-2" disabled={busy !== null} onClick={() => buildLooks("regen", () => regenerateAction(p.personId))}>Try again</Button> : null}
         </>
       )}
+
+      {p.canDress ? (
+        <div className="mt-[18px] flex flex-col border-t border-ink lg:col-start-2" data-testid="day-strips">
+          <div className="flex min-h-[56px] items-center justify-between gap-3 border-b border-line py-2">
+            <span className="flex min-w-0 flex-col gap-0.5"><span className="mono text-graphite">Check-in</span><span className="truncate text-[14px]">{p.checkIn ? (p.checkIn.source === "selfie" ? "From a selfie" : `${p.checkIn.answers.length} ${p.checkIn.answers.length === 1 ? "answer" : "answers"} today`) : p.mine ? "How are you looking today?" : `How is ${p.personName} looking today?`}</span></span>
+            <button type="button" onClick={() => setSheet("checkin")} className="pill pill-sm shrink-0" data-testid="check-in">{p.checkIn ? "Change" : "Check in"}</button>
+          </div>
+          <div className="flex min-h-[56px] items-center justify-between gap-3 border-b border-line py-2">
+            <span className="flex min-w-0 flex-col gap-0.5"><span className="mono text-graphite">Plan</span><span className="truncate text-[14px]">{p.plan.label ?? (p.calendarConnected ? "Nothing on the calendar" : "Nothing planned")}</span></span>
+            <button type="button" onClick={() => setSheet("plan")} className="pill pill-sm shrink-0" data-testid="edit-plan">{p.plan.label ? "Change" : "Set a plan"}</button>
+          </div>
+        </div>
+      ) : null}
 
       {p.unrated ? (
         <div className="mt-[18px] border-t border-ink pt-3 lg:col-start-2" data-testid="yesterday-strip">
@@ -294,7 +339,7 @@ export function TodayScreen(p: Props) {
       ) : null}
 
       {p.cleanOutCount > 0 && p.canDress ? (
-        <Link href="/closet/clean-out" className="mt-3 flex items-center justify-between border border-ink px-4 py-3.5 hover:bg-bone lg:col-start-2" data-testid="clean-out-link">
+        <Link href="/closet/clean-out?from=today" className="mt-3 flex items-center justify-between border border-ink px-4 py-3.5 hover:bg-bone lg:col-start-2" data-testid="clean-out-link">
           <span className="flex flex-col gap-0.5">
             <span className="serif text-[22px]">Time for a <em>clean-out?</em></span>
             <span className="mono text-ink">{p.cleanOutCount} {p.cleanOutCount === 1 ? "piece" : "pieces"} not worn in a while</span>
@@ -303,16 +348,16 @@ export function TodayScreen(p: Props) {
         </Link>
       ) : null}
 
-      {p.weather ? <p className="mono mt-5 text-graphite lg:col-start-2">Weather by Open-Meteo{p.weather.source === "mock" ? " · mock" : ""}</p> : null}
+      {p.weather ? <p className="mono mt-5 text-graphite lg:col-start-2">Weather by Open-Meteo</p> : null}
 
       {/* Check-in: taps on each scale, or a selfie read by Claude. */}
-      <CheckInSheet open={sheet === "checkin"} onClose={() => setSheet(null)} scales={p.scales} current={p.checkIn} busy={busy}
+      <CheckInSheet open={sheet === "checkin"} onClose={() => setSheet(null)} scales={p.scales} current={p.checkIn} busy={busy} isAdmin={p.isAdmin} mine={p.mine} personName={p.personName}
         onTaps={(answers) => saveThenRefresh(() => checkInTapsAction(p.personId, answers))}
         onSelfie={(file) => { const fd = new FormData(); fd.set("selfie", file); saveThenRefresh(() => checkInSelfieAction(p.personId, fd)); }} />
 
       {/* Plan: the occasion list (admins add right here), free text, or back to the calendar. */}
       <Sheet open={sheet === "plan"} onClose={() => setSheet(null)} title="Today’s plan">
-        <p className="mono mb-3 text-graphite">{p.plan.source === "calendar" ? `From your calendar: ${p.plan.label}` : p.plan.source === "pick" ? `Picked: ${p.plan.label}` : p.calendarConnected ? "Nothing on your calendar today" : p.calendarConfigured ? "Connect Google Calendar in Settings, or pick a plan" : "Pick a plan"}</p>
+        <p className="mono mb-3 text-graphite">{p.plan.source === "calendar" ? `From your calendar: ${p.plan.label}` : p.plan.source === "pick" ? `Picked: ${p.plan.label}` : p.calendarConnected ? "Nothing on your calendar today" : p.calendarConfigured ? <>Pick a plan, or <Link href="/profile/settings" className="text-ink underline underline-offset-4">connect Google Calendar</Link></> : "Pick a plan"}</p>
         <PlanPicker occasions={p.occasions} selected={p.plan.occasionId} isAdmin={p.isAdmin} busy={busy !== null}
           onPick={(id) => saveThenRefresh(() => setPlanAction(p.personId, { occasionId: id }))}
           onText={() => setSheet("planText")}
@@ -337,11 +382,16 @@ export function TodayScreen(p: Props) {
       </Sheet>
 
       {/* See it on: the look on your own body photo (yours alone), or on the shared mannequin (no body in it). */}
-      <MirrorSheet m={m} pieces={board?.pieces.map((x) => x.label).join(" · ") ?? ""} mine={p.mine} personId={p.personId} personName={p.personName} tryOnState={p.tryOn} backPhoto={p.backPhoto} mannequinAvailable={p.mannequinAvailable} />
+      <MirrorSheet m={m} pieces={board?.pieces.map((x) => x.label).join(" · ") ?? ""} mine={p.mine} personId={p.personId} personName={p.personName} tryOnState={p.tryOn} backPhoto={p.backPhoto} mannequinAvailable={p.mannequinAvailable} admin={p.isAdmin} />
 
-      <TextSheet open={sheet === "zip"} onClose={() => setSheet(null)} title="Weather for your zip" label="Zip code" value={p.savedZip ?? ""} placeholder="92101" onSave={(v) => run("zip", () => setZipAction(v))} />
+      <TextSheet open={sheet === "zip"} onClose={() => setSheet(null)} title="Weather for your zip" label="Zip code" kind="zip" value={p.savedZip ?? ""} placeholder="92101" onSave={(v) => run("zip", () => setZipAction(v))} />
     </div>
   );
+}
+
+/** The weather card: a button when the zip can be changed, a plain block for someone just looking. */
+function WeatherBlock({ onClick, className, children }: { onClick?: () => void; className: string; children: React.ReactNode }) {
+  return onClick ? <button type="button" onClick={onClick} className={cn(className, "tap")} data-testid="weather-block">{children}</button> : <div className={className} data-testid="weather-block">{children}</div>;
 }
 
 function Tile({ piece, className }: { piece?: BoardView["pieces"][number]; className?: string }) {
@@ -379,7 +429,7 @@ function Board({ board, index, active }: { board: BoardView; index: number; acti
   const stacked = sorted.filter((p) => slotOf(p) < 4);
   const extras = sorted.filter((p) => slotOf(p) === 4);
   return (
-    <div className="w-full shrink-0 snap-center px-5 lg:px-0" aria-hidden={!active} data-testid="board" data-index={index} data-pieces={n}>
+    <div className="w-[92%] shrink-0 snap-center px-5 first:ml-[4%] last:mr-[4%] lg:w-full lg:px-0 lg:first:ml-0 lg:last:mr-0" aria-hidden={!active} data-testid="board" data-index={index} data-pieces={n}>
       {n <= 1 ? (
         <Tile piece={board.pieces[0]} className="h-[400px] lg:h-[406px]" />
       ) : (
@@ -394,6 +444,9 @@ function Board({ board, index, active }: { board: BoardView; index: number; acti
 
 /** Plain bullets under the sentence: weather by name with the numbers, then dress code, color, and what the person reaches for. */
 function WhyList({ why }: { why: NonNullable<BoardView["why"]> }) {
+  // Folded on a phone, open on a desktop (A1): the sentence is the reason; this is the receipt.
+  const [open, setOpen] = useState(false);
+  useEffect(() => { setOpen(window.matchMedia("(min-width: 1024px)").matches); }, []);
   const rows: { label: string; lines: string[] }[] = [
     { label: "Weather", lines: why.weather },
     { label: "Dress code", lines: why.dressCode ? [why.dressCode] : [] },
@@ -402,19 +455,22 @@ function WhyList({ why }: { why: NonNullable<BoardView["why"]> }) {
   ].filter((r) => r.lines.length);
   if (!rows.length) return null;
   return (
-    <ul className="flex flex-col gap-1.5 border-t border-line pt-2" data-testid="why">
-      {rows.map((r) => (
-        <li key={r.label} className="grid grid-cols-[86px_minmax(0,1fr)] gap-x-3 text-[14px] leading-snug">
-          <span className="mono pt-0.5 text-graphite">{r.label}</span>
-          <span className="flex flex-col gap-0.5">{r.lines.map((l, i) => <span key={i}>{l}</span>)}</span>
-        </li>
-      ))}
-    </ul>
+    <details open={open} onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)} className="group border-t border-line pt-1" data-testid="why-details">
+      <summary className="mono flex min-h-9 cursor-pointer list-none items-center justify-between text-graphite [&::-webkit-details-marker]:hidden"><span>Why this look</span><span className="group-open:hidden">Show</span><span className="hidden group-open:inline">Hide</span></summary>
+      <ul className="flex flex-col gap-1.5 pb-1 pt-1" data-testid="why">
+        {rows.map((r) => (
+          <li key={r.label} className="grid grid-cols-[86px_minmax(0,1fr)] gap-x-3 text-[14px] leading-snug">
+            <span className="mono pt-0.5 text-graphite">{r.label}</span>
+            <span className="flex flex-col gap-0.5">{r.lines.map((l, i) => <span key={i}>{l}</span>)}</span>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 
-function CheckInSheet({ open, onClose, scales, current, busy, onTaps, onSelfie }: {
-  open: boolean; onClose: () => void; scales: Scale[]; current: Props["checkIn"]; busy: string | null;
+function CheckInSheet({ open, onClose, scales, current, busy, isAdmin, mine, personName, onTaps, onSelfie }: {
+  open: boolean; onClose: () => void; scales: Scale[]; current: Props["checkIn"]; busy: string | null; isAdmin: boolean; mine: boolean; personName: string;
   onTaps: (answers: { scaleId: string; optionId: string }[]) => void; onSelfie: (file: File) => void;
 }) {
   const [answers, setAnswers] = useState<Record<string, string>>(() => Object.fromEntries((current?.answers ?? []).map((a) => [a.scaleId, a.optionId])));
@@ -422,7 +478,7 @@ function CheckInSheet({ open, onClose, scales, current, busy, onTaps, onSelfie }
   const file = useRef<HTMLInputElement>(null);
   return (
     <Sheet open={open} onClose={onClose} title="Check-in">
-      <p className="mono mb-4 text-graphite">How are you looking today? Tap, or take a selfie and let the app read it.</p>
+      <p className="mb-4 text-[14px] leading-snug text-graphite">{mine ? "How are you looking today?" : `How is ${personName} looking today?`} Tap, or take a selfie and let the app read it.</p>
       <div className="space-y-5">
         {scales.map((s) => (
           <div key={s.id}>
@@ -430,18 +486,23 @@ function CheckInSheet({ open, onClose, scales, current, busy, onTaps, onSelfie }
             <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={s.name}>
               {s.options.map((o) => {
                 const on = answers[s.id] === o.id;
-                return <button key={o.id} type="button" role="radio" aria-checked={on} onClick={() => setAnswers((a) => ({ ...a, [s.id]: on ? "" : o.id }))} className={cn("mono mono-11 h-10 border px-3 uppercase", on ? "border-ink bg-ink text-paper" : "border-ink bg-paper text-ink")}>{o.name}</button>;
+                return <button key={o.id} type="button" role="radio" aria-checked={on} onClick={() => setAnswers((a) => ({ ...a, [s.id]: on ? "" : o.id }))} className={cn("pill pill-sm", on && "pill-solid")}>{o.name}</button>;
               })}
             </div>
           </div>
         ))}
-        {scales.length === 0 ? <p className="mono text-graphite">No check-in scales yet. Admins add them under Admin → Lists.</p> : null}
+        {scales.length === 0 ? (
+          <div className="flex flex-col gap-3">
+            <p className="mono text-graphite">No check-in questions yet.</p>
+            {isAdmin ? <Link href="/admin/lists/checkInScale" className="pill self-start">+ Add a question</Link> : <p className="mono text-graphite">A parent admin can add them under Lists.</p>}
+          </div>
+        ) : null}
       </div>
       <div className="mt-6 flex flex-col gap-2">
-        <Button className="w-full" disabled={busy !== null} onClick={() => onTaps(Object.entries(answers).filter(([, v]) => v).map(([scaleId, optionId]) => ({ scaleId, optionId })))} data-testid="save-check-in">{busy === "checkin" ? "Saving…" : "Save check-in"}</Button>
-        <Button variant="secondary" className="w-full" disabled={busy !== null} onClick={() => file.current?.click()}>Take a selfie</Button>
+        <Button className="w-full" busy={busy === "checkin"} disabled={busy !== null} onClick={() => onTaps(Object.entries(answers).filter(([, v]) => v).map(([scaleId, optionId]) => ({ scaleId, optionId })))} data-testid="save-check-in">{busy === "checkin" ? "Saving…" : "Save check-in"}</Button>
+        <button type="button" className="pill h-[50px] w-full" disabled={busy !== null} onClick={() => file.current?.click()}>Take a selfie</button>
         <input ref={file} type="file" accept="image/*" capture="user" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onSelfie(f); e.target.value = ""; }} />
-        {current?.source === "selfie" ? <p className="mono text-graphite">Read from your selfie · only you can see it</p> : null}
+        {current?.source === "selfie" ? <p className="mono text-graphite">Read from {mine ? "your" : `${personName}’s`} selfie · only {mine ? "you" : `${personName} and a parent`} can see it</p> : null}
       </div>
     </Sheet>
   );
@@ -450,7 +511,6 @@ function CheckInSheet({ open, onClose, scales, current, busy, onTaps, onSelfie }
 function PlanPicker({ occasions, selected, isAdmin, busy, onPick, onText, onClear }: {
   occasions: { id: string; name: string }[]; selected: string | null; isAdmin: boolean; busy: boolean; onPick: (id: string) => void; onText: () => void; onClear?: () => void;
 }) {
-  const [pick, setPick] = useState(false);
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-col">
@@ -460,12 +520,11 @@ function PlanPicker({ occasions, selected, isAdmin, busy, onPick, onText, onClea
           </button>
         ))}
       </div>
-      <div className="mt-2 flex items-center justify-between">
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         <button type="button" onClick={onText} className="pill pill-sm">Something else…</button>
-        {isAdmin ? <button type="button" onClick={() => setPick(true)} className="pill pill-sm">Edit list</button> : null}
+        {isAdmin ? <InlineAdd kind="occasion" label="Add occasion" onCreated={(e) => onPick(e.id)} /> : null}
       </div>
-      {onClear ? <Button variant="secondary" className="mt-2 w-full" disabled={busy} onClick={onClear}>Back to my calendar</Button> : null}
-      <PickSheet open={pick} onClose={() => setPick(false)} title="Occasions" kind="occasion" options={occasions} selected={selected ? [selected] : []} canAdd onChange={(ids) => { if (ids[0]) onPick(ids[0]); }} />
+      {onClear ? <button type="button" className="pill mt-3 h-[50px] w-full" disabled={busy} onClick={onClear}>Back to the calendar</button> : null}
     </div>
   );
 }

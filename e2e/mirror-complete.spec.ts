@@ -12,7 +12,7 @@ test("a top asks for a bottom, then shoes (the mannequin can wear them); the pic
   await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
   await page.goto("/closet");
   await page.getByRole("link", { name: /white tee/i }).first().click();
-  await expect(page.getByTestId("see-on-me")).toHaveText("See it on a mannequin"); // no body photo yet
+  await expect(page.getByTestId("see-on-me")).toContainText("See it on a mannequin"); // no body photo yet
   await page.getByTestId("see-on-me").click();
   await expect(page.getByTestId("complete-look")).toBeVisible();
   await expect(page.getByTestId("complete-ask")).toHaveText("Add a bottom?");
@@ -82,10 +82,10 @@ test("on your own photo with FASHN there is no shoes question, and a line says w
   execSync("npx tsx e2e/seed-color.ts 'Jeff linen blazer' 'beige|cream|tan|oat'", { stdio: "ignore", env: { ...process.env, DATABASE_URL: E2E_DB, MOCK_S3: "true" } });
   await page.goto("/closet");
   await page.getByRole("link", { name: /white tee/i }).first().click();
-  await expect(page.getByTestId("see-on-me")).toHaveText("See it on me");
+  await expect(page.getByTestId("see-on-me")).toContainText("See it on me");
   await page.getByTestId("see-on-me").click();
   await expect(page.getByTestId("complete-ask")).toHaveText("Add a bottom?");
-  await expect(page.getByTestId("complete-shoes-note")).toContainText("FASHN can’t put them on yet");
+  await expect(page.getByTestId("complete-shoes-note")).toContainText("Shoes can’t go in this picture yet");
   await page.getByTestId("complete-option").first().click();
   await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 }); // straight to the picture: no shoes question on FASHN
   await expect(page.getByTestId("mirror-pieces")).toHaveText(/white tee · .*dark jeans/i);

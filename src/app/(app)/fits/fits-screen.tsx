@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
-import { Banner } from "@/components/ui/banner";
+import { toast } from "@/components/ui/toast";
 import { Sheet } from "@/components/ui/sheet";
 import { PickSheet, TextSheet } from "@/components/items/row-editor";
 import { shrinkPhoto } from "@/lib/import/client-queue";
@@ -32,10 +32,11 @@ export function FitsScreen(p: {
   const router = useRouter();
   const [, start] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string>();
+  const setError = (e?: string) => { if (e) toast.error(e); };
   const [sheet, setSheet] = useState<{ kind: "share" | "title" | "pick" | "remove"; fitId?: string } | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const [pickTitle, setPickTitle] = useState("");
+  const [pickCat, setPickCat] = useState<string | null>(null);
   const file = useRef<HTMLInputElement>(null);
   const photoFor = useRef<string | null>(null);
 
@@ -74,24 +75,24 @@ export function FitsScreen(p: {
     <div data-testid="fits" className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-14">
       <div className="lg:col-span-2"><PageHeader title="Fits" aside={
         <span className="flex items-center gap-0.5 text-ink">
-          <Link href={`/fits?m=${monthKey(-1)}&d=${p.selected}`} aria-label="Previous month" className="flex size-9 items-center justify-center"><ChevronLeft className="size-3" strokeWidth={2} /></Link>
+          <Link href={`/fits?m=${monthKey(-1)}`} aria-label="Previous month" className="flex size-11 items-center justify-center active:bg-bone"><ChevronLeft className="size-4" strokeWidth={2} /></Link>
           <span data-testid="month-label">{monoMonth(p.year, p.month0)}</span>
-          <Link href={`/fits?m=${monthKey(1)}&d=${p.selected}`} aria-label="Next month" className="flex size-9 items-center justify-center"><ChevronRight className="size-3" strokeWidth={2} /></Link>
+          <Link href={`/fits?m=${monthKey(1)}`} aria-label="Next month" className="flex size-11 items-center justify-center active:bg-bone"><ChevronRight className="size-4" strokeWidth={2} /></Link>
+          {p.selected !== p.today ? <Link href={`/fits?d=${p.today}`} replace className="pill pill-sm ml-2" data-testid="fits-today">Today</Link> : null}
         </span>
       } /></div>
-      {error ? <Banner tone="danger" title={error} className="mb-3 lg:col-span-2" /> : null}
       <div className="lg:col-start-1">
       <div className="mono grid grid-cols-7 border-b border-ink pb-2 text-graphite">{["S", "M", "T", "W", "T", "F", "S"].map((d, i) => <div key={i}>{d}</div>)}</div>
       <div className="grid grid-cols-7 gap-0.5 pt-1" data-testid="calendar">
         {cells.map((day, i) => {
           if (!day) return <div key={i} className="h-[46px]" />;
           const fitsOn = byDay.get(day) ?? [];
-          const img = fitsOn[0]?.photoKey ?? fitsOn[0]?.thumbKey ?? null;
+          const img = fitsOn[0]?.thumbKey ?? fitsOn[0]?.photoKey ?? null; // the small cutout, not the full photo of the night, in a 46px cell
           const isToday = day === p.today, isSel = day === p.selected;
           return (
-            <Link key={i} href={`/fits?m=${monthKey(0)}&d=${day}`} aria-label={day} aria-current={isSel ? "date" : undefined}
+            <Link key={i} href={`/fits?m=${monthKey(0)}&d=${day}`} replace scroll={false} aria-label={day} aria-current={isSel ? "date" : undefined}
               className={cn("relative h-[46px] overflow-hidden lg:h-[84px]", fitsOn.length ? "bg-bone" : "bg-paper", isSel && "outline outline-2 -outline-offset-2 outline-ink")} data-testid={fitsOn.length ? "day-with-fit" : undefined}>
-              {img ? <img src={`/api/photo/${img}`} alt="" className="absolute inset-0 size-full object-cover" /> : null}
+              {img ? <img src={`/api/photo/${img}`} alt="" loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover" /> : null}
               <span className={cn("mono absolute left-1 top-[3px] px-[3px] py-px", isToday ? "bg-ink text-paper" : fitsOn.length ? "bg-paper text-ink" : "text-ink")}>{Number(day.slice(8))}</span>
             </Link>
           );
@@ -107,14 +108,14 @@ export function FitsScreen(p: {
                 <p className="mono text-graphite">{monoDate(f.date)}{p.scope === "family" ? ` · ${f.ownerName.toUpperCase()}` : ""}</p>
                 {f.canEdit ? <button type="button" onClick={() => setSheet({ kind: "title", fitId: f.id })} className="text-left" data-testid="fit-title"><Title title={f.title} /></button> : <Title title={f.title} />}
               </div>
-              {f.canEdit ? <button type="button" onClick={() => setSheet({ kind: "share", fitId: f.id })} className="pill pill-sm" data-testid="share">Share</button> : null}
+              {f.canEdit ? <button type="button" onClick={() => setSheet({ kind: "share", fitId: f.id })} className="pill pill-sm" data-testid="share">Who sees it</button> : null}
             </div>
             <div className="grid grid-cols-3 grid-rows-[112px_112px] gap-1">
               <div className="col-span-2 row-span-2 overflow-hidden bg-bone">
                 {f.photoKey ? <img src={`/api/photo/${f.photoKey}`} alt="Photo from the night" className="size-full object-cover" /> : (
                   <button type="button" disabled={!f.canEdit || busy === "photo"} onClick={() => { photoFor.current = f.id; file.current?.click(); }} className="flex size-full flex-col items-center justify-center gap-2" data-testid="photo-empty">
                     <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="1.4" strokeLinejoin="round" aria-hidden><path d="M3 8h4l2-3h6l2 3h4v12H3z" /><circle cx="12" cy="13.5" r="3.5" /></svg>
-                    <span className="mono">{busy === "photo" ? "Saving…" : f.canEdit ? "Your photo from the night" : "No photo from the night"}</span>
+                    <span className="mono">{busy === "photo" ? "Saving…" : f.canEdit ? "Add a photo" : "No photo yet"}</span>
                   </button>
                 )}
               </div>
@@ -125,23 +126,28 @@ export function FitsScreen(p: {
             <p className="mono text-graphite" data-testid="visibility">{f.visibility}</p>
             {f.canEdit && f.date <= p.today ? <RatingRow rating={f.rating} disabled={busy !== null} onRate={(r) => run("rate", () => rateFitAction(f.id, r))} /> : null}
             {f.canEdit ? (
-              <div className="grid grid-cols-2 gap-2">
-                <Button className="h-[50px]" disabled={busy !== null} onClick={() => { setPicked(f.pieces.map((x) => x.id)); setPickTitle(f.title); setSheet({ kind: "pick", fitId: f.id }); }} data-testid="save-the-fit">Change pieces</Button>
-                <Button variant="secondary" className="h-[50px]" disabled={busy !== null} onClick={() => { photoFor.current = f.id; file.current?.click(); }} data-testid="add-photo">{f.photoKey ? "Change photo" : "Add photo"}</Button>
-              </div>
+              // One orange thing: the photo of the night while there is none, else changing the pieces. The other is an outlined pill.
+              f.photoKey ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <Button className="h-[50px]" disabled={busy !== null} onClick={() => { setPicked(f.pieces.map((x) => x.id)); setPickTitle(f.title); setSheet({ kind: "pick", fitId: f.id }); }} data-testid="save-the-fit">Change pieces</Button>
+                  <button type="button" className="pill h-[50px]" disabled={busy !== null} onClick={() => { photoFor.current = f.id; file.current?.click(); }} data-testid="add-photo">Change photo</button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <Button className="h-[50px]" busy={busy === "photo"} disabled={busy !== null} onClick={() => { photoFor.current = f.id; file.current?.click(); }} data-testid="add-photo">{busy === "photo" ? "Saving…" : "Add photo"}</Button>
+                  <button type="button" className="pill h-[50px]" disabled={busy !== null} onClick={() => { setPicked(f.pieces.map((x) => x.id)); setPickTitle(f.title); setSheet({ kind: "pick", fitId: f.id }); }} data-testid="save-the-fit">Change pieces</button>
+                </div>
+              )
             ) : null}
-            {f.canEdit ? <div className="flex justify-between"><button type="button" onClick={() => setSheet({ kind: "remove", fitId: f.id })} className="pill pill-sm pill-quiet">Remove fit</button>{f.photoKey ? <button type="button" onClick={() => run("photo", () => setFitPhotoAction(f.id, null))} className="pill pill-sm pill-quiet">Remove photo</button> : null}</div> : null}
+            {f.canEdit ? <div className="flex justify-between"><button type="button" onClick={() => setSheet({ kind: "remove", fitId: f.id })} className="pill pill-sm pill-quiet">Remove fit</button>{f.photoKey ? <button type="button" onClick={() => run("photo", () => setFitPhotoAction(f.id, null), () => toast.ok("Photo removed"))} className="pill pill-sm pill-quiet">Remove photo</button> : null}</div> : null}
           </section>
         )) : (
           <section className="flex flex-col gap-3" data-testid="fit-empty">
             <p className="mono text-graphite">{monoDate(p.selected)}{p.scope === "family" ? "" : ` · ${p.personName.toUpperCase()}`}</p>
             <p className="serif text-[30px] leading-none">Nothing <em>yet</em></p>
-            <div className="grid grid-cols-3 grid-rows-[112px_112px] gap-1"><div className="col-span-2 row-span-2 bg-bone" /><div className="bg-bone" /><div className="bg-bone" /></div>
+            <div className="flex h-[160px] items-center justify-center bg-bone"><span className="mono text-graphite">{canSaveHere ? "Nothing worn this day yet" : "Nothing saved this day"}</span></div>
             {canSaveHere ? (
-              <div className="grid grid-cols-2 gap-2">
-                <Button className="h-[50px]" onClick={() => { setPicked([]); setPickTitle(""); setSheet({ kind: "pick" }); }} data-testid="save-the-fit">Save the fit</Button>
-                <Button variant="secondary" className="h-[50px]" disabled>Add photo</Button>
-              </div>
+              <Button className="h-[50px] w-full" onClick={() => { setPicked([]); setPickTitle(""); setSheet({ kind: "pick" }); }} data-testid="save-the-fit">Save the fit</Button>
             ) : <p className="text-[14px] leading-snug text-graphite">{p.scope === "family" ? "No fits shared with you on this day." : p.selected > p.today ? "That day hasn’t happened yet." : `${p.personName} didn’t save a fit this day.`}</p>}
           </section>
         )}
@@ -150,12 +156,17 @@ export function FitsScreen(p: {
       <input ref={file} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f && photoFor.current) uploadPhoto(photoFor.current, f); e.target.value = ""; }} />
 
       {/* SAVE THE FIT: pick pieces from the closet, name it. */}
-      <Sheet open={sheet?.kind === "pick"} onClose={() => setSheet(null)} title={sheet?.fitId ? "Change pieces" : "Save the fit"}>
+      <Sheet open={sheet?.kind === "pick"} onClose={() => setSheet(null)} title={sheet?.fitId ? "Change pieces" : "Save the fit"}
+        footer={<Button className="w-full" busy={busy === "save"} disabled={busy !== null || picked.length === 0} onClick={() => run("save", () => saveFitAction(p.personId, p.selected, picked, pickTitle), () => { setSheet(null); toast.ok("Saved to Fits"); })} data-testid="confirm-save-fit">{busy === "save" ? "Saving…" : `Save the fit${picked.length ? ` · ${picked.length} ${picked.length === 1 ? "piece" : "pieces"}` : ""}`}</Button>}>
         <label className="mono block text-graphite" htmlFor="fit-title">Name</label>
-        <input id="fit-title" value={pickTitle} onChange={(e) => setPickTitle(e.target.value)} placeholder="Dinner out" maxLength={60} className="mb-4 w-full border-b border-ink bg-transparent pb-2 text-[17px] outline-none" />
-        <p className="mono mb-2 text-graphite">{picked.length} {picked.length === 1 ? "piece" : "pieces"} picked</p>
+        <input id="fit-title" value={pickTitle} onChange={(e) => setPickTitle(e.target.value)} placeholder="Dinner out" maxLength={60} className="mb-4 h-11 w-full border-b border-ink bg-transparent text-[17px] outline-none" />
+        <div className="-mx-5 mb-3 flex gap-[18px] overflow-x-auto px-5 [scrollbar-width:none]" role="tablist" aria-label="Category">
+          {["All", ...Array.from(new Set(p.closet.map((c) => c.categoryName).filter(Boolean) as string[]))].map((c) => (
+            <button key={c} type="button" role="tab" aria-selected={(pickCat ?? "All") === c} onClick={() => setPickCat(c === "All" ? null : c)} className={cn("mono mono-11 flex min-h-11 shrink-0 items-center", (pickCat ?? "All") === c ? "text-ink" : "text-graphite")}><span className={cn("py-1", (pickCat ?? "All") === c && "border-b-[1.5px] border-ink")}>{c}</span></button>
+          ))}
+        </div>
         <div className="grid grid-cols-3 gap-1" role="listbox" aria-multiselectable>
-          {p.closet.map((c) => {
+          {p.closet.filter((c) => !pickCat || c.categoryName === pickCat).map((c) => {
             const on = picked.includes(c.id);
             return (
               <button key={c.id} type="button" role="option" aria-selected={on} onClick={() => setPicked(on ? picked.filter((x) => x !== c.id) : [...picked, c.id])} className={cn("relative h-[112px] overflow-hidden bg-bone", on && "outline outline-2 -outline-offset-2 outline-ink")} data-testid={`pick-${c.id}`}>
@@ -165,15 +176,14 @@ export function FitsScreen(p: {
             );
           })}
         </div>
-        {p.closet.length === 0 ? <p className="mono py-4 text-graphite">Nothing in the closet yet</p> : null}
-        <Button className="mt-4 w-full" disabled={busy !== null || picked.length === 0} onClick={() => run("save", () => saveFitAction(p.personId, p.selected, picked, pickTitle), () => setSheet(null))} data-testid="confirm-save-fit">{busy === "save" ? "Saving…" : "Save the fit"}</Button>
+        {p.closet.length === 0 ? <div className="flex flex-col items-start gap-3 py-4"><p className="mono text-graphite">Nothing in the closet yet</p><Link href="/add" className="pill">+ Add clothes</Link></div> : null}
       </Sheet>
 
       <PickSheet open={sheet?.kind === "share"} onClose={() => setSheet(null)} title="Who can see this fit" kind="tag" options={p.people} selected={selectedFits.find((f) => f.id === sheet?.fitId)?.viewerIds ?? []} multi canAdd={false} onChange={(ids) => run("share", () => setFitViewersAction(sheet!.fitId!, ids))} />
       <TextSheet open={sheet?.kind === "title"} onClose={() => setSheet(null)} title="Name this fit" label="Name" value={selectedFits.find((f) => f.id === sheet?.fitId)?.title ?? ""} onSave={(v) => run("title", () => setFitTitleAction(sheet!.fitId!, v))} />
       <Sheet open={sheet?.kind === "remove"} onClose={() => setSheet(null)} title="Remove this fit?">
         <p className="text-[14px] leading-snug text-graphite">The pieces go back to their previous wear counts. The photo is deleted.</p>
-        <div className="mt-5 grid grid-cols-2 gap-2"><Button variant="secondary" onClick={() => setSheet(null)}>Keep it</Button><Button onClick={() => run("remove", () => deleteFitAction(sheet!.fitId!), () => setSheet(null))}>Remove</Button></div>
+        <div className="mt-5 grid grid-cols-2 gap-2"><button type="button" className="pill pill-quiet h-[50px]" onClick={() => setSheet(null)}>Keep it</button><Button variant="danger" onClick={() => run("remove", () => deleteFitAction(sheet!.fitId!), () => { setSheet(null); toast.ok("Fit removed"); })} data-testid="confirm-remove-fit">Remove</Button></div>
       </Sheet>
     </div>
   );

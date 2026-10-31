@@ -1,5 +1,6 @@
 import { requirePerson } from "@/lib/auth/current";
 import { shoppingFor } from "@/lib/shop/people";
+import { rememberedShopFor } from "@/lib/shop/remember";
 import { listWants } from "@/lib/shop/wants";
 import { LookingForScreen } from "./looking-for-screen";
 
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function LookingForPage({ searchParams }: { searchParams: Promise<{ for?: string }> }) {
   const me = await requirePerson();
   const { for: forParam } = await searchParams;
-  const { people, forPersonId } = await shoppingFor(me, forParam);
+  const { people, forPersonId } = await shoppingFor(me, forParam ?? (await rememberedShopFor()));
   const wants = await listWants(me, forPersonId);
   return <LookingForScreen meId={me.id} people={people} forPersonId={forPersonId} wants={wants} />;
 }

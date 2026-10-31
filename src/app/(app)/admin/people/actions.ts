@@ -28,7 +28,7 @@ export async function invitePersonAction(input: {
       const r = await deliverInvite(token, "email"); delivered.email = r.sent; if (!r.sent && r.error) errors.push(`Email: ${r.error}`);
     }
     if (input.channels.includes("sms") && input.phone) {
-      if (!smsConfigured()) errors.push("Text: SMS isn't connected yet (Twilio keys missing). Copy the link instead.");
+      if (!smsConfigured()) errors.push("Text: texting isn’t set up on the site yet. Copy the link instead.");
       else { const r = await deliverInvite(token, "sms"); delivered.sms = r.sent; if (!r.sent && r.error) errors.push(`Text: ${r.error}`); }
     }
     revalidatePath("/admin/people");

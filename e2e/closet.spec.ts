@@ -25,17 +25,17 @@ test.describe("closet", () => {
     // search by brand
     await page.goto("/closet");
     await page.getByRole("button", { name: "Search" }).click();
-    await page.getByRole("textbox", { name: "Search" }).fill("levi");
-    await page.getByRole("textbox", { name: "Search" }).press("Enter");
+    await page.getByRole("searchbox", { name: "Search" }).fill("levi");
+    await page.getByRole("searchbox", { name: "Search" }).press("Enter");
     await expect(page.getByTestId("item-card")).toHaveCount(1);
 
     // item detail: laundry word changes with one tap and shows in the grid
     await page.getByTestId("item-card").click();
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Dark jeans");
-    await page.getByTestId("laundry-cycle").click();
-    await expect(page.getByText("Laundry · Laundry")).toBeVisible();
+    await page.getByTestId("laundry-dirty").click();
+    await expect(page.getByTestId("laundry-dirty")).toHaveAttribute("aria-checked", "true");
     await page.goto("/closet");
-    await expect(page.getByTestId("item-card").filter({ hasText: "Dark jeans" })).toContainText("Laundry");
+    await expect(page.getByTestId("item-card").filter({ hasText: "Dark jeans" })).toContainText("In the wash");
 
     // put it in the Family closet, then switch the header to FAMILY and see it there
     await page.getByTestId("item-card").filter({ hasText: "Dark jeans" }).click();

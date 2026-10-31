@@ -1,4 +1,4 @@
-import type { Engine } from "@/lib/tryon/engines";
+import { enginePlacesShoes, type Engine } from "@/lib/tryon/engines";
 
 /**
  * Completing a look before the mirror dresses it (Jeff, 24 Oct 2026: "make me select a top and bottom if it's not a
@@ -27,9 +27,9 @@ export function slotOf(category: string | null | undefined): Slot | "onePiece" |
   return null;
 }
 
-/** FASHN places tops, bottoms and one-pieces, not shoes; Google and the mannequin's image model can. */
+/** FASHN and Kling place tops, bottoms and one-pieces, not shoes; Google and the mannequin's image model can. */
 export function shoesPlaceable(on: "me" | "mannequin", engine: Engine): boolean {
-  return on === "mannequin" || engine !== "fashn";
+  return on === "mannequin" || enginePlacesShoes(engine);
 }
 
 /**

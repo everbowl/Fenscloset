@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import { Sheet } from "@/components/ui/sheet";
 import { Button, Icons } from "@/components/ui/button";
 import { Banner } from "@/components/ui/banner";
@@ -11,7 +11,8 @@ import type { Named, TagLists, TagResult } from "@/lib/ai/tag-item";
 import type { ItemEdits } from "@/lib/items/service";
 import type { DuplicateHint } from "@/lib/items/duplicates";
 import { shrinkPhoto } from "@/lib/import/client-queue";
-import { attachPhotoAction, confirmEntryAction, mergeEntryAction, mirrorEntryAction, rotateEntryAction, saveEditsAction, skipEntryAction } from "./actions";
+import { attachPhotoAction, confirmEntryAction, mergeEntryAction, mirrorEntryAction, rotateEntryAction, saveEditsAction, skipEntryAction, unskipEntryAction } from "./actions";
+import { UndoStrip } from "@/components/ui/undo-strip";
 import { PickSheet, Row, TextSheet } from "@/components/items/row-editor";
 import { BrandSearch } from "@/components/items/brand-search";
 import { MatchSheet } from "@/components/items/match-sheet";
@@ -46,7 +47,11 @@ const nameOf = (xs: Named[], id: string | null) => xs.find((x) => x.id === id)?.
 
 /** Design 03: one tap per item when the tags are right. */
 export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists, counter, progress, duplicate, canEditLists, readyCount, myBrands }: Props) {
+  // "Now the back" asks once per batch (Jeff, 31 Oct 2026, K1): "Not now" sticks for the rest of the pile.
+  const askKey = `fc:askmore-no:${batchId}`;
   const [askMore, setAskMore] = useState(true);
+  useLayoutEffect(() => { try { if (window.sessionStorage.getItem(askKey)) setAskMore(false); } catch { /* private mode */ } }, [askKey]);
+  function notNow() { setAskMore(false); try { window.sessionStorage.setItem(askKey, "1"); } catch { /* private mode */ } }
   /** "Another one like X?" asks once per entry (dismissal survives a reload through sessionStorage). */
   const [askLike, setAskLike] = useState<boolean>(() => Boolean(duplicate) && typeof window !== "undefined" && !window.sessionStorage.getItem(`like-asked:${entry.id}`));
   const [mirrored, setMirrored] = useState(false);
@@ -57,9 +62,12 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
     start(async () => { const r = await mirrorEntryAction(entry.id, duplicate.itemId); if (!r.ok) { setError(r.error); return; } setTags(r.value); setMirrored(true); });
   }
   const router = useRouter();
+  // Each piece starts at the top (router.refresh keeps the old scroll, which left the next photo above the fold).
+  useEffect(() => { window.scrollTo({ top: 0 }); }, []);
   const [tags, setTags] = useState(initial);
   const [lists, setLists] = useState(initialLists);
   const [sheet, setSheet] = useState<SheetKind>(null);
+  const [brandPicking, setBrandPicking] = useState(false); // the brand search takes the Brand · Size sheet's place, never stacks on it; a pick lands back on the card, Close goes back to the sheet
   const [error, setError] = useState<string>();
   const [pending, start] = useTransition();
   const labelRef = useRef<HTMLInputElement>(null);
@@ -125,7 +133,27 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
       router.refresh();
     });
   }
-  function skip() { start(async () => { await skipEntryAction(batchId, entry.id); router.refresh(); }); }
+  // Skip goes at once; the next card says "Skipped · Undo" for a few seconds (Q1).
+  const skippedKey = `fc:skipped:${batchId}`;
+  function skip() { try { window.sessionStorage.setItem(skippedKey, JSON.stringify({ id: entry.id, name: tags.name })); } catch { /* private mode */ } start(async () => { await skipEntryAction(batchId, entry.id); router.refresh(); }); }
+  const [skipped, setSkipped] = useState<{ id: string; name: string } | null>(null);
+  useEffect(() => {
+    try {
+      const raw = window.sessionStorage.getItem(skippedKey);
+      if (!raw) return;
+      window.sessionStorage.removeItem(skippedKey);
+      const last = JSON.parse(raw) as { id: string; name: string };
+      if (last.id === entry.id) return;
+      setSkipped(last);
+      const t = setTimeout(() => setSkipped(null), 5000);
+      return () => clearTimeout(t);
+    } catch { /* ignore */ }
+  }, [entry.id, skippedKey]);
+  function unskip() {
+    if (!skipped) return;
+    const id = skipped.id; setSkipped(null);
+    start(async () => { const r = await unskipEntryAction(batchId, id); if (!r.ok) { setError(r.error); return; } router.push(`/add/${batchId}?entry=${id}`); router.refresh(); });
+  }
   function merge() { if (!duplicate) return; start(async () => { const r = await mergeEntryAction(batchId, entry.id, duplicate.itemId); if (!r.ok) { setError(r.error); return; } router.refresh(); }); }
 
   async function onPhoto(kind: "label" | "worn" | "back", e: React.ChangeEvent<HTMLInputElement>) {
@@ -154,7 +182,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
 
   return (
     <div className="flex flex-1 flex-col">
-      <input ref={labelRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPhoto("label", e)} data-testid="label-photo" />
+      <input ref={labelRef} type="file" accept="image/*" className="hidden" onChange={(e) => onPhoto("label", e)} data-testid="label-photo" />
       <input ref={wornRef} type="file" accept="image/*" className="hidden" onChange={(e) => onPhoto("worn", e)} data-testid="worn-photo" />
       <input ref={backRef} type="file" accept="image/*" className="hidden" onChange={(e) => onPhoto("back", e)} data-testid="back-photo" />
 
@@ -163,7 +191,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden><path d="M5 5l14 14M19 5 5 19" /></svg>
         </Link>
         <span className="mono mono-11 px-2.5 py-1.5" data-testid="confirm-counter">{counter}</span>
-        <button type="button" onClick={skip} disabled={pending} className="pill pill-sm pill-quiet">Skip</button>
+        <button type="button" onClick={skip} disabled={pending} className="pill pill-sm pill-quiet" data-testid="skip-entry">Skip</button>
       </div>
 
       <div className="flex items-end justify-between px-5 pb-3">
@@ -196,26 +224,27 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
           <span className="mono tracking-[0.1em]">{mirrored ? `Details copied from ${duplicate.name ?? "it"} · check the color` : "Looks like one you own"}</span>
           <div className="flex items-center gap-2.5">
             <div className="h-9 w-[30px] overflow-hidden bg-bone">{duplicate.thumbKey ? <img src={`/api/photo/${duplicate.thumbKey}`} alt={duplicate.name ?? "Item you own"} className="size-full object-cover" /> : null}</div>
-            <button type="button" onClick={merge} disabled={pending} className="pill pill-sm">Same?</button>
+            <button type="button" onClick={() => setAskLike(true)} disabled={pending} className="pill pill-sm" data-testid="same-piece">Same?</button>
           </div>
         </div>
       ) : null}
 
       {bgFailed ? <p className="mono mx-5 mt-3 text-graphite">Background could not be removed · the original photo is used</p> : null}
+      {skipped ? <UndoStrip text={`Skipped · ${skipped.name}`} onUndo={unskip} testId="skipped-undo" className="mx-5 mt-3" /> : null}
 
       {askMore && !backKey && !labelKey && !wornKey ? (
         <div className="mx-5 mt-3 border-y border-ink py-2.5" data-testid="ask-more-photos">
           <div className="flex items-center justify-between gap-3">
             <span className="text-[15px] leading-snug">Now the back<span className="mono block text-graphite">So the mirror can show the fit from behind</span></span>
             <div className="flex shrink-0 gap-1.5">
-              <button type="button" onClick={() => backRef.current?.click()} className="pill pill-sm pill-solid" data-testid="more-back">Take it</button>
-              <button type="button" onClick={() => setAskMore(false)} className="pill pill-sm pill-quiet" data-testid="more-no">Not now</button>
+              <button type="button" onClick={() => backRef.current?.click()} className="pill pill-sm" data-testid="more-back">Add the back</button>
+              <button type="button" onClick={notNow} className="pill pill-sm pill-quiet" data-testid="more-no">Not now</button>
             </div>
           </div>
-          <div className="mono mt-2 flex items-center gap-3 text-graphite">
-            <span>Also:</span>
-            <button type="button" onClick={() => labelRef.current?.click()} className="py-1 text-ink" data-testid="more-label">Label</button>
-            <button type="button" onClick={() => wornRef.current?.click()} className="py-1 text-ink" data-testid="more-worn">Worn</button>
+          <div className="mt-2 flex items-center gap-2">
+            <span className="mono text-graphite">Also:</span>
+            <button type="button" onClick={() => labelRef.current?.click()} className="pill pill-sm pill-quiet" data-testid="more-label">Label</button>
+            <button type="button" onClick={() => wornRef.current?.click()} className="pill pill-sm pill-quiet" data-testid="more-worn">Worn</button>
           </div>
         </div>
       ) : null}
@@ -247,11 +276,12 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
       {uploading ? <p className="mono px-5 pt-3 text-graphite">{uploading === "label" ? "Reading the label…" : uploading === "back" ? "Reading front and back…" : "Saving the photo…"}</p> : null}
       {labelKey || wornKey || backKey ? <p className="mono px-5 pt-3 text-graphite" data-testid="photo-status">{[backKey ? "Back photo added" : null, labelKey ? "Label photo added" : null, wornKey ? "Worn photo added" : null].filter(Boolean).join(" · ")}</p> : null}
 
-      <div className="mt-auto flex gap-2.5 px-5 pb-[26px] pt-5">
+      {/* The one action stays in reach: pinned to the bottom of the screen, above the home bar. */}
+      <div className="sticky bottom-0 z-10 mt-auto flex items-center gap-2.5 border-t border-line bg-paper px-5 pb-[calc(16px+env(safe-area-inset-bottom))] pt-3" data-testid="confirm-bar">
         <Button size="lg" className="flex-1 justify-start" shelf={false} icon={<Icons.check />} sub={readyCount > 1 ? "Saves it · next photo" : "Saves it to your closet"} onClick={confirm} disabled={pending || Boolean(uploading)} data-testid="confirm-next">
           {pending ? "Saving…" : readyCount > 1 ? "Looks right · Next" : "Looks right · Done"}
         </Button>
-        <button type="button" onClick={() => setSheet("camera")} aria-label="Add a label or worn photo" className="flex size-[54px] items-center justify-center border border-ink bg-paper text-ink">
+        <button type="button" onClick={() => setSheet("camera")} aria-label="Add a label or worn photo" className="flex size-[60px] shrink-0 items-center justify-center rounded-full border-2 border-ink bg-paper text-ink active:bg-bone">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden><path d="M3 8h4l2-3h6l2 3h4v12H3z" /><circle cx="12" cy="13.5" r="3.5" /></svg>
         </button>
       </div>
@@ -271,12 +301,13 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
         onChange={(ids) => edit({ seasonIds: ids })} onAdded={(e) => setLists((l) => ({ ...l, seasons: [...l.seasons, e] }))} />
       <PickSheet open={sheet === "formality"} onClose={() => setSheet(null)} title="Dress code" kind="formality" options={lists.formalities} selected={tags.formalityId ? [tags.formalityId] : []} canAdd={canEditLists}
         onChange={(ids) => edit({ formalityId: ids[0] ?? null })} onAdded={(e) => setLists((l) => ({ ...l, formalities: [...l.formalities, e] }))} />
-      <Sheet open={sheet === "brand"} onClose={() => setSheet(null)} title="Brand · Size">
+      <Sheet open={sheet === "brand" && !brandPicking} onClose={() => setSheet(null)} title="Brand · Size">
         <div className="flex flex-col">
-          <BrandRows lists={lists} tags={tags} canAdd={canEditLists} onBrand={(id, text) => edit({ brandId: id, brandText: text })} onSize={() => setSheet("size")} onScan={() => labelRef.current?.click()} onAdded={(e) => setLists((l) => ({ ...l, brands: [...l.brands, e] }))} />
+          <BrandRows lists={lists} tags={tags} canAdd={canEditLists} picking={brandPicking} setPicking={setBrandPicking} onBrand={(id, text) => edit({ brandId: id, brandText: text })} onSize={() => setSheet("size")} onScan={() => labelRef.current?.click()} onAdded={(e) => setLists((l) => ({ ...l, brands: [...l.brands, e] }))} />
         </div>
       </Sheet>
       <TextSheet open={sheet === "size"} onClose={() => setSheet("brand")} title="Size" label="Size" value={tags.sizeText ?? ""} placeholder="M · 28 · 8 · EU 38" onSave={(v) => edit({ sizeText: v })} />
+      <BrandSearch open={sheet === "brand" && brandPicking} onClose={() => setBrandPicking(false)} brands={lists.brands} selectedId={tags.brandId} onPick={(b) => { edit({ brandId: b.id, brandText: b.name }); setSheet(null); }} onAdded={(e) => setLists((l) => ({ ...l, brands: [...l.brands, e] }))} />
       <MatchSheet open={sheet === "match"} onClose={() => setSheet(null)} busy={matching || pending} onPick={pickMatch}
         probe={{ brand: brandName ?? "", name: tags.name, category: nameOf(lists.categories, tags.categoryId), color: tags.colorIds[0] ? nameOf(lists.colors, tags.colorIds[0]) : null }} />
       <TextSheet open={sheet === "rename"} onClose={() => setSheet(null)} title="Rename" label="Name" value={tags.name} onSave={(v) => edit({ name: v })} />
@@ -291,13 +322,13 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
       <Sheet open={askLike && Boolean(duplicate)} onClose={dismissLike} title="Another one like this?">
         {duplicate ? (
           <div className="flex flex-col gap-4" data-testid="like-sheet">
-            <div className="flex items-center gap-3">
-              <div className="h-[72px] w-[60px] overflow-hidden bg-bone">{duplicate.thumbKey ? <img src={`/api/photo/${duplicate.thumbKey}`} alt="" className="size-full object-cover" /> : null}</div>
-              <p className="text-[15px] leading-snug">You own <strong>{duplicate.name ?? "a piece like this"}</strong>. Is this another one of the same?</p>
+            <div className="grid grid-cols-2 gap-3">
+              <figure><div className="h-[150px] overflow-hidden bg-bone"><img src={`/api/photo/${photoKey}`} alt="" className="size-full object-contain" /></div><figcaption className="mono mt-1.5 text-graphite">This photo</figcaption></figure>
+              <figure><div className="h-[150px] overflow-hidden bg-bone">{duplicate.thumbKey ? <img src={`/api/photo/${duplicate.thumbKey}`} alt="" className="size-full object-contain" /> : null}</div><figcaption className="mono mt-1.5 truncate text-graphite">{duplicate.name ?? "What you own"}</figcaption></figure>
             </div>
-            <Button size="lg" className="w-full justify-start" shelf={false} icon={<Icons.copy />} sub="Copies its details · you check the color" onClick={mirror} data-testid="like-mirror">Yes · same piece</Button>
-            <button type="button" onClick={() => { dismissLike(); merge(); }} className="pill pill-solid h-[50px] w-full" data-testid="like-merge">It&apos;s this exact one · add the photo to it</button>
-            <button type="button" onClick={dismissLike} className="pill pill-quiet h-[50px] w-full" data-testid="like-new">No · a new piece</button>
+            <Button size="lg" className="w-full justify-start" shelf={false} icon={<Icons.copy />} sub="Copies its details · you check the color" onClick={mirror} data-testid="like-mirror">Another one of these</Button>
+            <button type="button" onClick={() => { dismissLike(); merge(); }} className="pill h-[50px] w-full" data-testid="like-merge">It&apos;s the one I have · add this photo</button>
+            <button type="button" onClick={dismissLike} className="pill pill-quiet h-[50px] w-full" data-testid="like-new">No · something new</button>
           </div>
         ) : null}
       </Sheet>
@@ -305,17 +336,15 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
   );
 }
 
-function BrandRows({ lists, tags, canAdd, onBrand, onSize, onScan, onAdded }: {
-  lists: TagLists; tags: TagResult; canAdd: boolean; onBrand: (id: string | null, text: string | null) => void; onSize: () => void; onScan: () => void; onAdded: (e: Named) => void;
+function BrandRows({ lists, tags, canAdd, picking, setPicking, onBrand, onSize, onScan, onAdded }: {
+  lists: TagLists; tags: TagResult; canAdd: boolean; picking: boolean; setPicking: (v: boolean) => void; onBrand: (id: string | null, text: string | null) => void; onSize: () => void; onScan: () => void; onAdded: (e: Named) => void;
 }) {
-  const [picking, setPicking] = useState(false);
   const brandName = nameOf(lists.brands, tags.brandId) ?? tags.brandText;
   return (
     <>
       <Row label="Brand" value={brandName ?? "Pick a brand"} muted={!brandName} onClick={() => setPicking(true)} />
       <Row label="Size" value={tags.sizeText ?? "Add a size"} muted={!tags.sizeText} onClick={onSize} />
       <button type="button" onClick={onScan} className="pill mt-4 h-[50px]">Scan the label</button>
-      <BrandSearch open={picking} onClose={() => setPicking(false)} brands={lists.brands} selectedId={tags.brandId} onPick={(b) => onBrand(b.id, b.name)} onAdded={onAdded} />
     </>
   );
 }

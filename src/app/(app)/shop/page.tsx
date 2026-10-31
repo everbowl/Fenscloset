@@ -1,6 +1,7 @@
 import { requirePerson } from "@/lib/auth/current";
 import { getLookup, listRecent } from "@/lib/shop/engine";
 import { shoppingFor } from "@/lib/shop/people";
+import { rememberedShopFor } from "@/lib/shop/remember";
 import { newMatchCount } from "@/lib/shop/wants";
 import { openBrandFeed } from "@/lib/shop/brand-feed";
 import { ShopScreen } from "./shop-screen";
@@ -15,7 +16,7 @@ export const dynamic = "force-dynamic";
 export default async function ShopPage({ searchParams }: { searchParams: Promise<{ for?: string; l?: string; /** A store link to judge as soon as the page opens ("Judge it" from a piece's go-with page). */ link?: string }> }) {
   const me = await requirePerson();
   const { for: forParam, l, link } = await searchParams;
-  const { people, forPersonId } = await shoppingFor(me, forParam);
+  const { people, forPersonId } = await shoppingFor(me, forParam ?? (await rememberedShopFor()));
   const [recent, selected, lookingFor, brandFeed] = await Promise.all([listRecent(me, forPersonId), l ? getLookup(me, l) : Promise.resolve(null), newMatchCount(me, forPersonId), openBrandFeed(me, forPersonId)]);
   const tryOn = await tryOnState(me, forPersonId);
   const mannequin = tryOn !== "ready" && isMannequinConfigured() && (await canDress(me, forPersonId));

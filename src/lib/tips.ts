@@ -9,7 +9,7 @@ import type { Viewer } from "@/lib/people/visibility";
 export const GENERAL_TIPS: string[] = [
   "One piece per photo. Never a pile.",
   "Lay it flat on a plain, light background, or hang it on a plain wall. No patterned rugs.",
-  "Front side, done up: buttons, zips, sleeves out. Smooth the wrinkles.",
+  "Front side, done up: buttons, zippers, sleeves out. Smooth the wrinkles.",
   "Stand straight above it so the piece fills the frame. No angles.",
   "Daylight, no flash. By a window is perfect.",
   "Shoot the whole closet in your camera app first, then pick them all here at once.",

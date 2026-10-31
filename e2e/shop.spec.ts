@@ -14,20 +14,21 @@ test("link lookup for me, photo lookup for Mya as a parent, recent list and remo
   await expect(page.getByTestId("shop-empty")).toBeVisible();
   await page.getByTestId("paste-link").click();
   await page.getByRole("dialog").getByRole("textbox").fill("https://mock.example/p/1");
-  await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Judge it" }).click();
   // the lookup runs in the background: the screen shows the step and the seconds while it works (MOCK_SHOP_SLOW_MS makes the mock slow enough to see)
   await expect(page.getByTestId("shop-thinking")).toContainText(/Reading the store page|Looking at the piece|Judging it|Finding what to wear/);
   await expect(page.getByTestId("shop-thinking")).toContainText(/[1-9]\d*s/);
   await expect(page.getByTestId("shop-result")).toBeVisible({ timeout: 20000 });
   await expect(page.getByTestId("shop-thinking")).toHaveCount(0);
   await expect(page.getByTestId("shop-result")).toContainText("Linen Blazer");
-  await expect(page.getByTestId("verdict")).toContainText(/Fits|Risky|Pass/);
+  await expect(page.getByTestId("verdict")).toContainText(/Buy it|Maybe|Skip it/);
   await expect(page.getByTestId("pairings")).toBeVisible();
 
   // shop for Mya (parent): the switcher lists her; Olivia is not offered
   await page.getByTestId("shop-for").click();
   await expect(page.getByRole("dialog").getByRole("option", { name: "Olivia" })).toHaveCount(0);
   await page.getByRole("dialog").getByRole("option", { name: "Mya" }).click();
+  await expect(page.getByTestId("shop-for")).toContainText("Shopping for Mya"); // the pick is remembered, then the page is hers (N1)
   await expect(page).toHaveURL(/for=/);
   await page.getByTestId("upload-screenshot").click();
   await page.getByTestId("shop-file").setInputFiles({ name: "shot.jpg", mimeType: "image/jpeg", buffer: Buffer.from(await (await import("sharp")).default({ create: { width: 200, height: 260, channels: 3, background: { r: 40, g: 40, b: 40 } } }).jpeg().toBuffer()) });
@@ -40,11 +41,12 @@ test("link lookup for me, photo lookup for Mya as a parent, recent list and remo
   await page.getByTestId("judge-product").first().click();
   await expect(page.getByTestId("shop-result")).toContainText("Linen Blazer");
   await page.getByTestId("remove-lookup").click();
+  await expect(page.getByTestId("shop-undo")).toContainText("Removed"); // five seconds to change your mind, then it goes
   // the screenshot lookup for Mya is what's left, so it is shown; removing it too empties the screen
-  await expect(page.getByTestId("shop-result")).toContainText("For Mya");
+  await expect(page.getByTestId("shop-result")).toContainText("For Mya", { timeout: 15_000 });
   await expect(page.getByTestId("shop-result")).not.toContainText("Linen Blazer");
   await page.getByTestId("remove-lookup").click();
-  await expect(page.getByTestId("shop-empty")).toBeVisible();
+  await expect(page.getByTestId("shop-empty")).toBeVisible({ timeout: 15_000 });
 });
 
 test("from a piece in the closet: what would go with it, products for that, looks from the closet; Judge it lands on the Shop", async ({ page }) => {

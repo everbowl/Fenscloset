@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useClosetPick } from "./pick-context";
 import { ItemCard } from "@/components/item-card";
 import { Button } from "@/components/ui/button";
 import { MirrorSheet } from "@/components/mirror/mirror-sheet";
@@ -18,7 +19,7 @@ export const PICK_MAX = 3;
  * sheet as Today opens and dresses them. Pieces the model can't place (hats, bags, jewelry) say so.
  */
 export function ClosetGrid({ items, showOwner, mirror }: { items: ItemCardData[]; showOwner: boolean; mirror: MirrorConfig | null }) {
-  const [picking, setPicking] = useState(false);
+  const { picking, setPicking } = useClosetPick(); // the Mirror pill in the tools row starts it (F1)
   const [picked, setPicked] = useState<string[]>([]);
   const m = useMirror(mirror?.personId ?? "", mirror?.wardrobe, mirror?.engine);
   const onMe = mirror?.tryOn === "ready";
@@ -30,21 +31,11 @@ export function ClosetGrid({ items, showOwner, mirror }: { items: ItemCardData[]
 
   return (
     <>
-      {canMirror ? (
-        picking ? (
-          <div className="mono mt-4 flex items-center justify-between border-y border-ink py-2.5" data-testid="pick-bar" aria-live="polite">
-            <span>{picked.length ? `${picked.length} picked` : "Tap the pieces"} · up to {PICK_MAX}</span>
-            <button type="button" onClick={stop} className="pill pill-sm" data-testid="pick-cancel">Cancel</button>
-          </div>
-        ) : (
-          <button type="button" onClick={() => setPicking(true)} className="mt-4 flex w-full items-center justify-between gap-3 border border-ink px-4 py-3 text-left hover:bg-bone" data-testid="closet-mirror">
-            <span className="flex flex-col gap-0.5">
-              <span className="mono text-[13px] uppercase tracking-[0.18em] text-ink">Mirror</span>
-              <span className="text-[15px] leading-snug">{onMe ? "Pick pieces and see them on you." : "Pick pieces and see them on a mannequin."}</span>
-            </span>
-            <span className="mono text-ink">→</span>
-          </button>
-        )
+      {canMirror && picking ? (
+        <div className="mono mt-4 flex items-center justify-between border-y border-ink py-2.5" data-testid="pick-bar" aria-live="polite">
+          <span>{picked.length ? `${picked.length} picked` : `Tap the pieces · ${onMe ? "they go on you" : "they go on a mannequin"}`} · up to {PICK_MAX}</span>
+          <button type="button" onClick={stop} className="pill pill-sm" data-testid="pick-cancel">Cancel</button>
+        </div>
       ) : null}
       <div className="mt-4 grid grid-cols-2 gap-x-2.5 gap-y-[18px] lg:grid-cols-4 lg:gap-x-4 lg:gap-y-7">
         {items.map((it) => (
@@ -62,7 +53,7 @@ export function ClosetGrid({ items, showOwner, mirror }: { items: ItemCardData[]
           </div>
         </div>
       ) : null}
-      {mirror ? <MirrorSheet m={m} pieces={names} mine personId={mirror.personId} personName={mirror.personName} tryOnState={mirror.tryOn} backPhoto={mirror.backPhoto} mannequinAvailable={mirror.mannequinAvailable} /> : null}
+      {mirror ? <MirrorSheet m={m} pieces={names} mine personId={mirror.personId} personName={mirror.personName} tryOnState={mirror.tryOn} backPhoto={mirror.backPhoto} mannequinAvailable={mirror.mannequinAvailable} admin={mirror.admin} /> : null}
     </>
   );
 }

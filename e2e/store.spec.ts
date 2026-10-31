@@ -22,7 +22,7 @@ test.describe("add from a store", () => {
     await page.getByRole("button", { name: "One more" }).click();
     await expect(page.getByTestId("quantity")).toHaveText("2");
     await page.getByTestId("add-to-closet").click();
-    await expect(page.getByTestId("added-strip")).toContainText("2 added");
+    await expect(page.getByTestId("added-strip")).toContainText("2 ready to check");
 
     // receipt
     await page.getByTestId("tab-receipt").click();
@@ -32,7 +32,7 @@ test.describe("add from a store", () => {
     await page.getByTestId("receipt-file").setInputFiles(file);
     await expect(page.getByTestId("receipt-line")).toHaveCount(2, { timeout: 20_000 });
     await page.getByTestId("add-receipt").click();
-    await expect(page.getByTestId("added-strip")).toContainText("3 added");
+    await expect(page.getByTestId("added-strip")).toContainText("3 ready to check");
 
     // the pieces run through the normal confirm card with the store's facts
     await page.goto("/add");

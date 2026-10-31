@@ -162,6 +162,13 @@ export async function skipEntry(personId: string, entryId: string): Promise<void
   await finishBatchIfDone(entry.batchId);
 }
 
+/** "Skipped · Undo" on the next card (Q1): the piece comes back to the pile while its batch is still open. */
+export async function unskipEntry(personId: string, entryId: string): Promise<void> {
+  const entry = await ownedEntry(personId, entryId);
+  if (entry.status !== "skipped") throw new ItemError("That one is already back.");
+  await db.importEntry.update({ where: { id: entryId }, data: { status: "needs_confirm" } });
+}
+
 export async function attachEntryPhoto(personId: string, entryId: string, kind: "label" | "worn" | "back", key: string): Promise<void> {
   await ownedEntry(personId, entryId);
   await db.importEntry.update({ where: { id: entryId }, data: kind === "label" ? { labelKey: key } : kind === "worn" ? { wornKey: key } : { backKey: key } });
@@ -267,6 +274,14 @@ export async function cycleLaundry(viewer: { id: string; role: string }, itemId:
   const next = LAUNDRY_CYCLE[(LAUNDRY_CYCLE.indexOf(it.laundryStatus) + 1) % LAUNDRY_CYCLE.length];
   await db.item.update({ where: { id: itemId }, data: { laundryStatus: next } });
   return next;
+}
+
+/** Laundry as three states, one tap each on the piece page. */
+export async function setLaundry(viewer: { id: string; role: string }, itemId: string, status: LaundryStatus): Promise<LaundryStatus> {
+  await ownedItem(viewer, itemId);
+  if (!LAUNDRY_CYCLE.includes(status)) throw new ItemError("Pick clean, in the wash, or at the cleaners.");
+  await db.item.update({ where: { id: itemId }, data: { laundryStatus: status } });
+  return status;
 }
 
 export async function addItemPhoto(viewer: { id: string; role: string }, itemId: string, kind: "alone" | "worn" | "label" | "back", key: string): Promise<void> {

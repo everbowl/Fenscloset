@@ -85,18 +85,23 @@ describe("FASHN try-on client", () => {
 
   it("the rule and the keys decide who dresses: the chosen one, both for Compare, a stand-in and a note when a key is missing", () => {
     expect(engineRuleOf("fashn")).toBe("fashn");
+    expect(engineRuleOf("kling")).toBe("kling");
     expect(engineRuleOf("compare")).toBe("compare");
     expect(engineRuleOf("nonsense")).toBe("google");
     expect(engineRuleOf(null)).toBe("google");
-    expect(resolveEngines("google", { google: true, fashn: true })).toEqual({ engines: ["google"] });
-    expect(resolveEngines("compare", { google: true, fashn: true })).toEqual({ engines: ["google", "fashn"] });
-    const noKey = resolveEngines("fashn", { google: true, fashn: false });
+    expect(resolveEngines("google", { google: true, fashn: true, kling: true })).toEqual({ engines: ["google"] });
+    expect(resolveEngines("kling", { google: true, fashn: true, kling: true })).toEqual({ engines: ["kling"] });
+    expect(resolveEngines("compare", { google: true, fashn: true, kling: true })).toEqual({ engines: ["google", "fashn", "kling"] });
+    const noKey = resolveEngines("fashn", { google: true, fashn: false, kling: true });
     expect(noKey.engines).toEqual(["google"]);
     expect(noKey.note).toBe("FASHN isn’t set up yet: no FASHN_API_KEY in Railway. Google dressed this one.");
-    const half = resolveEngines("compare", { google: true, fashn: false });
-    expect(half.engines).toEqual(["google"]);
+    const half = resolveEngines("compare", { google: true, fashn: false, kling: true });
+    expect(half.engines).toEqual(["google", "kling"]);
     expect(half.note).toMatch(/^FASHN isn’t set up yet/);
-    expect(resolveEngines("google", { google: false, fashn: true })).toMatchObject({ engines: ["fashn"] });
-    expect(resolveEngines("compare", { google: false, fashn: false }).engines).toEqual([]);
+    const noKling = resolveEngines("compare", { google: true, fashn: true, kling: false });
+    expect(noKling.engines).toEqual(["google", "fashn"]);
+    expect(noKling.note).toBe("Kling isn’t set up yet: no KLING_ACCESS_KEY and KLING_SECRET_KEY in Railway.");
+    expect(resolveEngines("google", { google: false, fashn: true, kling: false })).toMatchObject({ engines: ["fashn"] });
+    expect(resolveEngines("compare", { google: false, fashn: false, kling: false }).engines).toEqual([]);
   });
 });

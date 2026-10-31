@@ -9,7 +9,7 @@ import type { Named, StyleProfileView } from "@/lib/profiles/service";
 import { setNeverSuggestAction, updateStyleAction } from "../actions";
 
 /** Style profile (screen 12, undrawn): loved / avoid colors, style words, never-suggest list. */
-export function StyleEditor({ ownerId, style, colors, words, canEdit, canEditLists }: { ownerId: string; style: StyleProfileView; colors: Named[]; words: Named[]; canEdit: boolean; canEditLists: boolean }) {
+export function StyleEditor({ ownerId, style, colors, words, canEdit, canEditLists }: { ownerId: string; style: StyleProfileView; colors: (Named & { hex?: string | null })[]; words: Named[]; canEdit: boolean; canEditLists: boolean }) {
   const router = useRouter();
   const [sheet, setSheet] = useState<"loved" | "avoid" | "words" | null>(null);
   const [wordList, setWordList] = useState(words);
@@ -25,8 +25,8 @@ export function StyleEditor({ ownerId, style, colors, words, canEdit, canEditLis
       {error ? <Banner tone="danger" title={error} /> : null}
       <section>
         <p className="mono border-b border-ink pb-2 text-graphite">Colors</p>
-        <Row label="Loved" value={names(colors, style.lovedColorIds) || "Pick colors"} muted={!style.lovedColorIds.length} onClick={() => open("loved")} testId="row-loved" />
-        <Row label="Avoid" value={names(colors, style.avoidColorIds) || "None"} muted={!style.avoidColorIds.length} onClick={() => open("avoid")} />
+        <Row label="Loved" value={names(colors, style.lovedColorIds) || "Pick colors"} muted={!style.lovedColorIds.length} onClick={() => open("loved")} testId="row-loved" trailing={<Swatches colors={colors} ids={style.lovedColorIds} />} />
+        <Row label="Avoid" value={names(colors, style.avoidColorIds) || "None"} muted={!style.avoidColorIds.length} onClick={() => open("avoid")} trailing={<Swatches colors={colors} ids={style.avoidColorIds} />} />
       </section>
       <section>
         <p className="mono border-b border-ink pb-2 text-graphite">Style</p>
@@ -34,7 +34,7 @@ export function StyleEditor({ ownerId, style, colors, words, canEdit, canEditLis
       </section>
       <section>
         <p className="mono border-b border-ink pb-2 text-graphite">Never suggest</p>
-        {style.neverSuggest.length === 0 ? <p className="mono py-3 text-graphite">Nothing excluded · mark a piece on its own page</p> : null}
+        {style.neverSuggest.length === 0 ? <p className="mono py-3 text-graphite">Nothing excluded · turn off “Suggest it” on a piece in <Link href="/closet" className="text-ink underline underline-offset-4">the closet</Link></p> : null}
         {style.neverSuggest.map((it) => (
           <div key={it.id} className="flex h-[42px] items-center justify-between border-b border-line">
             <Link href={`/closet/${it.id}`} className="truncate text-[14px]">{it.name ?? "Untitled piece"}</Link>
@@ -42,9 +42,16 @@ export function StyleEditor({ ownerId, style, colors, words, canEdit, canEditLis
           </div>
         ))}
       </section>
-      <PickSheet open={sheet === "loved"} onClose={() => setSheet(null)} title="Loved colors" kind="color" options={colors} selected={style.lovedColorIds} multi canAdd={false} onChange={(ids) => save({ lovedColorIds: ids })} />
-      <PickSheet open={sheet === "avoid"} onClose={() => setSheet(null)} title="Colors to avoid" kind="color" options={colors} selected={style.avoidColorIds} multi canAdd={false} onChange={(ids) => save({ avoidColorIds: ids })} />
+      <PickSheet open={sheet === "loved"} onClose={() => setSheet(null)} title="Loved colors" kind="color" options={colors.filter((c) => !style.avoidColorIds.includes(c.id))} selected={style.lovedColorIds} multi canAdd={false} onChange={(ids) => save({ lovedColorIds: ids })} />
+      <PickSheet open={sheet === "avoid"} onClose={() => setSheet(null)} title="Colors to avoid" kind="color" options={colors.filter((c) => !style.lovedColorIds.includes(c.id))} selected={style.avoidColorIds} multi canAdd={false} onChange={(ids) => save({ avoidColorIds: ids })} />
       <PickSheet open={sheet === "words"} onClose={() => setSheet(null)} title="Style words" kind="styleWord" options={wordList} selected={style.styleWordIds} multi canAdd={canEditLists} onChange={(ids) => save({ styleWordIds: ids })} onAdded={(e) => setWordList((l) => [...l, e])} />
     </div>
   );
+}
+
+/** The picked colors as dots, next to their names. */
+function Swatches({ colors, ids }: { colors: { id: string; hex?: string | null }[]; ids: string[] }) {
+  const hexes = ids.map((id) => colors.find((c) => c.id === id)?.hex).filter(Boolean) as string[];
+  if (!hexes.length) return null;
+  return <span className="flex shrink-0 gap-1" aria-hidden>{hexes.slice(0, 5).map((h, i) => <span key={i} className="size-3.5 rounded-full border border-line" style={{ background: h }} />)}</span>;
 }

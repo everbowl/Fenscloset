@@ -21,6 +21,13 @@ export async function saveRuleAction(_prev: RuleState, formData: FormData): Prom
   }
 }
 
+/** Save on change: the row saves the moment a value changes, no Save button. */
+export async function setRuleAction(key: string, value: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireAdmin();
+  try { await setRule(key, value); revalidatePath("/admin/rules"); return { ok: true }; }
+  catch (e) { return { ok: false, error: e instanceof Error ? e.message : "Couldn’t save." }; }
+}
+
 export type UntidyState = { done?: UntidyReport; error?: string };
 
 /** Admin maintenance: the pieces Tidy and Smooth touched that still wait for a fresh cutout (remove.bg ran out of credits mid-run, say). */

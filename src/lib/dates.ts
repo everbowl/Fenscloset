@@ -15,11 +15,16 @@ export function hourIn(date: Date, tz: string): number {
   return Number(h) % 24;
 }
 
-/** `SAT 18 OCT` */
+/** `SAT, OCT 18` (Jeff, 31 Oct 2026, C1: month before day, as Americans read it). */
 export function monoDate(key: string): string {
   const d = fromDayKey(key);
   const f = (o: Intl.DateTimeFormatOptions) => d.toLocaleDateString("en-US", { ...o, timeZone: "UTC" }).toUpperCase();
-  return `${f({ weekday: "short" })} ${f({ day: "2-digit" })} ${f({ month: "short" })}`;
+  return `${f({ weekday: "short" })}, ${f({ month: "short" })} ${f({ day: "numeric" })}`;
+}
+
+/** `Oct 18, 2026` for sentences and rows. */
+export function prettyDate(key: string): string {
+  return fromDayKey(key).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
 
 /** `OCT 2026` */

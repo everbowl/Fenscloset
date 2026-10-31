@@ -79,6 +79,7 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
   const [picks, setPicks] = useState<Product[] | null>(null);
   const [error, setError] = useState<string>();
   const [added, setAdded] = useState<number>(0);
+  const [batchId, setBatchId] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [busy, setBusy] = useState<"lookup" | "photos" | "add" | null>(null);
   /** Linear (Jeff, 18 Oct 2026): one question at a time. Color is asked only when the store lists colors, size likewise. */
@@ -119,17 +120,20 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
       const r = await addFromStoreAction({ product: { url: product.url, name: product.name, brandText: product.brandText, storeName: product.storeName, priceText: product.priceText }, imageUrl, color: color || null, size: size || null, quantity: qty });
       setBusy(null);
       if (!r.ok) { setError(r.error); return; }
-      setAdded((n) => n + r.value.count);
+      setAdded((n) => n + r.value.count); setBatchId(r.value.batchId);
       router.refresh();
     });
   }
 
   return (
     <div className="mt-5 flex flex-col gap-5">
-      <Field label="Product link" htmlFor="store-url" hint="Paste the page of the piece you own. Most stores work; some block it, and then you can pick a photo from a search instead.">
-        <Input id="store-url" inputMode="url" autoCapitalize="off" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://shop.lululemon.com/…" data-testid="store-url" />
-      </Field>
-      <Button size="lg" onClick={lookup} disabled={pending || !url.trim()} data-testid="lookup">{busy === "lookup" ? "Looking it up…" : "Look it up"}</Button>
+      <form onSubmit={(e) => { e.preventDefault(); if (url.trim() && !pending) lookup(); }} className="flex flex-col gap-5">
+        <Field label="Product link" htmlFor="store-url" hint="Paste the page of the piece you own. Most stores work; some block it, and then you can pick a photo from a search instead.">
+          <Input id="store-url" type="url" inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} enterKeyHint="go" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://shop.lululemon.com/…" data-testid="store-url" />
+        </Field>
+        {product ? <button type="submit" className="pill self-start" disabled={pending || !url.trim()} data-testid="lookup">{busy === "lookup" ? "Looking it up…" : "Look up another"}</button>
+          : <Button type="submit" size="lg" disabled={pending || !url.trim()} data-testid="lookup">{busy === "lookup" ? "Looking it up…" : "Look it up"}</Button>}
+      </form>
       {error ? <Banner tone="danger" title={error} /> : null}
 
       {product ? (
@@ -146,7 +150,7 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
           {step === "color" ? (
             <Field label="Which color?" htmlFor="store-color" hint="Tap one, or type it and press Next.">
               <Pills options={product.colors} value={color} onPick={pickColor} testPrefix="color" />
-              <div className="flex gap-2"><Input id="store-color" value={color} onChange={(e) => { setColor(e.target.value); setPicks(null); }} placeholder="Black" data-testid="store-color" /><Button type="button" variant="secondary" onClick={() => pickColor(color.trim())} disabled={!color.trim()} data-testid="color-next">Next</Button></div>
+              <div className="flex gap-2"><Input id="store-color" value={color} onChange={(e) => { setColor(e.target.value); setPicks(null); }} placeholder="Black" data-testid="store-color" /><Button type="button" variant="outline" onClick={() => pickColor(color.trim())} disabled={!color.trim()} data-testid="color-next">Next</Button></div>
             </Field>
           ) : null}
           {step !== "color" && color ? <p className="mono" data-testid="chosen-color">Color · {color} <button type="button" onClick={() => setStep("color")} className="ml-2 text-graphite">change</button></p> : null}
@@ -155,7 +159,7 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
           {step === "size" ? (
             <Field label="Which size?" htmlFor="store-size" hint="Tap one, type it, or skip.">
               <Pills options={product.sizes} value={size} onPick={pickSize} testPrefix="size" />
-              <div className="flex gap-2"><Input id="store-size" value={size} onChange={(e) => setSize(e.target.value)} placeholder="M · 32 · 8" data-testid="store-size" /><Button type="button" variant="secondary" onClick={() => pickSize(size.trim())} data-testid="size-next">{size.trim() ? "Next" : "Skip"}</Button></div>
+              <div className="flex gap-2"><Input id="store-size" value={size} onChange={(e) => setSize(e.target.value)} placeholder="M · 32 · 8" data-testid="store-size" /><Button type="button" variant="outline" onClick={() => pickSize(size.trim())} data-testid="size-next">{size.trim() ? "Next" : "Skip"}</Button></div>
             </Field>
           ) : null}
           {step === "qty" && size ? <p className="mono" data-testid="chosen-size">Size · {size} <button type="button" onClick={() => setStep("size")} className="ml-2 text-graphite">change</button></p> : null}
@@ -167,8 +171,8 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
           {step === "qty" && added === 0 ? <Button size="lg" onClick={add} disabled={pending || !imageUrl} data-testid="add-to-closet">{busy === "add" ? "Adding…" : `Add ${qty > 1 ? `${qty} ` : ""}to closet`}</Button> : null}
           {added > 0 ? (
             <div className="flex items-center justify-between border-y border-ink py-2.5" data-testid="added-strip">
-              <span className="mono tracking-[0.1em]">{added} added</span>
-              <div className="flex gap-4"><button type="button" onClick={again} className="pill" data-testid="add-another-color">Another color or size</button><Link href="/add" className="pill pill-solid">Confirm →</Link></div>
+              <span className="mono tracking-[0.1em]">{added} ready to check</span>
+              <div className="flex gap-4"><button type="button" onClick={again} className="pill" data-testid="add-another-color">Another color or size</button><Link href={batchId ? `/add/${batchId}` : "/add"} className="pill pill-solid" data-testid="check-it">Check it →</Link></div>
             </div>
           ) : null}
         </div>
@@ -187,7 +191,7 @@ function ReceiptTab() {
   const [openPicks, setOpenPicks] = useState<number | null>(null);
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState<"read" | "add" | null>(null);
-  const [done, setDone] = useState<{ count: number; skipped: number } | null>(null);
+  const [done, setDone] = useState<{ count: number; skipped: number; batchId: string | null } | null>(null);
   const [pending, start] = useTransition();
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -217,7 +221,7 @@ function ReceiptTab() {
       const r = await addReceiptLinesAction(receipt.storeName ?? "", receipt.orderDate, lines.map((l) => ({ name: l.name, color: l.color, size: l.size, quantity: l.quantity, priceText: l.priceText, pick: l.pick })));
       setBusy(null);
       if (!r.ok) { setError(r.error); return; }
-      setDone({ count: r.value.count, skipped: r.value.skipped });
+      setDone({ count: r.value.count, skipped: r.value.skipped, batchId: r.value.batchId });
       router.refresh();
     });
   }
@@ -251,8 +255,8 @@ function ReceiptTab() {
           ))}
           {done ? (
             <div className="mt-4 flex items-center justify-between border-y border-ink py-2.5" data-testid="added-strip">
-              <span className="mono tracking-[0.1em]">{done.count} added{done.skipped ? ` · ${done.skipped} skipped` : ""}</span>
-              <Link href="/add" className="pill pill-solid">Confirm →</Link>
+              <span className="mono tracking-[0.1em]">{done.count} ready to check{done.skipped ? ` · ${done.skipped} skipped` : ""}</span>
+              <Link href={done.batchId ? `/add/${done.batchId}` : "/add"} className="pill pill-solid" data-testid="check-it">Check it →</Link>
             </div>
           ) : (
             <Button size="lg" className="mt-4" onClick={add} disabled={pending || !total} data-testid="add-receipt">{busy === "add" ? "Adding…" : `Add ${total} piece${total === 1 ? "" : "s"}`}</Button>
