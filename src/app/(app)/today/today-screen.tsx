@@ -82,26 +82,34 @@ export function TodayScreen(p: Props) {
   // Looks are built in the background and polled (20 to 40 seconds of Claude); the screen stays usable and a phone
   // that gives up on a long request has nothing to give up on.
   const poll = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Each build gets a number; a poll from an older build (a check-in saved while the first looks were building) is dropped.
+  const build = useRef(0);
   useEffect(() => () => { if (poll.current) clearTimeout(poll.current); }, []);
-  function looksDone(r: LooksResult, after?: () => void) {
+  function newBuild(): number {
+    if (poll.current) { clearTimeout(poll.current); poll.current = null; }
+    return ++build.current;
+  }
+  function looksDone(r: LooksResult, n: number, after?: () => void) {
+    if (n !== build.current) return; // a newer build took over
     if (!r.ok) { setBusy(null); setError(r.error); router.refresh(); return; }
     if (r.pending) {
       const { jobId } = r.pending;
       poll.current = setTimeout(async () => {
         let next: LooksResult;
         try { next = await looksStatusAction(jobId); } catch { next = r; } // a dropped poll (phone asleep): ask again
-        looksDone(next, after);
+        looksDone(next, n, after);
       }, 2000);
       return;
     }
     setBusy(null); after?.(); router.refresh();
   }
   function buildLooks(label: string, fn: () => Promise<LooksResult>, after?: () => void) {
+    const n = newBuild();
     setError(undefined); setBusy(label);
     start(async () => {
       let r: LooksResult;
       try { r = await fn(); } catch { r = { ok: false, error: "Couldn’t build the looks. Try again." }; }
-      looksDone(r, after);
+      looksDone(r, n, after);
     });
   }
   /** No looks for today yet: ask for them the moment the screen opens. */
@@ -111,16 +119,20 @@ export function TodayScreen(p: Props) {
     asked.current = true;
     buildLooks("regen", () => regenerateAction(p.personId));
   }, [p.needsLooks]); // eslint-disable-line react-hooks/exhaustive-deps
-  /** Save a check-in or plan (quick), close the sheet, then ask for fresh looks while the screen stays usable. */
+  /**
+   * Save a check-in or plan (quick), close the sheet, then ask for fresh looks while the screen stays usable.
+   * Allowed while looks are already building: the build running is followed by a fresh one that knows the new input.
+   */
   function saveThenRefresh(fn: () => Promise<{ ok: boolean; error?: string }>) {
+    const n = newBuild();
     setSheet(null); setError(undefined); setBusy("regen");
     start(async () => {
       const saved = await fn();
-      if (!saved.ok) { setBusy(null); setError(saved.error); router.refresh(); return; }
+      if (!saved.ok) { if (n === build.current) { setBusy(null); setError(saved.error); } router.refresh(); return; }
       router.refresh();
       let r: LooksResult;
-      try { r = await regenerateAction(p.personId); } catch { r = { ok: false, error: "Couldn’t build the looks. Try again." }; }
-      looksDone(r, () => setIndex(0));
+      try { r = await regenerateAction(p.personId, true); } catch { r = { ok: false, error: "Couldn’t build the looks. Try again." }; }
+      looksDone(r, n, () => setIndex(0));
     });
   }
 
@@ -358,7 +370,7 @@ export function TodayScreen(p: Props) {
       {/* Plan: the occasion list (admins add right here), free text, or back to the calendar. */}
       <Sheet open={sheet === "plan"} onClose={() => setSheet(null)} title="Today’s plan">
         <p className="mono mb-3 text-graphite">{p.plan.source === "calendar" ? `From your calendar: ${p.plan.label}` : p.plan.source === "pick" ? `Picked: ${p.plan.label}` : p.calendarConnected ? "Nothing on your calendar today" : p.calendarConfigured ? <>Pick a plan, or <Link href="/profile/settings" className="text-ink underline underline-offset-4">connect Google Calendar</Link></> : "Pick a plan"}</p>
-        <PlanPicker occasions={p.occasions} selected={p.plan.occasionId} isAdmin={p.isAdmin} busy={busy !== null}
+        <PlanPicker occasions={p.occasions} selected={p.plan.occasionId} isAdmin={p.isAdmin} busy={busy !== null && busy !== "regen"}
           onPick={(id) => saveThenRefresh(() => setPlanAction(p.personId, { occasionId: id }))}
           onText={() => setSheet("planText")}
           onClear={p.plan.source === "pick" ? () => saveThenRefresh(() => setPlanAction(p.personId, null)) : undefined} />
@@ -476,6 +488,8 @@ function CheckInSheet({ open, onClose, scales, current, busy, isAdmin, mine, per
   const [answers, setAnswers] = useState<Record<string, string>>(() => Object.fromEntries((current?.answers ?? []).map((a) => [a.scaleId, a.optionId])));
   useEffect(() => { if (open) setAnswers(Object.fromEntries((current?.answers ?? []).map((a) => [a.scaleId, a.optionId]))); }, [open, current]);
   const file = useRef<HTMLInputElement>(null);
+  // Usable while the day's looks are building (Jeff, 2 Nov 2026: "can't click button"); blocked only while another action runs.
+  const blocked = busy !== null && busy !== "regen";
   return (
     <Sheet open={open} onClose={onClose} title="Check-in">
       <p className="mb-4 text-[14px] leading-snug text-graphite">{mine ? "How are you looking today?" : `How is ${personName} looking today?`} Tap, or take a selfie and let the app read it.</p>
@@ -499,8 +513,8 @@ function CheckInSheet({ open, onClose, scales, current, busy, isAdmin, mine, per
         ) : null}
       </div>
       <div className="mt-6 flex flex-col gap-2">
-        <Button className="w-full" busy={busy === "checkin"} disabled={busy !== null} onClick={() => onTaps(Object.entries(answers).filter(([, v]) => v).map(([scaleId, optionId]) => ({ scaleId, optionId })))} data-testid="save-check-in">{busy === "checkin" ? "Saving…" : "Save check-in"}</Button>
-        <button type="button" className="pill h-[50px] w-full" disabled={busy !== null} onClick={() => file.current?.click()}>Take a selfie</button>
+        <Button className="w-full" disabled={blocked} onClick={() => onTaps(Object.entries(answers).filter(([, v]) => v).map(([scaleId, optionId]) => ({ scaleId, optionId })))} data-testid="save-check-in">Save check-in</Button>
+        <button type="button" className="pill h-[50px] w-full" disabled={blocked} onClick={() => file.current?.click()}>Take a selfie</button>
         <input ref={file} type="file" accept="image/*" capture="user" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onSelfie(f); e.target.value = ""; }} />
         {current?.source === "selfie" ? <p className="mono text-graphite">Read from {mine ? "your" : `${personName}’s`} selfie · only {mine ? "you" : `${personName} and a parent`} can see it</p> : null}
       </div>

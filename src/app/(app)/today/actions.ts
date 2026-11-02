@@ -97,13 +97,17 @@ export async function moreAction(personId: string): Promise<LooksResult> {
   } catch (e) { return looksFailed(e); }
 }
 
-/** The day's looks (first open of the day), or fresh ones after new inputs (plan, check-in, weather). */
-export async function regenerateAction(personId: string): Promise<LooksResult> {
+/**
+ * The day's looks (first open of the day), or fresh ones after new inputs (plan, check-in, weather). `afterInputs`:
+ * a build already running started before the new input was saved, so it is followed by a fresh one instead of
+ * joined (Jeff, 2 Nov 2026: the Check-in sheet's Save was dead while the first looks of the day were building).
+ */
+export async function regenerateAction(personId: string, afterInputs = false): Promise<LooksResult> {
   const me = await requirePerson();
   try {
     await assertCanDress(me, personId);
     const ctx = await loadTodayContext(me, personId);
-    const job = startJob<void>(`looks|${personId}|${ctx.date}`, me.id, async () => { await generateSuggestion(personId, ctx.date, ctx); });
+    const job = startJob<void>(`looks|${personId}|${ctx.date}`, me.id, async () => { await generateSuggestion(personId, ctx.date, ctx); }, { after: afterInputs });
     return looksAnswer(await settled(job, QUICK_MS), job.id);
   } catch (e) { return looksFailed(e); }
 }
