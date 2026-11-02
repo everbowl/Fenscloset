@@ -44,6 +44,7 @@ export const HELP_TOPICS: HelpTopic[] = [
   ] },
   { slug: "shop", title: "Should I", accent: "buy it?", blurb: "A verdict before you pay.", link: { href: "/shop", label: "Open Shop" }, cover: { kind: "verdict", word: "BUY IT" }, steps: [
     { text: "Tap SHOP.", cue: { kind: "nav", tab: "Shop" } },
+    { text: "The first time, tap the section you shop in: MEN'S, WOMEN'S, BOYS' or GIRLS'. Every store search carries it, so the other section stays out. Change it any time on the small pill under the title, or in Settings.", cue: { kind: "button", label: "Men's" } },
     { text: "Tap PASTE A LINK and paste the store link, or tap SCREENSHOT, or tap TAKE A PHOTO in the dressing room.", cue: { kind: "button", label: "Paste a link" } },
     { text: "Read the verdict: BUY IT, MAYBE, or SKIP IT, with one reason.", cue: { kind: "verdict", word: "MAYBE" } },
     { text: "Look at WEAR IT WITH to see three ways to wear it with clothes you already own.", cue: { kind: "board" } },

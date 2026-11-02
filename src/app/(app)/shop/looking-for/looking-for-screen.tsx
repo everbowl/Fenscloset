@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
+import { SectionPick } from "@/components/shop/section-pick";
 import { Button } from "@/components/ui/button";
 import { Banner } from "@/components/ui/banner";
 import { Sheet } from "@/components/ui/sheet";
@@ -20,7 +21,7 @@ import { ago } from "./ago";
  * found so far and when the stores were last checked. Add a line and the stores are searched at once in the
  * background; every day after that on the schedule in Admin → Rules.
  */
-export function LookingForScreen({ meId, people, forPersonId, wants }: { meId: string; people: { id: string; name: string }[]; forPersonId: string; wants: WantView[] }) {
+export function LookingForScreen({ meId, people, forPersonId, wants, section, sections, isAdmin }: { meId: string; people: { id: string; name: string }[]; forPersonId: string; wants: WantView[]; section: { id: string; name: string } | null; sections: { id: string; name: string }[]; isAdmin: boolean }) {
   const [sheet, setSheet] = useState<"add" | "for" | null>(null);
   const router = useRouter();
   const [, startFor] = useTransition();
@@ -38,8 +39,9 @@ export function LookingForScreen({ meId, people, forPersonId, wants }: { meId: s
     <div data-testid="looking-for" className="flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-14">
       <div className="order-1 lg:col-span-2">
         <PageHeader
-          eyebrow={<button type="button" onClick={() => setSheet("for")} className="pill pill-sm" aria-haspopup="dialog" data-testid="looking-for-for">For {forPersonId === meId ? "me" : forName} <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden><path d="m6 9 6 6 6-6" /></svg></button>}
+          eyebrow={<span className="flex flex-wrap items-center gap-2"><button type="button" onClick={() => setSheet("for")} className="pill pill-sm" aria-haspopup="dialog" data-testid="looking-for-for">For {forPersonId === meId ? "me" : forName} <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden><path d="m6 9 6 6 6-6" /></svg></button>{section ? <SectionPick personId={forPersonId} forName={forName} mine={forPersonId === meId} section={section} sections={sections} isAdmin={isAdmin} /> : null}</span>}
           title="Looking" accent="for" aside={open.length ? `${open.length} open` : undefined} />
+        {!section ? <SectionPick personId={forPersonId} forName={forName} mine={forPersonId === meId} section={null} sections={sections} isAdmin={isAdmin} className="mb-4" /> : null}
       </div>
       {error ? <Banner tone="danger" title={error} className="mb-3 lg:col-span-2" /> : null}
 

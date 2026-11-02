@@ -56,4 +56,4 @@ Jeff answers in chat (letters and numbers, recommended pick first). Decisions ar
 - **O1 (rec.)** Check-in fix (done, 9fb9a1c) → C (done) → F → A → E → D → B. **O2** B before C.
 
 ## Decisions
-- (none yet; Jeff's answers land here with the date)
+- 2 Nov 2026: A built as A1 while Jeff's answer is pending (Jeff = Men's by the seed; everyone else picks on the Shop or Looking-for the first time, or in Settings → Shops in). A2 would only add the other people's picks.

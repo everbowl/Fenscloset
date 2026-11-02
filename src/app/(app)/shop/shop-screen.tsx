@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
+import { SectionPick } from "@/components/shop/section-pick";
 import { Button, Icons } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { Sheet } from "@/components/ui/sheet";
@@ -23,7 +24,7 @@ const CALL_WORD = { FITS: "Buy it", RISKY: "Maybe", PASS: "Skip it" } as const;
 /** How often the screen asks after a lookup that is still running. */
 const POLL_MS = 2000;
 
-export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn, mannequin, autoLink = null, lookingFor, brandFeed }: { meId: string; people: { id: string; name: string }[]; forPersonId: string; selected: LookupView | null; recent: LookupView[]; tryOn: TryOnState; /** SEE IT ON dresses the shared mannequin when the person's own try-on is not ready. */ mannequin: boolean; /** A store link to judge as soon as the page opens ("Judge it" from a piece's go-with page). */ autoLink?: string | null; /** The person's Looking-for list: how many lines are open and how many matches are new. */ lookingFor: { wants: number; newMatches: number }; /** "New from your brands": the feed as stored, refreshed in the background when stale. */ brandFeed: BrandFeedView }) {
+export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn, mannequin, autoLink = null, lookingFor, brandFeed, section, sections, isAdmin }: { meId: string; people: { id: string; name: string }[]; forPersonId: string; /** The section the person shops in (A1): asked right here while unset. */ section: { id: string; name: string } | null; sections: { id: string; name: string }[]; isAdmin: boolean; selected: LookupView | null; recent: LookupView[]; tryOn: TryOnState; /** SEE IT ON dresses the shared mannequin when the person's own try-on is not ready. */ mannequin: boolean; /** A store link to judge as soon as the page opens ("Judge it" from a piece's go-with page). */ autoLink?: string | null; /** The person's Looking-for list: how many lines are open and how many matches are new. */ lookingFor: { wants: number; newMatches: number }; /** "New from your brands": the feed as stored, refreshed in the background when stale. */ brandFeed: BrandFeedView }) {
   const router = useRouter();
   const [, start] = useTransition();
   const [busy, setBusy] = useState<"link" | "photo" | "delete" | "tryon" | null>(null);
@@ -162,8 +163,9 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
     <div data-testid="shop" className="flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-14" {...drop}>
       <div className="order-1 lg:col-span-2">
         <PageHeader
-          eyebrow={<button type="button" onClick={() => setSheet("for")} className="pill pill-sm" aria-haspopup="dialog" data-testid="shop-for">Shopping for {forPersonId === meId ? "me" : forName} <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden><path d="m6 9 6 6 6-6" /></svg></button>}
+          eyebrow={<span className="flex flex-wrap items-center gap-2"><button type="button" onClick={() => setSheet("for")} className="pill pill-sm" aria-haspopup="dialog" data-testid="shop-for">Shopping for {forPersonId === meId ? "me" : forName} <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden><path d="m6 9 6 6 6-6" /></svg></button>{section ? <SectionPick personId={forPersonId} forName={forName} mine={forPersonId === meId} section={section} sections={sections} isAdmin={isAdmin} /> : null}</span>}
           title="Should I" accent="buy it?" />
+        {!section ? <SectionPick personId={forPersonId} forName={forName} mine={forPersonId === meId} section={null} sections={sections} isAdmin={isAdmin} className="mb-4" /> : null}
       </div>
       {/* The right column on desktop (the ways in, Recent); on phones its children take their own places in the order. */}
       <div className="contents lg:col-start-2 lg:row-start-2 lg:flex lg:flex-col lg:gap-8 lg:self-start lg:sticky lg:top-24">

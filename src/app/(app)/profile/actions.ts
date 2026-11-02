@@ -6,7 +6,7 @@ import { requirePerson } from "@/lib/auth/current";
 import { updatePersonDetails } from "@/lib/people/service";
 import {
   addBodyPhoto, ProfileError, removeBodyPhoto, removeSize, setBodyPhotoPrivacy, setBodyViewers, setFitNotes, setMeasurement, setMinorBodyImageApproval,
-  setNeverSuggest, setShoppers, updateFavorites, updateStyle, upsertSize,
+  setNeverSuggest, setShoppers, setShopSection, updateFavorites, updateStyle, upsertSize,
 } from "@/lib/profiles/service";
 import { forgetTasteFor } from "@/lib/profiles/service";
 import { addInspiration, removeInspiration } from "@/lib/profiles/inspiration";
@@ -86,6 +86,12 @@ export async function setCalendarIdsAction(ids: string[]): Promise<Result> {
   const me = await requirePerson();
   return run(async () => { const { setCalendarIds } = await import("@/lib/plans/google"); await setCalendarIds(me.id, ids); });
 }
+/** The section a person shops in (null owner = me). Revalidates the Shop, where the ask lives. */
+export async function setShopSectionAction(ownerId: string | null, sectionId: string | null): Promise<Result> {
+  const me = await requirePerson();
+  return run(() => setShopSection(me, ownerId ?? me.id, sectionId), ["/profile", "/profile/settings", "/shop", "/shop/looking-for"]);
+}
+
 export async function setSavedZipAction(zip: string): Promise<Result> {
   const me = await requirePerson();
   const z = zip.trim();

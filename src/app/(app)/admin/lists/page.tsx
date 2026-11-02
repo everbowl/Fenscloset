@@ -13,7 +13,7 @@ const GROUPS: { title: string; kinds: ListKind[] }[] = [
   { title: "Sizes & bodies", kinds: ["size", "measurementKind", "brand", "store"] },
   { title: "Check-in & style", kinds: ["checkInScale", "checkInOption", "styleWord"] },
   { title: "Mirror", kinds: ["mirrorPose", "wearGroup", "wearOption"] },
-  { title: "Household", kinds: ["closet"] },
+  { title: "Household", kinds: ["closet", "shopSection"] },
 ];
 
 export default async function ListsOverviewPage() {

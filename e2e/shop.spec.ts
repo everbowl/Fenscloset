@@ -12,6 +12,7 @@ test("link lookup for me, photo lookup for Mya as a parent, recent list and remo
   await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
   await page.goto("/shop");
   await expect(page.getByTestId("shop-empty")).toBeVisible();
+  await expect(page.getByTestId("shop-section")).toContainText("Men's"); // Jeff's section, seeded; every store search carries it
   await page.getByTestId("paste-link").click();
   await page.getByRole("dialog").getByRole("textbox").fill("https://mock.example/p/1");
   await page.getByRole("dialog").getByRole("button", { name: "Judge it" }).click();
@@ -30,6 +31,9 @@ test("link lookup for me, photo lookup for Mya as a parent, recent list and remo
   await page.getByRole("dialog").getByRole("option", { name: "Mya" }).click();
   await expect(page.getByTestId("shop-for")).toContainText("Shopping for Mya"); // the pick is remembered, then the page is hers (N1)
   await expect(page).toHaveURL(/for=/);
+  // Mya has no section yet: the ask sits right here, one tap, no leaving the page
+  await page.getByTestId("shop-section-ask").getByRole("button", { name: "Girls'" }).click();
+  await expect(page.getByTestId("shop-section")).toContainText("Girls'");
   await page.getByTestId("upload-screenshot").click();
   await page.getByTestId("shop-file").setInputFiles({ name: "shot.jpg", mimeType: "image/jpeg", buffer: Buffer.from(await (await import("sharp")).default({ create: { width: 200, height: 260, channels: 3, background: { r: 40, g: 40, b: 40 } } }).jpeg().toBuffer()) });
   await expect(page.getByTestId("shop-result")).toContainText("For Mya");

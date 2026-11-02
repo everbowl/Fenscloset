@@ -3,6 +3,8 @@ import { shoppingFor } from "@/lib/shop/people";
 import { rememberedShopFor } from "@/lib/shop/remember";
 import { listWants } from "@/lib/shop/wants";
 import { LookingForScreen } from "./looking-for-screen";
+import { sectionOf } from "@/lib/shop/section";
+import { listEntries } from "@/lib/lists/service";
 
 export const metadata = { title: "Looking for" };
 export const dynamic = "force-dynamic";
@@ -12,6 +14,6 @@ export default async function LookingForPage({ searchParams }: { searchParams: P
   const me = await requirePerson();
   const { for: forParam } = await searchParams;
   const { people, forPersonId } = await shoppingFor(me, forParam ?? (await rememberedShopFor()));
-  const wants = await listWants(me, forPersonId);
-  return <LookingForScreen meId={me.id} people={people} forPersonId={forPersonId} wants={wants} />;
+  const [wants, section, sections] = await Promise.all([listWants(me, forPersonId), sectionOf(forPersonId), listEntries("shopSection")]);
+  return <LookingForScreen meId={me.id} people={people} forPersonId={forPersonId} wants={wants} section={section} sections={sections.map((x) => ({ id: x.id, name: x.name }))} isAdmin={me.role === "admin"} />;
 }

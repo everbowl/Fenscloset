@@ -41,7 +41,7 @@ describe("looking for", () => {
     expect(done.state).toBe("done");
     let v = (await getWant(jeff, added.id))!;
     expect(v.text).toBe("navy cashmere crewneck under $100");
-    expect(v.queries[0]).toBe("navy cashmere crewneck"); // the price words stay out of the search
+    expect(v.queries[0]).toBe("men's navy cashmere crewneck"); // the price words stay out of the search; Jeff's section (Men's, seeded) leads it
     expect(v.category).toBe("Tops");
     expect(v.maxPrice).toBe(100);
     expect(v.matches.length).toBeGreaterThan(0);

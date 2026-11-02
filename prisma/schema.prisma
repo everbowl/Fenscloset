@@ -64,6 +64,9 @@ model Person {
   favoriteStores     Store[]                  @relation("favoriteStores")
   listRequests       ListRequest[]
   tryOnChoices       TryOnChoice[]
+  /** Which section of a store this person shops in (Men's, Women's, Girls'…): every store search carries it (Jeff, 2 Nov 2026). */
+  shopSectionId      String?
+  shopSection        ShopSection?             @relation(fields: [shopSectionId], references: [id], onDelete: SetNull)
   bodyGrantsGiven    BodyDataGrant[]          @relation("bodyGrantOwner")
   bodyGrantsReceived BodyDataGrant[]          @relation("bodyGrantViewer")
   shopGrantsGiven    ShopForGrant[]           @relation("shopGrantOwner")
@@ -540,6 +543,16 @@ model MeasurementKind {
 /**
  * Editable list: style words a person picks for their style profile.
  */
+/** The sections of a store (Men's, Women's, Boys', Girls', Unisex), editable under Lists; each person picks theirs. */
+model ShopSection {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  sortOrder  Int      @default(0)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  people     Person[]
+}
+
 model StyleWord {
   id         String   @id @default(cuid())
   name       String   @unique
