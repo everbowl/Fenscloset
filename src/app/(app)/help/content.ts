@@ -14,6 +14,8 @@ export const HELP_TOPICS: HelpTopic[] = [
     { text: "Wait. The app cuts out the background and guesses what each piece is.", cue: { kind: "wait" } },
     { text: "For each piece you see a card. If the tags look right, tap LOOKS RIGHT · NEXT. If not, tap the wrong row and pick the right word.", cue: { kind: "button", label: "Looks right · next" } },
     { text: "If it says LOOKS LIKE ONE YOU OWN, tap SAME? if it really is the same piece.", cue: { kind: "strip", label: "Looks like one you own · Same?" } },
+    { text: "Lots of the same piece? Tap FROM A STORE LINK, paste the page, then tap + beside each color and pick one size for all, or say it in words: “I own 7 of these, all Medium: black ×2, navy…”.", cue: { kind: "button", label: "Add 7 to closet" } },
+    { text: "Got receipts or order emails? Tap FROM A RECEIPT and upload as many as you like at once. Each is read once and deleted; the pieces land in the pile with the store's photo.", cue: { kind: "button", label: "Upload receipts" } },
     { text: "You can close the app any time. The pile waits for you.", cue: { kind: "link", label: "× Close" } },
   ] },
   { slug: "closet", title: "See your", accent: "closet", blurb: "Everything you own, by category.", link: { href: "/closet", label: "Open Closet" }, cover: { kind: "nav", tab: "Closet" }, steps: [

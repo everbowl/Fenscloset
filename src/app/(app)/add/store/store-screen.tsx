@@ -8,16 +8,17 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Banner } from "@/components/ui/banner";
 import { Field } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { Input, Textarea } from "@/components/ui/input";
+import { cn } from "@/lib/cn";
 import { shrinkPhoto } from "@/lib/import/client-queue";
 import type { StoreProduct } from "@/lib/store/add";
 import type { MatchedLine, Receipt } from "@/lib/store/receipt";
 import type { Product } from "@/lib/shop/products";
-import { addFromStoreAction, addReceiptLinesAction, colorPhotosAction, lookupProductAction, readReceiptAction } from "./actions";
+import { addReceiptsAction, addStoreRowsAction, colorPhotosAction, lookupProductAction, ownedRowsAction, readReceiptAction } from "./actions";
 
 type Tab = "link" | "receipt";
 
-/** Add from a store: a product link or a receipt → the store's photo and facts → the normal confirm card. */
+/** Add from a store: a product link (how many in each color and size, or said in words) or receipts, as many as you like → the store's photo and facts → the normal confirm card. */
 export function StoreScreen({ canSearch, initialTab = "link" }: { canSearch: boolean; initialTab?: Tab }) {
   const [tab, setTab] = useState<Tab>(initialTab);
   return (
@@ -25,7 +26,7 @@ export function StoreScreen({ canSearch, initialTab = "link" }: { canSearch: boo
       <PageHeader title="Add from" accent="a store" aside={<Link href="/add" className="pill pill-sm">Photos instead</Link>} />
       <div className="mt-2 flex gap-1.5" role="tablist">
         {(["link", "receipt"] as const).map((t) => (
-          <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`mono mono-11 h-9 px-4 ${tab === t ? "bg-ink text-paper" : "border border-ink"}`} data-testid={`tab-${t}`}>{t === "link" ? "Product link" : "Receipt"}</button>
+          <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`mono mono-11 h-9 px-4 ${tab === t ? "bg-ink text-paper" : "border border-ink"}`} data-testid={`tab-${t}`}>{t === "link" ? "Product link" : "Receipts"}</button>
         ))}
       </div>
       {tab === "link" ? <LinkTab canSearch={canSearch} /> : <ReceiptTab />}
@@ -33,12 +34,12 @@ export function StoreScreen({ canSearch, initialTab = "link" }: { canSearch: boo
   );
 }
 
-function Stepper({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+function Stepper({ value, onChange, min = 1, what = "", testId = "quantity" }: { value: number; onChange: (n: number) => void; min?: number; what?: string; testId?: string }) {
   return (
-    <div className="flex h-9 items-center border-b border-ink">
-      <button type="button" aria-label="One fewer" onClick={() => onChange(Math.max(1, value - 1))} className="mono size-9 text-[17px]">−</button>
-      <span className="mono w-10 text-center text-[17px]" data-testid="quantity">{value}</span>
-      <button type="button" aria-label="One more" onClick={() => onChange(Math.min(10, value + 1))} className="mono size-9 text-[17px]">+</button>
+    <div className="flex h-9 shrink-0 items-center border-b border-ink">
+      <button type="button" aria-label={`One fewer${what ? ` ${what}` : ""}`} onClick={() => onChange(Math.max(min, value - 1))} className="mono size-9 text-[17px]">−</button>
+      <span className={cn("mono w-9 text-center text-[17px]", value === 0 && "text-graphite")} data-testid={testId}>{value}</span>
+      <button type="button" aria-label={`One more${what ? ` ${what}` : ""}`} onClick={() => onChange(Math.min(10, value + 1))} className="mono size-9 text-[17px]">+</button>
     </div>
   );
 }
@@ -68,62 +69,101 @@ function PhotoPicks({ picks, chosen, onPick }: { picks: Product[]; chosen: strin
   );
 }
 
+/** One color of the product: how many, its size when it differs from "size for all", and its photo. */
+type Row = { color: string | null; size: string | null; quantity: number; imageUrl: string | null; picks: Product[] | null; sizing: boolean };
+const sameColor = (a: string | null, b: string | null) => (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
+const rowKey = (r: Row) => r.color ?? "any";
+
 function LinkTab({ canSearch }: { canSearch: boolean }) {
   const router = useRouter();
   const [url, setUrl] = useState("");
   const [product, setProduct] = useState<StoreProduct | null>(null);
-  const [color, setColor] = useState("");
-  const [size, setSize] = useState("");
-  const [qty, setQty] = useState(1);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [picks, setPicks] = useState<Product[] | null>(null);
+  const [rows, setRows] = useState<Row[]>([]);
+  const [sizeAll, setSizeAll] = useState("");
+  const [sizeTyped, setSizeTyped] = useState("");
+  const [newColor, setNewColor] = useState("");
+  const [words, setWords] = useState("");
   const [error, setError] = useState<string>();
   const [added, setAdded] = useState<number>(0);
   const [batchId, setBatchId] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const [busy, setBusy] = useState<"lookup" | "photos" | "add" | null>(null);
-  /** Linear (Jeff, 18 Oct 2026): one question at a time. Color is asked only when the store lists colors, size likewise. */
-  const [step, setStep] = useState<"color" | "size" | "qty">("color");
+  const [busy, setBusy] = useState<"lookup" | "words" | "photos" | "add" | null>(null);
+
+  /** The page's colors, each with its own photo when the page gave one; a page without colors gets one row. */
+  const rowsFrom = (p: StoreProduct): Row[] => (p.colors.length ? p.colors : [null]).map((c) => ({ color: c, size: null, quantity: 0, imageUrl: c ? p.colorImages[c] ?? null : p.imageUrl, picks: null, sizing: false }));
+  const patch = (i: number, changes: Partial<Row>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...changes } : r)));
 
   function lookup() {
-    setError(undefined); setProduct(null); setPicks(null); setAdded(0); setBusy("lookup");
+    setError(undefined); setProduct(null); setAdded(0); setBusy("lookup");
     start(async () => {
       const r = await lookupProductAction(url);
       setBusy(null);
       if (!r.ok) { setError(r.error); return; }
-      setProduct(r.value); setColor(""); setSize(""); setQty(1); setImageUrl(r.value.imageUrl);
-      setStep(r.value.colors.length ? "color" : r.value.sizes.length ? "size" : "qty");
+      setProduct(r.value); setRows(rowsFrom(r.value)); setSizeAll(""); setSizeTyped(""); setWords(""); setNewColor("");
     });
   }
-  function pickColor(c: string) {
-    setColor(c); setPicks(null);
-    if (product?.colorImages[c]) setImageUrl(product.colorImages[c]);
-    setStep(product?.sizes.length ? "size" : "qty");
+  function addColor(name: string) {
+    const c = name.trim();
+    if (!c) return;
+    setRows((rs) => {
+      const i = rs.findIndex((r) => sameColor(r.color, c));
+      return i >= 0 ? rs.map((r, j) => (j === i ? { ...r, quantity: Math.min(10, r.quantity + 1) } : r)) : [...rs, { color: c, size: null, quantity: 1, imageUrl: null, picks: null, sizing: false }];
+    });
+    setNewColor("");
   }
-  function pickSize(v: string) { setSize(v); setStep("qty"); }
-  function again() { setAdded(0); setStep(product?.colors.length ? "color" : product?.sizes.length ? "size" : "qty"); }
-  function findPhotos() {
-    if (!product || !color.trim()) return;
+  /** The note becomes counts on the rows: a color the page knows gets its count, a new color gets a row, one size for all when every row says the same size. */
+  function readWords() {
+    if (!product || !words.trim()) return;
+    setError(undefined); setBusy("words");
+    start(async () => {
+      const r = await ownedRowsAction({ name: product.name, colors: product.colors, sizes: product.sizes }, words);
+      setBusy(null);
+      if (!r.ok) { setError(r.error); return; }
+      if (!r.value.length) { setError("Couldn’t read a color or a count in that. Try “black ×2, navy, all M”."); return; }
+      const sizes = new Set(r.value.map((x) => x.size ?? ""));
+      const oneSize = sizes.size === 1 ? [...sizes][0] : "";
+      if (oneSize) setSizeAll(oneSize);
+      setRows((rs) => {
+        const next = rs.map((x) => ({ ...x }));
+        for (const o of r.value) {
+          const i = next.findIndex((x) => sameColor(x.color, o.color));
+          const size = oneSize || !o.size ? null : o.size;
+          if (i >= 0) { next[i].quantity = Math.min(10, o.quantity); next[i].size = size; }
+          else next.push({ color: o.color, size, quantity: Math.min(10, o.quantity), imageUrl: o.color ? null : product.imageUrl, picks: null, sizing: false });
+        }
+        return next;
+      });
+    });
+  }
+  function findPhotos(i: number) {
+    const row = rows[i];
+    if (!product || !row?.color) return;
     setError(undefined); setBusy("photos");
     start(async () => {
-      const r = await colorPhotosAction({ name: product.name, brandText: product.brandText }, color.trim());
+      const r = await colorPhotosAction({ name: product.name, brandText: product.brandText }, row.color!);
       setBusy(null);
       if (!r.ok) { setError(r.error); return; }
-      setPicks(r.value);
-      if (!r.value.length) setError("No photos found for that color. The store's own photo will be used.");
+      patch(i, { picks: r.value });
+      if (!r.value.length) setError(`No photos found in ${row.color}. The store's main photo will be used.`);
     });
   }
+  const chosen = rows.filter((r) => r.quantity > 0);
+  const total = chosen.reduce((n, r) => n + r.quantity, 0);
   function add() {
-    if (!product) return;
+    if (!product || !total) return;
     setError(undefined); setBusy("add");
     start(async () => {
-      const r = await addFromStoreAction({ product: { url: product.url, name: product.name, brandText: product.brandText, storeName: product.storeName, priceText: product.priceText }, imageUrl, color: color || null, size: size || null, quantity: qty });
+      const r = await addStoreRowsAction({
+        product: { url: product.url, name: product.name, brandText: product.brandText, storeName: product.storeName, priceText: product.priceText },
+        rows: chosen.map((x) => ({ color: x.color, size: x.size ?? (sizeAll || null), quantity: x.quantity, imageUrl: x.imageUrl ?? product.imageUrl })),
+      });
       setBusy(null);
       if (!r.ok) { setError(r.error); return; }
-      setAdded((n) => n + r.value.count); setBatchId(r.value.batchId);
+      setAdded(r.value.count); setBatchId(r.value.batchId);
       router.refresh();
     });
   }
+  function again() { setAdded(0); setRows((rs) => rs.map((r) => ({ ...r, quantity: 0, sizing: false }))); setWords(""); }
 
   return (
     <div className="mt-5 flex flex-col gap-5">
@@ -137,42 +177,76 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
       {error ? <Banner tone="danger" title={error} /> : null}
 
       {product ? (
-        <div className="flex flex-col gap-4" data-testid="product-card">
-          <div className="h-[300px] bg-bone">{imageUrl ? <img src={imageUrl} alt="" referrerPolicy="no-referrer" className="size-full object-contain" data-testid="product-image" /> : null}</div>
-          <div>
-            <h2 className="serif text-[26px] leading-tight" data-testid="product-name">{product.name}</h2>
-            <p className="mono mt-1 text-graphite">{[product.brandText, product.storeName, product.priceText].filter(Boolean).join(" · ")}</p>
-            {product.source === "search" ? <p className="mono mt-2 normal-case text-graphite" data-testid="via-search">{product.storeName} blocked the link, so this came from a product search. Check the photo is your piece; if not, type the color and tap “Find a photo in this color”.</p> : null}
+        <div className="flex flex-col gap-6" data-testid="product-card">
+          <div className="flex gap-4">
+            <div className="h-[170px] w-[128px] shrink-0 bg-bone">{product.imageUrl ? <img src={product.imageUrl} alt="" referrerPolicy="no-referrer" className="size-full object-contain" data-testid="product-image" /> : null}</div>
+            <div className="min-w-0">
+              <h2 className="serif text-[26px] leading-tight" data-testid="product-name">{product.name}</h2>
+              <p className="mono mt-1 text-graphite">{[product.brandText, product.storeName, product.priceText].filter(Boolean).join(" · ")}</p>
+              {product.source === "search" ? <p className="mono mt-2 normal-case text-graphite" data-testid="via-search">{product.storeName} blocked the link, so this came from a product search. Check the photo is your piece; if not, tap “find a photo” on a color.</p> : null}
+            </div>
           </div>
-          <ol className="mono flex gap-3 text-graphite" aria-label="Steps">
-            {([["color", "Color"], ["size", "Size"], ["qty", "How many"]] as const).filter(([k]) => k === "qty" || (k === "color" ? product.colors.length : product.sizes.length)).map(([k, l], i) => <li key={k} className={step === k ? "text-ink" : ""}>{i + 1} {l}</li>)}
-          </ol>
-          {step === "color" ? (
-            <Field label="Which color?" htmlFor="store-color" hint="Tap one, or type it and press Next.">
-              <Pills options={product.colors} value={color} onPick={pickColor} testPrefix="color" />
-              <div className="flex gap-2"><Input id="store-color" value={color} onChange={(e) => { setColor(e.target.value); setPicks(null); }} placeholder="Black" data-testid="store-color" /><Button type="button" variant="outline" onClick={() => pickColor(color.trim())} disabled={!color.trim()} data-testid="color-next">Next</Button></div>
+
+          <section>
+            <p className="mono mb-2 border-b border-ink pb-2 text-graphite">Size for all{sizeAll ? <span className="ml-2 text-ink" data-testid="chosen-size">· {sizeAll}</span> : null}</p>
+            <div className="flex flex-col gap-2">
+              <Pills options={product.sizes} value={sizeAll} onPick={(v) => { setSizeAll(v); setSizeTyped(""); }} testPrefix="size" />
+              <form onSubmit={(e) => { e.preventDefault(); if (sizeTyped.trim()) { setSizeAll(sizeTyped.trim()); setSizeTyped(""); } }} className="flex gap-2">
+                <Input id="store-size" value={sizeTyped} onChange={(e) => setSizeTyped(e.target.value)} placeholder={product.sizes.length ? "Or type a size" : "M · 32 · 8"} aria-label="Size for all" data-testid="store-size" />
+                <Button type="submit" variant="outline" disabled={!sizeTyped.trim()} data-testid="size-next">Set</Button>
+              </form>
+              <p className="mono text-graphite">One size differs? Tap “change” on that color.</p>
+            </div>
+          </section>
+
+          <section>
+            <p className="mono mb-1 border-b border-ink pb-2 text-graphite">How many of each color?</p>
+            <div className="flex flex-col" data-testid="color-rows">
+              {rows.map((r, i) => {
+                const size = r.size ?? sizeAll;
+                return (
+                  <div key={rowKey(r)} className="border-b border-line py-2.5" data-testid={`row-${rowKey(r)}`}>
+                    <div className="flex items-center gap-3">
+                      <div className="h-[56px] w-[42px] shrink-0 overflow-hidden bg-bone">{(r.imageUrl ?? product.imageUrl) ? <img src={r.imageUrl ?? product.imageUrl!} alt="" referrerPolicy="no-referrer" loading="lazy" className="size-full object-cover" data-testid={`row-image-${rowKey(r)}`} /> : null}</div>
+                      <div className="min-w-0 flex-1">
+                        <p className={cn("text-[15px] leading-snug", r.quantity > 0 && "font-medium")}>{r.color ?? "No color given"}</p>
+                        <p className="mono mt-0.5 flex flex-wrap gap-x-3 text-graphite">
+                          <span>{size ? `Size ${size}` : "No size"}{r.size && r.size !== sizeAll ? " · its own" : ""}</span>
+                          <button type="button" onClick={() => patch(i, { sizing: !r.sizing })} className="underline underline-offset-4" data-testid={`row-size-change-${rowKey(r)}`}>{r.sizing ? "done" : "change"}</button>
+                          {canSearch && r.color && !r.imageUrl && !r.picks ? <button type="button" onClick={() => findPhotos(i)} disabled={pending} className="underline underline-offset-4" data-testid={`find-photos-${rowKey(r)}`}>{busy === "photos" ? "searching…" : "find a photo"}</button> : null}
+                        </p>
+                      </div>
+                      <Stepper value={r.quantity} min={0} what={r.color ?? "of this"} onChange={(n) => patch(i, { quantity: n })} testId={`qty-${rowKey(r)}`} />
+                    </div>
+                    {r.sizing ? (
+                      <div className="mt-2 flex flex-col gap-2 pl-[54px]">
+                        <Pills options={product.sizes} value={size} onPick={(v) => patch(i, { size: v === sizeAll ? null : v, sizing: false })} testPrefix={`row-size-${rowKey(r)}`} />
+                        <RowSizeInput value={r.size ?? ""} onSet={(v) => patch(i, { size: v && v !== sizeAll ? v : null, sizing: false })} />
+                      </div>
+                    ) : null}
+                    {r.picks && r.picks.length ? <div className="mt-2"><PhotoPicks picks={r.picks} chosen={r.imageUrl} onPick={(u) => patch(i, { imageUrl: u })} /></div> : null}
+                  </div>
+                );
+              })}
+            </div>
+            <form onSubmit={(e) => { e.preventDefault(); addColor(newColor); }} className="mt-3 flex gap-2">
+              <Input value={newColor} onChange={(e) => setNewColor(e.target.value)} placeholder={product.colors.length ? "Another color" : "Name a color"} aria-label="Another color" data-testid="new-color" />
+              <Button type="submit" variant="outline" disabled={!newColor.trim()} data-testid="add-color">Add</Button>
+            </form>
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <Field label="Or tell it in words" htmlFor="owned-words" hint="Colors, counts and a size, any way you say it. It fills the rows above.">
+              <Textarea id="owned-words" value={words} onChange={(e) => setWords(e.target.value)} placeholder="I own 7 of these, all Medium: black ×2, navy, white, grey ×3" rows={2} data-testid="owned-words" />
             </Field>
-          ) : null}
-          {step !== "color" && color ? <p className="mono" data-testid="chosen-color">Color · {color} <button type="button" onClick={() => setStep("color")} className="ml-2 text-graphite">change</button></p> : null}
-          {step !== "color" && canSearch && color.trim() && !product.colorImages[color] && !picks ? <button type="button" onClick={findPhotos} disabled={pending} className="pill self-start" data-testid="find-photos">{busy === "photos" ? "Searching…" : "Find a photo in this color"}</button> : null}
-          {picks && picks.length ? <PhotoPicks picks={picks} chosen={imageUrl} onPick={setImageUrl} /> : null}
-          {step === "size" ? (
-            <Field label="Which size?" htmlFor="store-size" hint="Tap one, type it, or skip.">
-              <Pills options={product.sizes} value={size} onPick={pickSize} testPrefix="size" />
-              <div className="flex gap-2"><Input id="store-size" value={size} onChange={(e) => setSize(e.target.value)} placeholder="M · 32 · 8" data-testid="store-size" /><Button type="button" variant="outline" onClick={() => pickSize(size.trim())} data-testid="size-next">{size.trim() ? "Next" : "Skip"}</Button></div>
-            </Field>
-          ) : null}
-          {step === "qty" && size ? <p className="mono" data-testid="chosen-size">Size · {size} <button type="button" onClick={() => setStep("size")} className="ml-2 text-graphite">change</button></p> : null}
-          {step === "qty" ? (
-            <Field label="How many of this one?">
-              <Stepper value={qty} onChange={setQty} />
-            </Field>
-          ) : null}
-          {step === "qty" && added === 0 ? <Button size="lg" onClick={add} disabled={pending || !imageUrl} data-testid="add-to-closet">{busy === "add" ? "Adding…" : `Add ${qty > 1 ? `${qty} ` : ""}to closet`}</Button> : null}
+            <button type="button" onClick={readWords} disabled={pending || !words.trim()} className="pill self-start" data-testid="read-words">{busy === "words" ? "Reading…" : "Read it"}</button>
+          </section>
+
+          {added === 0 ? <Button size="lg" onClick={add} disabled={pending || !total} sub={total ? `${chosen.length} ${chosen.length === 1 ? "color" : "colors"}${sizeAll ? ` · size ${sizeAll}` : ""}` : "Tap + on a color first"} data-testid="add-to-closet">{busy === "add" ? "Adding…" : `Add ${total || ""} to closet`.replace("  ", " ")}</Button> : null}
           {added > 0 ? (
             <div className="flex items-center justify-between border-y border-ink py-2.5" data-testid="added-strip">
               <span className="mono tracking-[0.1em]">{added} ready to check</span>
-              <div className="flex gap-4"><button type="button" onClick={again} className="pill" data-testid="add-another-color">Another color or size</button><Link href={batchId ? `/add/${batchId}` : "/add"} className="pill pill-solid" data-testid="check-it">Check it →</Link></div>
+              <div className="flex gap-4"><button type="button" onClick={again} className="pill" data-testid="add-another-color">More of this</button><Link href={batchId ? `/add/${batchId}` : "/add"} className="pill pill-solid" data-testid="check-it">Check it →</Link></div>
             </div>
           ) : null}
         </div>
@@ -181,24 +255,40 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
   );
 }
 
+function RowSizeInput({ value, onSet }: { value: string; onSet: (v: string) => void }) {
+  const [v, setV] = useState(value);
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); onSet(v.trim()); }} className="flex gap-2">
+      <Input value={v} onChange={(e) => setV(e.target.value)} placeholder="Or type this color’s size" aria-label="This color’s size" />
+      <Button type="submit" variant="outline">Set</Button>
+    </form>
+  );
+}
+
 type LineState = MatchedLine & { pick: Product | null };
+/** One receipt as uploaded: read in the background while the next ones upload; its lines join the list. */
+type Group = { id: number; fileName: string; receipt: Receipt | null; lines: LineState[]; reading: boolean; error?: string };
+
+/** Up to `limit` at a time: a phone keeps every request short, and three readers at once is plenty. */
+async function mapLimit<T>(items: T[], limit: number, fn: (item: T, i: number) => Promise<void>): Promise<void> {
+  let next = 0;
+  const worker = async () => { while (next < items.length) { const i = next++; await fn(items[i], i); } };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+}
 
 function ReceiptTab() {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [receipt, setReceipt] = useState<Receipt | null>(null);
-  const [lines, setLines] = useState<LineState[]>([]);
-  const [openPicks, setOpenPicks] = useState<number | null>(null);
+  const nextId = useRef(1);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [openPicks, setOpenPicks] = useState<string | null>(null);
   const [error, setError] = useState<string>();
-  const [busy, setBusy] = useState<"read" | "add" | null>(null);
+  const [busy, setBusy] = useState<"add" | null>(null);
   const [done, setDone] = useState<{ count: number; skipped: number; batchId: string | null } | null>(null);
   const [pending, start] = useTransition();
+  const patchGroup = (id: number, changes: Partial<Group>) => setGroups((gs) => gs.map((g) => (g.id === id ? { ...g, ...changes } : g)));
 
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    setError(undefined); setReceipt(null); setLines([]); setDone(null); setBusy("read");
+  async function readOne(file: File, id: number) {
     try {
       const blob = await shrinkPhoto(file);
       const signRes = await fetch("/api/uploads/sign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contentType: blob.type || "image/jpeg", kind: "labels" }) });
@@ -208,58 +298,76 @@ function ReceiptTab() {
       if (!put.ok) throw new Error("Upload failed.");
       const r = await readReceiptAction(signed.key);
       if (!r.ok) throw new Error(r.error);
-      setReceipt(r.value.receipt);
-      setLines(r.value.lines.map((l) => ({ ...l, pick: l.picks[0] ?? null })));
-      if (!r.value.lines.length) setError("No clothing lines were found on that receipt.");
-    } catch (err) { setError((err as Error).message); } finally { setBusy(null); }
+      patchGroup(id, { receipt: r.value.receipt, lines: r.value.lines.map((l) => ({ ...l, pick: l.picks[0] ?? null })), reading: false, error: r.value.lines.length ? undefined : "No clothing lines were found on this one." });
+    } catch (err) { patchGroup(id, { reading: false, error: (err as Error).message }); }
   }
-  function update(i: number, patch: Partial<LineState>) { setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l))); }
+  async function onFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []).slice(0, 40);
+    e.target.value = "";
+    if (!files.length) return;
+    setError(undefined); setDone(null);
+    const first = nextId.current; nextId.current += files.length;
+    setGroups((gs) => [...gs, ...files.map((f, i) => ({ id: first + i, fileName: f.name, receipt: null, lines: [], reading: true }))]);
+    await mapLimit(files, 3, (file, i) => readOne(file, first + i));
+  }
+  function updateLine(gid: number, i: number, changes: Partial<LineState>) { setGroups((gs) => gs.map((g) => (g.id === gid ? { ...g, lines: g.lines.map((l, j) => (j === i ? { ...l, ...changes } : l)) } : g))); }
+  const reading = groups.filter((g) => g.reading).length;
+  const total = groups.reduce((n, g) => n + g.lines.reduce((m, l) => m + (l.pick ? l.quantity : 0), 0), 0);
   function add() {
-    if (!receipt) return;
+    const ready = groups.filter((g) => g.receipt && g.lines.length);
+    if (!ready.length) return;
     setError(undefined); setBusy("add");
     start(async () => {
-      const r = await addReceiptLinesAction(receipt.storeName ?? "", receipt.orderDate, lines.map((l) => ({ name: l.name, color: l.color, size: l.size, quantity: l.quantity, priceText: l.priceText, pick: l.pick })));
+      const r = await addReceiptsAction(ready.map((g) => ({ storeName: g.receipt!.storeName ?? "", purchaseDate: g.receipt!.orderDate, lines: g.lines.map((l) => ({ name: l.name, color: l.color, size: l.size, quantity: l.quantity, priceText: l.priceText, pick: l.pick })) })));
       setBusy(null);
       if (!r.ok) { setError(r.error); return; }
       setDone({ count: r.value.count, skipped: r.value.skipped, batchId: r.value.batchId });
       router.refresh();
     });
   }
-  const total = lines.reduce((n, l) => n + (l.pick ? l.quantity : 0), 0);
 
   return (
     <div className="mt-5 flex flex-col gap-5">
-      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFile} data-testid="receipt-file" />
-      <p className="mono text-graphite">A screenshot of the order email, or a photo of the receipt. It is read once and deleted; only the pieces and prices are kept.</p>
-      <Button size="lg" onClick={() => fileRef.current?.click()} disabled={busy === "read"} data-testid="pick-receipt">{busy === "read" ? "Reading the receipt…" : "Upload a receipt"}</Button>
+      <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onFiles} data-testid="receipt-file" />
+      <p className="mono text-graphite">Screenshots of order emails or photos of paper receipts, as many as you like. Each is read once and deleted; only the pieces and prices are kept.</p>
+      <Button size="lg" onClick={() => fileRef.current?.click()} disabled={busy === "add"} sub={groups.length ? "Add more receipts" : "Pick several at once"} data-testid="pick-receipt">Upload receipts</Button>
+      {reading ? <p className="mono text-ink" role="status" data-testid="receipt-progress">Reading {groups.length - reading + 1} of {groups.length} receipts…</p> : null}
       {error ? <Banner tone="danger" title={error} /> : null}
 
-      {receipt && lines.length ? (
-        <div className="flex flex-col" data-testid="receipt-lines">
-          <p className="mono text-graphite">{[receipt.storeName, receipt.orderDate].filter(Boolean).join(" · ")}</p>
-          {lines.map((l, i) => (
-            <div key={i} className="border-b border-line py-3" data-testid="receipt-line">
-              <div className="flex gap-3">
-                <div className="h-[72px] w-[56px] shrink-0 overflow-hidden bg-bone">{l.pick?.imageUrl ? <img src={l.pick.imageUrl} alt="" referrerPolicy="no-referrer" className="size-full object-cover" /> : null}</div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[15px] font-medium leading-snug">{l.name}</p>
-                  <p className="mono mt-1 text-graphite">{[l.color, l.size, l.quantity > 1 ? `×${l.quantity}` : null, l.priceText, l.pick?.query === "exact" ? "Exact item at the store" : l.pick ? "Closest match" : null].filter(Boolean).join(" · ")}</p>
-                  <div className="mt-1.5 flex gap-4">
-                    {l.picks.length ? <button type="button" onClick={() => setOpenPicks(openPicks === i ? null : i)} className="pill pill-sm" data-testid="pick-another">{l.pick ? "Pick another" : "Pick a photo"}</button> : <span className="mono text-graphite">No photo found · take one later</span>}
-                    {l.pick ? <button type="button" onClick={() => update(i, { pick: null })} className="pill pill-sm pill-quiet">Skip this one</button> : null}
-                  </div>
-                </div>
+      {groups.length ? (
+        <div className="flex flex-col gap-6" data-testid="receipt-groups">
+          {groups.map((g) => (
+            <div key={g.id} className="flex flex-col" data-testid="receipt-group">
+              <div className="flex items-end justify-between border-b border-ink pb-2">
+                <p className="mono text-graphite">{g.reading ? `Reading ${g.fileName}…` : g.receipt ? [g.receipt.storeName ?? "Store", g.receipt.orderDate, g.lines.length ? `${g.lines.length} ${g.lines.length === 1 ? "line" : "lines"}` : null].filter(Boolean).join(" · ") : g.fileName}</p>
+                {!g.reading ? <button type="button" onClick={() => setGroups((gs) => gs.filter((x) => x.id !== g.id))} className="pill pill-sm pill-quiet" data-testid="remove-receipt">Remove</button> : null}
               </div>
-              {openPicks === i ? <div className="mt-3"><PhotoPicks picks={l.picks} chosen={l.pick?.imageUrl ?? null} onPick={(u) => { update(i, { pick: l.picks.find((p) => p.imageUrl === u) ?? null }); setOpenPicks(null); }} /></div> : null}
+              {g.error ? <p className="mono mt-2 text-danger" data-testid="receipt-error">{g.error}</p> : null}
+              {g.lines.map((l, i) => (
+                <div key={i} className="border-b border-line py-3" data-testid="receipt-line">
+                  <div className="flex gap-3">
+                    <div className="h-[72px] w-[56px] shrink-0 overflow-hidden bg-bone">{l.pick?.imageUrl ? <img src={l.pick.imageUrl} alt="" referrerPolicy="no-referrer" className="size-full object-cover" /> : null}</div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[15px] font-medium leading-snug">{l.name}</p>
+                      <p className="mono mt-1 text-graphite">{[l.color, l.size, l.quantity > 1 ? `×${l.quantity}` : null, l.priceText, l.pick?.query === "exact" ? "Exact item at the store" : l.pick ? "Closest match" : null].filter(Boolean).join(" · ")}</p>
+                      <div className="mt-1.5 flex gap-4">
+                        {l.picks.length ? <button type="button" onClick={() => setOpenPicks(openPicks === `${g.id}:${i}` ? null : `${g.id}:${i}`)} className="pill pill-sm" data-testid="pick-another">{l.pick ? "Pick another" : "Pick a photo"}</button> : <span className="mono text-graphite">No photo found · take one later</span>}
+                        {l.pick ? <button type="button" onClick={() => updateLine(g.id, i, { pick: null })} className="pill pill-sm pill-quiet">Skip this one</button> : null}
+                      </div>
+                    </div>
+                  </div>
+                  {openPicks === `${g.id}:${i}` ? <div className="mt-3"><PhotoPicks picks={l.picks} chosen={l.pick?.imageUrl ?? null} onPick={(u) => { updateLine(g.id, i, { pick: l.picks.find((p) => p.imageUrl === u) ?? null }); setOpenPicks(null); }} /></div> : null}
+                </div>
+              ))}
             </div>
           ))}
           {done ? (
-            <div className="mt-4 flex items-center justify-between border-y border-ink py-2.5" data-testid="added-strip">
+            <div className="flex items-center justify-between border-y border-ink py-2.5" data-testid="added-strip">
               <span className="mono tracking-[0.1em]">{done.count} ready to check{done.skipped ? ` · ${done.skipped} skipped` : ""}</span>
               <Link href={done.batchId ? `/add/${done.batchId}` : "/add"} className="pill pill-solid" data-testid="check-it">Check it →</Link>
             </div>
           ) : (
-            <Button size="lg" className="mt-4" onClick={add} disabled={pending || !total} data-testid="add-receipt">{busy === "add" ? "Adding…" : `Add ${total} piece${total === 1 ? "" : "s"}`}</Button>
+            <Button size="lg" onClick={add} disabled={pending || !total || reading > 0} sub={reading ? "Still reading" : groups.length > 1 ? `From ${groups.filter((g) => g.receipt).length} receipts` : undefined} data-testid="add-receipt">{busy === "add" ? "Adding…" : `Add ${total} piece${total === 1 ? "" : "s"}`}</Button>
           )}
         </div>
       ) : null}

@@ -182,6 +182,26 @@ export async function createStoreEntries(personId: string, input: StoreAddInput)
   return { batchId: batch.id, entryIds };
 }
 
+/** One row of the bulk add: a color and size with how many, and the photo for it (the page's photo for that color, a search pick, or the page's main photo). */
+export type StoreRowInput = { color: string | null; size: string | null; quantity: number; imageUrl: string | null };
+const MAX_ROWS = 30;
+
+/**
+ * Several rows of one product at once (Jeff, 2 Nov 2026: "I own 7 of these, all Medium, these colors…", or
+ * a count beside every color): every row becomes its entries in the same open batch. Rows with no count are skipped.
+ */
+export async function createStoreRows(personId: string, product: StoreAddInput["product"], rows: StoreRowInput[], purchaseDate?: string | null): Promise<{ batchId: string; entryIds: string[] }> {
+  const usable = rows.filter((r) => r && r.quantity > 0).slice(0, MAX_ROWS);
+  if (!usable.length) throw new StoreAddError("Say how many of at least one color.");
+  let batchId: string | null = null;
+  const entryIds: string[] = [];
+  for (const r of usable) {
+    const made = await createStoreEntries(personId, { product, imageUrl: r.imageUrl, color: r.color, size: r.size, quantity: r.quantity, purchaseDate });
+    batchId = made.batchId; entryIds.push(...made.entryIds);
+  }
+  return { batchId: batchId!, entryIds };
+}
+
 /** Price text like "$128.00" or "128 USD" → "128.00" for the item, else null. */
 export function priceNumber(priceText: string | null | undefined): string | null {
   const m = (priceText ?? "").replace(/,/g, "").match(/(\d+(?:\.\d{1,2})?)/);

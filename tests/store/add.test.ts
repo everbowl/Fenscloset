@@ -8,7 +8,7 @@ import { resetDb } from "../helpers";
 import { seed } from "../../prisma/seed";
 import { newKey, objectExists, putObject } from "@/lib/storage";
 import { drainQueue } from "@/lib/import/queue";
-import { createStoreEntries, findColorPhotos, lookupProduct, priceNumber, storeNameFromUrl, wordsFromUrl } from "@/lib/store/add";
+import { createStoreEntries, createStoreRows, findColorPhotos, lookupProduct, priceNumber, storeNameFromUrl, wordsFromUrl } from "@/lib/store/add";
 import { parseJsonLoose } from "@/lib/ai/claude";
 import { matchReceipt, readReceipt } from "@/lib/store/receipt";
 import { addItemPhoto, answerPhotoNudge, createItemFromEntry, photoNudge } from "@/lib/items/service";
@@ -141,5 +141,20 @@ describe("add from a store", () => {
     expect(parseJsonLoose<{ a: number }>('Here you go:\n```json\n{"a":1}\n```')).toEqual({ a: 1 });
     expect(parseJsonLoose<{ a: number }>('Sure. {"a":1} Hope that helps.')).toEqual({ a: 1 });
     expect(parseJsonLoose('no json here')).toBeUndefined();
+  });
+
+  it("rows of one product at once (the bulk add): each color and size gets its pieces in one batch, rows with no count are skipped", async () => {
+    const product = { url: "https://mock.example/products/linen-blazer", name: "Linen Blazer", brandText: "Everlane", storeName: "Mock Store", priceText: "$128.00" };
+    const r = await createStoreRows(jeffId, product, [
+      { color: "Black", size: "M", quantity: 2, imageUrl: "https://mock.example/blazer-black.jpg" },
+      { color: "Oatmeal", size: null, quantity: 0, imageUrl: "https://mock.example/blazer.jpg" },
+      { color: "Oatmeal", size: "L", quantity: 1, imageUrl: "https://mock.example/blazer.jpg" },
+    ]);
+    expect(r.entryIds).toHaveLength(3);
+    const entries = await db.importEntry.findMany({ where: { id: { in: r.entryIds } }, orderBy: { order: "asc" } });
+    expect(entries.every((e) => e.batchId === r.batchId)).toBe(true);
+    expect(entries.map((e) => (e.storeMeta as { color: string; size: string | null }).color)).toEqual(["Black", "Black", "Oatmeal"]);
+    expect((entries[2].storeMeta as { size: string }).size).toBe("L");
+    await expect(createStoreRows(jeffId, product, [{ color: "Black", size: null, quantity: 0, imageUrl: null }])).rejects.toThrow(/how many/);
   });
 });

@@ -70,11 +70,11 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
             <button type="button" aria-label="Take a photo" className="flex w-[64px] shrink-0 items-center justify-center rounded-full border-2 border-ink bg-paper text-ink active:bg-bone lg:hidden" onClick={() => cameraRef.current?.click()}><CameraIcon /></button>
           </div>
           <Link href="/add/store?tab=link" className="flex min-h-[64px] w-full items-center justify-between border border-ink px-5 text-left" data-testid="add-by-link">
-            <span><span className="mono block text-[12px] uppercase tracking-[0.16em]">From a store link</span><span className="mono mt-1 block text-[11px] text-graphite">Paste the product page · pick color, size, how many</span></span>
+            <span><span className="mono block text-[12px] uppercase tracking-[0.16em]">From a store link</span><span className="mono mt-1 block text-[11px] text-graphite">Paste the product page · how many in each color and size, or say it in words</span></span>
             <span className="mono">→</span>
           </Link>
           <Link href="/add/store?tab=receipt" className="flex min-h-[64px] w-full items-center justify-between border border-ink px-5 text-left" data-testid="add-by-receipt">
-            <span><span className="mono block text-[12px] uppercase tracking-[0.16em]">From a receipt</span><span className="mono mt-1 block text-[11px] text-graphite">A photo of the receipt · the store's own product photos</span></span>
+            <span><span className="mono block text-[12px] uppercase tracking-[0.16em]">From a receipt</span><span className="mono mt-1 block text-[11px] text-graphite">Receipts or order emails, as many as you like · the stores' own photos</span></span>
             <span className="mono">→</span>
           </Link>
         </div>
