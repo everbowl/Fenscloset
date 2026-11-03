@@ -43,6 +43,15 @@ Jeff answers in chat (letters and numbers, recommended pick first). Decisions ar
   (front, side, back), a better body photo when the mirror struggled, pieces still on a store photo, sizes
   missing for a favorite brand, no shop section. "Not now" hides a row for 30 days.
 - **Q D1 (rec.)** closet page only. **D2** also one line on Today.
+- **Built (3 Nov 2026, D1)**: `src/lib/closet/needs.ts` listNeeds / snoozeNeed; strip `closet/needs-strip.tsx` under the
+  Sort · Filter pills, three rows then "n more". Rows, most pressing first: the mirror could not read a body photo
+  (BodyPhoto.problem, set when FASHN or Kling says "pose", cleared by a dressing that works) → Retake; no front photo →
+  Add front photo (the Body page's privacy ask and upload, now shared: `components/profile/body-photo-upload.tsx`); no
+  shop section → the section pills in the row; a favorite brand with no size → Add size (the Brands page's sheet, now
+  shared: `components/profile/my-brand-sheet.tsx`); pieces still on the store's photo → See them (new closet toggle
+  Store photo, `?store=1`); front but no back → Add back photo. Not now = NeedSnooze row for the new rule
+  needSnoozeDays (Admin → Rules → Closet, 30). Minors and people with the mirror off get no body rows; only the owner
+  sees the strip.
 
 ## E. Several shirts in one photo
 - **Build**: on the confirm card, "Several pieces in this photo?" → Claude counts them and reads each

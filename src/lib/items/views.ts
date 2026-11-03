@@ -17,9 +17,10 @@ export const STATUS_OPTIONS: { id: LaundryStatus; name: string }[] = [
   { id: "clean", name: "Clean" }, { id: "dirty", name: "In the wash" }, { id: "cleaners", name: "At cleaners" },
 ];
 
-export type ClosetFilters = Record<FacetKey, string[]> & { favorites: boolean; unworn: boolean };
-export type Toggle = "favorites" | "unworn";
-export const TOGGLE_LABEL: Record<Toggle, string> = { favorites: "Favorites", unworn: "Never worn" };
+export type ClosetFilters = Record<FacetKey, string[]> & { favorites: boolean; unworn: boolean; store: boolean };
+/** favorites · never worn · still on the store's photo (the What's-needed row's "See them"). */
+export type Toggle = "favorites" | "unworn" | "store";
+export const TOGGLE_LABEL: Record<Toggle, string> = { favorites: "Favorites", unworn: "Never worn", store: "Store photo" };
 
 export const SORTS = [
   { value: "newest", label: "Newest first" },
@@ -39,27 +40,28 @@ export const sortLabel = (s: ClosetSort) => SORTS.find((x) => x.value === s)?.la
 /** A piece with everything a filter or a sort looks at. */
 export type ViewItem = ItemCardData & {
   colorIds: string[]; brandId: string | null; seasonIds: string[]; occasionIds: string[]; formalityIds: string[]; fabricIds: string[]; patternIds: string[]; tagIds: string[]; closetIds: string[];
-  laundryStatus: LaundryStatus; isFavorite: boolean; wearCount: number; lastWornAt: Date | null; createdAt: Date; price: number | null;
+  laundryStatus: LaundryStatus; isFavorite: boolean; storePhoto: boolean; wearCount: number; lastWornAt: Date | null; createdAt: Date; price: number | null;
 };
 
 export function emptyFilters(): ClosetFilters {
-  return { color: [], brand: [], season: [], occasion: [], formality: [], fabric: [], pattern: [], tag: [], closet: [], status: [], favorites: false, unworn: false };
+  return { color: [], brand: [], season: [], occasion: [], formality: [], fabric: [], pattern: [], tag: [], closet: [], status: [], favorites: false, unworn: false, store: false };
 }
 
 export function activeFilterCount(f: ClosetFilters): number {
-  return FACET_KEYS.reduce((n, k) => n + f[k].length, 0) + Number(f.favorites) + Number(f.unworn);
+  return FACET_KEYS.reduce((n, k) => n + f[k].length, 0) + Number(f.favorites) + Number(f.unworn) + Number(f.store);
 }
 
 const ON = new Set(["1", "true", "on", "yes"]);
 type Params = Record<string, string | string[] | undefined>;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 
-/** The view a URL asks for: ?color=a,b&season=c&status=dirty&fav=1&unworn=1&sort=most-worn. Unknown sorts fall back to newest. */
+/** The view a URL asks for: ?color=a,b&season=c&status=dirty&fav=1&unworn=1&store=1&sort=most-worn. Unknown sorts fall back to newest. */
 export function parseClosetParams(sp: Params): { filters: ClosetFilters; sort: ClosetSort } {
   const filters = emptyFilters();
   for (const k of FACET_KEYS) filters[k] = [...new Set(one(sp[k]).split(",").map((s) => s.trim()).filter(Boolean))];
   filters.favorites = ON.has(one(sp.fav).toLowerCase());
   filters.unworn = ON.has(one(sp.unworn).toLowerCase());
+  filters.store = ON.has(one(sp.store).toLowerCase());
   const s = one(sp.sort);
   const sort = SORTS.some((x) => x.value === s) ? (s as ClosetSort) : DEFAULT_SORT;
   return { filters, sort };
@@ -74,6 +76,7 @@ export function closetQuery(opts: { filters?: Partial<ClosetFilters>; sort?: Clo
   for (const k of FACET_KEYS) if (f[k].length) p.set(k, f[k].join(","));
   if (f.favorites) p.set("fav", "1");
   if (f.unworn) p.set("unworn", "1");
+  if (f.store) p.set("store", "1");
   if (opts.sort && opts.sort !== DEFAULT_SORT) p.set("sort", opts.sort);
   const s = p.toString();
   return s ? `?${s}` : "";
@@ -94,6 +97,7 @@ export function matches(it: ViewItem, f: ClosetFilters, except?: FacetKey | Togg
   }
   if (f.favorites && except !== "favorites" && !it.isFavorite) return false;
   if (f.unworn && except !== "unworn" && it.wearCount > 0) return false;
+  if (f.store && except !== "store" && !it.storePhoto) return false;
   return true;
 }
 
@@ -112,12 +116,13 @@ export function facetCounts(items: ViewItem[], f: ClosetFilters, key: FacetKey):
 }
 
 export function toggleCounts(items: ViewItem[], f: ClosetFilters): Record<Toggle, number> {
-  let favorites = 0, unworn = 0;
+  let favorites = 0, unworn = 0, store = 0;
   for (const it of items) {
     if (it.isFavorite && matches(it, f, "favorites")) favorites++;
     if (it.wearCount === 0 && matches(it, f, "unworn")) unworn++;
+    if (it.storePhoto && matches(it, f, "store")) store++;
   }
-  return { favorites, unworn };
+  return { favorites, unworn, store };
 }
 
 const time = (d: Date | null) => (d ? d.getTime() : null);

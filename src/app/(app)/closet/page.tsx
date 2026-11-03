@@ -15,6 +15,10 @@ import { ClosetGrid } from "./closet-grid";
 import { ClosetTools } from "./closet-tools";
 import { ClosetPickProvider } from "./pick-context";
 import { countCleanOut } from "@/lib/outfits/cleanout";
+import { listNeeds } from "@/lib/closet/needs";
+import { bodyViewerNames } from "@/lib/profiles/service";
+import { likelySizes, sizeOptionsByCategory } from "@/lib/profiles/sizes";
+import { NeedsStrip } from "./needs-strip";
 
 export const metadata = { title: "Closet" };
 export const dynamic = "force-dynamic";
@@ -34,6 +38,14 @@ export default async function ClosetPage({ searchParams }: { searchParams: Promi
   const mirror = mine || view.kind === "family" ? await mirrorConfig(person) : null;
   const canMirror = Boolean(mirror && (mirror.tryOn === "ready" || mirror.mannequinAvailable));
   const cleanOut = mine ? await countCleanOut(person.id) : 0;
+  // What's needed (D1): the owner's own closet only; the rows' sheets get their lists only when a row needs them.
+  const needs = mine ? await listNeeds(person, person.id) : [];
+  const [sections, sizeOptions, likely, visibleTo] = await Promise.all([
+    needs.some((n) => n.kind === "section") ? listEntries("shopSection") : [],
+    needs.some((n) => n.kind === "size") ? sizeOptionsByCategory() : [],
+    needs.some((n) => n.kind === "size") ? likelySizes(person.id) : null,
+    needs.some((n) => n.view) ? bodyViewerNames(person.id) : [],
+  ]);
   const filtered = activeFilterCount(filters) > 0;
   const narrowed = Boolean(categoryId || q || filtered);
   // Everything but the category rides along when a tab changes: the search, the sort, the filters.
@@ -47,6 +59,7 @@ export default async function ClosetPage({ searchParams }: { searchParams: Promi
       <FilterTabs categories={categories} active={categoryId} basePath="/closet" keep={keep} canEdit={isAdmin(person)} />
       <ClosetPickProvider>
       <ClosetTools basePath="/closet" filters={filters} sort={sort} facets={facets} toggles={toggles} shown={shown} total={total} cat={categoryId} q={q} mirror={canMirror && items.length > 0} cleanOut={cleanOut} />
+      {needs.length ? <NeedsStrip personId={person.id} needs={needs} sections={sections} isAdmin={isAdmin(person)} sizeOptions={sizeOptions} likely={likely} visibleTo={visibleTo} /> : null}
       {items.length ? (
         <ClosetGrid items={items} showOwner={view.kind === "family"} mirror={mirror} />
       ) : (

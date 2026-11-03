@@ -67,6 +67,7 @@ model Person {
   /** Which section of a store this person shops in (Men's, Women's, Girls'…): every store search carries it (Jeff, 2 Nov 2026). */
   shopSectionId      String?
   shopSection        ShopSection?             @relation(fields: [shopSectionId], references: [id], onDelete: SetNull)
+  needSnoozes        NeedSnooze[]
   bodyGrantsGiven    BodyDataGrant[]          @relation("bodyGrantOwner")
   bodyGrantsReceived BodyDataGrant[]          @relation("bodyGrantViewer")
   shopGrantsGiven    ShopForGrant[]           @relation("shopGrantOwner")
@@ -617,9 +618,22 @@ model BodyPhoto {
   /** Locked to the owner: nobody else sees it, the AI may still use it to dress the owner. */
   onlyMe    Boolean  @default(false)
   takenAt   DateTime @default(now())
+  /** What an engine last said about this photo when it could not make out the body (the Closet's What's-needed asks for a retake); null once a dressing on it works. */
+  problem   String?
   person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
 
   @@index([personId])
+}
+
+/// "Not now" on a What's-needed row of the Closet page (Jeff, 2 Nov 2026, D1): the row stays hidden until this date.
+model NeedSnooze {
+  personId  String
+  key       String
+  until     DateTime
+  createdAt DateTime @default(now())
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@id([personId, key])
 }
 
 /**

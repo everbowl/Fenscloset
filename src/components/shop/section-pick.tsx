@@ -13,8 +13,9 @@ type Named = { id: string; name: string };
  * right on the Shop, nobody leaves the page to fix it. Set: a small pill under the title that opens the list.
  * Anyone who may shop for the person may pick it (the person, a parent of a minor, a shopper they allowed).
  */
-export function SectionPick({ personId, forName, mine, section, sections, isAdmin, className }: {
+export function SectionPick({ personId, forName, mine, section, sections, isAdmin, className, bare = false }: {
   personId: string; forName: string; mine: boolean; section: Named | null; sections: Named[]; isAdmin: boolean; className?: string;
+  /** Only the pills, for a row that already asks the question (the Closet's What's-needed strip). */ bare?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -23,15 +24,20 @@ export function SectionPick({ personId, forName, mine, section, sections, isAdmi
   const pick = (id: string | null) => { setOpen(false); setError(undefined); start(async () => { const r = await setShopSectionAction(personId, id); if (!r.ok) setError(r.error); router.refresh(); }); };
   const sheet = <PickSheet open={open} onClose={() => setOpen(false)} title={mine ? "I shop in" : `${forName} shops in`} kind="shopSection" options={sections} selected={section ? [section.id] : []} canAdd={isAdmin} onChange={(ids) => pick(ids[0] ?? null)} clearable={Boolean(section)} />;
   if (!section) {
+    const pills = (
+      <div className={cn("flex flex-wrap gap-2", !bare && "mt-2.5")}>
+        {sections.map((s) => <button key={s.id} type="button" onClick={() => pick(s.id)} className="pill pill-sm" data-testid={`section-${s.name}`}>{s.name}</button>)}
+        {isAdmin ? <button type="button" onClick={() => setOpen(true)} className="pill pill-sm pill-quiet">Another…</button> : null}
+      </div>
+    );
+    const note = error ? <p className="mono mt-2 text-danger" role="alert">{error}</p> : null;
+    if (bare) return <>{pills}{note}{sheet}</>;
     return (
       <div className={cn("border-y border-ink py-3", className)} data-testid="shop-section-ask">
         <p className="mono text-ink">Which section {mine ? "do you" : `does ${forName}`} shop in?</p>
         <p className="mono mt-1 text-graphite">Every store search carries it, so the other section stays out.</p>
-        <div className="mt-2.5 flex flex-wrap gap-2">
-          {sections.map((s) => <button key={s.id} type="button" onClick={() => pick(s.id)} className="pill pill-sm" data-testid={`section-${s.name}`}>{s.name}</button>)}
-          {isAdmin ? <button type="button" onClick={() => setOpen(true)} className="pill pill-sm pill-quiet">Another…</button> : null}
-        </div>
-        {error ? <p className="mono mt-2 text-danger" role="alert">{error}</p> : null}
+        {pills}
+        {note}
         {sheet}
       </div>
     );

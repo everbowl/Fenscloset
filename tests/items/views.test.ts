@@ -7,7 +7,7 @@ const at = (d: number) => new Date(t0.getTime() + d * day);
 const piece = (id: string, o: Partial<ViewItem> = {}): ViewItem => ({
   id, name: id, thumbKey: null, categoryName: "Tops", status: "New", ownerId: "jeff", ownerName: "Jeff", copies: 1, copiesWord: null,
   colorIds: [], brandId: null, seasonIds: [], occasionIds: [], formalityIds: [], fabricIds: [], patternIds: [], tagIds: [], closetIds: [],
-  laundryStatus: "clean", isFavorite: false, wearCount: 0, lastWornAt: null, createdAt: t0, price: null, ...o,
+  laundryStatus: "clean", isFavorite: false, storePhoto: false, wearCount: 0, lastWornAt: null, createdAt: t0, price: null, ...o,
 });
 const tee = piece("tee", { colorIds: ["black"], brandId: "uniqlo", seasonIds: ["summer"], isFavorite: true, wearCount: 5, lastWornAt: at(-2), createdAt: at(-30), price: 25 });
 const hoodie = piece("hoodie", { colorIds: ["black"], brandId: "nike", seasonIds: ["fall", "winter"], laundryStatus: "dirty", wearCount: 2, lastWornAt: at(-30), createdAt: at(-10), price: 60 });
@@ -61,9 +61,9 @@ describe("closet views: filters", () => {
     expect(Object.fromEntries(facetCounts(all, black, "brand"))).toEqual({ uniqlo: 1, nike: 2 });
     expect(Object.fromEntries(facetCounts(all, f({ brand: ["nike"] }), "status"))).toEqual({ dirty: 1, cleaners: 1 });
     expect(Object.fromEntries(facetCounts(all, f({ color: ["black"], favorites: true }), "season"))).toEqual({ summer: 1 });
-    expect(toggleCounts(all, black)).toEqual({ favorites: 1, unworn: 0 });
-    expect(toggleCounts(all, f({ favorites: true }))).toEqual({ favorites: 1, unworn: 0 }); // each toggle's count respects the other one: no favorite is unworn
-    expect(toggleCounts(all, f({ unworn: true }))).toEqual({ favorites: 0, unworn: 1 });
+    expect(toggleCounts(all, black)).toEqual({ favorites: 1, unworn: 0, store: 0 });
+    expect(toggleCounts(all, f({ favorites: true }))).toEqual({ favorites: 1, unworn: 0, store: 0 }); // each toggle's count respects the other one: no favorite is unworn
+    expect(toggleCounts(all, f({ unworn: true }))).toEqual({ favorites: 0, unworn: 1, store: 0 });
   });
 });
 
@@ -88,5 +88,16 @@ describe("closet views: sorts", () => {
     expect(ids(sortItems([a, b, c], "name"))).toEqual(["Tee 2", "Tee 2", "Tee 10"]);
     expect(sortItems([a, c, b], "name")[0]).toBe(b); // the newer of the two "Tee 2"
     expect(ids(sortItems([a, b, c], "most-worn"))).toEqual(["Tee 2", "Tee 10", "Tee 2"]); // all unworn: newest first, the name between the two of a day
+  });
+});
+
+describe("the Store photo toggle (the What's-needed row's See them)", () => {
+  it("keeps the pieces still on the store's photo, counts them, and lives in the URL as store=1", () => {
+    const storeTee = piece("store-tee", { storePhoto: true });
+    expect(ids(applyFilters([...all, storeTee], f({ store: true })))).toEqual(["store-tee"]);
+    expect(toggleCounts([...all, storeTee], f({})).store).toBe(1);
+    expect(activeFilterCount(f({ store: true }))).toBe(1);
+    expect(closetQuery({ filters: { store: true } })).toBe("?store=1");
+    expect(parseClosetParams({ store: "1" }).filters.store).toBe(true);
   });
 });

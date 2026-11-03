@@ -21,6 +21,7 @@ export const RULE_COPY: Record<string, { label: string; description: string; uni
   noRepeatDays: { label: "Days before a piece repeats", description: "A piece worn within this many days is not suggested again.", unit: "days" },
   notWornMonths: { label: "Months before a clean-out nudge", description: "A piece not worn in this many months lands on the Clean-out list.", unit: "months" },
   laundryCycleDays: { label: "Days between washes", description: "With ten of the same shirt, this says how many you really need: the Clean-out suggests the rest can go.", unit: "days" },
+  needSnoozeDays: { label: "Days a Not now lasts", description: "Not now on a What’s-needed row of the Closet hides that row for this many days.", unit: "days" },
   timezone: { label: "Household time zone", description: "When “today” starts for check-ins, looks and the Fits calendar." },
   accentColor: { label: "Button color", description: "The color of the main buttons. Everything else stays black and white." },
   mirrorEngine: { label: "Mirror engine", description: "Who dresses a look on a body photo. Compare runs every engine that is set up and shows them side by side." },
@@ -39,6 +40,7 @@ export const RULE_COPY: Record<string, { label: string; description: string; uni
 /** `advanced` groups fold under one "Advanced" heading on the Rules page (Jeff, 31 Oct 2026, R1). */
 export const RULE_GROUPS: { title: string; blurb?: string; keys: string[]; compact?: boolean; advanced?: boolean }[] = [
   { title: "Outfits", keys: ["noRepeatDays", "notWornMonths", "laundryCycleDays"] },
+  { title: "Closet", keys: ["needSnoozeDays"] },
   { title: "Household", keys: ["timezone", "accentColor"] },
   { title: "Mirror", keys: ["mirrorEngine"], advanced: true },
   { title: "Shop", keys: ["wantSweepHours"] },

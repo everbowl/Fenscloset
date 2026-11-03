@@ -101,7 +101,7 @@ export type ClosetViewData = {
 
 const viewSelect = {
   ...cardSelect,
-  brandId: true, isFavorite: true, lastWornAt: true, createdAt: true, purchasePrice: true,
+  brandId: true, isFavorite: true, storePhoto: true, lastWornAt: true, createdAt: true, purchasePrice: true,
   colors: { select: { id: true } }, seasons: { select: { id: true } }, occasions: { select: { id: true } }, formalities: { select: { id: true } },
   fabrics: { select: { id: true } }, patterns: { select: { id: true } }, tags: { select: { id: true } }, closets: { select: { closetId: true } },
 };
@@ -150,7 +150,7 @@ export async function loadClosetView(view: ClosetView, opts: { categoryId?: stri
     status: statusWord(it), copies: it.copies, copiesWord: copiesWord(countsOf(it)), ownerId: it.ownerId, ownerName: it.owner.name.split(" ")[0],
     colorIds: it.colors.map((x) => x.id), brandId: it.brandId, seasonIds: it.seasons.map((x) => x.id), occasionIds: it.occasions.map((x) => x.id),
     formalityIds: it.formalities.map((x) => x.id), fabricIds: it.fabrics.map((x) => x.id), patternIds: it.patterns.map((x) => x.id), tagIds: it.tags.map((x) => x.id),
-    closetIds: it.closets.map((x) => x.closetId), laundryStatus: it.laundryStatus, isFavorite: it.isFavorite, wearCount: it.wearCount, lastWornAt: it.lastWornAt,
+    closetIds: it.closets.map((x) => x.closetId), laundryStatus: it.laundryStatus, isFavorite: it.isFavorite, storePhoto: it.storePhoto, wearCount: it.wearCount, lastWornAt: it.lastWornAt,
     createdAt: it.createdAt, price: it.purchasePrice === null ? null : Number(it.purchasePrice),
   }));
   const kept = sortItems(applyFilters(all, opts.filters), opts.sort);

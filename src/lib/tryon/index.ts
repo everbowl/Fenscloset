@@ -240,12 +240,16 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
           out = by === "fashn" ? await fashnTryOn(person, garment, g.id === "extra" ? "auto" : (fashnCategory(g.category) ?? "auto")) : by === "kling" ? await klingTryOn(person, garment) : await googleTryOn(person, garment);
         } catch (e) {
           if (e instanceof TryOnModelError) throw new TryOnError(e.message, 502);
-          if (e instanceof FashnError || e instanceof KlingError) throw new TryOnError(e.message, e.status);
+          if (e instanceof FashnError || e instanceof KlingError) {
+            if (e.code === "pose") await noteBodyPhotoProblem(photo.id, e.message); // the Closet's What's-needed asks for a retake
+            throw new TryOnError(e.message, e.status);
+          }
           throw e;
         }
         person = await sharp(out.data).jpeg({ quality: 90 }).toBuffer();
       }
     }
+    if (photo.problem) await noteBodyPhotoProblem(photo.id, null); // the engine read the body this time: the retake row goes
     // Is each piece worn as it really is (full length, no holes, no missing panels)? If not, the image model dresses the
     // person once more with the pieces named, and the first picture that passes is kept. Neither passing: the try-on's
     // picture stays, with what the check saw under it, rather than nothing at all.
@@ -356,6 +360,11 @@ export async function dressOnMe(viewer: Viewer, personId: string, itemIds: strin
 }
 
 /** Does this person have a back photo (so the mirror can offer the view from behind)? */
+/** What an engine said about a body photo it could not make out (the Closet's What's-needed asks for a retake); null once a dressing on it works. */
+export async function noteBodyPhotoProblem(photoId: string, problem: string | null): Promise<void> {
+  await db.bodyPhoto.update({ where: { id: photoId }, data: { problem } }).catch(() => {}); // the photo may have been removed meanwhile
+}
+
 export async function hasBackPhoto(personId: string): Promise<boolean> {
   return Boolean(await db.bodyPhoto.findFirst({ where: { personId, view: "back" }, select: { id: true } }));
 }

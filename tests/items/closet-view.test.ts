@@ -55,7 +55,7 @@ describe("loadClosetView", () => {
     expect(facet("status").options.map((o) => [o.id, o.name, o.count])).toEqual([["clean", "Clean", 3], ["dirty", "In the wash", 1]]);
     expect(facet("closet").options.map((o) => [o.name, o.count])).toEqual([["Family", 1]]);
     expect(v.facets.map((f) => f.key)).not.toContain("fabric"); // nothing tagged with one: no section
-    expect(v.toggles).toEqual({ favorites: 1, unworn: 1 });
+    expect(v.toggles).toEqual({ favorites: 1, unworn: 1, store: 0 });
   });
 
   it("filters and sorts, keeps the sibling options of a picked facet, narrows by the tab and the search, and counts the whole view as the total", async () => {
@@ -65,7 +65,7 @@ describe("loadClosetView", () => {
     expect(v.items.map((i) => i.name)).toEqual(["Black hoodie", "Black tee"]);
     expect(v.facets.find((f) => f.key === "color")!.options.map((o) => o.name)).toEqual(["Black", "White"]);
     expect(v.facets.find((f) => f.key === "brand")!.options).toEqual([{ id: ids.nike, name: "Nike", count: 2 }]);
-    expect(v.toggles).toEqual({ favorites: 1, unworn: 0 });
+    expect(v.toggles).toEqual({ favorites: 1, unworn: 0, store: 0 });
     const laundry = await loadClosetView(view(), { filters: { ...black, status: ["dirty"] }, sort: "newest" });
     expect(laundry.items.map((i) => i.name)).toEqual(["Black hoodie"]);
     const tab = await loadClosetView(view(), { categoryId: ids.bottoms, filters: emptyFilters(), sort: "newest" });

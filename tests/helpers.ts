@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 export async function resetDb() {
   const tables = [
     "Want", "BrandFeed", "GoWith", "ShoppingLookup", "LookFeedback", "InspirationLook", "TryOn", "DayPlan", "CheckInAnswer", "CheckIn", "FitViewer", "FitItem", "WearLog", "Fit", "OutfitSuggestion", "TogetherPerson", "TogetherSession", "GoogleCalendarConnection", "WeatherCache",
-    "BodyMeasurement", "BodySizeByBrand", "BodyPhoto", "BodyProfile", "BodyDataGrant", "ShopForGrant", "MinorBodyImageApproval", "MeasurementKind", "StyleWord",
+    "NeedSnooze", "BodyMeasurement", "BodySizeByBrand", "BodyPhoto", "BodyProfile", "BodyDataGrant", "ShopForGrant", "MinorBodyImageApproval", "MeasurementKind", "StyleWord",
     "ImportEntry", "ImportBatch", "ItemPhoto", "ItemShare", "ItemCloset", "Item", "Session", "PasswordResetToken", "InviteToken", "GuardianLink",
     "Closet", "Subcategory", "Category", "Color", "Pattern", "Fabric", "Season",
     "FormalityLevel", "Occasion", "Tag", "Brand", "Store", "CheckInOption", "CheckInScale",

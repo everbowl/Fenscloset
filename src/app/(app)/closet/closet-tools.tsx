@@ -10,7 +10,7 @@ import { cn } from "@/lib/cn";
 import { activeFilterCount, closetQuery, emptyFilters, FACET_KEYS, SORTS, sortLabel, TOGGLE_LABEL, type ClosetFilters, type ClosetSort, type FacetKey, type Toggle } from "@/lib/items/views";
 import type { Facet } from "@/lib/items/query";
 
-const TOGGLES: Toggle[] = ["favorites", "unworn"];
+const TOGGLES: Toggle[] = ["favorites", "unworn", "store"];
 
 /**
  * Sort and Filter under the category tabs (Shop v2 item 5; Jeff: "C", both). Each lives in the URL, so a view can

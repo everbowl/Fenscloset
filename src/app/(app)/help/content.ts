@@ -25,6 +25,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     { text: "Tap a piece to open it. Tap IN THE WASH? when it's dirty so the app stops suggesting it.", cue: { kind: "button", label: "In the wash?", variant: "secondary" } },
     { text: "Tap your name at the top left to look at someone else's closet, or the whole FAMILY closet.", cue: { kind: "switcher", label: "Jeff" } },
     { text: "Ten of the same shirt show as one card with ×10. On the piece, tap ONE IN THE WASH as you wear them; Today keeps offering the shirt while any copy is clean, and the Clean-out says when ten is too many.", cue: { kind: "button", label: "One in the wash" } },
+    { text: "WHAT’S NEEDED at the top of your closet lists what the app still needs from you: a front photo for the mirror, your size in a favorite brand, pieces still on the store’s photo. Fix it right there, or tap NOT NOW to hide that row for a while.", cue: { kind: "strip", label: "What’s needed · 3" } },
   ] },
   { slug: "today", title: "Get dressed", accent: "today", blurb: "Three looks for the weather and the plan.", link: { href: "/today", label: "Open Today" }, cover: { kind: "board" }, steps: [
     { text: "Tap TODAY. The first time, tap ENTER ZIP so it knows your weather.", cue: { kind: "nav", tab: "Today" } },

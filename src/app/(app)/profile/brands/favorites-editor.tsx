@@ -3,19 +3,15 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Banner } from "@/components/ui/banner";
-import { PickSheet, Row } from "@/components/items/row-editor";
+import { PickSheet } from "@/components/items/row-editor";
 import { BrandSearch } from "@/components/items/brand-search";
-import { Sheet } from "@/components/ui/sheet";
-import { Input } from "@/components/ui/input";
-import { Field } from "@/components/ui/field";
-import { Button } from "@/components/ui/button";
-import { SizeSheet } from "@/components/profile/size-sheet";
+import { MyBrandSheet } from "@/components/profile/my-brand-sheet";
 import { UndoStrip, useUndoable } from "@/components/ui/undo-strip";
 import type { MyBrand } from "@/lib/profiles/brands";
 import type { CategorySizes } from "@/lib/profiles/sizes";
-import { likelyFor, type LikelySizes } from "@/lib/profiles/size-options";
+import type { LikelySizes } from "@/lib/profiles/size-options";
 import type { FavoritesView, Named } from "@/lib/profiles/service";
-import { removeMyBrandAction, setMyBrandAction, updateFavoritesAction } from "../actions";
+import { removeMyBrandAction, updateFavoritesAction } from "../actions";
 
 const shortUrl = (u: string) => u.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
 
@@ -26,10 +22,6 @@ export function FavoritesEditor({ ownerId, favs, brands, stores, myBrands, sizeO
   const router = useRouter();
   const [sheet, setSheet] = useState<"brands" | "stores" | "pickMine" | null>(null);
   const [editing, setEditing] = useState<MyBrand | null>(null);
-  const [url, setUrl] = useState("");
-  /** category id ("" = any) → size; only the ones touched in this sheet are saved. */
-  const [picked, setPicked] = useState<Record<string, string | null>>({});
-  const [sizeFor, setSizeFor] = useState<CategorySizes | null>(null);
   const [brandList, setBrandList] = useState(brands);
   const [storeList, setStoreList] = useState(stores);
   const [error, setError] = useState<string>();
@@ -37,19 +29,7 @@ export function FavoritesEditor({ ownerId, favs, brands, stores, myBrands, sizeO
   const undoable = useUndoable();
   const [gone, setGone] = useState<string[]>([]); // brands taken away, until the strip runs out (Q1)
 
-  function openEdit(b: MyBrand) { setEditing(b); setUrl(b.url ?? ""); setPicked({}); }
-  const current = (categoryId: string | null) => {
-    const key = categoryId ?? "";
-    if (key in picked) return picked[key];
-    return editing?.sizes.find((s) => s.categoryId === categoryId)?.size ?? null;
-  };
-  function saveMine() {
-    if (!editing) return;
-    const b = editing;
-    const sizes = Object.entries(picked).map(([k, size]) => ({ categoryId: k || null, size }));
-    setEditing(null);
-    start(async () => { const r = await setMyBrandAction(ownerId, { brandId: b.brandId, url, sizes }); if (!r.ok) setError(r.error); router.refresh(); });
-  }
+  function openEdit(b: MyBrand) { setEditing(b); }
   function save(patch: { brandIds?: string[]; storeIds?: string[] }) {
     start(async () => { const r = await updateFavoritesAction(ownerId, patch); if (!r.ok) setError(r.error); router.refresh(); });
   }
@@ -64,7 +44,6 @@ export function FavoritesEditor({ ownerId, favs, brands, stores, myBrands, sizeO
       {ids.map((id) => <div key={id} className="flex h-[42px] items-center border-b border-line text-[14px]">{items.find((x) => x.id === id)?.name}</div>)}
     </section>
   );
-  const anySizes = editing?.sizes.filter((s) => s.categoryId === null) ?? [];
   return (
     <div className="space-y-6">
       {error ? <Banner tone="danger" title={error} /> : null}
@@ -93,24 +72,7 @@ export function FavoritesEditor({ ownerId, favs, brands, stores, myBrands, sizeO
       <BrandSearch open={sheet === "pickMine"} onClose={() => setSheet(null)} title="Which brand?" brands={brandList} selectedId={null}
         onPick={(b) => { setSheet(null); openEdit(myBrands.find((m) => m.brandId === b.id) ?? { brandId: b.id, name: b.name, url: null, sizes: [] }); }}
         onAdded={(e) => setBrandList((l) => [...l, e])} />
-      <Sheet open={Boolean(editing)} onClose={() => setEditing(null)} title={editing?.name ?? "Brand"}>
-        <div className="flex flex-col gap-5">
-          <section>
-            <p className="mono border-b border-ink pb-2 text-graphite">Your size by item type</p>
-            {sizeOptions.map((c) => {
-              const v = current(c.categoryId);
-              const hint = likelyFor(likely, c.categoryName);
-              return <Row key={c.categoryId} label={c.categoryName} value={v ?? (hint ? `Likely ${hint} · tap to set` : "Tap to set")} muted={!v} onClick={() => setSizeFor(c)} testId={`my-size-${c.categoryName.toLowerCase()}`} />;
-            })}
-            {anySizes.map(() => <Row key="any" label="Any item" value={current(null) ?? "Cleared"} muted={!current(null)} onClick={() => setSizeFor({ categoryId: "", categoryName: "Any item", options: [] })} />)}
-            <p className="mono mt-2 text-graphite">Tap only the types you buy from this brand.</p>
-          </section>
-          <Field label="Store link" htmlFor="my-brand-url" hint="Where you buy it. New pieces of this brand get this link."><Input id="my-brand-url" inputMode="url" autoCapitalize="off" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://shop.lululemon.com" data-testid="my-brand-url" /></Field>
-          <Button size="lg" onClick={saveMine} data-testid="save-my-brand">Save</Button>
-        </div>
-      </Sheet>
-      <SizeSheet open={Boolean(sizeFor)} onClose={() => setSizeFor(null)} title={sizeFor ? `${editing?.name ?? ""} · ${sizeFor.categoryName}` : ""} options={sizeFor?.options ?? []} value={sizeFor ? current(sizeFor.categoryId || null) : null} suggested={sizeFor ? likelyFor(likely, sizeFor.categoryName) : null}
-        onPick={(v) => { if (sizeFor) setPicked((p) => ({ ...p, [sizeFor.categoryId]: v })); }} />
+      {editing ? <MyBrandSheet key={editing.brandId} ownerId={ownerId} brand={editing} sizeOptions={sizeOptions} likely={likely} onClose={() => setEditing(null)} onSaved={() => router.refresh()} onError={setError} /> : null}
       <PickSheet open={sheet === "stores"} onClose={() => setSheet(null)} title="Favorite stores" kind="store" options={storeList} selected={favs.storeIds} multi canAdd={canEditLists} onChange={(ids) => save({ storeIds: ids })} onAdded={(e) => setStoreList((l) => [...l, e])} />
     </div>
   );

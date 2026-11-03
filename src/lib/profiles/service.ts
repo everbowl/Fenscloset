@@ -134,6 +134,16 @@ export async function removeBodyPhoto(viewer: Viewer, ownerId: string, photoId: 
   await deleteObject(photo.bucketKey).catch(() => {});
 }
 
+/** "VISIBLE TO JEFF, BRITTNEY": the owner, a minor's parents and the granted viewers, by first name. */
+export async function bodyViewerNames(ownerId: string): Promise<string[]> {
+  const [owner, parents, grants] = await Promise.all([
+    db.person.findUniqueOrThrow({ where: { id: ownerId }, select: { name: true } }),
+    db.guardianLink.findMany({ where: { minorId: ownerId }, include: { parent: { select: { name: true } } } }),
+    db.bodyDataGrant.findMany({ where: { ownerId }, include: { viewer: { select: { name: true } } } }),
+  ]);
+  return [owner.name, ...parents.map((p) => p.parent.name), ...grants.map((g) => g.viewer.name)].map((n) => n.split(" ")[0]);
+}
+
 // ---------- Style ----------
 
 export async function getStyleProfile(ownerId: string): Promise<StyleProfileView> {

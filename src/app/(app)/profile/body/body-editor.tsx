@@ -2,22 +2,21 @@
 
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Banner } from "@/components/ui/banner";
 import { Row, TextSheet } from "@/components/items/row-editor";
 import { InlineAdd } from "@/components/lists/inline-add";
-import { shrinkPhoto } from "@/lib/import/client-queue";
 import type { BodyProfileView, Named } from "@/lib/profiles/service";
 import { SizeSheet } from "@/components/profile/size-sheet";
+import { PhotoPrivacySheet, useBodyPhotoUpload, type BodyPhotoView } from "@/components/profile/body-photo-upload";
 import { formatMeasurement, measurementOptions, type LikelySizes } from "@/lib/profiles/size-options";
 import { monoDate } from "@/lib/dates";
-import { addBodyPhotoAction, removeBodyPhotoAction, setBodyPhotoPrivacyAction, setFitNotesAction, setMeasurementAction } from "../actions";
+import { removeBodyPhotoAction, setBodyPhotoPrivacyAction, setFitNotesAction, setMeasurementAction } from "../actions";
 
-type BodyView = "front" | "back" | "left" | "right" | "side";
-type Body = Omit<BodyProfileView, "photos"> & { photos: { id: string; key: string; takenAt: string; onlyMe: boolean; view: BodyView }[] };
+type Body = Omit<BodyProfileView, "photos"> & { photos: { id: string; key: string; takenAt: string; onlyMe: boolean; view: BodyPhotoView }[] };
 
 /**
  * Body profile (screen 11, undrawn): measurements from the editable list, sizes by brand, fit notes,
@@ -32,43 +31,23 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, likely, canEdit
   const [photoSheet, setPhotoSheet] = useState<string | null>(null);
   const [confirmPhoto, setConfirmPhoto] = useState(false); // a body photo asks before it goes (Q1)
   const [askPrivacy, setAskPrivacy] = useState(false);
-  const [nextOnlyMe, setNextOnlyMe] = useState(false);
-  const [nextView, setNextView] = useState<BodyView>("front");
+  const [nextView, setNextView] = useState<BodyPhotoView>("front");
   const [error, setError] = useState<string>();
-  const [uploading, setUploading] = useState(false);
   const [pending, start] = useTransition();
-  const fileRef = useRef<HTMLInputElement>(null);
+  const upload = useBodyPhotoUpload(ownerId, () => router.refresh());
 
   function run(fn: () => Promise<{ ok: boolean; error?: string }>) {
     setError(undefined);
     start(async () => { const r = await fn(); if (!r.ok) setError(r.error); router.refresh(); });
   }
 
-  async function onPhoto(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]; e.target.value = "";
-    if (!file) return;
-    setUploading(true); setError(undefined);
-    try {
-      const blob = await shrinkPhoto(file);
-      const signRes = await fetch("/api/uploads/sign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contentType: blob.type || "image/jpeg", kind: "bodies", ownerId }) });
-      const signed = (await signRes.json()) as { key: string; url: string; headers: Record<string, string>; error?: string };
-      if (!signRes.ok) throw new Error(signed.error || "Upload failed.");
-      const put = await fetch(signed.url, { method: "PUT", headers: signed.headers, body: blob });
-      if (!put.ok) throw new Error("Upload failed.");
-      const r = await addBodyPhotoAction(ownerId, signed.key, nextOnlyMe, nextView);
-      if (!r.ok) throw new Error(r.error);
-      router.refresh();
-    } catch (err) { setError((err as Error).message); } finally { setUploading(false); }
-  }
-
-
   return (
     <div className="space-y-6">
-      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPhoto} data-testid="body-photo" />
+      {upload.input}
       <div className="flex items-center justify-between border-y border-ink py-2.5">
         <span className="mono tracking-[0.1em]">Visible to {visibleTo.join(", ")}{isMinor ? " only" : ""}</span>
       </div>
-      {error ? <Banner tone="danger" title={error} /> : null}
+      {error ?? upload.error ? <Banner tone="danger" title={error ?? upload.error ?? ""} /> : null}
 
       <section>
         <p className="mono border-b border-ink pb-2 text-graphite">Measurements</p>
@@ -123,9 +102,9 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, likely, canEdit
                     {p.onlyMe ? <span className="mono absolute left-1.5 top-1.5 bg-paper px-1.5 py-1">Only me</span> : null}
                   </button>
                 ) : canEdit ? (
-                  <button key={v} type="button" onClick={() => { setNextView(v); setAskPrivacy(true); }} disabled={uploading} className="flex aspect-[3/4] flex-col items-center justify-center gap-2 border border-dashed border-ink bg-paper" data-testid={`add-body-photo-${v}`}>
+                  <button key={v} type="button" onClick={() => { setNextView(v); setAskPrivacy(true); }} disabled={Boolean(upload.uploading)} className="flex aspect-[3/4] flex-col items-center justify-center gap-2 border border-dashed border-ink bg-paper" data-testid={`add-body-photo-${v}`}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden><path d="M3 8h4l2-3h6l2 3h4v12H3z" /><circle cx="12" cy="13.5" r="3.5" /></svg>
-                    <span className="mono">{uploading && nextView === v ? "Saving…" : word}</span>
+                    <span className="mono">{upload.uploading === v ? "Saving…" : word}</span>
                   </button>
                 ) : (
                   <div key={v} className="flex aspect-[3/4] items-center justify-center bg-bone"><span className="mono text-graphite">No {v}</span></div>
@@ -158,16 +137,7 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, likely, canEdit
       <SizeSheet open={Boolean(measuring)} onClose={() => setMeasuring(null)} title={measuring?.name ?? ""} options={measuring ? measurementOptions(measuring) : []} value={measuring?.value || null} unit={measuring?.unit} format={measuring ? (v) => formatMeasurement(measuring, v) : undefined} testId="measure-sheet"
         onPick={(v) => measuring && run(() => setMeasurementAction(ownerId, measuring.kindId, v ?? ""))} />
       <TextSheet open={notes} onClose={() => setNotes(false)} title="Fit notes" label="Notes" value={body.fitNotes ?? ""} placeholder="Long arms · short torso · size up in jackets" onSave={(v) => run(() => setFitNotesAction(ownerId, v))} />
-      <Sheet open={askPrivacy} onClose={() => setAskPrivacy(false)} title="Who can see this photo?">
-        <div className="flex flex-col">
-          <button type="button" data-testid="photo-only-me" onClick={() => { setNextOnlyMe(true); setAskPrivacy(false); fileRef.current?.click(); }} className="flex min-h-12 items-center justify-between gap-3 border-b border-line py-2 text-left text-[15px]">
-            <span>Only me<span className="mono block text-graphite">Nobody else, ever · the AI still uses it to dress you</span></span>
-          </button>
-          <button type="button" data-testid="photo-shared" onClick={() => { setNextOnlyMe(false); setAskPrivacy(false); fileRef.current?.click(); }} className="flex min-h-12 items-center justify-between gap-3 border-b border-line py-2 text-left text-[15px]">
-            <span>Everyone who can see my body profile<span className="mono block text-graphite">Currently {visibleTo.join(", ")}</span></span>
-          </button>
-        </div>
-      </Sheet>
+      <PhotoPrivacySheet open={askPrivacy} onClose={() => setAskPrivacy(false)} visibleTo={visibleTo} onPick={(onlyMe) => { setAskPrivacy(false); upload.pick(nextView, onlyMe); }} />
       <Sheet open={Boolean(photoSheet)} onClose={() => { setPhotoSheet(null); setConfirmPhoto(false); }} title={confirmPhoto ? "Remove this photo?" : "This photo"}>
         {(() => { const p = body.photos.find((x) => x.id === photoSheet); return p && confirmPhoto ? (
           <div data-testid="body-photo-confirm">
