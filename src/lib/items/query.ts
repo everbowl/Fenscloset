@@ -1,3 +1,4 @@
+import { copiesWord, countsOf } from "@/lib/items/copies";
 import { db } from "@/lib/db";
 import type { ClosetView } from "@/lib/people/visibility";
 import type { LaundryStatus } from "@/generated/prisma/client";
@@ -8,6 +9,9 @@ export type ItemCardData = {
   name: string;
   thumbKey: string | null;
   categoryName: string | null;
+  /** How many identical pieces the card stands for, and "×10 · 7 clean" when more than one. */
+  copies: number;
+  copiesWord: string | null;
   status: string;
   ownerId: string;
   ownerName: string;
@@ -21,7 +25,7 @@ export function statusWord(it: { laundryStatus: LaundryStatus; wearCount: number
 }
 
 const cardSelect = {
-  id: true, name: true, ownerId: true, laundryStatus: true, wearCount: true,
+  id: true, name: true, ownerId: true, laundryStatus: true, wearCount: true, copies: true, dirtyCopies: true, cleanersCopies: true,
   owner: { select: { name: true } },
   category: { select: { name: true } },
   photos: { where: { kind: "thumb" as const }, take: 1, select: { bucketKey: true } },
@@ -42,7 +46,7 @@ export async function listClosetItems(view: ClosetView, opts: { categoryId?: str
   });
   return items.map((it) => ({
     id: it.id, name: it.name ?? "Untitled piece", thumbKey: it.photos[0]?.bucketKey ?? null, categoryName: it.category?.name ?? null,
-    status: statusWord(it), ownerId: it.ownerId, ownerName: it.owner.name.split(" ")[0],
+    status: statusWord(it), copies: it.copies, copiesWord: copiesWord(countsOf(it)), ownerId: it.ownerId, ownerName: it.owner.name.split(" ")[0],
   }));
 }
 
@@ -143,7 +147,7 @@ export async function loadClosetView(view: ClosetView, opts: { categoryId?: stri
   ]);
   const all: ViewItem[] = rows.map((it) => ({
     id: it.id, name: it.name ?? "Untitled piece", thumbKey: it.photos[0]?.bucketKey ?? null, categoryName: it.category?.name ?? null,
-    status: statusWord(it), ownerId: it.ownerId, ownerName: it.owner.name.split(" ")[0],
+    status: statusWord(it), copies: it.copies, copiesWord: copiesWord(countsOf(it)), ownerId: it.ownerId, ownerName: it.owner.name.split(" ")[0],
     colorIds: it.colors.map((x) => x.id), brandId: it.brandId, seasonIds: it.seasons.map((x) => x.id), occasionIds: it.occasions.map((x) => x.id),
     formalityIds: it.formalities.map((x) => x.id), fabricIds: it.fabrics.map((x) => x.id), patternIds: it.patterns.map((x) => x.id), tagIds: it.tags.map((x) => x.id),
     closetIds: it.closets.map((x) => x.closetId), laundryStatus: it.laundryStatus, isFavorite: it.isFavorite, wearCount: it.wearCount, lastWornAt: it.lastWornAt,
@@ -161,7 +165,7 @@ export async function loadClosetView(view: ClosetView, opts: { categoryId?: stri
     if (options.length) facets.push({ key, label: FACET_LABEL[key], options });
   }
   return {
-    items: kept.map(({ id, name, thumbKey, categoryName, status, ownerId, ownerName }) => ({ id, name, thumbKey, categoryName, status, ownerId, ownerName })),
+    items: kept.map(({ id, name, thumbKey, categoryName, status, ownerId, ownerName, copies, copiesWord }) => ({ id, name, thumbKey, categoryName, status, ownerId, ownerName, copies, copiesWord })),
     shown: kept.length, total, facets, toggles: toggleCounts(all, opts.filters),
   };
 }

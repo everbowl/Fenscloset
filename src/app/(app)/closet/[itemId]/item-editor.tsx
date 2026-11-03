@@ -17,7 +17,8 @@ import { shrinkPhoto } from "@/lib/import/client-queue";
 import type { ItemLists } from "@/lib/items/query";
 import type { ItemDetailEdits } from "@/lib/items/service";
 import type { LaundryStatus, PhotoKind } from "@/generated/prisma/client";
-import { addItemPhotoAction, setLaundryAction, deleteItemAction, mirrorPhotoAction, notNowPhotoAction, removeItemPhotoAction, rotateItemPhotoAction, updateItemAction } from "./actions";
+import { addItemPhotoAction, laundryCopiesAction, setCopiesAction, setLaundryAction, splitOneOffAction, deleteItemAction, mirrorPhotoAction, notNowPhotoAction, removeItemPhotoAction, rotateItemPhotoAction, updateItemAction } from "./actions";
+import { cleanCopies, copiesLine, copiesWord, countsOf, MAX_COPIES, type CopyAction } from "@/lib/items/copies";
 import { unretireAction } from "../clean-out/actions";
 import { monoDate, prettyDate } from "@/lib/dates";
 import { lastClosetUrl, markClosetRestore } from "@/lib/closet-memory";
@@ -41,12 +42,15 @@ export type ItemView = {
   wearHistory: { wornOn: string; title: string | null }[];
   retired: { reason: string; at: string } | null;
   storePhoto: boolean;
+  /** Identical pieces behind this card, and how many are in the wash or at the cleaners (F1). */
+  copies: number; dirtyCopies: number; cleanersCopies: number;
   photoNudge: "first" | "refresh" | null;
 };
 
 type SheetKind = "category" | "subcategory" | "color" | "pattern" | "fabric" | "season" | "formality" | "occasion" | "tag" | "brand" | "match" | "store" | "size" | "price" | "url" | "notes" | "made" | "closets" | "share" | "rename" | "photo" | "delete" | null;
 
 const LAUNDRY_WORD: Record<LaundryStatus, string> = { clean: "Clean", dirty: "In the wash", cleaners: "At cleaners" };
+const statusWordOf = (s: LaundryStatus, wearCount: number) => (s === "dirty" ? "In the wash" : s === "cleaners" ? "At cleaners" : wearCount > 0 ? `Worn ${wearCount}×` : "New");
 const KIND_WORD: Record<PhotoKind, string> = { alone: "Photo", worn: "Worn", label: "Label", cutout: "Cutout", thumb: "Thumb", back: "Back", retail: "Store" };
 
 /** A yes/no row that reads as a switch: the word says the state, the pill flips it. */
@@ -114,8 +118,21 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
     start(async () => { const r = await updateItemAction(it.id, patch); if (!r.ok) { setError(r.error); router.refresh(); } });
   }
   /** Laundry is three states, one tap each (it used to be a button that cycled through them). */
+  /** A stack: one copy at a time (F1, Jeff 3 Nov 2026); the counts and the summary word come back from the server. */
+  const counts = countsOf(it);
+  function copyAction(a: CopyAction) {
+    setError(undefined);
+    start(async () => { const r = await laundryCopiesAction(it.id, a); if (!r.ok) setError(r.error); else setIt((x) => ({ ...x, ...r.value, status: statusWordOf(r.value.laundryStatus, x.wearCount) })); router.refresh(); });
+  }
+  function setCopies(n: number) {
+    setError(undefined);
+    start(async () => { const r = await setCopiesAction(it.id, n); if (!r.ok) setError(r.error); else setIt((x) => ({ ...x, ...r.value, status: statusWordOf(r.value.laundryStatus, x.wearCount) })); router.refresh(); });
+  }
+  function splitOne() {
+    setError(undefined);
+    start(async () => { const r = await splitOneOffAction(it.id); if (!r.ok) setError(r.error); else router.push(`/closet/${r.value}`); });
+  }
   function setLaundry(st: LaundryStatus) {
-    const statusWordOf = (s: LaundryStatus, wearCount: number) => (s === "dirty" ? "In the wash" : s === "cleaners" ? "At cleaners" : wearCount > 0 ? `Worn ${wearCount}×` : "New");
     setIt((x) => ({ ...x, laundryStatus: st, status: statusWordOf(st, x.wearCount) }));
     start(async () => { const r = await setLaundryAction(it.id, st); if (!r.ok) { setError(r.error); router.refresh(); } });
   }
@@ -168,6 +185,7 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
           ) : null}
         </div>
       ) : null}
+      {canEdit && it.storePhoto ? <p className="mono mt-2 text-graphite" data-testid="store-photo-line">Store photo · add your own when you can <button type="button" onClick={() => setSheet("photo")} className="text-ink underline underline-offset-4">Add photo</button></p> : null}
 
       <div className="flex items-end justify-between gap-3 pt-[18px]">
         <Title name={it.name} />
@@ -178,7 +196,7 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
           </div>
         ) : null}
       </div>
-      <p className="mono mt-2 text-graphite">{[!it.mine ? it.ownerName : null, category?.name, it.status, it.isFavorite ? "Favorite" : null].filter(Boolean).join(" · ")}</p>
+      <p className="mono mt-2 text-graphite">{[!it.mine ? it.ownerName : null, category?.name, copiesWord(counts), it.status, it.isFavorite ? "Favorite" : null].filter(Boolean).join(" · ")}</p>
       {/* The one orange action on a piece (Jeff, 31 Oct 2026, E1): this piece in the mirror, on you or on the mannequin. */}
       {mirror && (mirror.tryOn === "ready" || mirror.mannequinAvailable) && !it.retired && mirrorCanPlace(category?.name) ? (
         <div className="mt-4"><Button size="lg" className="w-full" busy={m.busy} sub={mirror.tryOn === "ready" ? "This piece on your photo" : "On the mannequin · no body photo needed"} onClick={() => m.begin({ look: { kind: "closet", itemIds: [it.id] }, on: mirror.tryOn === "ready" ? "me" : "mannequin" })} data-testid="see-on-me">{m.busy ? "Dressing…" : mirror.tryOn === "ready" ? "See it on me" : "See it on a mannequin"}</Button></div>
@@ -208,18 +226,46 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
           {canEdit ? <button type="button" disabled={pending} onClick={() => start(async () => { const r = await unretireAction(it.id); if (!r.ok) setError(r.error); else { setIt((x) => ({ ...x, retired: null })); router.refresh(); } })} className="pill">Bring it back</button> : null}
         </div>
       ) : null}
-      {canEdit && !it.retired ? (
+      {canEdit && !it.retired && it.copies > 1 ? (
+        <div className="mt-3 border-y border-ink py-2.5" data-testid="laundry-row">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="mono tracking-[0.1em]">Laundry · {it.copies} copies</span>
+            <span className="mono text-graphite" data-testid="copies-line">{copiesLine(counts)}</span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <button type="button" disabled={pending || cleanCopies(counts) === 0} onClick={() => copyAction("one_dirty")} className="pill pill-sm" data-testid="one-dirty">One in the wash</button>
+            <button type="button" disabled={pending || cleanCopies(counts) === 0} onClick={() => copyAction("one_cleaners")} className="pill pill-sm" data-testid="one-cleaners">One to cleaners</button>
+            <button type="button" disabled={pending || counts.dirtyCopies + counts.cleanersCopies === 0} onClick={() => copyAction("one_clean")} className="pill pill-sm pill-quiet" data-testid="one-clean">One back clean</button>
+            <button type="button" disabled={pending || counts.dirtyCopies + counts.cleanersCopies === 0} onClick={() => copyAction("all_clean")} className="pill pill-sm pill-solid" data-testid="all-clean">All clean</button>
+          </div>
+        </div>
+      ) : canEdit && !it.retired ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-y border-ink py-2.5" data-testid="laundry-row">
           <span className="mono tracking-[0.1em]">Laundry</span>
           <div className="flex gap-1.5" role="radiogroup" aria-label="Laundry">
             {(["clean", "dirty", "cleaners"] as const).map((st) => (
-              <button key={st} type="button" role="radio" aria-checked={it.laundryStatus === st} disabled={pending || it.laundryStatus === st} onClick={() => setLaundry(st)} className={cn("pill pill-sm", it.laundryStatus === st && "pill-solid disabled:opacity-100")} data-testid={`laundry-${st}`}>{LAUNDRY_WORD[st]}</button>
+              <button key={st} type="button" role="radio" aria-checked={it.laundryStatus === st} disabled={pending || it.laundryStatus === st} onClick={() => setLaundry(st)} className={cn("pill pill-sm", it.laundryStatus === st && "pill-solid")} data-testid={`laundry-${st}`}>{LAUNDRY_WORD[st]}</button>
             ))}
           </div>
         </div>
       ) : null}
 
       <div className="flex flex-col">
+        {!it.retired && (canEdit || it.copies > 1) ? (
+          <div className="flex min-h-[42px] items-center justify-between gap-3 border-b border-line" data-testid="copies-row">
+            <span className="mono w-[120px] shrink-0 text-graphite">Copies</span>
+            <div className="flex flex-1 items-center justify-end gap-2">
+              {canEdit && it.copies > 1 ? <button type="button" disabled={pending} onClick={splitOne} className="pill pill-sm pill-quiet" data-testid="split-one">Split one off</button> : null}
+              {canEdit ? (
+                <div className="flex items-center">
+                  <button type="button" aria-label="One fewer copy" disabled={pending || it.copies <= 1} onClick={() => setCopies(it.copies - 1)} className="mono size-9 text-[17px] disabled:text-graphite">−</button>
+                  <span className="mono w-8 text-center text-[15px]" data-testid="copies">{it.copies}</span>
+                  <button type="button" aria-label="One more copy" disabled={pending || it.copies >= MAX_COPIES} onClick={() => setCopies(it.copies + 1)} className="mono size-9 text-[17px] disabled:text-graphite">+</button>
+                </div>
+              ) : <span className="mono text-[15px]" data-testid="copies">{it.copies}</span>}
+            </div>
+          </div>
+        ) : null}
         <Row label="Category" value={category ? `${category.name}${sub ? ` · ${sub}` : ""}` : "Pick a category"} muted={!category} onClick={() => open("category")} testId="row-category" />
         <Row label="Color" value={names(lists.colors, it.colorIds) || "Pick a color"} muted={!it.colorIds.length} onClick={() => open("color")} />
         <Row label="Pattern" value={name(lists.patterns, it.patternId) ?? "Not set"} muted={!it.patternId} onClick={() => open("pattern")} testId="row-pattern" />

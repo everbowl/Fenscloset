@@ -377,6 +377,10 @@ model Item {
   laundryStatus LaundryStatus @default(clean)
   neverSuggest  Boolean       @default(false)
   wearCount     Int           @default(0)
+  /** Identical pieces kept as one card (Jeff, 2 Nov 2026: ten of the same shirt). Laundry is counted per copy; laundryStatus is the summary the closet reads. */
+  copies        Int           @default(1)
+  dirtyCopies   Int           @default(0)
+  cleanersCopies Int          @default(0)
   /// The photo of record is the store product shot, not the person own photo.
   storePhoto    Boolean       @default(false)
   /// wearCount when the person last answered a photo nudge (add one / not now).
@@ -502,6 +506,8 @@ model ImportEntry {
   id          String      @id @default(cuid())
   batchId     String
   order       Int
+  /// How many identical pieces this entry stands for (a store row "Black ×3", a receipt line ×2): the item gets that many copies.
+  quantity    Int         @default(1)
   originalKey String
   status      EntryStatus @default(queued)
   cutoutKey   String?

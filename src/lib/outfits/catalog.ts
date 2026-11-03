@@ -22,12 +22,14 @@ export type Candidate = {
   wearCount: number;
   lastWornAt: Date | null;
   thumbKey: string | null;
+  /** Identical pieces behind this card: a stack of ten rests only once all ten were worn inside the window. */
+  copies: number;
 };
 
 export type CandidateSet = { usable: Candidate[]; restingIds: string[]; noRepeatDays: number };
 
 type CandidateRow = {
-  id: string; name: string | null; ownerId: string; isFavorite: boolean; wearCount: number; lastWornAt: Date | null;
+  id: string; name: string | null; ownerId: string; isFavorite: boolean; wearCount: number; lastWornAt: Date | null; copies?: number;
   category: { name: string } | null; subcategory: { name: string } | null; brand: { name: string } | null;
   colors: { name: string }[]; patterns: { name: string }[]; fabrics: { name: string }[]; seasons: { name: string }[]; formalities: { name: string }[]; occasions: { name: string }[];
   photos: { bucketKey: string }[];
@@ -39,12 +41,13 @@ export function toCandidate(it: CandidateRow): Candidate {
     colors: it.colors.map((c) => c.name), pattern: it.patterns[0]?.name ?? null, fabric: it.fabrics[0]?.name ?? null,
     seasons: it.seasons.map((s) => s.name), formality: it.formalities[0]?.name ?? null, occasions: it.occasions.map((o) => o.name),
     brand: it.brand?.name ?? null, isFavorite: it.isFavorite, wearCount: it.wearCount, lastWornAt: it.lastWornAt, thumbKey: it.photos[0]?.bucketKey ?? null,
+    copies: Math.max(1, it.copies ?? 1),
   };
 }
 
 /** The item fields a Candidate is built from; `toCandidate` turns one row into a Candidate (the Shop's "go with it" loads one piece this way). */
 export const candidateSelect = {
-  id: true, name: true, ownerId: true, isFavorite: true, wearCount: true, lastWornAt: true,
+  id: true, name: true, ownerId: true, isFavorite: true, wearCount: true, lastWornAt: true, copies: true,
   category: { select: { name: true } }, subcategory: { select: { name: true } }, brand: { select: { name: true } },
   colors: { select: { name: true } }, patterns: { select: { name: true } }, fabrics: { select: { name: true } },
   seasons: { select: { name: true } }, formalities: { select: { name: true } }, occasions: { select: { name: true } },
@@ -70,7 +73,14 @@ export async function loadCandidates(personId: string, now = new Date(), opts: {
   const tz = await getTimezone();
   const today = dayKey(now, tz);
   const all = items.map(toCandidate);
-  const resting = all.filter((c) => c.lastWornAt && c.lastWornAt.getTime() > cutoff && dayKey(c.lastWornAt, tz) !== today);
+  // A stack (ten of the same shirt) rests only once as many wears as copies landed inside the window.
+  const stacks = all.filter((c) => c.copies > 1 && c.lastWornAt && c.lastWornAt.getTime() > cutoff);
+  const wearsInWindow = new Map<string, number>();
+  if (stacks.length) {
+    const rows = await db.wearLog.groupBy({ by: ["itemId"], where: { itemId: { in: stacks.map((c) => c.id) }, wornOn: { gte: dayKey(new Date(cutoff), tz) } }, _count: { _all: true } });
+    for (const r of rows) wearsInWindow.set(r.itemId, r._count._all);
+  }
+  const resting = all.filter((c) => c.lastWornAt && c.lastWornAt.getTime() > cutoff && dayKey(c.lastWornAt, tz) !== today && (c.copies <= 1 || (wearsInWindow.get(c.id) ?? 0) >= c.copies));
   return { usable: all.filter((c) => !resting.includes(c)), restingIds: resting.map((c) => c.id), noRepeatDays };
 }
 

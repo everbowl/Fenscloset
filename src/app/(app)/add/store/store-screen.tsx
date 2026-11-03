@@ -245,8 +245,8 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
           {added === 0 ? <Button size="lg" onClick={add} disabled={pending || !total} sub={total ? `${chosen.length} ${chosen.length === 1 ? "color" : "colors"}${sizeAll ? ` · size ${sizeAll}` : ""}` : "Tap + on a color first"} data-testid="add-to-closet">{busy === "add" ? "Adding…" : `Add ${total || ""} to closet`.replace("  ", " ")}</Button> : null}
           {added > 0 ? (
             <div className="flex items-center justify-between border-y border-ink py-2.5" data-testid="added-strip">
-              <span className="mono tracking-[0.1em]">{added} ready to check</span>
-              <div className="flex gap-4"><button type="button" onClick={again} className="pill" data-testid="add-another-color">More of this</button><Link href={batchId ? `/add/${batchId}` : "/add"} className="pill pill-solid" data-testid="check-it">Check it →</Link></div>
+              <span className="flex flex-col"><span className="mono tracking-[0.1em]">{added} added to the closet</span><span className="mono text-graphite">Tagging takes a few seconds each · same color and size become one card</span></span>
+              <div className="flex gap-4"><button type="button" onClick={again} className="pill" data-testid="add-another-color">More of this</button><Link href="/closet" className="pill pill-solid" data-testid="check-it">See closet →</Link></div>
             </div>
           ) : null}
         </div>
@@ -363,8 +363,8 @@ function ReceiptTab() {
           ))}
           {done ? (
             <div className="flex items-center justify-between border-y border-ink py-2.5" data-testid="added-strip">
-              <span className="mono tracking-[0.1em]">{done.count} ready to check{done.skipped ? ` · ${done.skipped} skipped` : ""}</span>
-              <Link href={done.batchId ? `/add/${done.batchId}` : "/add"} className="pill pill-solid" data-testid="check-it">Check it →</Link>
+              <span className="flex flex-col"><span className="mono tracking-[0.1em]">{done.count} added to the closet{done.skipped ? ` · ${done.skipped} skipped` : ""}</span><span className="mono text-graphite">Tagging takes a few seconds each</span></span>
+              <Link href="/closet" className="pill pill-solid" data-testid="check-it">See closet →</Link>
             </div>
           ) : (
             <Button size="lg" onClick={add} disabled={pending || !total || reading > 0} sub={reading ? "Still reading" : groups.length > 1 ? `From ${groups.filter((g) => g.receipt).length} receipts` : undefined} data-testid="add-receipt">{busy === "add" ? "Adding…" : `Add ${total} piece${total === 1 ? "" : "s"}`}</Button>

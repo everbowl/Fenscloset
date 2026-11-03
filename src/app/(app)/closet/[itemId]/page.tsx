@@ -41,6 +41,7 @@ export default async function ItemPage({ params }: { params: Promise<{ itemId: s
         wearHistory: history.map((h) => ({ wornOn: h.wornOn, title: h.title })),
         retired: item.retiredAt ? { reason: item.retiredReason ?? "donate", at: item.retiredAt.toISOString() } : null,
         storePhoto: item.storePhoto,
+        copies: item.copies, dirtyCopies: item.dirtyCopies, cleanersCopies: item.cleanersCopies,
         photoNudge: photoNudge(item),
       }}
       lists={lists}

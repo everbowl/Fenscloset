@@ -12,8 +12,8 @@ async function run(fn: () => Promise<unknown>): Promise<Result> {
   catch (e) { if (e instanceof OutfitError) return { ok: false, error: e.message }; console.error(e); return { ok: false, error: "Something went wrong. Try again." }; }
 }
 
-export async function cleanOutAction(itemId: string, decision: "keep" | "donate" | "sell"): Promise<Result> {
-  const me = await requirePerson(); return run(() => cleanOutDecision(me, itemId, decision));
+export async function cleanOutAction(itemId: string, decision: "keep" | "donate" | "sell" | "trim", keep?: number): Promise<Result> {
+  const me = await requirePerson(); return run(() => cleanOutDecision(me, itemId, decision, new Date(), keep));
 }
 export async function unretireAction(itemId: string): Promise<Result> {
   const me = await requirePerson(); return run(() => unretire(me, itemId));

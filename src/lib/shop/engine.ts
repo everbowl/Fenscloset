@@ -133,7 +133,7 @@ async function findProducts(forPersonId: string, verdict: Verdict): Promise<Prod
 
 /** Plan B4: three looks with the candidate pinned as hero. */
 async function pairings(forPersonId: string, read: CandidateRead, imageKey: string | null, closet: Candidate[], style: string): Promise<(Board & { pieces: Piece[] })[]> {
-  const cand: Candidate = { id: CANDIDATE_ID, name: read.name, ownerId: forPersonId, category: read.categoryName, subcategory: null, colors: read.colorNames, pattern: null, fabric: read.fabricName, seasons: [], formality: read.formalityName, occasions: [], brand: read.brandText, isFavorite: false, wearCount: 0, lastWornAt: null, thumbKey: imageKey };
+  const cand: Candidate = { id: CANDIDATE_ID, name: read.name, ownerId: forPersonId, category: read.categoryName, subcategory: null, colors: read.colorNames, pattern: null, fabric: read.fabricName, seasons: [], formality: read.formalityName, occasions: [], brand: read.brandText, isFavorite: false, wearCount: 0, lastWornAt: null, copies: 1, thumbKey: imageKey };
   const others = closet.filter((c) => c.category !== read.categoryName || c.category == null);
   if (others.length < 1) return [];
   const boards = await composeLooks({ cands: [cand, ...others], inputs: { weather: null, plan: { label: null, source: "none" }, checkIn: [], restingIds: [], noRepeatDays: 0 }, style, count: 3, extra: `Piece #1 "${read.name}" is the NEW piece being considered: every look must include #1 and list it first.` });

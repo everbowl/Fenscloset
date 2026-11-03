@@ -5,7 +5,7 @@ const day = 86400000;
 const t0 = new Date("2026-10-01T00:00:00Z");
 const at = (d: number) => new Date(t0.getTime() + d * day);
 const piece = (id: string, o: Partial<ViewItem> = {}): ViewItem => ({
-  id, name: id, thumbKey: null, categoryName: "Tops", status: "New", ownerId: "jeff", ownerName: "Jeff",
+  id, name: id, thumbKey: null, categoryName: "Tops", status: "New", ownerId: "jeff", ownerName: "Jeff", copies: 1, copiesWord: null,
   colorIds: [], brandId: null, seasonIds: [], occasionIds: [], formalityIds: [], fabricIds: [], patternIds: [], tagIds: [], closetIds: [],
   laundryStatus: "clean", isFavorite: false, wearCount: 0, lastWornAt: null, createdAt: t0, price: null, ...o,
 });

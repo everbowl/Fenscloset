@@ -42,7 +42,7 @@ export async function addStoreRowsAction(input: { product: StoreAddInput["produc
   try {
     const r = await createStoreRows(person.id, input.product, input.rows ?? []);
     revalidatePath("/add");
-    return { ok: true, value: { batchId: r.batchId, count: r.entryIds.length } };
+    return { ok: true, value: { batchId: r.batchId, count: r.pieces } };
   } catch (e) { return fail(e); }
 }
 
@@ -74,7 +74,7 @@ export async function addReceiptsAction(groups: ReceiptGroupInput[]): Promise<Ac
           product: { url: l.pick.url, name: l.name, brandText: null, storeName: g.storeName || l.pick.storeName, priceText: l.priceText ?? l.pick.priceText },
           imageUrl: l.pick.imageUrl, color: l.color, size: l.size, quantity: l.quantity, purchaseDate: g.purchaseDate,
         });
-        batchId = r.batchId; count += r.entryIds.length;
+        batchId = r.batchId; count += r.pieces;
       }
     }
     revalidatePath("/add");

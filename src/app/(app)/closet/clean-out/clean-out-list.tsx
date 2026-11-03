@@ -8,13 +8,15 @@ import { Banner } from "@/components/ui/banner";
 import { cleanOutAction, unretireAction } from "./actions";
 
 type Row = { id: string; name: string; thumbKey: string | null; categoryName: string | null; lastWornAt: string | null; createdAt: string; wearCount: number };
-type Decision = "keep" | "donate" | "sell";
-const WORD: Record<Decision, string> = { keep: "Kept · back in 3 months", donate: "Donated", sell: "Set aside to sell" };
+type Decision = "keep" | "donate" | "sell" | "trim";
+const WORD: Record<Decision, string> = { keep: "Kept · back in 3 months", donate: "Donated", sell: "Set aside to sell", trim: "Trimmed" };
+/** A stack with more copies than its wears call for (Jeff, 2 Nov 2026: "advise when I should remove"). */
+type Stack = { id: string; name: string; thumbKey: string | null; categoryName: string | null; copies: number; wears90: number; keep: number; cycleDays: number };
 
 const month = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", year: "numeric" }).toUpperCase();
 
 /** Each piece not worn in a while, with Keep / Donate / Sell as pills. Donate and Sell can be undone for a few seconds right here. */
-export function CleanOutList({ items, canDecide }: { items: Row[]; canDecide: boolean }) {
+export function CleanOutList({ items, stacks = [], canDecide }: { items: Row[]; stacks?: Stack[]; canDecide: boolean }) {
   const router = useRouter();
   const [, start] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
@@ -24,10 +26,10 @@ export function CleanOutList({ items, canDecide }: { items: Row[]; canDecide: bo
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
-  function decide(it: Row, d: Decision) {
+  function decide(it: Row, d: Decision, keep?: number) {
     setBusy(it.id); setError(undefined);
     start(async () => {
-      const r = await cleanOutAction(it.id, d);
+      const r = await cleanOutAction(it.id, d, keep);
       setBusy(null);
       if (!r.ok) { setError(r.error); return; }
       setGone((g) => [...g, it.id]);
@@ -50,16 +52,40 @@ export function CleanOutList({ items, canDecide }: { items: Row[]; canDecide: bo
   }
 
   const shown = items.filter((it) => !gone.includes(it.id));
+  const shownStacks = stacks.filter((st) => !gone.includes(st.id));
+  const asRow = (st: Stack): Row => ({ id: st.id, name: st.name, thumbKey: st.thumbKey, categoryName: st.categoryName, lastWornAt: null, createdAt: "", wearCount: st.wears90 });
   // The action revalidates the page, so the list can come back empty while the strip is still up: the strip stays, with Undo, until its timer runs out.
-  const empty = !items.length;
+  const empty = !items.length && !stacks.length;
   return (
     <div>
       {error ? <Banner tone="danger" title={error} className="mb-3" /> : null}
       {last ? (
         <div className="mb-3 flex min-h-[50px] items-center justify-between gap-3 border-y border-ink py-2" role="status" data-testid="clean-out-undo">
           <span className="mono truncate">{WORD[last.decision]} · {last.item.name}</span>
-          {last.decision !== "keep" ? <button type="button" onClick={undo} className="pill pill-sm shrink-0" data-testid="undo-clean-out">Undo</button> : null}
+          {last.decision === "donate" || last.decision === "sell" ? <button type="button" onClick={undo} className="pill pill-sm shrink-0" data-testid="undo-clean-out">Undo</button> : null}
         </div>
+      ) : null}
+      {shownStacks.length ? (
+        <section className="mb-6" data-testid="stacks">
+          <p className="mono border-b border-ink pb-2 text-graphite">Too many of the same</p>
+          {shownStacks.map((st) => (
+            <div key={st.id} className="flex flex-col gap-2.5 border-b border-line py-3 sm:flex-row sm:items-center sm:gap-3" data-testid="stack-row">
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <Link href={`/closet/${st.id}`} className="size-14 shrink-0 bg-bone">{st.thumbKey ? <img src={`/api/photo/${st.thumbKey}`} alt="" className="size-full object-contain" /> : null}</Link>
+                <div className="min-w-0 flex-1">
+                  <Link href={`/closet/${st.id}`} className="block truncate text-[15px] font-medium">{st.name} <span className="mono text-graphite">×{st.copies}</span></Link>
+                  <p className="mono truncate text-graphite">{st.wears90 ? `Worn ${st.wears90}× in 90 days` : "Not worn in 90 days"} · with a wash every {st.cycleDays} days, {st.keep} {st.keep === 1 ? "is" : "are"} enough</p>
+                </div>
+              </div>
+              {canDecide ? (
+                <div className="flex shrink-0 gap-1.5 pl-[68px] sm:pl-0">
+                  <button type="button" disabled={busy === st.id} onClick={() => decide(asRow(st), "keep")} className="pill pill-sm pill-quiet" data-testid={`stack-keep-${st.id}`}>Leave it</button>
+                  <button type="button" disabled={busy === st.id} onClick={() => decide(asRow(st), "trim", st.keep)} className="pill pill-sm" data-testid={`stack-trim-${st.id}`}>Keep {st.keep} · let {st.copies - st.keep} go</button>
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </section>
       ) : null}
       {empty ? <p className="serif text-[21px] italic leading-[1.3]">{last ? "That’s the list. Nice." : "Everything in this closet has been worn recently. Nice."}</p> : (
       <div className="flex flex-col">

@@ -6,6 +6,7 @@ import { finishBatchIfDone } from "@/lib/import/service";
 import type { EntryAiResult } from "@/lib/import/process";
 import type { TagResult } from "@/lib/ai/tag-item";
 import type { Item } from "@/generated/prisma/client";
+import type { PhotoKind } from "@/generated/prisma/client";
 
 export class ItemError extends Error {
   constructor(message: string, public readonly status = 400) {
@@ -88,6 +89,7 @@ export async function createItemFromEntry(personId: string, entryId: string, edi
         subcategoryId: tags.subcategoryId,
         brandId: tags.brandId,
         size: tags.sizeText,
+        copies: Math.min(MAX_COPIES, Math.max(1, entry.quantity)),
         phash: entry.phash,
         ...(meta ? { storeId, purchaseUrl: meta.url?.slice(0, 500) ?? null, purchasePrice: priceNumber(meta.priceText), purchaseDate: meta.purchaseDate ? new Date(`${meta.purchaseDate}T12:00:00Z`) : null, storePhoto: !meta.matched, fitNotes: meta.fitNotes?.slice(0, 500) ?? null } : { purchaseUrl: brandUrl }),
         aiConfidence: JSON.parse(JSON.stringify({ confidence: tags.confidence, fabricConfidence: tags.fabricConfidence, warnings: ai.warnings })),
@@ -184,10 +186,11 @@ export function emptyTags(): TagResult {
 
 // ---------- Item detail editing ----------
 
-import { deleteObject, getObject, newKey, putObject, type PhotoKeyKind } from "@/lib/storage";
+import { deleteObject, getObject, newKey, parseKey, putObject, type PhotoKeyKind } from "@/lib/storage";
 import { quarterTurn, rotateImage, type RotateDirection } from "@/lib/images/rotate";
 import { makeThumb } from "@/lib/images/thumb";
 import { phash } from "@/lib/images/phash";
+import { applyCopyAction, countsFor, countsOf, laundrySummary, MAX_COPIES, type CopyAction, type CopyCounts } from "@/lib/items/copies";
 import type { LaundryStatus } from "@/generated/prisma/client";
 
 export type ItemDetailEdits = ItemEdits & {
@@ -209,7 +212,7 @@ export type ItemDetailEdits = ItemEdits & {
 };
 
 async function ownedItem(viewer: { id: string; role: string }, itemId: string) {
-  const item = await db.item.findUnique({ where: { id: itemId }, select: { id: true, ownerId: true, storePhoto: true, wearCount: true, photoNudgedAt: true } });
+  const item = await db.item.findUnique({ where: { id: itemId }, select: { id: true, ownerId: true, storePhoto: true, wearCount: true, photoNudgedAt: true, copies: true, dirtyCopies: true, cleanersCopies: true, laundryStatus: true } });
   if (!item) throw new ItemError("That item is gone.", 404);
   if (item.ownerId !== viewer.id && viewer.role !== "admin") throw new ItemError("Only the owner or an admin can change this.", 403);
   return item;
@@ -238,7 +241,7 @@ export async function updateItem(viewer: { id: string; role: string }, itemId: s
     if (!e.purchaseDate) data.purchaseDate = null;
     else { const d = new Date(e.purchaseDate); if (Number.isNaN(d.getTime())) throw new ItemError("That date doesn't look right."); data.purchaseDate = d; }
   }
-  if (e.laundryStatus !== undefined) data.laundryStatus = e.laundryStatus;
+  if (e.laundryStatus !== undefined) Object.assign(data, { laundryStatus: e.laundryStatus, ...countsFor(item.copies, e.laundryStatus) });
   if (e.isFavorite !== undefined) data.isFavorite = e.isFavorite;
   if (e.neverSuggest !== undefined) data.neverSuggest = e.neverSuggest;
   if (e.colorIds !== undefined) data.colors = set(e.colorIds);
@@ -267,21 +270,73 @@ export async function updateItem(viewer: { id: string; role: string }, itemId: s
 
 const LAUNDRY_CYCLE: LaundryStatus[] = ["clean", "dirty", "cleaners"];
 
-/** One tap moves CLEAN → LAUNDRY → AT CLEANERS → CLEAN. Returns the new status. */
+/** One tap moves CLEAN → LAUNDRY → AT CLEANERS → CLEAN. Returns the new status. The whole stack moves together. */
 export async function cycleLaundry(viewer: { id: string; role: string }, itemId: string): Promise<LaundryStatus> {
-  await ownedItem(viewer, itemId);
-  const it = await db.item.findUniqueOrThrow({ where: { id: itemId }, select: { laundryStatus: true } });
+  const it = await ownedItem(viewer, itemId);
   const next = LAUNDRY_CYCLE[(LAUNDRY_CYCLE.indexOf(it.laundryStatus) + 1) % LAUNDRY_CYCLE.length];
-  await db.item.update({ where: { id: itemId }, data: { laundryStatus: next } });
+  await db.item.update({ where: { id: itemId }, data: { laundryStatus: next, ...countsFor(it.copies, next) } });
   return next;
 }
 
-/** Laundry as three states, one tap each on the piece page. */
+/** Laundry as three states, one tap each on the piece page. On a stack every copy moves together. */
 export async function setLaundry(viewer: { id: string; role: string }, itemId: string, status: LaundryStatus): Promise<LaundryStatus> {
-  await ownedItem(viewer, itemId);
+  const it = await ownedItem(viewer, itemId);
   if (!LAUNDRY_CYCLE.includes(status)) throw new ItemError("Pick clean, in the wash, or at the cleaners.");
-  await db.item.update({ where: { id: itemId }, data: { laundryStatus: status } });
+  await db.item.update({ where: { id: itemId }, data: { laundryStatus: status, ...countsFor(it.copies, status) } });
   return status;
+}
+
+/** A stack's laundry one copy at a time (F1, Jeff 3 Nov 2026): one in the wash, one to the cleaners, one back clean, or wash day for all. */
+export async function laundryCopies(viewer: { id: string; role: string }, itemId: string, action: CopyAction): Promise<CopyCounts & { laundryStatus: LaundryStatus }> {
+  const it = await ownedItem(viewer, itemId);
+  const next = applyCopyAction(countsOf(it), action);
+  const laundryStatus = laundrySummary(next);
+  await db.item.update({ where: { id: itemId }, data: { ...next, laundryStatus } });
+  return { ...next, laundryStatus };
+}
+
+/** How many identical pieces this card stands for. Copies in the wash or at the cleaners shrink to fit. */
+export async function setCopies(viewer: { id: string; role: string }, itemId: string, copies: number): Promise<CopyCounts & { laundryStatus: LaundryStatus }> {
+  const it = await ownedItem(viewer, itemId);
+  const n = Math.floor(Number(copies));
+  if (!Number.isFinite(n) || n < 1 || n > MAX_COPIES) throw new ItemError(`Copies go from 1 to ${MAX_COPIES}.`);
+  const next = countsOf({ ...countsOf(it), copies: n, laundryStatus: it.laundryStatus });
+  const laundryStatus = laundrySummary(next);
+  await db.item.update({ where: { id: itemId }, data: { ...next, laundryStatus } });
+  return { ...next, laundryStatus };
+}
+
+/** One copy becomes its own card (it got a real photo, a stain, a story): same facts and photos, one piece. Returns the new item's id. */
+export async function splitOneOff(viewer: { id: string; role: string }, itemId: string): Promise<string> {
+  const it = await ownedItem(viewer, itemId);
+  if (it.copies <= 1) throw new ItemError("This is already a single piece.");
+  const full = await db.item.findUniqueOrThrow({ where: { id: itemId }, include: { colors: true, patterns: true, fabrics: true, seasons: true, formalities: true, occasions: true, tags: true, photos: true, closets: true } });
+  const ids = (xs: { id: string }[]) => ({ connect: xs.map((x) => ({ id: x.id })) });
+  // A photo key belongs to one piece: the new card gets its own copies of the pictures.
+  const photos: { kind: PhotoKind; bucketKey: string; isPrimary: boolean; forMirror: boolean; wholeGarment: boolean | null }[] = [];
+  for (const ph of full.photos) {
+    const parsed = parseKey(ph.bucketKey);
+    if (!parsed) continue;
+    const { body, contentType } = await getObject(ph.bucketKey);
+    const key = newKey(parsed.kind, full.ownerId, contentType);
+    await putObject(key, body, contentType);
+    photos.push({ kind: ph.kind, bucketKey: key, isPrimary: ph.isPrimary, forMirror: ph.forMirror, wholeGarment: ph.wholeGarment });
+  }
+  return db.$transaction(async (tx) => {
+    const made = await tx.item.create({
+      data: {
+        ownerId: full.ownerId, categoryId: full.categoryId, subcategoryId: full.subcategoryId, brandId: full.brandId, storeId: full.storeId,
+        name: full.name, size: full.size, fitNotes: full.fitNotes, purchasePrice: full.purchasePrice, purchaseDate: full.purchaseDate, purchaseUrl: full.purchaseUrl,
+        storePhoto: full.storePhoto, features: full.features, phash: full.phash, aiConfidence: full.aiConfidence ?? undefined, copies: 1,
+        colors: ids(full.colors), patterns: ids(full.patterns), fabrics: ids(full.fabrics), seasons: ids(full.seasons), formalities: ids(full.formalities), occasions: ids(full.occasions), tags: ids(full.tags),
+        closets: { create: full.closets.map((c) => ({ closetId: c.closetId })) },
+        photos: { create: photos },
+      },
+    });
+    const rest = countsOf({ ...countsOf(it), copies: it.copies - 1, laundryStatus: it.laundryStatus });
+    await tx.item.update({ where: { id: itemId }, data: { ...rest, laundryStatus: laundrySummary(rest) } });
+    return made.id;
+  });
 }
 
 export async function addItemPhoto(viewer: { id: string; role: string }, itemId: string, kind: "alone" | "worn" | "label" | "back", key: string): Promise<void> {

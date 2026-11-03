@@ -32,6 +32,9 @@ Jeff answers in chat (letters and numbers, recommended pick first). Decisions ar
   ask still comes after the first wear and every six wears (`photoNudge`).
 - **Q C1 (rec.)** link/receipt pieces go straight into the closet, fixable on the piece page. **C2** keep the
   one-tap cards. **C3** a "Confirm all" button.
+- **Built 3 Nov 2026 (C1)**: one entry per color-and-size row with its count; once tagged, a store piece is added
+  on its own as one card with that many copies (`process.ts` auto-add; only a missing category still asks). The
+  strips say "n added to the closet". C4 built as the store-photo line on the piece page.
 - **Q C4 (rec.)** a quiet "store photo · add yours" line on the piece page with Add photo right there.
   **C5** a popup next time the piece opens. **C6** leave as is.
 
@@ -51,9 +54,15 @@ Jeff answers in chat (letters and numbers, recommended pick first). Decisions ar
   state; a real photo attaches to one copy; the clean-out advises when copies sit unworn.
 - **Q F1 (rec.)** laundry per copy (one worn → one dirty, nine clean; Today keeps offering it while any copy
   is clean). **F2** the whole stack goes dirty together.
+- **Built 3 Nov 2026 (F1)**: `Item.copies` + `dirtyCopies` / `cleanersCopies` (`src/lib/items/copies.ts`);
+  `laundryStatus` stays the summary word. Card badge ×n; piece page Copies row, Split one off, laundry one copy at a
+  time; Today rests a stack only after as many wears as copies in the window; Clean-out "Too many of the same"
+  with the new rule Days between washes (7) → Keep n / Leave it. Real photos per copy: Split one off, then add the
+  photo on the new card (E lands on top of this).
 
 ## O. Order
 - **O1 (rec.)** Check-in fix (done, 9fb9a1c) → C (done) → F → A → E → D → B. **O2** B before C.
 
 ## Decisions
 - 2 Nov 2026: A built as A1 while Jeff's answer is pending (Jeff = Men's by the seed; everyone else picks on the Shop or Looking-for the first time, or in Settings → Shops in). A2 would only add the other people's picks.
+- 3 Nov 2026 (Jeff): B1, C1, D1, E1, F1, O1. The real-photo ask was not answered: built as C4 (a quiet line on the piece page), flagged in chat. Order: C1 → F → E → D → B.
