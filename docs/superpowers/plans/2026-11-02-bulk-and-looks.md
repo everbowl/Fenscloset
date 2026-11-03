@@ -48,6 +48,11 @@ Jeff answers in chat (letters and numbers, recommended pick first). Decisions ar
 - **Build**: on the confirm card, "Several pieces in this photo?" → Claude counts them and reads each
   one's color; one piece each, sharing name and size; identical ones become copies (F).
 - **Q E1 (rec.)** each piece cropped out as its own photo. **E2** the group photo on all until real ones arrive.
+- **Built 3 Nov 2026 (E1)**: the tagger reports how many garments lie in the photo (`pieceCount`); the card shows
+  "Looks like n pieces · Split into n / It's one piece", and a "Several pieces?" pill is always there. Split
+  (`src/lib/import/split.ts`): Claude gives a box and a color per garment, each is cropped out as its own photo and
+  queued as its own entry in the same batch (the same color twice → one entry with quantity 2 → ×2 copies); the
+  original steps aside as skipped.
 
 ## F. Ten of the same shirt
 - **Build**: a copies count on a piece; one closet card "×10"; the piece page lists the copies and their

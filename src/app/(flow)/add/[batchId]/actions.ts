@@ -5,6 +5,7 @@ import { requirePerson } from "@/lib/auth/current";
 import { attachEntryPhoto, createItemFromEntry, ItemError, mergeIntoItem, saveEntryEdits, skipEntry, unskipEntry, type ItemEdits, mirrorFromItem } from "@/lib/items/service";
 import { readBackForEntry, readLabelForEntry } from "@/lib/import/process";
 import { rotateEntry } from "@/lib/import/rotate-entry";
+import { splitEntry } from "@/lib/import/split";
 import { abandonBatch, ImportError } from "@/lib/import/service";
 import { parseKey } from "@/lib/storage";
 import type { TagResult } from "@/lib/ai/tag-item";
@@ -29,6 +30,16 @@ export async function confirmEntryAction(batchId: string, entryId: string, edits
 export async function skipEntryAction(batchId: string, entryId: string): Promise<ActionResult> {
   const person = await requirePerson();
   try { await skipEntry(person.id, entryId); revalidatePath(`/add/${batchId}`); return { ok: true, value: undefined }; } catch (e) { return fail(e); }
+}
+
+/** Several pieces in one photo (E1): each garment becomes its own entry in the batch; the original steps aside. */
+export async function splitEntryAction(batchId: string, entryId: string): Promise<ActionResult<{ count: number; pieces: number }>> {
+  const person = await requirePerson();
+  try {
+    const r = await splitEntry(person.id, entryId);
+    revalidatePath(`/add/${batchId}`); revalidatePath("/add");
+    return { ok: true, value: { count: r.entryIds.length, pieces: r.pieces } };
+  } catch (e) { return fail(e); }
 }
 
 export async function unskipEntryAction(batchId: string, entryId: string): Promise<ActionResult> {
