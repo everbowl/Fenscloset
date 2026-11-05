@@ -28,6 +28,8 @@ export function FitsScreen(p: {
   year: number; month0: number; today: string; selected: string; days: FitDay[]; fits: FitView[];
   scope: "family" | "person"; personId: string; personName: string; canDress: boolean;
   people: { id: string; name: string }[]; closet: ClosetPiece[];
+  /** Saved looks (B1): things to buy and things owned, together; the open one is reached from + New look. */
+  looks: { id: string; name: string; pieces: number; toBuy: number }[];
 }) {
   const router = useRouter();
   const [, start] = useTransition();
@@ -81,6 +83,24 @@ export function FitsScreen(p: {
           {p.selected !== p.today ? <Link href={`/fits?d=${p.today}`} replace className="pill pill-sm ml-2" data-testid="fits-today">Today</Link> : null}
         </span>
       } /></div>
+      {p.scope === "person" ? (
+        <section className="mb-5 lg:col-span-2" data-testid="looks-row">
+          <div className="flex items-center justify-between border-b border-ink pb-2">
+            <h2 className="mono text-graphite">Looks{p.looks.length ? ` · ${p.looks.length}` : ""}</h2>
+            {p.canDress ? <Link href={`/looks/new?for=${p.personId}`} className="pill pill-sm" data-testid="new-look">+ New look</Link> : null}
+          </div>
+          {p.looks.length ? (
+            <div className="-mx-5 mt-2 flex snap-x gap-2 overflow-x-auto px-5 pb-1 lg:mx-0 lg:px-0">
+              {p.looks.map((l) => (
+                <Link key={l.id} href={`/looks/${l.id}`} className="flex w-[168px] shrink-0 snap-start flex-col gap-1 border border-ink p-3 active:bg-bone" data-testid="look-card">
+                  <span className="truncate text-[15px]">{l.name}</span>
+                  <span className="mono text-graphite">{l.pieces} {l.pieces === 1 ? "piece" : "pieces"}{l.toBuy ? ` · ${l.toBuy} to buy` : ""}</span>
+                </Link>
+              ))}
+            </div>
+          ) : <p className="mono py-2 text-graphite">Things to buy and things you own, together on you. Tap ADD TO A LOOK on a store find.</p>}
+        </section>
+      ) : null}
       <div className="lg:col-start-1">
       <div className="mono grid grid-cols-7 border-b border-ink pb-2 text-graphite">{["S", "M", "T", "W", "T", "F", "S"].map((d, i) => <div key={i}>{d}</div>)}</div>
       <div className="grid grid-cols-7 gap-0.5 pt-1" data-testid="calendar">

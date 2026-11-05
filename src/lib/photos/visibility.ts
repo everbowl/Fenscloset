@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { parseKey } from "@/lib/storage";
 import { MANNEQUIN_OWNER } from "@/lib/tryon/mannequin-key";
-import { canSeeBodyData } from "@/lib/people/visibility";
+import { canSeeBodyData, canShopFor } from "@/lib/people/visibility";
 import type { Role } from "@/generated/prisma/client";
 
 export type Viewer = { id: string; role: Role; status?: string };
@@ -27,6 +27,7 @@ export async function canViewKey(viewer: Viewer, key: string): Promise<boolean> 
   if (parsed.kind === "mannequin") return canSeeMannequinKey(viewer, parsed.ownerId); // no body in it: the person and a minor's parents
   if (parsed.kind === "fits") return canSeeFitPhotoKey(viewer, parsed.ownerId, key);
   if (parsed.kind === "shop") return canSeeShopKey(viewer, parsed.ownerId, key);
+  if (parsed.kind === "looks") return canShopFor(viewer, parsed.ownerId); // a store find in a look: whoever may build the look
   const owner = await db.person.findUnique({ where: { id: parsed.ownerId }, select: { id: true, role: true, status: true } });
   if (!owner || owner.status === "removed") return false;
   if (owner.role === "minor") {

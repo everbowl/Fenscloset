@@ -15,6 +15,7 @@ import { shrinkPhoto } from "@/lib/import/client-queue";
 import { cn } from "@/lib/cn";
 import type { LookupView, SimilarItem } from "@/lib/shop/engine";
 import type { BrandFeedView } from "@/lib/shop/brand-feed";
+import { AddToLook } from "@/components/looks/add-to-look";
 import { brandFeedAction, brandFeedStatusAction, deleteLookupAction, lookupLinkAction, lookupPhotoAction, lookupStatusAction, rememberShopForAction, tryOnLookupAction, type FeedResult, type LookupResult } from "./actions";
 import type { TryOnState, TryOnView } from "@/lib/tryon";
 import { ago } from "./looking-for/ago";
@@ -240,6 +241,10 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
               {tryOn === "off" || tryOn === "no_photo" ? <Link href={tryOn === "off" ? "/profile/settings" : "/profile/body"} className="mono flex h-[38px] items-center justify-center text-graphite" data-testid={tryOn === "off" ? "try-on-off" : "try-on-photo"}>{tryOn === "off" ? "Want it on you? Turn on try-on in Settings" : "Want it on you? Add a body photo first"}</Link> : null}
             </div>
           ) : null}
+          {selected.inputUrl || selected.imageKey ? (
+            // The judged piece itself into a look (B1), with its link and its picture.
+            <div className="mt-2"><AddToLook personId={forPersonId} piece={{ title: selected.title ?? selected.read.name, url: selected.inputUrl, priceText: selected.priceText, imageKey: selected.imageKey, category: selected.read.categoryName }} testId="lookup-add-look" /></div>
+          ) : null}
           {selected.similar.length ? (
             // Jeff, 23 Oct 2026 (Shop v2, A): bigger, with a tap to see the two side by side.
             <div className="mt-5" data-testid="own-similar">
@@ -290,6 +295,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
                     <div className="mt-2 flex flex-col gap-1.5">
                       <a href={p.url} target="_blank" rel="noreferrer" className="pill pill-sm w-full" aria-label={`Buy ${p.title} at ${p.storeName}`}>Buy ↗</a>
                       <button type="button" disabled={thinking} onClick={() => run("link", () => lookupLinkAction(forPersonId, p.url))} className="pill pill-sm pill-solid w-full" aria-label={`Judge ${p.title}`} data-testid="judge-product">Judge it</button>
+                      <AddToLook personId={forPersonId} piece={{ title: p.title, url: p.url, storeName: p.storeName, priceText: p.priceText, imageUrl: p.imageUrl, category: selected.verdict.missingCategory ?? null }} testId="product-add-look" />
                     </div>
                   </div>
                 ))}
@@ -347,6 +353,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
                 <div className="mt-2 flex flex-col gap-1.5">
                   <a href={p.url} target="_blank" rel="noreferrer" className="pill pill-sm w-full" aria-label={`Buy ${p.title} at ${p.storeName}`}>Buy ↗</a>
                   <button type="button" disabled={thinking} onClick={() => run("link", () => lookupLinkAction(forPersonId, p.url))} className="pill pill-sm pill-solid w-full" aria-label={`Judge ${p.title}`} data-testid="brand-feed-judge">Judge it</button>
+                  <AddToLook personId={forPersonId} piece={{ title: p.title, url: p.url, storeName: p.storeName, priceText: p.priceText, imageUrl: p.imageUrl }} testId="brand-feed-add-look" />
                 </div>
               </div>
             ))}

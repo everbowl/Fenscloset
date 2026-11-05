@@ -19,6 +19,7 @@ import { listNeeds } from "@/lib/closet/needs";
 import { bodyViewerNames } from "@/lib/profiles/service";
 import { likelySizes, sizeOptionsByCategory } from "@/lib/profiles/sizes";
 import { NeedsStrip } from "./needs-strip";
+import { LookTray } from "@/components/looks/look-tray";
 
 export const metadata = { title: "Closet" };
 export const dynamic = "force-dynamic";
@@ -77,6 +78,7 @@ export default async function ClosetPage({ searchParams }: { searchParams: Promi
         </div>
       )}
       </ClosetPickProvider>
+      {mine ? <LookTray personId={person.id} /> : null}
     </div>
   );
 }

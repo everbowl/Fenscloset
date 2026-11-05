@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { useClosetPick } from "./pick-context";
 import { ItemCard } from "@/components/item-card";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/toast";
+import { addPickedToLookAction } from "@/app/(app)/looks/actions";
 import { MirrorSheet } from "@/components/mirror/mirror-sheet";
 import { useMirror } from "@/components/mirror/use-mirror";
 import { mirrorCanPlace } from "@/lib/tryon/features";
@@ -28,6 +31,21 @@ export function ClosetGrid({ items, showOwner, mirror }: { items: ItemCardData[]
   const toggle = (id: string) => setPicked((xs) => (xs.includes(id) ? xs.filter((x) => x !== id) : xs.length >= PICK_MAX ? xs : [...xs, id]));
   const names = picked.map((id) => items.find((i) => i.id === id)?.name).filter(Boolean).join(" · ");
   const stop = () => { setPicking(false); setPicked([]); };
+  // The picked pieces onto the open look (B1): the tray at the bottom then says how many are in it.
+  const router = useRouter();
+  const [, start] = useTransition();
+  const [adding, setAdding] = useState(false);
+  const addToLook = () => {
+    if (!mirror) return;
+    setAdding(true);
+    start(async () => {
+      const r = await addPickedToLookAction(mirror.personId, picked);
+      setAdding(false);
+      if (!r.ok) { toast.error(r.error); return; }
+      toast.ok(`In the look · ${r.count} ${r.count === 1 ? "piece" : "pieces"}`);
+      stop(); router.refresh();
+    });
+  };
 
   return (
     <>
@@ -45,11 +63,12 @@ export function ClosetGrid({ items, showOwner, mirror }: { items: ItemCardData[]
       </div>
       {picking ? (
         <div className="fixed inset-x-0 bottom-[calc(76px_+_env(safe-area-inset-bottom))] z-30 border-t border-ink bg-paper px-5 py-3 lg:bottom-0 lg:py-4">
-          <div className="mx-auto max-w-[440px] lg:max-w-[1040px]">
+          <div className="mx-auto flex max-w-[440px] flex-col gap-2 lg:max-w-[1040px]">
             <Button size="lg" className="w-full" disabled={!picked.length || m.busy} shelf={false} sub={picked.length ? names : "Tap pieces in the grid"}
               onClick={() => mirror && m.begin({ look: { kind: "closet", itemIds: picked }, on: onMe ? "me" : "mannequin" })} data-testid="see-picked">
               {m.busy ? "Dressing…" : onMe ? "See it on me" : "See it on a mannequin"}
             </Button>
+            <button type="button" disabled={!picked.length || adding || m.busy} onClick={addToLook} className="pill h-[44px] w-full" data-testid="pick-add-look">{adding ? "Adding…" : "Add to a look"}</button>
           </div>
         </div>
       ) : null}

@@ -68,6 +68,8 @@ model Person {
   shopSectionId      String?
   shopSection        ShopSection?             @relation(fields: [shopSectionId], references: [id], onDelete: SetNull)
   needSnoozes        NeedSnooze[]
+  looksFor           Look[]                   @relation("looksFor")
+  looksBy            Look[]                   @relation("looksBy")
   bodyGrantsGiven    BodyDataGrant[]          @relation("bodyGrantOwner")
   bodyGrantsReceived BodyDataGrant[]          @relation("bodyGrantViewer")
   shopGrantsGiven    ShopForGrant[]           @relation("shopGrantOwner")
@@ -418,6 +420,7 @@ model Item {
   importEntries ImportEntry[]
   wearLogs      WearLog[]
   fitItems      FitItem[]
+  lookPieces    LookPiece[]
 
   @@index([ownerId])
   @@index([ownerId, phash])
@@ -634,6 +637,46 @@ model NeedSnooze {
   person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
 
   @@id([personId, key])
+}
+
+/// A look someone is putting together (Jeff, 2 Nov 2026, B1): store finds and closet pieces together, dressed on the person or the mannequin. No name = the open look the tray shows; named = saved under Fits → Looks.
+model Look {
+  id        String      @id @default(cuid())
+  /// Whose look: dressed on them, kept under their Fits.
+  personId  String
+  /// Who put it together: the person, a parent, or someone allowed to shop for them.
+  byId      String
+  name      String?
+  savedAt   DateTime?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  person    Person      @relation("looksFor", fields: [personId], references: [id], onDelete: Cascade)
+  by        Person      @relation("looksBy", fields: [byId], references: [id], onDelete: Cascade)
+  pieces    LookPiece[]
+
+  @@index([personId, savedAt])
+}
+
+/// One piece of a look: a closet piece (itemId) or a store find (title, link, store, price, picture).
+model LookPiece {
+  id        String   @id @default(cuid())
+  lookId    String
+  sortOrder Int      @default(0)
+  itemId    String?
+  title     String?
+  url       String?
+  storeName String?
+  priceText String?
+  imageUrl  String?
+  /// The store picture, copied into the bucket the first time the mirror needs it (looks/<personId>/…).
+  imageKey  String?
+  /// What the find was read as (Tops, Bottoms…): the slot it takes in the mirror.
+  category  String?
+  createdAt DateTime @default(now())
+  look      Look     @relation(fields: [lookId], references: [id], onDelete: Cascade)
+  item      Item?    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([lookId])
 }
 
 /**

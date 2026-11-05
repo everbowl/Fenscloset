@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { Banner } from "@/components/ui/banner";
+import { AddToLook } from "@/components/looks/add-to-look";
 import { cn } from "@/lib/cn";
 import type { GoWithView } from "@/lib/shop/go-with";
 import { goWithAction, goWithStatusAction, type GoWithResult } from "./actions";
@@ -112,6 +113,7 @@ export function GoWithScreen({ itemId, name, thumbKey, fresh, initial }: { itemI
                     <div className="mt-2 flex flex-col gap-1.5">
                       <a href={p.url} target="_blank" rel="noreferrer" className="pill pill-sm w-full" aria-label={`Buy ${p.title} at ${p.storeName}`}>Buy ↗</a>
                       <button type="button" onClick={() => router.push(`/shop?for=${view.forPersonId}&link=${encodeURIComponent(p.url)}`)} className="pill pill-sm pill-solid w-full" data-testid="go-with-judge">Judge it</button>
+                      <AddToLook personId={view.forPersonId} piece={{ title: p.title, url: p.url, storeName: p.storeName, priceText: p.priceText, imageUrl: p.imageUrl, category: view.needCategory }} testId="go-with-add-look" />
                     </div>
                   </div>
                 ))}

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { OutfitError } from "@/lib/outfits/engine";
 import { dressOnMe, keepTryOn, mirrorEngines, TryOnError, type TryOnView } from "@/lib/tryon";
 import { mannequinLook } from "@/lib/tryon/mannequin";
+import { getLook, lookGarments, LookError } from "@/lib/looks/service";
 import { jobStatus, settled, startJob, type JobStatus } from "@/lib/jobs";
 import type { StylingChoice } from "@/lib/tryon/features";
 
@@ -14,7 +15,7 @@ import type { StylingChoice } from "@/lib/tryon/features";
  * call answers with the picture when it is quick, else with a job to poll.
  */
 
-export type MirrorLook = { kind: "today"; suggestionId: string; index: number } | { kind: "closet"; itemIds: string[] };
+export type MirrorLook = { kind: "today"; suggestionId: string; index: number } | { kind: "closet"; itemIds: string[] } | { kind: "look"; lookId: string };
 export type MirrorRequest = {
   personId: string;
   look: MirrorLook;
@@ -35,7 +36,7 @@ export type MirrorResult =
 const QUICK_MS = 1500;
 
 function failed(e: unknown): MirrorResult {
-  if (e instanceof TryOnError || e instanceof OutfitError) return { ok: false, error: e.message };
+  if (e instanceof TryOnError || e instanceof OutfitError || e instanceof LookError) return { ok: false, error: e.message };
   console.error(e);
   return { ok: false, error: "The mirror didn’t come back. Try again." };
 }
@@ -54,6 +55,7 @@ async function lookItemIds(personId: string, look: MirrorLook): Promise<string[]
     if (!board) throw new TryOnError("That look isn’t here anymore.");
     return board.itemIds;
   }
+  if (look.kind !== "closet") throw new TryOnError("That look isn’t here anymore."); // a saved look is read in dressAction
   const ids = [...new Set((look.itemIds ?? []).filter((id) => typeof id === "string" && id.length < 64))].slice(0, 12);
   if (!ids.length) throw new TryOnError("Pick a piece first.");
   const found = await db.item.findMany({ where: { id: { in: ids }, retiredAt: null }, select: { id: true } });
@@ -65,15 +67,25 @@ async function lookItemIds(personId: string, look: MirrorLook): Promise<string[]
 export async function dressAction(req: MirrorRequest): Promise<MirrorResult> {
   const me = await requirePerson();
   try {
-    const ids = await lookItemIds(req.personId, req.look);
+    // A look (B1): its closet pieces now, its store finds fetched inside the job; anything else: the pieces as before.
+    const look = req.look.kind === "look" ? await getLook(me, req.look.lookId) : null;
+    if (req.look.kind === "look" && !look) throw new TryOnError("That look isn’t here anymore.");
+    if (look && look.personId !== req.personId) throw new TryOnError("That look is someone else’s.");
+    if (look && !look.pieces.length) throw new TryOnError("Add a piece to the look first.");
+    const ids = look ? look.pieces.flatMap((p) => (p.itemId ? [p.itemId] : [])) : await lookItemIds(req.personId, req.look);
+    const stamp = look ? `look:${look.id}:${look.pieces.map((p) => p.id).join(",")}` : [...ids].sort().join(",");
+    const source = look ? "look" : req.look.kind;
     const view = req.view === "back" ? "back" : "front";
     const on = req.on === "mannequin" ? "mannequin" : "me";
     const rule = on === "me" ? (await mirrorEngines()).rule : "mannequin";
-    const key = [me.id, req.personId, on, rule, view, [...ids].sort().join(","), JSON.stringify(req.pick ?? null), req.fresh ? "fresh" : ""].join("|");
-    const job = startJob<TryOnView>(key, me.id, (step) =>
-      on === "mannequin"
-        ? mannequinLook(me, req.personId, ids, req.look.kind, undefined, undefined, req.pick, [], Boolean(req.fresh), { step })
-        : dressOnMe(me, req.personId, ids, req.look.kind, view, req.pick, Boolean(req.fresh), { step }));
+    const key = [me.id, req.personId, on, rule, view, stamp, JSON.stringify(req.pick ?? null), req.fresh ? "fresh" : ""].join("|");
+    const job = startJob<TryOnView>(key, me.id, async (step) => {
+      const { extras, features } = look ? await lookGarments(look.id) : { extras: [], features: [] };
+      if (look && !ids.length && !extras.length) throw new TryOnError("None of these pieces has a picture the mirror can use.");
+      return on === "mannequin"
+        ? mannequinLook(me, req.personId, ids, source, extras, undefined, req.pick, features, Boolean(req.fresh), { step })
+        : dressOnMe(me, req.personId, ids, source, view, req.pick, Boolean(req.fresh), { step }, extras, features);
+    });
     return answer(await settled(job, QUICK_MS), job.id);
   } catch (e) {
     return failed(e);

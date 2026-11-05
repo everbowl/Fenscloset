@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { Banner } from "@/components/ui/banner";
 import { UndoStrip, useUndoable } from "@/components/ui/undo-strip";
+import { AddToLook } from "@/components/looks/add-to-look";
 import { cn } from "@/lib/cn";
 import type { WantView } from "@/lib/shop/wants";
 import { deleteWantAction, editWantAction, foundWantAction, searchWantAction } from "../actions";
@@ -93,6 +94,7 @@ export function WantScreen({ meId, want }: { meId: string; want: WantView }) {
                 <div className="mt-2 flex flex-col gap-1.5">
                   <a href={p.url} target="_blank" rel="noreferrer" className="pill pill-sm w-full" aria-label={`Buy ${p.title} at ${p.storeName}`}>Buy ↗</a>
                   <button type="button" onClick={() => router.push(`/shop?for=${want.forPersonId}&link=${encodeURIComponent(p.url)}`)} className="pill pill-sm pill-solid w-full" data-testid="want-judge">Judge it</button>
+                  <AddToLook personId={want.forPersonId} piece={{ title: p.title, url: p.url, storeName: p.storeName, priceText: p.priceText, imageUrl: p.imageUrl, category: want.category }} testId="want-add-look" />
                 </div>
               </div>
             ))}

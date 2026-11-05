@@ -30,6 +30,8 @@ export class TryOnError extends Error {
 
 export type TryOnState = "ready" | "off" | "minor" | "no_photo" | "unconfigured" | "not_you";
 export type BodyViewSide = "front" | "back";
+/** A garment that is not a closet piece: the Shop's candidate, or a store find in a look (src/lib/looks). Its id keys the cached picture. */
+export type ExtraGarment = { id: string; name: string; category: string | null; buf: Buffer };
 /** The styling chips for the mirror: the pose row and each group that applies to the look, with what is chosen. */
 export type StylingView = { summary: string; poseId: string | null; poses: { id: string; name: string }[]; groups: Styling["groups"] };
 export type TryOnView = {
@@ -79,6 +81,16 @@ export async function forgetTryOns(itemId: string): Promise<number> {
 export const MAX_GARMENTS = 3;
 /** Garment order that reads best on a body: outer layer last (src/lib/tryon/features.ts, shared with the closet's pick mode). */
 const ORDER: readonly string[] = MIRROR_CATEGORIES;
+
+/** The Shop's one candidate picture, or a look's store finds, as extra garments. */
+export function asExtras(extra: Buffer | ExtraGarment[] | undefined): ExtraGarment[] {
+  if (!extra) return [];
+  return Buffer.isBuffer(extra) ? [{ id: "extra", name: "the new piece", category: null, buf: extra }] : extra;
+}
+/** How an extra garment is keyed in a cached picture's itemIds: the Shop's by its source, a look's by its own id. */
+export const extraKeys = (extras: ExtraGarment[], source: string) => extras.map((g) => (g.id === "extra" ? `extra:${source}` : `extra:${g.id}`));
+/** Top, dress, bottom, shoes, outer layer: the order the engines dress in. A garment without a category goes first. */
+export const byMirrorOrder = <T extends { category: string | null }>(gs: T[]): T[] => [...gs].sort((a, b) => ORDER.indexOf(a.category ?? "") - ORDER.indexOf(b.category ?? ""));
 /** Progress reports while a look is dressed ("Dressing you · Oxford", "Checking the picture…"), shown in the mirror while it runs. */
 export type DressingHooks = { step?: (step: string) => void };
 
@@ -191,19 +203,20 @@ export async function garmentImages(itemIds: string[], back = false): Promise<{ 
  * for next time. `extraFeatures` describes a garment that is not an item (a shop candidate). `engine` names who
  * dresses; left out, the rule's engine (the first of two for Compare; dressOnMe runs both).
  */
-export async function tryOnLook(viewer: Viewer, personId: string, itemIds: string[], source: string, extraGarment?: Buffer, view: BodyViewSide = "front", pick?: StylingChoice, extraFeatures: string[] = [], fresh = false, hooks: DressingHooks = {}, engine?: Engine): Promise<TryOnView> {
+export async function tryOnLook(viewer: Viewer, personId: string, itemIds: string[], source: string, extraGarment?: Buffer | ExtraGarment[], view: BodyViewSide = "front", pick?: StylingChoice, extraFeatures: string[] = [], fresh = false, hooks: DressingHooks = {}, engine?: Engine): Promise<TryOnView> {
   const step = (s: string) => hooks.step?.(s);
   await assertReady(viewer, personId);
   const by: Engine = engine ?? (await mirrorEngines()).engines[0] ?? "google";
   // FASHN and Kling place tops, bottoms and one-pieces, not shoes: those stay as they are, said under the picture.
-  const leftOut = (g: { id: string; category: string | null }) => !enginePlacesShoes(by) && g.id !== "extra" && g.category === "Shoes";
+  const leftOut = (g: { id: string; category: string | null }) => !enginePlacesShoes(by) && g.category === "Shoes";
+  const extras = asExtras(extraGarment);
   // Front: the front photo, else the newest photo of any view. Back: only a back photo will do.
   const photo = view === "back"
     ? await db.bodyPhoto.findFirst({ where: { personId, view: "back" }, orderBy: { takenAt: "desc" } })
     : (await db.bodyPhoto.findFirst({ where: { personId, view: "front" }, orderBy: { takenAt: "desc" } })) ?? (await db.bodyPhoto.findFirst({ where: { personId }, orderBy: { takenAt: "desc" } }));
   if (!photo) throw new TryOnError(view === "back" ? "Add a back photo on your Body page to see the look from behind." : "Add a full-body photo on your Body page first.");
   const ids = [...new Set(itemIds)];
-  const cacheIds = [...(extraGarment ? [...ids, `extra:${source}`] : ids)].sort();
+  const cacheIds = [...ids, ...extraKeys(extras, source)].sort();
   const { lists, styling } = await stylingFor(personId, ids, pick, extraFeatures);
   const where = { personId, bodyPhotoKey: photo.bucketKey, itemIds: { equals: cacheIds }, engine: by };
   if (fresh) await db.tryOn.deleteMany({ where }); // "Dress again": the look is dressed from scratch, raw and styled
@@ -221,7 +234,7 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
   let person: Buffer;
   if (raw) person = (await getObject(raw.bucketKey)).body;
   else {
-    const garments = [...(extraGarment ? [{ id: "extra", name: "the new piece", category: null, buf: extraGarment }] : []), ...(await garmentImages(ids, view === "back"))].slice(0, MAX_GARMENTS);
+    const garments = byMirrorOrder([...extras, ...(await garmentImages(ids, view === "back"))]).slice(0, MAX_GARMENTS);
     if (!garments.length) throw new TryOnError("None of these pieces has a photo the try-on can use.");
     const skipped = garments.filter(leftOut);
     const dressed = garments.filter((g) => !leftOut(g));
@@ -237,7 +250,7 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
         const garment = await sharp(g.buf).flatten({ background: "#ffffff" }).resize(1024, 1024, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
         let out: { data: Buffer };
         try {
-          out = by === "fashn" ? await fashnTryOn(person, garment, g.id === "extra" ? "auto" : (fashnCategory(g.category) ?? "auto")) : by === "kling" ? await klingTryOn(person, garment) : await googleTryOn(person, garment);
+          out = by === "fashn" ? await fashnTryOn(person, garment, fashnCategory(g.category) ?? "auto") : by === "kling" ? await klingTryOn(person, garment) : await googleTryOn(person, garment);
         } catch (e) {
           if (e instanceof TryOnModelError) throw new TryOnError(e.message, 502);
           if (e instanceof FashnError || e instanceof KlingError) {
@@ -321,8 +334,10 @@ export async function keepTryOn(viewer: Viewer, personId: string, tryOnId: strin
   const engine = row.engine as Engine;
   await db.tryOnChoice.upsert({ where: { personId_lookKey: { personId, lookKey: lookKeyOf(row.bodyPhotoKey, row.itemIds) } }, create: { personId, lookKey: lookKeyOf(row.bodyPhotoKey, row.itemIds), engine }, update: { engine } });
   const view: BodyViewSide = (await db.bodyPhoto.findFirst({ where: { bucketKey: row.bodyPhotoKey }, select: { view: true } }))?.view === "back" ? "back" : "front";
+  // The kept column is the picture the person saw: it comes back as it is (a look's store finds included), never dressed again.
   const ids = row.itemIds.filter((id) => !id.startsWith("extra:"));
-  return { ...(await tryOnLook(viewer, personId, ids, row.source, undefined, view, undefined, [], false, {}, engine)), kept: true };
+  const { lists, styling } = await stylingFor(personId, ids, undefined, []);
+  return { id: row.id, key: row.bucketKey, itemIds: row.itemIds, createdAt: row.createdAt.toISOString(), cached: true, view, engine, styling: stylingView(lists, styling), note: row.note ?? null, kept: true };
 }
 
 /** The engine a person kept for this look in Compare, if any. */
@@ -339,20 +354,21 @@ async function keptEngine(personId: string, itemIds: string[], view: BodyViewSid
  * other's picture with the failure said under it; both failing throws the first reason. A column the person kept
  * (G1) is shown alone until "Dress again".
  */
-export async function dressOnMe(viewer: Viewer, personId: string, itemIds: string[], source: string, view: BodyViewSide = "front", pick?: StylingChoice, fresh = false, hooks: DressingHooks = {}): Promise<TryOnView> {
+export async function dressOnMe(viewer: Viewer, personId: string, itemIds: string[], source: string, view: BodyViewSide = "front", pick?: StylingChoice, fresh = false, hooks: DressingHooks = {}, extras: ExtraGarment[] = [], extraFeatures: string[] = []): Promise<TryOnView> {
   const { engines, note } = await mirrorEngines();
   if (!engines.length) throw new TryOnError("Try-on isn’t set up on the site yet.");
+  const keyIds = [...new Set(itemIds), ...extraKeys(extras, source)]; // the kept engine (Compare) is remembered per look, store finds included
   const withNote = (v: TryOnView, extra?: string) => { const n = [note, extra].filter(Boolean).join(" · "); return n ? { ...v, engineNote: n } : v; };
-  if (engines.length === 1) return withNote(await tryOnLook(viewer, personId, itemIds, source, undefined, view, pick, [], fresh, hooks, engines[0]));
-  if (fresh) { const key = await bodyPhotoKeyFor(personId, view); if (key) await db.tryOnChoice.deleteMany({ where: { personId, lookKey: lookKeyOf(key, [...new Set(itemIds)]) } }); }
+  if (engines.length === 1) return withNote(await tryOnLook(viewer, personId, itemIds, source, extras, view, pick, extraFeatures, fresh, hooks, engines[0]));
+  if (fresh) { const key = await bodyPhotoKeyFor(personId, view); if (key) await db.tryOnChoice.deleteMany({ where: { personId, lookKey: lookKeyOf(key, keyIds) } }); }
   else {
-    const kept = await keptEngine(personId, itemIds, view);
-    if (kept && engines.includes(kept)) return { ...withNote(await tryOnLook(viewer, personId, itemIds, source, undefined, view, pick, [], false, hooks, kept)), kept: true };
+    const kept = await keptEngine(personId, keyIds, view);
+    if (kept && engines.includes(kept)) return { ...withNote(await tryOnLook(viewer, personId, itemIds, source, extras, view, pick, extraFeatures, false, hooks, kept)), kept: true };
   }
   if (pick) await stylingFor(personId, [...new Set(itemIds)], pick); // remembered once, before either engine reads it
   const steps: Partial<Record<Engine, string>> = {};
   const report = () => hooks.step?.(engines.map((e) => `${ENGINE_WORD[e]} · ${steps[e] ?? "starting…"}`).join("   "));
-  const results = await Promise.allSettled(engines.map((e) => tryOnLook(viewer, personId, itemIds, source, undefined, view, undefined, [], fresh, { step: (s) => { steps[e] = s; report(); } }, e)));
+  const results = await Promise.allSettled(engines.map((e) => tryOnLook(viewer, personId, itemIds, source, extras, view, undefined, extraFeatures, fresh, { step: (s) => { steps[e] = s; report(); } }, e)));
   const ok = results.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
   const failed = results.flatMap((r, i) => (r.status === "rejected" ? [`${ENGINE_WORD[engines[i]]}: ${(r.reason as Error).message}`] : []));
   if (!ok.length) throw results[0].status === "rejected" ? results[0].reason : new TryOnError("The mirror didn’t come back.");

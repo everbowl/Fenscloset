@@ -19,6 +19,7 @@ const POLL_MS = 2000;
 function sameLook(a: MirrorLook, b: MirrorLook): boolean {
   if (a.kind === "today" && b.kind === "today") return a.suggestionId === b.suggestionId && a.index === b.index;
   if (a.kind === "closet" && b.kind === "closet") return [...a.itemIds].sort().join() === [...b.itemIds].sort().join();
+  if (a.kind === "look" && b.kind === "look") return a.lookId === b.lookId;
   return false;
 }
 

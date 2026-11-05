@@ -18,6 +18,14 @@ Jeff answers in chat (letters and numbers, recommended pick first). Decisions ar
   pieces (remove, Buy links), See it on me / On a mannequin; `tryOnLook` takes several store garments
   (today one `extraGarment`); assumption: up to 5 pieces per look.
 - **Q B1 (rec.)** saved looks under Fits as a named "Looks" row. **B2** on the Shop page. **B3** no saving.
+- **Built (3 Nov 2026, B1)**: `src/lib/looks/service.ts` (Look + LookPiece, migration 20261103150000_looks): one open look per
+  person (no name), "Add to a look" on every store find (Looking-for matches, the Shop's judged piece, its products and
+  the brand feed, a piece's go-with products) and on the closet's pick mode; the tray "Look · n pieces · Open →" fixed
+  above the tab bar on those screens; the look screen `/looks/[id]` (pieces with Buy links, remove, Add from the closet,
+  See it on me / on a mannequin, Name and save, Start over / Remove). The mirror takes several extra garments
+  (`ExtraGarment[]`, store pictures fetched once into `looks/<personId>/…`), keyed per piece so a dressed look is cached
+  until it changes; `MirrorLook` gains `{ kind: "look", lookId }`. Saved looks: a Looks row under Fits with "+ New look".
+  Up to 5 pieces; the mirror dresses up to three (top, bottom, shoes). Whoever may shop for the person may build it.
 
 ## C. Bulk loading the wardrobe — built 2 Nov 2026
 - **Existed**: /add/store with a link tab (one color, one size, one count per pass) and a receipt tab (one).

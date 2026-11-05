@@ -45,6 +45,13 @@ export const HELP_TOPICS: HelpTopic[] = [
     { text: "Tap SHARE to pick who can see it. The line under the photo always says who can.", cue: { kind: "link", label: "Share" } },
     { text: "Forgot to tap WEAR THIS? Tap that day, tap SAVE THE FIT, and pick the pieces.", cue: { kind: "button", label: "Save the fit" } },
   ] },
+  { slug: "looks", title: "Build a", accent: "look", blurb: "Things to buy and things you own, together on you.", link: { href: "/shop", label: "Open Shop" }, cover: { kind: "strip", label: "Look · 3 pieces · Open →" }, steps: [
+    { text: "On any store find (LOOKING FOR, the Shop's verdict, something to go with a piece), tap ADD TO A LOOK.", cue: { kind: "button", label: "Add to a look", variant: "secondary" } },
+    { text: "In the closet, tap MIRROR, tap pieces, then ADD TO A LOOK. The strip at the bottom says LOOK · 3 PIECES; tap it to open the look.", cue: { kind: "strip", label: "Look · 3 pieces · Open →" } },
+    { text: "Tap SEE IT ON ME (or ON A MANNEQUIN). The mirror dresses up to three pieces: a top, a bottom, shoes.", cue: { kind: "button", label: "See it on me" } },
+    { text: "ADD FROM MY CLOSET picks more of what you own. Every store piece keeps its BUY link.", cue: { kind: "link", label: "Buy ↗" } },
+    { text: "Tap NAME AND SAVE. Saved looks live under FITS → LOOKS; + NEW LOOK starts another.", cue: { kind: "button", label: "Name and save", variant: "secondary" } },
+  ] },
   { slug: "shop", title: "Should I", accent: "buy it?", blurb: "A verdict before you pay.", link: { href: "/shop", label: "Open Shop" }, cover: { kind: "verdict", word: "BUY IT" }, steps: [
     { text: "Tap SHOP.", cue: { kind: "nav", tab: "Shop" } },
     { text: "The first time, tap the section you shop in: MEN'S, WOMEN'S, BOYS' or GIRLS'. Every store search carries it, so the other section stays out. Change it any time on the small pill under the title, or in Settings.", cue: { kind: "button", label: "Men's" } },
