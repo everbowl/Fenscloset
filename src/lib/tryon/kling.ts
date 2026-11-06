@@ -7,10 +7,11 @@ import { fetchWithBackoff } from "@/lib/tryon/google";
  * FASHN (Jeff, 24 Oct 2026: "add Kling"). One garment onto one person image per call; it works out whether the
  * garment is a top, a bottom or a one-piece by itself; it does not place shoes. Minors never reach this call
  * (src/lib/tryon/index.ts assertReady). Env, all in Railway:
- *   KLING_ACCESS_KEY, KLING_SECRET_KEY  the pair from the Kling developer console (API Keys)
+ *   KLING_API_KEY                       an API key from the Kling developer console (kling.ai → API keys): sent as it is
+ *   KLING_ACCESS_KEY, KLING_SECRET_KEY  the older access-key / secret-key pair: signed into a short-lived JWT
  *   KLING_API_BASE                      default https://api-singapore.klingai.com (Kling's global API)
  *   KLING_MODEL                         default kolors-virtual-try-on-v1-5
- * Auth is a short-lived JWT (HS256, iss = the access key) signed with the secret key, sent as a Bearer token.
+ * Either goes as a Bearer token; with both set, the API key wins.
  * MOCK_KLING=true pastes the garment on instead, cooler than the other mocks so a comparison shows three pictures.
  */
 
@@ -25,7 +26,14 @@ export const KLING_PATH = "/v1/images/kolors-virtual-try-on";
 export const klingBase = () => (process.env.KLING_API_BASE || "https://api-singapore.klingai.com").replace(/\/$/, "");
 
 export function isKlingConfigured(): boolean {
-  return process.env.MOCK_KLING === "true" || Boolean(process.env.KLING_ACCESS_KEY && process.env.KLING_SECRET_KEY);
+  return process.env.MOCK_KLING === "true" || Boolean(process.env.KLING_API_KEY) || Boolean(process.env.KLING_ACCESS_KEY && process.env.KLING_SECRET_KEY);
+}
+
+/** The Authorization value: the API key as it is, else a token signed from the access-key / secret-key pair; null without either. */
+export function klingAuth(env: Record<string, string | undefined> = process.env): string | null {
+  if (env.KLING_API_KEY) return `Bearer ${env.KLING_API_KEY}`;
+  if (env.KLING_ACCESS_KEY && env.KLING_SECRET_KEY) return `Bearer ${klingToken(env.KLING_ACCESS_KEY, env.KLING_SECRET_KEY)}`;
+  return null;
 }
 
 const b64url = (s: Buffer | string) => Buffer.from(s).toString("base64").replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
@@ -45,7 +53,7 @@ type QueryResponse = { code?: number; message?: string; data?: { task_id?: strin
 /** A message a person can act on, from Kling's codes and words. */
 function friendly(code: number | undefined, text: string | undefined): KlingError {
   const t = text ?? "";
-  if (code !== undefined && code >= 1000 && code < 1100) return new KlingError(`Kling refused the keys (${code}). Check KLING_ACCESS_KEY and KLING_SECRET_KEY in Railway.`, 503, "key");
+  if (code !== undefined && code >= 1000 && code < 1100) return new KlingError(`Kling refused the key (${code}). Check KLING_API_KEY in Railway, and that API access is turned on in the Kling console.`, 503, "key");
   if (code !== undefined && code >= 1100 && code < 1200) return new KlingError("Kling is out of credits.", 503, "credits");
   if (code === 1301 || code === 1302 || /risk|sensitive|content|moderation|policy/i.test(t)) return new KlingError("Kling’s filters refused this picture.", 422, "moderation");
   if (code === 1303 || code === 1304) return new KlingError("Kling is busy right now. Try again in a minute.", 503, "busy");
@@ -57,13 +65,13 @@ function friendly(code: number | undefined, text: string | undefined): KlingErro
 /** One garment onto one person image → image bytes. A task is created, then polled every KLING_POLL_MS (2 s) until it is done. */
 export async function klingTryOn(person: Buffer, garment: Buffer, fetchImpl: typeof fetch = fetch): Promise<{ data: Buffer; mimeType: string }> {
   if (process.env.MOCK_KLING === "true") return { data: await mockKling(person, garment), mimeType: "image/jpeg" };
-  const ak = process.env.KLING_ACCESS_KEY, sk = process.env.KLING_SECRET_KEY;
-  if (!ak || !sk) throw new KlingError("Kling isn’t set up yet: KLING_ACCESS_KEY and KLING_SECRET_KEY are not in Railway.", 503, "no_key");
-  const headers = { Authorization: `Bearer ${klingToken(ak, sk)}`, "Content-Type": "application/json" };
+  const auth = klingAuth();
+  if (!auth) throw new KlingError("Kling isn’t set up yet: KLING_API_KEY is not in Railway.", 503, "no_key");
+  const headers = { Authorization: auth, "Content-Type": "application/json" };
   // Kling takes plain base64 (no data: prefix) or a URL; the pictures stay ours, so base64.
   const body = JSON.stringify({ model_name: process.env.KLING_MODEL || "kolors-virtual-try-on-v1-5", human_image: person.toString("base64"), cloth_image: garment.toString("base64") });
   const run = await fetchWithBackoff(fetchImpl, `${klingBase()}${KLING_PATH}`, { method: "POST", headers, body, signal: AbortSignal.timeout(30_000) });
-  if (run.status === 401 || run.status === 403) throw new KlingError(`Kling refused the keys (${run.status}). Check KLING_ACCESS_KEY and KLING_SECRET_KEY in Railway.`, 503, "key");
+  if (run.status === 401 || run.status === 403) throw new KlingError(`Kling refused the key (${run.status}). Check KLING_API_KEY in Railway, and that API access is turned on in the Kling console.`, 503, "key");
   const text = await run.text();
   let started: CreateResponse;
   try { started = JSON.parse(text) as CreateResponse; } catch { console.error(`kling: create ${run.status}: ${text.slice(0, 300)}`); throw new KlingError(`Kling ${run.status}: ${text.slice(0, 120)}`, 502); }

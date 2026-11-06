@@ -100,7 +100,7 @@ describe("FASHN try-on client", () => {
     expect(half.note).toMatch(/^FASHN isn’t set up yet/);
     const noKling = resolveEngines("compare", { google: true, fashn: true, kling: false });
     expect(noKling.engines).toEqual(["google", "fashn"]);
-    expect(noKling.note).toBe("Kling isn’t set up yet: no KLING_ACCESS_KEY and KLING_SECRET_KEY in Railway.");
+    expect(noKling.note).toBe("Kling isn’t set up yet: no KLING_API_KEY in Railway.");
     expect(resolveEngines("google", { google: false, fashn: true, kling: false })).toMatchObject({ engines: ["fashn"] });
     expect(resolveEngines("compare", { google: false, fashn: false, kling: false }).engines).toEqual([]);
   });

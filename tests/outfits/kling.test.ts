@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createHmac } from "node:crypto";
 import sharp from "sharp";
-import { isKlingConfigured, klingBase, KLING_PATH, klingToken, klingTryOn, mockKling } from "@/lib/tryon/kling";
+import { isKlingConfigured, klingAuth, klingBase, KLING_PATH, klingToken, klingTryOn, mockKling } from "@/lib/tryon/kling";
 
 const jpeg = () => sharp({ create: { width: 24, height: 32, channels: 3, background: { r: 10, g: 20, b: 30 } } }).jpeg().toBuffer();
 const picture = Buffer.from("89504e470d0a1a0a", "hex");
@@ -28,6 +28,21 @@ describe("Kling try-on client", () => {
     delete process.env.MOCK_KLING; delete process.env.KLING_API_BASE; delete process.env.KLING_MODEL; delete process.env.KLING_TIMEOUT_MS;
   });
   afterEach(() => { process.env = { ...env }; });
+
+  it("an API key from the Kling console goes as it is; with the key pair too, the API key wins; neither means not set up", async () => {
+    expect(klingAuth({ KLING_API_KEY: "key-123" })).toBe("Bearer key-123");
+    expect(klingAuth({ KLING_API_KEY: "key-123", KLING_ACCESS_KEY: "ak", KLING_SECRET_KEY: "sk" })).toBe("Bearer key-123");
+    expect(klingAuth({ KLING_ACCESS_KEY: "ak", KLING_SECRET_KEY: "sk" })).toMatch(/^Bearer [A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
+    expect(klingAuth({})).toBeNull();
+    delete process.env.KLING_ACCESS_KEY; delete process.env.KLING_SECRET_KEY;
+    expect(isKlingConfigured()).toBe(false);
+    process.env.KLING_API_KEY = "key-123";
+    expect(isKlingConfigured()).toBe(true);
+    const calls: Call[] = [];
+    const out = await klingTryOn(await jpeg(), await jpeg(), fakeKling([done("https://cdn.example/pic.png")], calls));
+    expect(out.mimeType).toBe("image/png");
+    expect(calls[0].headers.Authorization).toBe("Bearer key-123");
+  });
 
   it("signs a short-lived token with the secret key: the access key as the issuer, good for 30 minutes", () => {
     const tok = klingToken("ak-test", "sk-test", 1_700_000_000_000);
