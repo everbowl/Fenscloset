@@ -88,3 +88,4 @@ Jeff answers in chat (letters and numbers, recommended pick first). Decisions ar
 ## Decisions
 - 2 Nov 2026: A built as A1 while Jeff's answer is pending (Jeff = Men's by the seed; everyone else picks on the Shop or Looking-for the first time, or in Settings → Shops in). A2 would only add the other people's picks.
 - 3 Nov 2026 (Jeff): B1, C1, D1, E1, F1, O1. The real-photo ask was not answered: built as C4 (a quiet line on the piece page), flagged in chat. Order: C1 → F → E → D → B.
+- 6 Nov 2026 (Jeff): B-a, B-b, B-c, D-a, D-b confirmed as built. B-a five pieces per look, the mirror dresses three. B-b whoever may shop for the person builds their look (the person, a parent of a minor, an allowed shopper). B-c naming a look saves it under Fits → Looks and the next Add starts a fresh open look. D-a only the owner sees their What's-needed strip. D-b store photos: one row for all pieces plus the quiet line on each piece page (C4 stands).
