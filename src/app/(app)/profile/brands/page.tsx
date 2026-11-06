@@ -22,7 +22,7 @@ export default async function BrandsPage() {
   ]);
 
   return (
-    <div>
+    <div className="lg:max-w-[640px]">
       <PageHeader title={mine ? "Brands" : owner.first} accent={mine ? "& stores" : "brands"} />
       <FavoritesEditor ownerId={owner.id} favs={favs} brands={brands} stores={stores} myBrands={myBrands} sizeOptions={sizeOptions} likely={likely} canEdit={canEdit} canEditLists={viewer.role === "admin"} />
     </div>

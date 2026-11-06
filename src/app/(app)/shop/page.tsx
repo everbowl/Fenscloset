@@ -1,12 +1,16 @@
 import { requirePerson } from "@/lib/auth/current";
 import { getLookup, listRecent } from "@/lib/shop/engine";
 import { shoppingFor } from "@/lib/shop/people";
+import { rememberedShopFor } from "@/lib/shop/remember";
 import { newMatchCount } from "@/lib/shop/wants";
 import { openBrandFeed } from "@/lib/shop/brand-feed";
 import { ShopScreen } from "./shop-screen";
+import { LookTray } from "@/components/looks/look-tray";
 import { tryOnState } from "@/lib/tryon";
 import { isMannequinConfigured } from "@/lib/tryon/mannequin";
 import { canDress } from "@/lib/outfits/engine";
+import { sectionOf } from "@/lib/shop/section";
+import { listEntries } from "@/lib/lists/service";
 
 export const metadata = { title: "Shop" };
 export const dynamic = "force-dynamic";
@@ -15,9 +19,14 @@ export const dynamic = "force-dynamic";
 export default async function ShopPage({ searchParams }: { searchParams: Promise<{ for?: string; l?: string; /** A store link to judge as soon as the page opens ("Judge it" from a piece's go-with page). */ link?: string }> }) {
   const me = await requirePerson();
   const { for: forParam, l, link } = await searchParams;
-  const { people, forPersonId } = await shoppingFor(me, forParam);
+  const { people, forPersonId } = await shoppingFor(me, forParam ?? (await rememberedShopFor()));
   const [recent, selected, lookingFor, brandFeed] = await Promise.all([listRecent(me, forPersonId), l ? getLookup(me, l) : Promise.resolve(null), newMatchCount(me, forPersonId), openBrandFeed(me, forPersonId)]);
-  const tryOn = await tryOnState(me, forPersonId);
+  const [tryOn, section, sections] = await Promise.all([tryOnState(me, forPersonId), sectionOf(forPersonId), listEntries("shopSection")]);
   const mannequin = tryOn !== "ready" && isMannequinConfigured() && (await canDress(me, forPersonId));
-  return <ShopScreen meId={me.id} people={people} forPersonId={forPersonId} selected={selected ?? recent[0] ?? null} recent={recent} tryOn={tryOn} mannequin={mannequin} autoLink={link?.trim() || null} lookingFor={lookingFor} brandFeed={brandFeed ?? { personId: forPersonId, brands: [], products: [], newCount: 0, lastFetchedAt: null, stale: false }} />;
+  return (
+    <>
+      <ShopScreen meId={me.id} people={people} forPersonId={forPersonId} section={section} sections={sections.map((x) => ({ id: x.id, name: x.name }))} isAdmin={me.role === "admin"} selected={selected ?? recent[0] ?? null} recent={recent} tryOn={tryOn} mannequin={mannequin} autoLink={link?.trim() || null} lookingFor={lookingFor} brandFeed={brandFeed ?? { personId: forPersonId, brands: [], products: [], newCount: 0, lastFetchedAt: null, stale: false }} />
+      <LookTray personId={forPersonId} />
+    </>
+  );
 }

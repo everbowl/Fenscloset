@@ -77,7 +77,7 @@ export function InspirationBoard({ ownerId, looks, canEdit, isMinor }: { ownerId
             <Row k="Colors" v={open.notes.colorPairs.join("; ")} />
             <Row k="Formality" v={open.notes.formality} />
             <Row k="Pieces" v={open.notes.pieces.join(", ")} />
-            {canEdit ? <Button variant="secondary" className="mt-2 w-full" disabled={busy !== null} onClick={() => remove(open.id)} data-testid="remove-inspiration">{busy === "remove" ? "Removing…" : "Remove this look"}</Button> : null}
+            {canEdit ? <button type="button" className="pill pill-quiet mt-2 h-[50px] w-full" disabled={busy !== null} onClick={() => remove(open.id)} data-testid="remove-inspiration">{busy === "remove" ? "Removing…" : "Remove this look"}</button> : null}
           </div>
         ) : null}
       </Sheet>

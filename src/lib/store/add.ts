@@ -4,6 +4,7 @@ import { fetchImage, normalizeUrl, PageError, readProductPage } from "@/lib/shop
 import { searchProducts, type Product } from "@/lib/shop/products";
 import { getOrCreateOpenBatch, ImportError } from "@/lib/import/service";
 import { enqueueProcessing } from "@/lib/import/queue";
+import { MAX_COPIES } from "@/lib/items/copies";
 
 /**
  * Add from a store (plan 2026-10-18-add-from-store): a product link or a receipt line becomes
@@ -154,11 +155,12 @@ export type StoreAddInput = {
 };
 
 /**
- * Make the entries: the store photo is downloaded once and stored under `originals/` for each piece
- * (one entry per piece so each gets its own confirm). Returns the batch to continue on.
+ * Make the entry: the store photo is downloaded once and stored under `originals/`; one entry stands for every
+ * identical piece (`quantity`, Jeff 3 Nov 2026: ten of the same shirt is one card with ten copies), and a piece
+ * with store facts lands in the closet on its own once tagged (C1). Returns the batch to continue on.
  */
-export async function createStoreEntries(personId: string, input: StoreAddInput): Promise<{ batchId: string; entryIds: string[] }> {
-  const qty = Math.min(10, Math.max(1, Math.floor(input.quantity || 1)));
+export async function createStoreEntries(personId: string, input: StoreAddInput): Promise<{ batchId: string; entryIds: string[]; pieces: number }> {
+  const qty = Math.min(MAX_COPIES, Math.max(1, Math.floor(input.quantity || 1)));
   if (!input.imageUrl) throw new StoreAddError("Pick a photo for this piece first.");
   let imageUrl: string;
   try { imageUrl = normalizeUrl(input.imageUrl).toString(); } catch { throw new StoreAddError("That photo link isn't usable."); }
@@ -169,17 +171,33 @@ export async function createStoreEntries(personId: string, input: StoreAddInput)
     priceText: input.product.priceText, url: input.product.url, imageUrl, color: input.color?.trim().slice(0, 40) || null, size: input.size?.trim().slice(0, 20) || null,
     purchaseDate: input.purchaseDate && /^\d{4}-\d{2}-\d{2}$/.test(input.purchaseDate) ? input.purchaseDate : null,
   };
-  const batch = await getOrCreateOpenBatch(personId, qty);
+  const batch = await getOrCreateOpenBatch(personId, 1);
+  const key = newKey("originals", personId, image.contentType);
+  await putObject(key, image.data, image.contentType);
+  const entry = await db.importEntry.create({ data: { batchId: batch.id, order: batch.startOrder, originalKey: key, status: "uploaded", quantity: qty, storeMeta: JSON.parse(JSON.stringify(meta)) } });
+  enqueueProcessing(entry.id);
+  return { batchId: batch.id, entryIds: [entry.id], pieces: qty };
+}
+
+/** One row of the bulk add: a color and size with how many, and the photo for it (the page's photo for that color, a search pick, or the page's main photo). */
+export type StoreRowInput = { color: string | null; size: string | null; quantity: number; imageUrl: string | null };
+const MAX_ROWS = 30;
+
+/**
+ * Several rows of one product at once (Jeff, 2 Nov 2026: "I own 7 of these, all Medium, these colors…", or
+ * a count beside every color): every row becomes its entries in the same open batch. Rows with no count are skipped.
+ */
+export async function createStoreRows(personId: string, product: StoreAddInput["product"], rows: StoreRowInput[], purchaseDate?: string | null): Promise<{ batchId: string; entryIds: string[]; pieces: number }> {
+  const usable = rows.filter((r) => r && r.quantity > 0).slice(0, MAX_ROWS);
+  if (!usable.length) throw new StoreAddError("Say how many of at least one color.");
+  let batchId: string | null = null;
   const entryIds: string[] = [];
-  for (let i = 0; i < qty; i++) {
-    const key = newKey("originals", personId, image.contentType);
-    await putObject(key, image.data, image.contentType);
-    const entry = await db.importEntry.create({ data: { batchId: batch.id, order: batch.startOrder + i, originalKey: key, status: "uploaded", storeMeta: JSON.parse(JSON.stringify(meta)) } });
-    entryIds.push(entry.id);
-    enqueueProcessing(entry.id);
+  let pieces = 0;
+  for (const r of usable) {
+    const made = await createStoreEntries(personId, { product, imageUrl: r.imageUrl, color: r.color, size: r.size, quantity: r.quantity, purchaseDate });
+    batchId = made.batchId; entryIds.push(...made.entryIds); pieces += made.pieces;
   }
-  if (!entryIds.length) throw new ImportError("Nothing to add.");
-  return { batchId: batch.id, entryIds };
+  return { batchId: batchId!, entryIds, pieces };
 }
 
 /** Price text like "$128.00" or "128 USD" → "128.00" for the item, else null. */

@@ -13,7 +13,7 @@ export default async function PeoplePage() {
   const people = await listPeople();
   const admins = people.filter((p) => p.role === "admin").map((p) => ({ id: p.id, name: p.name }));
   return (
-    <div>
+    <div className="lg:max-w-[640px]">
       <PageHeader title="People" action={<InviteSheet admins={admins} smsReady={smsConfigured()} />} />
       <Card className="divide-y divide-line border-x-0 border-b-0 border-t border-ink p-0">
         {people.map((p) => (

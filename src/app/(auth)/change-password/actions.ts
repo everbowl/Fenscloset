@@ -13,10 +13,8 @@ export type ChangePasswordState = { error?: string };
 export async function changePasswordAction(_prev: ChangePasswordState, formData: FormData): Promise<ChangePasswordState> {
   const person = await requirePerson();
   const password = String(formData.get("password") ?? "");
-  const confirm = String(formData.get("confirm") ?? "");
   const problem = validateNewPassword(password);
   if (problem) return { error: problem };
-  if (password !== confirm) return { error: "The two passwords don't match." };
 
   await setPassword(person.id, password);
   // Keep this session, drop every other one.

@@ -22,6 +22,15 @@ async function seedSimple(delegate: SimpleDelegate, names: string[]) {
  * admins own every list and the seed must never re-create something they deleted or renamed.
  * Set SEED_FORCE=true to re-run the upserts on purpose (local dev / tests).
  */
+/** The parts of a store a person shops in (Jeff, 2 Nov 2026). The first one is Jeff's. */
+const SHOP_SECTIONS = ["Men's", "Women's", "Boys'", "Girls'", "Unisex"];
+
+/** Jeff shops the men's section; set once, never over a pick he changed. */
+async function setJeffSection() {
+  const mens = await db.shopSection.findUnique({ where: { name: SHOP_SECTIONS[0] } });
+  if (mens) await db.person.updateMany({ where: { email: "jeff@everbowl.com", shopSectionId: null }, data: { shopSectionId: mens.id } });
+}
+
 export async function seed() {
   const devMode = isDevMode();
   // Rules are keyed settings, not admin-owned list rows: a new rule must appear after a deploy, so they are
@@ -110,6 +119,8 @@ export async function seed() {
   await seedSimple(db.brand, BRANDS);
   await seedSimple(db.store, STORES);
   await seedSimple(db.styleWord, STYLE_WORDS);
+  await seedSimple(db.shopSection, SHOP_SECTIONS);
+  await setJeffSection();
   await seedMeasurementKinds();
   for (const a of BODY_IMAGE_APPROVALS) {
     if (ids[a.minor] && ids[a.by]) await db.minorBodyImageApproval.upsert({ where: { minorId: ids[a.minor] }, update: {}, create: { minorId: ids[a.minor], approvedById: ids[a.by] } });
@@ -175,6 +186,8 @@ const SEED_SETS: Record<string, () => Promise<void>> = {
   "measurement-kinds-v2": seedMeasurementKinds,
   "photo-tips-v1": seedPhotoTips,
   "style-words-v1": () => seedSimple(db.styleWord, STYLE_WORDS),
+  // Shop sections (Jeff, 2 Nov 2026: the Shop mixed men's and women's). Jeff starts in Men's; everyone else picks on the Shop.
+  "shop-sections-v1": async () => { await seedSimple(db.shopSection, SHOP_SECTIONS); await setJeffSection(); },
   "brands-v1": () => seedSimple(db.brand, BRANDS),
   "stores-v1": () => seedSimple(db.store, STORES),
   // The national brand catalog lands in the Brands list (Jeff, 19 Oct 2026: "brands didn't auto populate"), each with its store link.

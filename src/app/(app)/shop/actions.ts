@@ -9,6 +9,8 @@ import { refreshBrandFeedNow } from "@/lib/shop/brand-feed";
 import { tryOnLook, tryOnState, TryOnError, type TryOnView } from "@/lib/tryon";
 import { featuresOf } from "@/lib/tryon/features";
 import { isMannequinConfigured, mannequinLook } from "@/lib/tryon/mannequin";
+import { canShopFor } from "@/lib/people/visibility";
+import { rememberShopFor } from "@/lib/shop/remember";
 
 export type Result = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -120,4 +122,10 @@ export async function tryOnLookupAction(lookupId: string): Promise<Result & { tr
     if (e instanceof TryOnError || e instanceof ShopError) return { ok: false, error: e.message };
     console.error(e); return { ok: false, error: "The try-on didn’t come back. Try again." };
   }
+}
+
+/** "Shopping for" (N1): the pick is remembered, and Shop, Looking-for and Together open on that person next time. */
+export async function rememberShopForAction(personId: string): Promise<void> {
+  const me = await requirePerson();
+  if (personId === me.id || (await canShopFor(me, personId))) await rememberShopFor(personId);
 }

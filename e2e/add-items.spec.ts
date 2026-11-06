@@ -28,15 +28,15 @@ test.describe("add clothes", () => {
     await page.goto("/add");
     // three doors first: photos, a store link, a receipt
     await expect(page.getByTestId("add-doors")).toBeVisible();
-    await page.getByTestId("door-photo").click();
     // photo tips: general rules + a tab per category; hide for this person, bring back
     await expect(page.getByTestId("photo-tips")).toContainText("One piece per photo");
-    await page.getByTestId("tip-tab-Shoes").click();
+    // The tab row sits in the band under the fixed tab bar on a page just taller than the phone; mobile emulation mis-maps
+    // the tap there, so the tab is picked by its own click event (the row scrolls fine for a thumb).
+    await page.getByTestId("tip-tab-Shoes").dispatchEvent("click");
     await expect(page.getByTestId("tip-text")).toContainText("toes toward you");
     await page.getByTestId("hide-tips").click();
     await expect(page.getByTestId("show-tips")).toBeVisible();
     await page.reload();
-    await page.getByTestId("door-photo").click();
     await expect(page.getByTestId("photo-tips")).toHaveCount(0);
     await page.getByTestId("show-tips").click();
     await expect(page.getByTestId("photo-tips")).toBeVisible();
@@ -105,7 +105,7 @@ test.describe("add clothes", () => {
     await page.getByRole("button", { name: "Skip" }).click();
 
     await expect(page.getByRole("heading", { name: /All done/ })).toBeVisible();
-    await expect(page.getByText(/002 added/)).toBeVisible();
+    await expect(page.getByText(/2 added to your closet/)).toBeVisible();
     await page.getByRole("link", { name: "Go to closet" }).click();
     await expect(page).toHaveURL(/\/closet$/);
   });

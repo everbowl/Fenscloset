@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePerson } from "@/lib/auth/current";
-import { createStoreEntries, findColorPhotos, lookupProduct, StoreAddError, type StoreAddInput, type StoreProduct } from "@/lib/store/add";
+import { createStoreEntries, createStoreRows, findColorPhotos, lookupProduct, StoreAddError, type StoreAddInput, type StoreProduct, type StoreRowInput } from "@/lib/store/add";
+import { ownedRowsFromWords, type OwnedPage, type OwnedRow } from "@/lib/store/words";
 import { matchReceipt, readReceipt, type MatchedLine, type Receipt } from "@/lib/store/receipt";
 import { ImportError } from "@/lib/import/service";
 import { deleteObject, getObject, parseKey } from "@/lib/storage";
@@ -29,12 +30,19 @@ export async function colorPhotosAction(product: Pick<StoreProduct, "name" | "br
   try { return { ok: true, value: await findColorPhotos(product, color) }; } catch (e) { return fail(e); }
 }
 
-export async function addFromStoreAction(input: StoreAddInput): Promise<ActionResult<{ batchId: string; count: number }>> {
+/** "Tell it in words" on the product card: the note becomes rows of color, size and how many. */
+export async function ownedRowsAction(page: OwnedPage, text: string): Promise<ActionResult<OwnedRow[]>> {
+  await requirePerson();
+  try { return { ok: true, value: await ownedRowsFromWords(String(text ?? ""), { name: String(page.name ?? "").slice(0, 80), colors: (page.colors ?? []).slice(0, 60), sizes: (page.sizes ?? []).slice(0, 40) }) }; } catch (e) { return fail(e); }
+}
+
+/** Every row of the product at once: one entry per piece, all in the same batch. */
+export async function addStoreRowsAction(input: { product: StoreAddInput["product"]; rows: StoreRowInput[] }): Promise<ActionResult<{ batchId: string; count: number }>> {
   const person = await requirePerson();
   try {
-    const r = await createStoreEntries(person.id, input);
+    const r = await createStoreRows(person.id, input.product, input.rows ?? []);
     revalidatePath("/add");
-    return { ok: true, value: { batchId: r.batchId, count: r.entryIds.length } };
+    return { ok: true, value: { batchId: r.batchId, count: r.pieces } };
   } catch (e) { return fail(e); }
 }
 
@@ -52,18 +60,22 @@ export async function readReceiptAction(key: string): Promise<ActionResult<{ rec
   finally { await deleteObject(key).catch(() => undefined); }
 }
 
-/** Every line at once: one entry per piece, with the chosen picture and the receipt's date. */
-export async function addReceiptLinesAction(storeName: string, purchaseDate: string | null, lines: { name: string; color: string | null; size: string | null; quantity: number; priceText: string | null; pick: Product | null }[]): Promise<ActionResult<{ batchId: string | null; count: number; skipped: number }>> {
+export type ReceiptGroupInput = { storeName: string; purchaseDate: string | null; lines: { name: string; color: string | null; size: string | null; quantity: number; priceText: string | null; pick: Product | null }[] };
+
+/** Every line of every receipt at once: one entry per piece, with the chosen picture and that receipt's store and date. Lines without a picture are skipped and counted. */
+export async function addReceiptsAction(groups: ReceiptGroupInput[]): Promise<ActionResult<{ batchId: string | null; count: number; skipped: number }>> {
   const person = await requirePerson();
   let batchId: string | null = null; let count = 0; let skipped = 0;
   try {
-    for (const l of lines) {
-      if (!l.pick?.imageUrl) { skipped += l.quantity; continue; }
-      const r = await createStoreEntries(person.id, {
-        product: { url: l.pick.url, name: l.name, brandText: null, storeName: storeName || l.pick.storeName, priceText: l.priceText ?? l.pick.priceText },
-        imageUrl: l.pick.imageUrl, color: l.color, size: l.size, quantity: l.quantity, purchaseDate,
-      });
-      batchId = r.batchId; count += r.entryIds.length;
+    for (const g of (groups ?? []).slice(0, 40)) {
+      for (const l of (g.lines ?? []).slice(0, 25)) {
+        if (!l.pick?.imageUrl) { skipped += l.quantity; continue; }
+        const r = await createStoreEntries(person.id, {
+          product: { url: l.pick.url, name: l.name, brandText: null, storeName: g.storeName || l.pick.storeName, priceText: l.priceText ?? l.pick.priceText },
+          imageUrl: l.pick.imageUrl, color: l.color, size: l.size, quantity: l.quantity, purchaseDate: g.purchaseDate,
+        });
+        batchId = r.batchId; count += r.pieces;
+      }
     }
     revalidatePath("/add");
     return { ok: true, value: { batchId, count, skipped } };

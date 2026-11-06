@@ -1,0 +1,91 @@
+# Bulk wardrobe, sections, looks, copies (Jeff, 2 Nov 2026)
+
+Six asks arrived in one sitting. Each is recorded here with what exists, what gets built, and the questions
+Jeff answers in chat (letters and numbers, recommended pick first). Decisions are appended as they land.
+
+## A. Men's and women's mixed in the Shop
+- **Cause**: nothing on `Person` says which section they shop in; the Looking-for query writer only guesses
+  ("add who it is for when the line implies it"), so "jeans" brought back both.
+- **Build**: a `shopSection` list (Men's, Women's, Boys', Girls', Unisex; editable under Lists), one pick per
+  person (Profile → Settings; admins on People; a one-tap ask on Shop and Looking-for while unset). Every
+  store search carries it: Looking-for queries, the Shop verdict's shopping queries, Go with it, Find a photo
+  in this color; results whose title names the other section are dropped.
+- **Q A1 (rec.)** Jeff = Men's now, everyone else picks on first Shop open. **A2** Jeff names each person's section.
+
+## B. Build a look from a mix (buy + closet)
+- **Build**: "Add to a look" on any store find (Looking-for matches, Shop results, Go with it) and on closet
+  pieces in pick mode → a per-person `LookDraft`; a strip "Look · n pieces"; the look screen lists the
+  pieces (remove, Buy links), See it on me / On a mannequin; `tryOnLook` takes several store garments
+  (today one `extraGarment`); assumption: up to 5 pieces per look.
+- **Q B1 (rec.)** saved looks under Fits as a named "Looks" row. **B2** on the Shop page. **B3** no saving.
+- **Built (3 Nov 2026, B1)**: `src/lib/looks/service.ts` (Look + LookPiece, migration 20261103150000_looks): one open look per
+  person (no name), "Add to a look" on every store find (Looking-for matches, the Shop's judged piece, its products and
+  the brand feed, a piece's go-with products) and on the closet's pick mode; the tray "Look · n pieces · Open →" fixed
+  above the tab bar on those screens; the look screen `/looks/[id]` (pieces with Buy links, remove, Add from the closet,
+  See it on me / on a mannequin, Name and save, Start over / Remove). The mirror takes several extra garments
+  (`ExtraGarment[]`, store pictures fetched once into `looks/<personId>/…`), keyed per piece so a dressed look is cached
+  until it changes; `MirrorLook` gains `{ kind: "look", lookId }`. Saved looks: a Looks row under Fits with "+ New look".
+  Up to 5 pieces; the mirror dresses up to three (top, bottom, shoes). Whoever may shop for the person may build it.
+
+## C. Bulk loading the wardrobe — built 2 Nov 2026
+- **Existed**: /add/store with a link tab (one color, one size, one count per pass) and a receipt tab (one).
+- **Built**: the link tab shows "Size for all" (the page's sizes or typed) and a row per color with a count
+  stepper, its own size on tap ("change"), its photo (the page's per-color photo, a search pick, or the main
+  photo); "Another color" adds a row; "Or tell it in words" (`src/lib/store/words.ts`: Claude, mock in tests)
+  fills the rows from a note like "I own 7 of these, all Medium: black ×2, navy, white, grey ×3"; one
+  "Add n to closet" (`createStoreRows`). The receipt tab takes many files at once, reads three at a time
+  with a progress line, groups lines per receipt (store · date), one "Add n pieces" for all
+  (`addReceiptsAction`); each receipt image is deleted after reading, as before.
+- **Unchanged until Jeff answers**: every piece still waits on a confirm card (one tap each); the real-photo
+  ask still comes after the first wear and every six wears (`photoNudge`).
+- **Q C1 (rec.)** link/receipt pieces go straight into the closet, fixable on the piece page. **C2** keep the
+  one-tap cards. **C3** a "Confirm all" button.
+- **Built 3 Nov 2026 (C1)**: one entry per color-and-size row with its count; once tagged, a store piece is added
+  on its own as one card with that many copies (`process.ts` auto-add; only a missing category still asks). The
+  strips say "n added to the closet". C4 built as the store-photo line on the piece page.
+- **Q C4 (rec.)** a quiet "store photo · add yours" line on the piece page with Add photo right there.
+  **C5** a popup next time the piece opens. **C6** leave as is.
+
+## D. "What's needed" on a person's closet page
+- **Build**: a strip at the top of the closet with one row per gap, the action in the row: body photos
+  (front, side, back), a better body photo when the mirror struggled, pieces still on a store photo, sizes
+  missing for a favorite brand, no shop section. "Not now" hides a row for 30 days.
+- **Q D1 (rec.)** closet page only. **D2** also one line on Today.
+- **Built (3 Nov 2026, D1)**: `src/lib/closet/needs.ts` listNeeds / snoozeNeed; strip `closet/needs-strip.tsx` under the
+  Sort · Filter pills, three rows then "n more". Rows, most pressing first: the mirror could not read a body photo
+  (BodyPhoto.problem, set when FASHN or Kling says "pose", cleared by a dressing that works) → Retake; no front photo →
+  Add front photo (the Body page's privacy ask and upload, now shared: `components/profile/body-photo-upload.tsx`); no
+  shop section → the section pills in the row; a favorite brand with no size → Add size (the Brands page's sheet, now
+  shared: `components/profile/my-brand-sheet.tsx`); pieces still on the store's photo → See them (new closet toggle
+  Store photo, `?store=1`); front but no back → Add back photo. Not now = NeedSnooze row for the new rule
+  needSnoozeDays (Admin → Rules → Closet, 30). Minors and people with the mirror off get no body rows; only the owner
+  sees the strip.
+
+## E. Several shirts in one photo
+- **Build**: on the confirm card, "Several pieces in this photo?" → Claude counts them and reads each
+  one's color; one piece each, sharing name and size; identical ones become copies (F).
+- **Q E1 (rec.)** each piece cropped out as its own photo. **E2** the group photo on all until real ones arrive.
+- **Built 3 Nov 2026 (E1)**: the tagger reports how many garments lie in the photo (`pieceCount`); the card shows
+  "Looks like n pieces · Split into n / It's one piece", and a "Several pieces?" pill is always there. Split
+  (`src/lib/import/split.ts`): Claude gives a box and a color per garment, each is cropped out as its own photo and
+  queued as its own entry in the same batch (the same color twice → one entry with quantity 2 → ×2 copies); the
+  original steps aside as skipped.
+
+## F. Ten of the same shirt
+- **Build**: a copies count on a piece; one closet card "×10"; the piece page lists the copies and their
+  state; a real photo attaches to one copy; the clean-out advises when copies sit unworn.
+- **Q F1 (rec.)** laundry per copy (one worn → one dirty, nine clean; Today keeps offering it while any copy
+  is clean). **F2** the whole stack goes dirty together.
+- **Built 3 Nov 2026 (F1)**: `Item.copies` + `dirtyCopies` / `cleanersCopies` (`src/lib/items/copies.ts`);
+  `laundryStatus` stays the summary word. Card badge ×n; piece page Copies row, Split one off, laundry one copy at a
+  time; Today rests a stack only after as many wears as copies in the window; Clean-out "Too many of the same"
+  with the new rule Days between washes (7) → Keep n / Leave it. Real photos per copy: Split one off, then add the
+  photo on the new card (E lands on top of this).
+
+## O. Order
+- **O1 (rec.)** Check-in fix (done, 9fb9a1c) → C (done) → F → A → E → D → B. **O2** B before C.
+
+## Decisions
+- 2 Nov 2026: A built as A1 while Jeff's answer is pending (Jeff = Men's by the seed; everyone else picks on the Shop or Looking-for the first time, or in Settings → Shops in). A2 would only add the other people's picks.
+- 3 Nov 2026 (Jeff): B1, C1, D1, E1, F1, O1. The real-photo ask was not answered: built as C4 (a quiet line on the piece page), flagged in chat. Order: C1 → F → E → D → B.
+- 6 Nov 2026 (Jeff): B-a, B-b, B-c, D-a, D-b confirmed as built. B-a five pieces per look, the mirror dresses three. B-b whoever may shop for the person builds their look (the person, a parent of a minor, an allowed shopper). B-c naming a look saves it under Fits → Looks and the next Add starts a fresh open look. D-a only the owner sees their What's-needed strip. D-b store photos: one row for all pieces plus the quiet line on each piece page (C4 stands).

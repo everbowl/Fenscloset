@@ -1,6 +1,8 @@
 import { requirePerson, getCurrentSession } from "@/lib/auth/current";
 import { Banner } from "@/components/ui/banner";
 import { AuthHero } from "@/components/auth-hero";
+import Link from "next/link";
+import { logoutAction } from "@/app/(auth)/login/actions";
 import { ChangePasswordForm } from "./form";
 
 export const metadata = { title: "Set a new password" };
@@ -19,7 +21,10 @@ export default async function ChangePasswordPage() {
           <h1 className="serif text-[34px]">{person.mustChangePassword ? <>Set a new <em>password</em></> : <>Change <em>password</em></>}</h1>
           <p className="mono mono-11 normal-case text-graphite">Signed in as {person.email}</p>
         </div>
-        <ChangePasswordForm />
+        <ChangePasswordForm email={person.email ?? ""} />
+        {person.mustChangePassword
+          ? <form action={logoutAction}><button type="submit" className="pill pill-quiet h-[50px] w-full" data-testid="change-password-signout">Sign out instead</button></form>
+          : <Link href="/profile/settings" className="pill pill-quiet h-[50px] w-full" data-testid="change-password-cancel">Cancel</Link>}
       </main>
     </>
   );

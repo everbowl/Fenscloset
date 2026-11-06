@@ -18,7 +18,7 @@ export type Cue =
   | { kind: "strip"; label: string }
   | { kind: "row"; label: string; value?: string }
   | { kind: "icon"; name: "camera" | "calendar" | "search" | "image" | "link" | "mail" }
-  | { kind: "verdict"; word: "FITS" | "RISKY" | "PASS" }
+  | { kind: "verdict"; word: "BUY IT" | "MAYBE" | "SKIP IT" }
   | { kind: "calendar" }
   | { kind: "board" }
   | { kind: "wait" };

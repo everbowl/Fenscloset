@@ -9,7 +9,7 @@ import { seed } from "../../prisma/seed";
 import { personalClosetId } from "@/lib/items/service";
 import { newKey, putObject } from "@/lib/storage";
 import { canViewKey } from "@/lib/photos/visibility";
-import { dressOnMe, garmentImages, hasBackPhoto, listTryOns, mirrorEngines, setTryOnEnabled, tryOnLook, tryOnState } from "@/lib/tryon";
+import { dressOnMe, garmentImages, hasBackPhoto, keepTryOn, listTryOns, mirrorEngines, setTryOnEnabled, tryOnLook, tryOnState } from "@/lib/tryon";
 import { setRule } from "@/lib/rules";
 import { getPrivacy } from "@/lib/profiles/service";
 
@@ -59,6 +59,7 @@ describe("virtual try-on", () => {
   });
 
   it("from behind: needs a back body photo; the back view is its own picture, cached apart from the front", async () => {
+    await setRule("mirrorEngine", "google"); // the view is what is tested; the default engine is FASHN now, which leaves shoes out
     const jeff = await by("Jeff");
     await setTryOnEnabled(jeff, jeff.id, true);
     const front = newKey("bodies", jeff.id, "image/jpeg"); await putObject(front, await jpeg(), "image/jpeg");
@@ -88,8 +89,7 @@ describe("virtual try-on", () => {
     const pic = async () => { const k = newKey("originals", jeff.id, "image/jpeg"); await putObject(k, await jpeg(90), "image/jpeg"); return k; };
     const tee = await db.item.create({ data: { ownerId: jeff.id, name: "Tee", categoryId: (await cat("Tops")).id, photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
     const sneakers = await db.item.create({ data: { ownerId: jeff.id, name: "Sneakers", categoryId: (await cat("Shoes")).id, photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
-    expect(await mirrorEngines()).toEqual({ rule: "google", engines: ["google"] });
-    await setRule("mirrorEngine", "fashn");
+    expect(await mirrorEngines()).toEqual({ rule: "fashn", engines: ["fashn"] }); // FASHN by default (Jeff, 24 Oct 2026: no new photo)
     const f = await tryOnLook(jeff, jeff.id, [tee.id, sneakers.id], "closet"); // the rule's engine
     expect(f.engine).toBe("fashn");
     expect(f.cached).toBe(false);
@@ -104,16 +104,38 @@ describe("virtual try-on", () => {
     const steps: string[] = [];
     const both = await dressOnMe(jeff, jeff.id, [tee.id], "closet", "front", undefined, true, { step: (s) => steps.push(s) });
     expect(both.engine).toBe("google");
-    expect(both.alt?.engine).toBe("fashn");
-    expect(both.alt?.key).not.toBe(both.key);
+    expect(both.alts?.map((a) => a.engine)).toEqual(["fashn"]); // Kling has no key here: left out and said
+    expect(both.alts?.[0].key).not.toBe(both.key);
+    expect(both.engineNote).toMatch(/^Kling isn’t set up yet/);
     expect(steps.some((s) => s.includes("Google · ") && s.includes("FASHN · "))).toBe(true);
     expect((await db.tryOn.findMany({ where: { personId: jeff.id, itemIds: { equals: [tee.id] }, styling: null } })).map((r) => r.engine).sort()).toEqual(["fashn", "google"]);
+    // all three engines with keys: three pictures side by side
+    process.env.MOCK_KLING = "true";
+    const three = await dressOnMe(jeff, jeff.id, [tee.id], "closet", "front", undefined, true);
+    expect(three.engine).toBe("google");
+    expect(three.alts?.map((a) => a.engine)).toEqual(["fashn", "kling"]);
+    expect(new Set([three.key, ...three.alts!.map((a) => a.key)]).size).toBe(3);
+    expect(three.engineNote).toBeUndefined();
+    // G1: keep a column, and the mirror shows that engine alone for this look until "Dress again"
+    const fashnPic = three.alts!.find((a) => a.engine === "fashn")!;
+    const kept = await keepTryOn(jeff, jeff.id, fashnPic.id);
+    expect(kept.engine).toBe("fashn");
+    expect(kept.kept).toBe(true);
+    expect(kept.alts).toBeUndefined();
+    const again = await dressOnMe(jeff, jeff.id, [tee.id], "closet");
+    expect(again.engine).toBe("fashn");
+    expect(again.kept).toBe(true);
+    expect(again.alts).toBeUndefined();
+    const afresh = await dressOnMe(jeff, jeff.id, [tee.id], "closet", "front", undefined, true);
+    expect(afresh.kept).toBeUndefined();
+    expect(afresh.alts?.length).toBe(2);
+    delete process.env.MOCK_KLING;
     // FASHN without its key: Google dresses, and the picture says so
     delete process.env.MOCK_FASHN;
     const only = await dressOnMe(jeff, jeff.id, [tee.id], "closet");
     expect(only.engine).toBe("google");
-    expect(only.alt).toBeUndefined();
-    expect(only.engineNote).toMatch(/FASHN isn’t set up yet/);
+    expect(only.alts).toBeUndefined();
+    expect(only.engineNote).toMatch(/FASHN and Kling aren’t set up yet/);
   });
 
   it("reports its steps while it dresses (the mirror shows them); a cached look reports nothing", async () => {

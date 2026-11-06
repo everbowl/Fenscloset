@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { Banner } from "@/components/ui/banner";
 import { PickSheet, Row, TextSheet } from "@/components/items/row-editor";
 import type { Named, PrivacyView } from "@/lib/profiles/service";
-import { disconnectCalendarAction, setBodyViewersAction, setCalendarIdsAction, setSavedZipAction, setShoppersAction, setTryOnEnabledAction } from "../actions";
+import { ENGINE_WORD } from "@/lib/tryon/engines";
+import { disconnectCalendarAction, setBodyViewersAction, setCalendarIdsAction, setSavedZipAction, setShoppersAction, setShopSectionAction, setTryOnEnabledAction } from "../actions";
 
 /** Settings (screen 14, undrawn): saved zip, who sees my body profile, who shops for me, password, calendar (Phase 3). */
 type CalendarInfo = { configured: boolean; connected: boolean; email: string | null; notice: string | null; calendars: { id: string; name: string; primary: boolean }[]; calendarIds: string[] };
@@ -20,7 +21,7 @@ const NOTICE: Record<string, string> = {
 
 export function SettingsEditor({ privacy, people, calendar }: { privacy: PrivacyView; people: Named[]; calendar: CalendarInfo }) {
   const router = useRouter();
-  const [sheet, setSheet] = useState<"zip" | "viewers" | "shoppers" | "calendars" | null>(null);
+  const [sheet, setSheet] = useState<"zip" | "viewers" | "shoppers" | "calendars" | "section" | null>(null);
   const calendarWords = calendar.calendarIds.length ? calendar.calendarIds.map((id) => calendar.calendars.find((c) => c.id === id)?.name ?? id).join(", ") : "Primary only";
   const [error, setError] = useState<string>();
   const [, start] = useTransition();
@@ -37,6 +38,11 @@ export function SettingsEditor({ privacy, people, calendar }: { privacy: Privacy
       <section>
         <p className="mono border-b border-ink pb-2 text-graphite">Weather</p>
         <Row label="Saved zip" value={privacy.savedZip ?? "Ask each day"} muted={!privacy.savedZip} onClick={() => setSheet("zip")} testId="row-zip" />
+      </section>
+      <section>
+        <p className="mono border-b border-ink pb-2 text-graphite">Shopping</p>
+        <Row label="Shops in" value={privacy.shopSection?.name ?? "Pick a section"} muted={!privacy.shopSection} onClick={() => setSheet("section")} testId="row-section" />
+        <p className="mono pt-2 text-graphite">Men's, Women's, Boys', Girls'… Every store search carries it, so the other section stays out.</p>
       </section>
       <section>
         <p className="mono border-b border-ink pb-2 text-graphite">Privacy</p>
@@ -57,8 +63,8 @@ export function SettingsEditor({ privacy, people, calendar }: { privacy: Privacy
         <section data-testid="tryon-section">
           <p className="mono border-b border-ink pb-2 text-graphite">Try-on</p>
           <div className="flex min-h-[42px] items-center justify-between gap-3 border-b border-line py-2">
-            <span className="min-w-0"><span className="block text-[14px]">Show me wearing a look</span><span className="mono block text-graphite">{privacy.tryOn.configured ? (privacy.tryOn.enabled ? "On · your body photo is sent to Google to make the picture" : "Off") : "Not set up on the site yet"}</span></span>
-            <button type="button" role="switch" aria-checked={privacy.tryOn.enabled} disabled={!privacy.tryOn.configured} onClick={() => run(() => setTryOnEnabledAction(!privacy.tryOn.enabled))} className={`mono h-9 shrink-0 px-3 tracking-[0.1em] ${privacy.tryOn.enabled ? "bg-ink text-paper" : "border border-ink text-ink"} disabled:border-line disabled:text-graphite`} data-testid="tryon-toggle">{privacy.tryOn.enabled ? "On" : "Off"}</button>
+            <span className="min-w-0"><span className="block text-[14px]">Show me wearing a look</span><span className="mono block text-graphite">{privacy.tryOn.configured ? (privacy.tryOn.enabled ? `On · your body photo is sent to ${privacy.tryOn.engines.map((e) => ENGINE_WORD[e]).join(" and ") || "the dressing service"} to make the picture` : "Off") : "Not set up on the site yet"}</span></span>
+            <button type="button" role="switch" aria-checked={privacy.tryOn.enabled} disabled={!privacy.tryOn.configured} onClick={() => run(() => setTryOnEnabledAction(!privacy.tryOn.enabled))} className={`pill pill-sm shrink-0 ${privacy.tryOn.enabled ? "pill-solid" : ""}`} data-testid="tryon-toggle">{privacy.tryOn.enabled ? "On" : "Off"}</button>
           </div>
           {privacy.tryOn.enabled && !privacy.tryOn.hasBodyPhoto ? <p className="mono pt-2 text-graphite">Add a full-body photo on your <Link href="/profile/body" className="text-ink">Body page</Link> so it has something to dress</p> : null}
           <p className="mono pt-2 text-graphite">Pictures are yours alone. Never for kids.</p>
@@ -77,7 +83,8 @@ export function SettingsEditor({ privacy, people, calendar }: { privacy: Privacy
         </div>
         {calendar.connected ? <Row label="Calendars" value={calendarWords} onClick={() => setSheet("calendars")} testId="row-calendars" /> : null}
       </section>
-      <TextSheet open={sheet === "zip"} onClose={() => setSheet(null)} title="Saved zip" label="Zip code" value={privacy.savedZip ?? ""} placeholder="92101" onSave={(v) => run(() => setSavedZipAction(v))} />
+      <TextSheet open={sheet === "zip"} onClose={() => setSheet(null)} title="Saved zip" label="Zip code" kind="zip" value={privacy.savedZip ?? ""} placeholder="92101" onSave={(v) => run(() => setSavedZipAction(v))} />
+      <PickSheet open={sheet === "section"} onClose={() => setSheet(null)} title="I shop in" kind="shopSection" options={privacy.sections} selected={privacy.shopSection ? [privacy.shopSection.id] : []} canAdd={privacy.isAdmin} onChange={(ids) => { setSheet(null); run(() => setShopSectionAction(null, ids[0] ?? null)); }} clearable />
       <PickSheet open={sheet === "viewers"} onClose={() => setSheet(null)} title="Who sees my body profile" kind="tag" options={people} selected={privacy.bodyViewerIds} multi canAdd={false} onChange={(ids) => run(() => setBodyViewersAction(ids))} />
       <PickSheet open={sheet === "calendars"} onClose={() => setSheet(null)} title="Which calendars count" kind="tag" options={calendar.calendars.map((c) => ({ id: c.id, name: c.primary ? `${c.name} (primary)` : c.name }))} selected={calendar.calendarIds} multi canAdd={false} onChange={(ids) => run(() => setCalendarIdsAction(ids))} />
       <PickSheet open={sheet === "shoppers"} onClose={() => setSheet(null)} title="Who can shop for me" kind="tag" options={people} selected={privacy.shopperIds} multi canAdd={false} onChange={(ids) => run(() => setShoppersAction(ids))} />

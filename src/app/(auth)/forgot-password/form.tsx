@@ -16,7 +16,7 @@ export function ForgotForm() {
         <Banner tone="success" title="Check your email">
           If {state.email} belongs to someone in the family, a reset link is on its way. It works once and expires in 60 minutes.
         </Banner>
-        <Link href="/login" className="mono mono-11 py-2.5 underline underline-offset-4">Back to sign in</Link>
+        <Link href="/login" className="pill pill-quiet h-[50px] w-full">Back to sign in</Link>
       </div>
     );
   }
@@ -26,7 +26,7 @@ export function ForgotForm() {
         <Input id="email" name="email" type="email" autoComplete="username" inputMode="email" autoCapitalize="none" required defaultValue={state.email ?? ""} />
       </Field>
       <Button type="submit" size="lg" className="w-full" disabled={pending}>{pending ? "Sending…" : "Send reset link"}</Button>
-      <Link href="/login" className="mono mono-11 py-2.5 underline underline-offset-4">Back to sign in</Link>
+      <Link href="/login" className="pill pill-quiet h-[50px] w-full">Back to sign in</Link>
     </form>
   );
 }

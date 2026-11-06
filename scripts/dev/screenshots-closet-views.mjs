@@ -1,0 +1,35 @@
+/** Dev-only: the closet's Sort and Filter (Shop v2 item 5): the pills, the sort sheet, the filter sheet with live counts, the chips, a sorted grid. App on :3100 with the mock env. */
+import { chromium, devices } from "@playwright/test";
+import { execSync } from "node:child_process";
+const out = process.argv[2];
+const env = { ...process.env, DATABASE_URL: "postgresql://postgres@localhost:5433/fenscloset_e2e", DEV_MODE: "true", SEED_FORCE: "true", MOCK_S3: "true" };
+execSync(`psql -h localhost -p 5433 -U postgres -d fenscloset_e2e -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'`, { stdio: "ignore" });
+execSync("npx prisma migrate deploy && npx tsx prisma/seed.ts && npx tsx e2e/set-password.ts jeff@everbowl.com closet-rocks-2026 && npx tsx e2e/seed-views.ts", { stdio: "ignore", env });
+const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || undefined });
+const ctx = await browser.newContext({ ...devices["iPhone 15"] });
+const page = await ctx.newPage();
+const base = "http://localhost:3100";
+const shot = async (name, full = false) => { await page.waitForTimeout(500); await page.screenshot({ path: `${out}/${name}.png`, fullPage: full }); };
+await page.goto(base + "/login");
+await page.getByLabel("Email").fill("jeff@everbowl.com"); await page.getByLabel("Password").fill("closet-rocks-2026");
+await page.getByRole("button", { name: "Sign in" }).click(); await page.waitForURL(/today/);
+await page.goto(base + "/closet"); await page.getByTestId("closet-tools").waitFor(); await shot("01-closet");
+await page.getByTestId("sort-button").click(); await page.getByTestId("sort-sheet").waitFor(); await shot("02-sort-sheet");
+await page.keyboard.press("Escape");
+await page.getByTestId("filter-button").click(); await page.getByTestId("filter-sheet").waitFor(); await shot("03-filter-sheet");
+await page.getByRole("button", { name: /^Black 3$/ }).click(); await page.getByText("3 of 5 pieces").first().waitFor();
+await page.getByRole("button", { name: /^Favorites 1$/ }).click(); await page.getByText("1 of 5 pieces").first().waitFor(); await shot("04-filter-picked");
+await page.getByTestId("filter-done").click(); await shot("05-chips");
+await page.getByTestId("filter-clear").click(); await page.getByText("5 pieces").waitFor();
+await page.goto(base + "/closet?sort=most-worn"); await page.getByTestId("closet-tools").waitFor(); await shot("06-most-worn", true);
+// the same closet on a desktop: the pills sit under the tabs, the sheet is centered
+const desk = await browser.newContext({ ...devices["Desktop Chrome"] });
+const d = await desk.newPage();
+await d.goto(base + "/login"); await d.getByLabel("Email").fill("jeff@everbowl.com"); await d.getByLabel("Password").fill("closet-rocks-2026");
+await d.getByRole("button", { name: "Sign in" }).click(); await d.waitForURL(/today/);
+await d.goto(base + "/closet?sort=most-worn"); await d.getByTestId("closet-tools").waitFor();
+await d.getByTestId("filter-button").click(); await d.getByTestId("filter-sheet").waitFor();
+await d.getByRole("button", { name: /^Black 3$/ }).click(); await d.getByText("3 of 5 pieces").first().waitFor();
+await d.waitForTimeout(500); await d.screenshot({ path: `${out}/07-desktop-filter.png` });
+await browser.close();
+console.log("shots done");

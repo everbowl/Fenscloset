@@ -18,7 +18,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     db.person.findMany({ where: { status: { not: "removed" }, NOT: { id: me.id } }, orderBy: { createdAt: "asc" }, select: { id: true, name: true } }),
   ]);
   return (
-    <div>
+    <div className="lg:max-w-[640px]">
       <PageHeader title="Settings" accent="& privacy" />
       <SettingsEditor privacy={privacy} people={people.map((p) => ({ id: p.id, name: p.name.split(" ")[0] }))}
         calendar={{ configured: isGoogleConfigured(), email: connection?.email ?? null, connected: Boolean(connection), notice: calendar ?? null, calendars, calendarIds: connection?.calendarIds ?? [] }} />

@@ -55,7 +55,7 @@ describe("weather", () => {
     const d = new Date("2026-10-19T05:30:00Z"); // still Oct 18, 10:30 PM in Los Angeles
     expect(dayKey(d, "America/Los_Angeles")).toBe("2026-10-18");
     expect(hourIn(d, "America/Los_Angeles")).toBe(22);
-    expect(monoDate("2026-10-18")).toBe("SUN 18 OCT");
+    expect(monoDate("2026-10-18")).toBe("SUN, OCT 18");
     expect(addDays("2026-10-31", 1)).toBe("2026-11-01");
     expect(clock(new Date("2026-10-19T02:30:00Z"), "America/Los_Angeles")).toBe("7:30 PM");
   });

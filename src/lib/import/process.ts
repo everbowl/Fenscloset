@@ -86,6 +86,16 @@ export async function processEntry(entryId: string): Promise<ProcessOutcome> {
       where: { id: entryId },
       data: { status: "needs_confirm", cutoutKey, thumbKey, phash: hash, aiResult: JSON.parse(JSON.stringify(aiResult)), error: null },
     });
+    // C1 (Jeff, 3 Nov 2026): a piece with store facts (a link or a receipt, not a photo the person took) goes straight
+    // into the closet, no card; it is fixable on the piece page. Only a missing category still asks.
+    const meta = entry.storeMeta as { matched?: boolean } | null;
+    if (meta && !meta.matched && tags.categoryId) {
+      try {
+        const { createItemFromEntry } = await import("@/lib/items/service");
+        await createItemFromEntry(ownerId, entryId);
+        return { status: "done" };
+      } catch (e) { console.error("auto-add from store", e); }
+    }
     return { status: "needs_confirm" };
   } catch (e) {
     const msg = e instanceof AiError

@@ -9,7 +9,7 @@ describe("completing a look before the mirror", () => {
   it("knows which slot a piece fills and when shoes can be placed", () => {
     expect(slotOf("Tops")).toBe("top"); expect(slotOf("Outerwear")).toBe("top"); expect(slotOf("Bottoms")).toBe("bottom");
     expect(slotOf("Dresses")).toBe("onePiece"); expect(slotOf("Shoes")).toBe("shoes"); expect(slotOf("Hats")).toBeNull(); expect(slotOf(null)).toBeNull();
-    expect(shoesPlaceable("me", "fashn")).toBe(false); expect(shoesPlaceable("me", "google")).toBe(true); expect(shoesPlaceable("mannequin", "fashn")).toBe(true);
+    expect(shoesPlaceable("me", "fashn")).toBe(false); expect(shoesPlaceable("me", "kling")).toBe(false); expect(shoesPlaceable("me", "google")).toBe(true); expect(shoesPlaceable("mannequin", "fashn")).toBe(true); expect(shoesPlaceable("mannequin", "kling")).toBe(true);
   });
 
   it("asks for what is missing, in order, only when the closet has it; a one-piece asks for no top or bottom; an untyped piece asks nothing", () => {

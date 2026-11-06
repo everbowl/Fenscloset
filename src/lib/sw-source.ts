@@ -1,6 +1,7 @@
-/* Fen's Closet service worker: offline fallback + static asset caching. Pages stay network-first. */
+/** The service worker, as text: src/app/sw.js/route.ts serves it with a version per deploy. */
+export const SW_SOURCE = `/* Fen's Closet service worker: offline fallback + static asset caching. Pages stay network-first. */
 const VERSION = "v1";
-const STATIC = `fc-static-${VERSION}`;
+const STATIC = \`fc-static-\${VERSION}\`;
 const OFFLINE_URL = "/offline";
 
 self.addEventListener("install", (event) => {
@@ -38,3 +39,4 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(fetch(req).catch(() => caches.match(OFFLINE_URL)));
   }
 });
+`;

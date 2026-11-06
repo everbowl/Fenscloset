@@ -3,7 +3,7 @@ import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes 
 
 /* Underline inputs per the brand: no box, 1px black rule beneath, 17px text. */
 const base =
-  "w-full h-9 border-0 border-b border-ink bg-transparent px-0 text-[17px] text-ink placeholder:text-graphite/70 " +
+  "w-full h-11 border-0 border-b border-ink bg-transparent px-0 text-[17px] text-ink placeholder:text-graphite/70 " +
   "focus:outline-none focus:border-b-2 disabled:text-graphite";
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {

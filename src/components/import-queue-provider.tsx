@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { createBatch, pendingStore, shrinkPhoto, uploadOne, type PendingUpload } from "@/lib/import/client-queue";
 import type { BatchSummary } from "@/lib/import/service";
 
-type UploadState = { pending: number; done: number; failed: { name: string; error: string }[]; active: boolean };
+type UploadState = { pending: number; done: number; failed: { name: string; error: string }[]; active: boolean; /** Photos picked with no connection: added the moment it comes back. */ held: number };
 
 type Ctx = {
   batch: BatchSummary | null;
@@ -13,6 +13,10 @@ type Ctx = {
   addFiles: (files: File[]) => Promise<void>;
   refresh: () => Promise<void>;
   retryFailedUploads: () => void;
+  /** Forget the uploads that failed (a file the browser can't read, a photo too big): they leave the queue for good. */
+  dropFailedUploads: () => Promise<void>;
+  /** Try again now with the photos that were picked offline. */
+  retryHeld: () => Promise<void>;
 };
 
 const QueueContext = createContext<Ctx | null>(null);
@@ -22,8 +26,9 @@ const UPLOAD_CONCURRENCY = 2;
 export function ImportQueueProvider({ children }: { children: ReactNode }) {
   const [batch, setBatch] = useState<BatchSummary | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const [upload, setUpload] = useState<UploadState>({ pending: 0, done: 0, failed: [], active: false });
+  const [upload, setUpload] = useState<UploadState>({ pending: 0, done: 0, failed: [], active: false, held: 0 });
   const inFlight = useRef(0);
+  const held = useRef<File[]>([]);
   const pumping = useRef(false);
   const failedIds = useRef(new Set<number>());
 
@@ -70,7 +75,14 @@ export function ImportQueueProvider({ children }: { children: ReactNode }) {
   const addFiles = useCallback(async (files: File[]) => {
     const images = files.filter((f) => f.type.startsWith("image/") || /\.(jpe?g|png|webp|heic)$/i.test(f.name));
     if (!images.length) return;
-    const b = await createBatch(images.length);
+    let b: Awaited<ReturnType<typeof createBatch>>;
+    try { b = await createBatch(images.length); }
+    catch {
+      // No connection (or the server is away): keep the photos and add them when it is back.
+      held.current.push(...images);
+      setUpload((u) => ({ ...u, held: held.current.length }));
+      return;
+    }
     setUpload((u) => ({ ...u, active: true, pending: u.pending + images.length }));
     for (const [i, f] of images.entries()) {
       const blob = await shrinkPhoto(f);
@@ -87,6 +99,22 @@ export function ImportQueueProvider({ children }: { children: ReactNode }) {
     setUpload((u) => ({ ...u, failed: [] }));
     void pump();
   }, [pump]);
+  const dropFailedUploads = useCallback(async () => {
+    for (const id of failedIds.current) await pendingStore.remove(id);
+    failedIds.current.clear();
+    setUpload((u) => ({ ...u, failed: [] }));
+    void refresh();
+  }, [refresh]);
+  const retryHeld = useCallback(async () => {
+    const files = held.current.splice(0);
+    setUpload((u) => ({ ...u, held: 0 }));
+    if (files.length) await addFiles(files);
+  }, [addFiles]);
+  useEffect(() => {
+    const onLine = () => { if (held.current.length) void retryHeld(); };
+    window.addEventListener("online", onLine);
+    return () => window.removeEventListener("online", onLine);
+  }, [retryHeld]);
 
   // Resume anything left in IndexedDB and learn the open batch.
   useEffect(() => { void refresh(); void pump(); }, [refresh, pump]);
@@ -99,7 +127,7 @@ export function ImportQueueProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(t);
   }, [busy, refresh]);
 
-  const value = useMemo<Ctx>(() => ({ batch, upload, loaded, addFiles, refresh, retryFailedUploads }), [batch, upload, loaded, addFiles, refresh, retryFailedUploads]);
+  const value = useMemo<Ctx>(() => ({ batch, upload, loaded, addFiles, refresh, retryFailedUploads, dropFailedUploads, retryHeld }), [batch, upload, loaded, addFiles, refresh, retryFailedUploads, dropFailedUploads, retryHeld]);
   return <QueueContext.Provider value={value}>{children}</QueueContext.Provider>;
 }
 

@@ -50,7 +50,7 @@ describe("who sees what", () => {
     expect(statusWord({ laundryStatus: "clean", wearCount: 0 })).toBe("New");
     expect(statusWord({ laundryStatus: "clean", wearCount: 4 })).toBe("Worn 4×");
     expect(await cycleLaundry(jeff, a.id)).toBe("dirty");
-    expect((await listClosetItems({ kind: "person", personId: jeff.id, name: "Jeff" }))[0].status).toBe("Laundry");
+    expect((await listClosetItems({ kind: "person", personId: jeff.id, name: "Jeff" }))[0].status).toBe("In the wash");
     expect(await cycleLaundry(jeff, a.id)).toBe("cleaners");
     expect(await cycleLaundry(jeff, a.id)).toBe("clean");
     await expect(cycleLaundry(olivia, a.id)).rejects.toMatchObject({ status: 403 });

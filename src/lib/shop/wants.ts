@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { isMockAi, structured } from "@/lib/ai/claude";
+import { sectionWord, withSection } from "./section";
 import { startJob, type Job } from "@/lib/jobs";
 import { canShopFor, type Viewer } from "@/lib/people/visibility";
 import { getRuleNumber } from "@/lib/rules";
@@ -58,7 +59,7 @@ function mockParse(text: string): Parsed {
 }
 
 /** Claude turns the line into 1–3 Google Shopping searches, a category and a price cap. */
-async function parseWant(text: string, forName: string, brands: string[]): Promise<Parsed> {
+async function parseWant(text: string, forName: string, brands: string[], section: string | null = null): Promise<Parsed> {
   if (isMockAi()) return mockParse(text);
   const schema = {
     type: "object",
@@ -71,7 +72,7 @@ async function parseWant(text: string, forName: string, brands: string[]): Promi
   };
   const out = await structured<Parsed>({
     system: "You are a personal shopper for one family's private closet app. One line a person typed about something they want to buy becomes store searches.",
-    prompt: [`The line, typed for ${forName}: "${text}"`, brands.length ? `Their favorite brands: ${brands.join(", ")}. A search may name one when it fits.` : "No favorite brands set."].join("\n\n"),
+    prompt: [`The line, typed for ${forName}: "${text}"`, section ? `${forName} shops the ${section} section: start every search with "${sectionWord(section) ?? ""}" unless the line says otherwise.` : "Say who it is for only when the line implies it.", brands.length ? `Their favorite brands: ${brands.join(", ")}. A search may name one when it fits.` : "No favorite brands set."].join("\n\n"),
     schema, effort: "low", maxTokens: 300,
   });
   const queries = (out.queries ?? []).map((q) => q.replace(/\s+/g, " ").trim()).filter(Boolean).slice(0, 3);
@@ -86,8 +87,8 @@ export function mergeMatches(existing: StoredMatch[], found: Product[], maxPrice
 }
 
 async function prefsFor(personId: string) {
-  const person = await db.person.findUniqueOrThrow({ where: { id: personId }, select: { name: true, favoriteStores: { where: { isArchived: false }, select: { name: true } }, favoriteBrands: { where: { isArchived: false }, select: { name: true } } } });
-  return { name: person.name.split(" ")[0], favoriteStores: person.favoriteStores.map((s) => s.name), favoriteBrands: person.favoriteBrands.map((b) => b.name) };
+  const person = await db.person.findUniqueOrThrow({ where: { id: personId }, select: { name: true, favoriteStores: { where: { isArchived: false }, select: { name: true } }, favoriteBrands: { where: { isArchived: false }, select: { name: true } }, shopSection: { select: { name: true, isArchived: true } } } });
+  return { name: person.name.split(" ")[0], favoriteStores: person.favoriteStores.map((s) => s.name), favoriteBrands: person.favoriteBrands.map((b) => b.name), section: person.shopSection && !person.shopSection.isArchived ? person.shopSection.name : null };
 }
 
 /**
@@ -102,9 +103,10 @@ export async function searchWant(wantId: string, hooks: LookupHooks & { maxAgeHo
   let { queries, category, maxPrice } = row;
   if (!queries.length) {
     step("Reading what you want…");
-    const parsed = await parseWant(row.text, prefs.name, prefs.favoriteBrands);
+    const parsed = await parseWant(row.text, prefs.name, prefs.favoriteBrands, prefs.section);
     queries = parsed.queries; category = parsed.category; maxPrice = parsed.maxPrice;
   }
+  queries = withSection(queries, prefs.section); // the section's word on every search, older lines included
   step("Searching the stores…");
   const found = await searchProducts(queries, prefs, fetch, { maxAgeHours: hooks.maxAgeHours, limit: MAX_MATCHES });
   const now = new Date();

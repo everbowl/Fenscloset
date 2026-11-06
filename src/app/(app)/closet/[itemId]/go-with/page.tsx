@@ -3,6 +3,7 @@ import { requirePerson } from "@/lib/auth/current";
 import { getItemDetail } from "@/lib/items/query";
 import { latestGoWith } from "@/lib/shop/go-with";
 import { GoWithScreen } from "./go-with-screen";
+import { LookTray } from "@/components/looks/look-tray";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "To go with it" };
@@ -15,5 +16,10 @@ export default async function GoWithPage({ params, searchParams }: { params: Pro
   if (!item) notFound();
   const thumb = item.photos.find((p) => p.kind === "thumb")?.bucketKey ?? null;
   const initial = fresh === "1" ? null : await latestGoWith(me, itemId);
-  return <GoWithScreen itemId={item.id} name={item.name ?? "Untitled piece"} thumbKey={thumb} fresh={fresh === "1"} initial={initial} />;
+  return (
+    <>
+      <GoWithScreen itemId={item.id} name={item.name ?? "Untitled piece"} thumbKey={thumb} fresh={fresh === "1"} initial={initial} />
+      <LookTray personId={item.owner.id} />
+    </>
+  );
 }

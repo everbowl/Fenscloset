@@ -24,7 +24,8 @@ export default async function ItemPage({ params }: { params: Promise<{ itemId: s
   const photos = item.photos.filter((p) => p.kind !== "thumb" && (p.kind !== "worn" || seeWorn));
   return (
     <ItemEditor
-      key={item.updatedAt.toISOString()}
+      key={item.id}
+      version={item.updatedAt.toISOString()}
       item={{
         id: item.id, name: item.name ?? "Untitled piece", ownerId: item.ownerId, ownerName: item.owner.name.split(" ")[0], mine: item.ownerId === person.id,
         status: statusWord(item), laundryStatus: item.laundryStatus, isFavorite: item.isFavorite, neverSuggest: item.neverSuggest, wearCount: item.wearCount,
@@ -40,6 +41,7 @@ export default async function ItemPage({ params }: { params: Promise<{ itemId: s
         wearHistory: history.map((h) => ({ wornOn: h.wornOn, title: h.title })),
         retired: item.retiredAt ? { reason: item.retiredReason ?? "donate", at: item.retiredAt.toISOString() } : null,
         storePhoto: item.storePhoto,
+        copies: item.copies, dirtyCopies: item.dirtyCopies, cleanersCopies: item.cleanersCopies,
         photoNudge: photoNudge(item),
       }}
       lists={lists}

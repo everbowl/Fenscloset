@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requirePerson } from "@/lib/auth/current";
 import { openWant } from "@/lib/shop/wants";
 import { WantScreen } from "./want-screen";
+import { LookTray } from "@/components/looks/look-tray";
 
 export const metadata = { title: "Looking for" };
 export const dynamic = "force-dynamic";
@@ -12,5 +13,10 @@ export default async function WantPage({ params }: { params: Promise<{ wantId: s
   const { wantId } = await params;
   const want = await openWant(me, wantId);
   if (!want) notFound();
-  return <WantScreen meId={me.id} want={want} />;
+  return (
+    <>
+      <WantScreen meId={me.id} want={want} />
+      <LookTray personId={want.forPersonId} />
+    </>
+  );
 }

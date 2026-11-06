@@ -19,6 +19,24 @@ describe("background jobs (the mirror dresses and Today builds its looks off the
     expect(startJob("k1", "jeff", async () => "c")).not.toBe(job); // once done, the key is free again
   });
 
+  it("with `after`, a running job is followed by a fresh one, not joined (a check-in saved while the looks were building)", async () => {
+    const order: string[] = [];
+    const first = startJob("looks", "jeff", async () => { await wait(80); order.push("first"); return "without check-in"; });
+    const second = startJob("looks", "jeff", async () => { order.push("second"); return "with check-in"; }, { after: true });
+    expect(second).not.toBe(first);
+    expect(jobsRunning()).toBe(1); // the key now points at the follower
+    expect(startJob("looks", "jeff", async () => "x")).toBe(second); // a plain request joins the follower
+    expect(await settled(second, 2000)).toMatchObject({ state: "done", result: "with check-in" });
+    expect(order).toEqual(["first", "second"]); // the follower waited its turn
+    expect(jobStatus(first.id, "jeff")).toMatchObject({ state: "done", result: "without check-in" }); // the first is still readable
+    expect(jobsRunning()).toBe(0);
+    // A failed first job does not stop the follower.
+    const bad = startJob("looks2", "jeff", async () => { await wait(20); throw new Error("no weather"); });
+    const next = startJob("looks2", "jeff", async () => "fine", { after: true });
+    expect(await settled(next, 2000)).toMatchObject({ state: "done", result: "fine" });
+    expect(await settled(bad, 10)).toMatchObject({ state: "failed" });
+  });
+
   it("quick work answers in the first call; a failure is kept with its reason", async () => {
     const quick = startJob("k2", "jeff", async () => "q");
     expect(await settled(quick, 500)).toMatchObject({ state: "done", result: "q" });

@@ -4,6 +4,7 @@ import { canShopFor, type Viewer } from "@/lib/people/visibility";
 import { getRuleNumber } from "@/lib/rules";
 import { ShopError } from "@/lib/shop/engine";
 import { searchProducts, type Product } from "@/lib/shop/products";
+import { withSection } from "@/lib/shop/section";
 import { mergeMatches, type Match, type StoredMatch } from "@/lib/shop/wants";
 
 /**
@@ -29,8 +30,8 @@ const FRESH_HOURS = 1;
 const DEFAULT_SWEEP_HOURS = 24;
 
 async function favorites(personId: string) {
-  const p = await db.person.findUniqueOrThrow({ where: { id: personId }, select: { favoriteBrands: { where: { isArchived: false }, orderBy: { name: "asc" }, select: { name: true } }, favoriteStores: { where: { isArchived: false }, select: { name: true } } } });
-  return { brands: p.favoriteBrands.map((b) => b.name).slice(0, MAX_BRANDS), stores: p.favoriteStores.map((s) => s.name) };
+  const p = await db.person.findUniqueOrThrow({ where: { id: personId }, select: { favoriteBrands: { where: { isArchived: false }, orderBy: { name: "asc" }, select: { name: true } }, favoriteStores: { where: { isArchived: false }, select: { name: true } }, shopSection: { select: { name: true, isArchived: true } } } });
+  return { brands: p.favoriteBrands.map((b) => b.name).slice(0, MAX_BRANDS), stores: p.favoriteStores.map((s) => s.name), section: p.shopSection && !p.shopSection.isArchived ? p.shopSection.name : null };
 }
 
 /** Each brand's results take turns so the row is not all one brand. */
@@ -43,9 +44,9 @@ export function interleave(lists: Product[][]): Product[] {
 
 /** Search the stores for each favorite brand and fold what is new into the feed. `maxAgeHours`: how old a cached store answer may be. */
 export async function refreshBrandFeed(personId: string, opts: { maxAgeHours?: number } = {}): Promise<{ added: number; brands: string[] }> {
-  const { brands, stores } = await favorites(personId);
-  const prefs = { favoriteStores: stores, favoriteBrands: brands };
-  const lists = await Promise.all(brands.map((b) => searchProducts([`${b} new arrivals`], prefs, fetch, { maxAgeHours: opts.maxAgeHours, limit: PER_BRAND })));
+  const { brands, stores, section } = await favorites(personId);
+  const prefs = { favoriteStores: stores, favoriteBrands: brands, section };
+  const lists = await Promise.all(brands.map((b) => searchProducts(withSection([`${b} new arrivals`], section), prefs, fetch, { maxAgeHours: opts.maxAgeHours, limit: PER_BRAND })));
   const found = interleave(lists);
   const now = new Date();
   const row = await db.brandFeed.findUnique({ where: { personId } });
