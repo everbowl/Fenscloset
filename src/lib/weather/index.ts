@@ -29,7 +29,7 @@ export class WeatherError extends Error {
 
 const FORECAST_TTL_MS = 60 * 60 * 1000;
 
-export function isMockWeather(): boolean {
+function isMockWeather(): boolean {
   return process.env.MOCK_WEATHER === "true";
 }
 
@@ -66,7 +66,7 @@ async function cached<T>(key: string, ttlMs: number | null, fetcher: () => Promi
 /** Tests: forget the failures that are waiting to be retried. */
 export function forgetWeatherFailures(): void { failures.clear(); }
 
-export function isValidZip(zip: string): boolean {
+function isValidZip(zip: string): boolean {
   return /^\d{5}$/.test(zip.trim());
 }
 

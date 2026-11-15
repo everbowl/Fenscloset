@@ -15,7 +15,7 @@ import type { Viewer } from "@/lib/people/visibility";
  * needSnoozeDays (Admin → Rules, 30 by default). Minors never reach the mirror, so they get no body rows.
  */
 
-export type NeedKind = "body-retake" | "body-front" | "body-back" | "section" | "size" | "store-photos";
+type NeedKind = "body-retake" | "body-front" | "body-back" | "section" | "size" | "store-photos";
 export type Need = {
   key: string; kind: NeedKind; title: string; detail: string;
   /** Body rows: which photo to add or retake. */
@@ -26,7 +26,7 @@ export type Need = {
   count?: number;
 };
 
-export const DEFAULT_SNOOZE_DAYS = 30;
+const DEFAULT_SNOOZE_DAYS = 30;
 const KEY = /^(body-retake|body-retake-back|body-front|body-back|section|store-photos|size-[a-z0-9]+)$/;
 
 /** The rows for a person's own closet, most pressing first, minus the ones hidden with Not now. */

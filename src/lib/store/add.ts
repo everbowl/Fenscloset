@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { newKey, putObject } from "@/lib/storage";
 import { fetchImage, normalizeUrl, PageError, readProductPage } from "@/lib/shop/page";
 import { searchProducts, type Product } from "@/lib/shop/products";
-import { getOrCreateOpenBatch, ImportError } from "@/lib/import/service";
+import { getOrCreateOpenBatch } from "@/lib/import/service";
 import { enqueueProcessing } from "@/lib/import/queue";
 import { MAX_COPIES } from "@/lib/items/copies";
 

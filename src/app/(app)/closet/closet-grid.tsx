@@ -14,7 +14,7 @@ import type { ItemCardData } from "@/lib/items/query";
 import type { MirrorConfig } from "@/lib/tryon/config";
 
 /** The try-on model places up to three pieces on a body. */
-export const PICK_MAX = 3;
+const PICK_MAX = 3;
 
 /**
  * The closet grid, with the mirror's pick mode (Jeff, 19 Oct 2026: "in closet I should be able to choose

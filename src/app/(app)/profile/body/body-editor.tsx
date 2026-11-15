@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Banner } from "@/components/ui/banner";
 import { Row, TextSheet } from "@/components/items/row-editor";
 import { InlineAdd } from "@/components/lists/inline-add";
-import type { BodyProfileView, Named } from "@/lib/profiles/service";
+import type { BodyProfileView } from "@/lib/profiles/service";
 import { SizeSheet } from "@/components/profile/size-sheet";
 import { PhotoPrivacySheet, useBodyPhotoUpload, type BodyPhotoView } from "@/components/profile/body-photo-upload";
 import { formatMeasurement, measurementOptions, type LikelySizes } from "@/lib/profiles/size-options";

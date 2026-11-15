@@ -10,7 +10,7 @@ import type { ExtraGarment } from "@/lib/tryon";
 import { MAX_LOOK_PIECES, type LookPieceInput, type LookPieceView, type LookSummary, type LookView, type StorePieceInput } from "@/lib/looks/shared";
 
 export { MAX_LOOK_PIECES } from "@/lib/looks/shared";
-export type { LookPieceInput, LookPieceView, LookSummary, LookView, StorePieceInput } from "@/lib/looks/shared";
+export type { LookPieceInput, LookSummary, LookView } from "@/lib/looks/shared";
 
 /**
  * Looks (Jeff, 2 Nov 2026, B1): store finds and closet pieces in one look, dressed on the person or the mannequin

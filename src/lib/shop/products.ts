@@ -20,7 +20,7 @@ export type Product = {
 
 export type ProductPrefs = { favoriteStores: string[]; favoriteBrands: string[]; /** The section the person shops in (Men's, Women's…): results titled for another section are left out. */ section?: string | null };
 
-export const MAX_PRODUCTS = 12;
+const MAX_PRODUCTS = 12;
 const PER_QUERY = 10;
 const CACHE_HOURS = 24;
 
@@ -31,7 +31,7 @@ export function isProductSearchConfigured(): boolean {
 type RawShopping = { title?: string; source?: string; link?: string; price?: string | number; imageUrl?: string; position?: number };
 
 /** Deterministic products for tests and local dev. */
-export function mockProducts(query: string): RawShopping[] {
+function mockProducts(query: string): RawShopping[] {
   const stores = ["Nordstrom", "Everlane", "J.Crew", "Vuori"];
   return Array.from({ length: 6 }, (_, i) => ({
     title: `${query.replace(/\b\w/g, (c) => c.toUpperCase())} ${i + 1}`,

@@ -15,7 +15,7 @@ export const GENERAL_TIPS: string[] = [
   "Shoot the whole closet in your camera app first, then pick them all here at once.",
 ];
 
-export type CategoryTip = { id: string; name: string; tip: string };
+type CategoryTip = { id: string; name: string; tip: string };
 export type AddTips = { hidden: boolean; general: string[]; categories: CategoryTip[] };
 
 export async function getAddTips(personId: string): Promise<AddTips> {

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { bodyViewerNames, getBodyProfile } from "@/lib/profiles/service";
 import { likelySizes } from "@/lib/profiles/sizes";

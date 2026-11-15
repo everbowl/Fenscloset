@@ -27,11 +27,10 @@ function Row({ href, label, meta, testId }: { href?: string; label: string; meta
 export default async function ProfilePage() {
   const { viewer, owner, mine } = await resolveProfileTarget();
   const seeBody = await canSeeBodyData(viewer, owner.id);
-  const [body, style, favs, colors, words, brands, stores, email] = await Promise.all([
+  const [body, style, favs, words, brands, stores, email] = await Promise.all([
     seeBody ? getBodyProfile(viewer, owner.id) : null,
     getStyleProfile(owner.id),
     getFavorites(owner.id),
-    db.color.findMany({ select: { id: true, name: true } }),
     db.styleWord.findMany({ select: { id: true, name: true } }),
     db.brand.findMany({ select: { id: true, name: true } }),
     db.store.findMany({ select: { id: true, name: true } }),

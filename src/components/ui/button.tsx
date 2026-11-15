@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/cn";
 import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
-import { buttonClass, LIFT, type Size, type Variant } from "./button-class";
+import { buttonClass, type Size, type Variant } from "./button-class";
 
 /*
  * Brand buttons (Jeff, 19 Oct 2026, Q11 A + C + D + motion): pills in the household accent (real orange,
@@ -13,10 +13,10 @@ import { buttonClass, LIFT, type Size, type Variant } from "./button-class";
  * louder and apparent"; it was a 1px outline), danger an outlined one, and every text action on a screen
  * is a .pill (globals.css) so that anything tappable reads as a button.
  */
-export { buttonClass, LIFT };
+export { buttonClass };
 /** The bone band a big button sits on (Q11 D "warm paper"). It wraps the button rather than being a pseudo on it: the button animates (a stacking context of its own), and a -z pseudo inside it would paint over the orange. */
-export const SHELF = "block relative before:absolute before:-inset-x-5 before:-inset-y-3 before:-z-10 before:bg-bone before:content-['']";
-export function Shelf({ children, className }: { children: ReactNode; className?: string }) {
+const SHELF = "block relative before:absolute before:-inset-x-5 before:-inset-y-3 before:-z-10 before:bg-bone before:content-['']";
+function Shelf({ children, className }: { children: ReactNode; className?: string }) {
   return <span className={cn(SHELF, className)}>{children}</span>;
 }
 

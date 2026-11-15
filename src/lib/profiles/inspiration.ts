@@ -11,7 +11,7 @@ import type { Viewer } from "@/lib/people/visibility";
  * under `inspo/<personId>/…`: the owner's, plus a minor's parents. Only the image goes to Claude.
  */
 
-export type StyleDna = {
+type StyleDna = {
   summary: string;
   silhouettes: string[];
   colorPairs: string[];

@@ -5,8 +5,8 @@ import { revalidatePath } from "next/cache";
 import { requirePerson } from "@/lib/auth/current";
 import { updatePersonDetails } from "@/lib/people/service";
 import {
-  addBodyPhoto, ProfileError, removeBodyPhoto, removeSize, setBodyPhotoPrivacy, setBodyViewers, setFitNotes, setMeasurement, setMinorBodyImageApproval,
-  setNeverSuggest, setShoppers, setShopSection, updateFavorites, updateStyle, upsertSize,
+  addBodyPhoto, ProfileError, removeBodyPhoto, setBodyPhotoPrivacy, setBodyViewers, setFitNotes, setMeasurement, setMinorBodyImageApproval,
+  setNeverSuggest, setShoppers, setShopSection, updateFavorites, updateStyle,
 } from "@/lib/profiles/service";
 import { forgetTasteFor } from "@/lib/profiles/service";
 import { addInspiration, removeInspiration } from "@/lib/profiles/inspiration";
@@ -32,12 +32,6 @@ export async function setMeasurementAction(ownerId: string, kindId: string, valu
 }
 export async function setFitNotesAction(ownerId: string, notes: string): Promise<Result> {
   const me = await requirePerson(); return run(() => setFitNotes(me, ownerId, notes));
-}
-export async function upsertSizeAction(ownerId: string, input: { id?: string; brandId: string; categoryId: string | null; size: string }): Promise<Result> {
-  const me = await requirePerson(); return run(() => upsertSize(me, ownerId, input));
-}
-export async function removeSizeAction(ownerId: string, id: string): Promise<Result> {
-  const me = await requirePerson(); return run(() => removeSize(me, ownerId, id));
 }
 export async function addBodyPhotoAction(ownerId: string, key: string, onlyMe = false, view: "front" | "back" | "left" | "right" | "side" = "front"): Promise<Result> {
   const me = await requirePerson(); return run(() => addBodyPhoto(me, ownerId, key, { onlyMe, view }));

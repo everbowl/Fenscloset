@@ -4,7 +4,6 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Sheet } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
 import { Banner } from "@/components/ui/banner";
 import { shrinkPhoto } from "@/lib/import/client-queue";
 import type { InspirationView } from "@/lib/profiles/inspiration";

@@ -67,8 +67,3 @@ export async function removePersonAction(id: string, items: "delete" | "moveToFa
   revalidatePath("/admin/people");
   redirect("/admin/people");
 }
-
-export async function smsAvailableAction(): Promise<boolean> {
-  await requireAdmin();
-  return smsConfigured();
-}

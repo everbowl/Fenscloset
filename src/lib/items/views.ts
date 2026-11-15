@@ -34,7 +34,7 @@ export const SORTS = [
   { value: "price-low", label: "Price, low to high" },
 ] as const;
 export type ClosetSort = (typeof SORTS)[number]["value"];
-export const DEFAULT_SORT: ClosetSort = "newest";
+const DEFAULT_SORT: ClosetSort = "newest";
 export const sortLabel = (s: ClosetSort) => SORTS.find((x) => x.value === s)?.label ?? SORTS[0].label;
 
 /** A piece with everything a filter or a sort looks at. */
@@ -83,13 +83,13 @@ export function closetQuery(opts: { filters?: Partial<ClosetFilters>; sort?: Clo
 }
 
 /** What a piece carries for a facet. */
-export const facetIds: Record<FacetKey, (it: ViewItem) => string[]> = {
+const facetIds: Record<FacetKey, (it: ViewItem) => string[]> = {
   color: (it) => it.colorIds, brand: (it) => (it.brandId ? [it.brandId] : []), season: (it) => it.seasonIds, occasion: (it) => it.occasionIds, formality: (it) => it.formalityIds,
   fabric: (it) => it.fabricIds, pattern: (it) => it.patternIds, tag: (it) => it.tagIds, closet: (it) => it.closetIds, status: (it) => [it.laundryStatus],
 };
 
 /** Every facet is AND-ed; inside one, any of its picks will do. `except` leaves one facet or toggle out (for its own counts). */
-export function matches(it: ViewItem, f: ClosetFilters, except?: FacetKey | Toggle): boolean {
+function matches(it: ViewItem, f: ClosetFilters, except?: FacetKey | Toggle): boolean {
   for (const k of FACET_KEYS) {
     if (k === except || !f[k].length) continue;
     const ids = facetIds[k](it);

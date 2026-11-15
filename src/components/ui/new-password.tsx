@@ -6,7 +6,7 @@ import { Field } from "./field";
 import { cn } from "@/lib/cn";
 
 /** How strong a password is, in plain words (Jeff, 31 Oct 2026, S1): length first, variety second. */
-export function passwordStrength(v: string): { ok: boolean; word: string } {
+function passwordStrength(v: string): { ok: boolean; word: string } {
   if (!v) return { ok: false, word: "" };
   if (v.length < 8) return { ok: false, word: `Too short · ${8 - v.length} more` };
   const kinds = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter((r) => r.test(v)).length;

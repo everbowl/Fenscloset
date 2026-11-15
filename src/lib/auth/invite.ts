@@ -6,7 +6,7 @@ import { appUrl, renderEmail, sendEmail } from "@/lib/email";
 import { normalizePhone, sendSms } from "@/lib/sms";
 import type { Role } from "@/generated/prisma/client";
 
-export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export type InviteInput = {
   name: string;

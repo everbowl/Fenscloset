@@ -28,7 +28,7 @@ export async function getScales(): Promise<Scale[]> {
   return scales.map((s) => ({ id: s.id, name: s.name, options: s.options.map((o) => ({ id: o.id, name: o.name })) }));
 }
 
-export async function canTouchCheckIn(viewer: Viewer, personId: string): Promise<boolean> {
+async function canTouchCheckIn(viewer: Viewer, personId: string): Promise<boolean> {
   if (viewer.id === personId) return true;
   return Boolean(await db.guardianLink.findUnique({ where: { minorId_parentId: { minorId: personId, parentId: viewer.id } } }));
 }
@@ -79,7 +79,7 @@ export async function saveSelfie(viewer: Viewer, personId: string, date: string,
   return (await getCheckIn(viewer, personId, date))!;
 }
 
-export async function readSelfie(image: { data: Buffer; contentType: "image/jpeg" | "image/png" | "image/webp" }, scales: Scale[]): Promise<{ scaleId: string; optionId: string }[]> {
+async function readSelfie(image: { data: Buffer; contentType: "image/jpeg" | "image/png" | "image/webp" }, scales: Scale[]): Promise<{ scaleId: string; optionId: string }[]> {
   const usable = scales.filter((s) => s.options.length);
   if (!usable.length) return [];
   if (isMockAi()) return usable.map((s) => ({ scaleId: s.id, optionId: s.options[Math.min(1, s.options.length - 1)].id }));

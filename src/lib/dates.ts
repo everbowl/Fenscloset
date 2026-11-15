@@ -1,7 +1,5 @@
 /** Local-day helpers. The household time zone is a rule (`timezone`), default America/Los_Angeles. */
 
-export const DEFAULT_TZ = "America/Los_Angeles";
-
 /** YYYY-MM-DD for `date` in `tz`. */
 export function dayKey(date: Date, tz: string): string {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);

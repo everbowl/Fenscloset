@@ -107,7 +107,7 @@ export async function processEntry(entryId: string): Promise<ProcessOutcome> {
 }
 
 /** A piece from a store link or receipt: the store's name, brand, size and color win over the guess. */
-export function applyStoreMeta(tags: TagResult, meta: StoreMeta, lists: { brands: { id: string; name: string }[]; colors: { id: string; name: string }[] }): TagResult {
+function applyStoreMeta(tags: TagResult, meta: StoreMeta, lists: { brands: { id: string; name: string }[]; colors: { id: string; name: string }[] }): TagResult {
   const next = { ...tags };
   if (meta.name) next.name = meta.name.slice(0, 80);
   if (meta.brandText) {

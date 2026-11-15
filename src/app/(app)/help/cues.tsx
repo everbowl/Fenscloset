@@ -50,7 +50,7 @@ function MiniButton({ label, variant = "primary" }: { label: string; variant?: "
 
 const ICONS = { camera: Camera, calendar: Calendar, search: Search, image: ImageIcon, link: Link2, mail: Mail } as const;
 
-export function CueArt({ cue }: { cue: Cue }) {
+function CueArt({ cue }: { cue: Cue }) {
   switch (cue.kind) {
     case "nav": return <NavCue tab={cue.tab} />;
     case "plus": return <span className="flex size-9 items-center justify-center bg-ink text-paper"><PlusGlyph size={16} /></span>;

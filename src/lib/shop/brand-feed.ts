@@ -22,7 +22,7 @@ export type BrandFeedView = {
 };
 
 /** Products kept in the feed, newest first. */
-export const MAX_FEED = 24;
+const MAX_FEED = 24;
 /** Each brand's search returns up to this many. */
 const PER_BRAND = 6;
 const MAX_BRANDS = 6;
@@ -57,7 +57,7 @@ export async function refreshBrandFeed(personId: string, opts: { maxAgeHours?: n
 }
 
 /** The refresh as a background job, one per person at a time; the result is the person's id. */
-export function startBrandFeedRefresh(viewer: Viewer, personId: string): Job<string> {
+function startBrandFeedRefresh(viewer: Viewer, personId: string): Job<string> {
   return startJob<string>(["brandfeed", personId].join("|"), viewer.id, async (step) => { step("Checking your brands…"); await refreshBrandFeed(personId, { maxAgeHours: FRESH_HOURS }); return personId; });
 }
 

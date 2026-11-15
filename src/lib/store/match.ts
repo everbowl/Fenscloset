@@ -17,8 +17,8 @@ import { priceNumber, storeIdByName, type StoreMeta } from "@/lib/store/add";
  */
 
 export type StyleProbe = { brand: string; name: string; category?: string | null; color?: string | null };
-export const MAX_MATCHES = 6;
-export const MAX_RETAIL_PHOTOS = 3;
+const MAX_MATCHES = 6;
+const MAX_RETAIL_PHOTOS = 3;
 
 const host = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return ""; } };
 
@@ -50,10 +50,10 @@ export async function ensureBrand(name: string): Promise<Named & { url: string |
   return { id: made.id, name: made.name, url: cat ? `https://www.${cat.domain}` : null };
 }
 
-export type MatchDetails = { fabric: string | null; fitNotes: string | null };
+type MatchDetails = { fabric: string | null; fitNotes: string | null };
 
 /** Fabric and a one-line fit note read off the store's description (Claude), or nothing. */
-export async function detailsFromDescription(title: string, description: string | null, fabrics: Named[]): Promise<MatchDetails> {
+async function detailsFromDescription(title: string, description: string | null, fabrics: Named[]): Promise<MatchDetails> {
   if (!description?.trim()) return { fabric: null, fitNotes: null };
   if (isMockAi()) return { fabric: null, fitNotes: description.split(/(?<=[.!?])\s/)[0].slice(0, 120) };
   try {

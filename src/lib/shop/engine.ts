@@ -25,10 +25,10 @@ export class ShopError extends Error {
   }
 }
 
-export type CandidateRead = { name: string; categoryId: string | null; categoryName: string | null; colorIds: string[]; colorNames: string[]; fabricName: string | null; formalityName: string | null; brandText: string | null; sizeText: string | null };
+type CandidateRead = { name: string; categoryId: string | null; categoryName: string | null; colorIds: string[]; colorNames: string[]; fabricName: string | null; formalityName: string | null; brandText: string | null; sizeText: string | null };
 /** shoppingQueries: 1–3 Google Shopping searches for the missing category (or a better alternative on PASS); empty otherwise. */
-export type Verdict = { call: "FITS" | "RISKY" | "PASS"; reason: string; sizeNote: string | null; missingCategory: string | null; shoppingQueries: string[]; usedBodyData: boolean };
-export type Recommendation = { label: string; storeName: string; url: string };
+type Verdict = { call: "FITS" | "RISKY" | "PASS"; reason: string; sizeNote: string | null; missingCategory: string | null; shoppingQueries: string[]; usedBodyData: boolean };
+type Recommendation = { label: string; storeName: string; url: string };
 export type SimilarItem = { id: string; name: string; thumbKey: string | null };
 
 export type LookupView = {
@@ -70,7 +70,7 @@ async function readCandidate(lists: TagLists, input: { image?: { data: string; m
 }
 
 /** Plan B3: same category and a shared color or fabric, top 4. */
-export async function similarOwned(forPersonId: string, read: CandidateRead): Promise<SimilarItem[]> {
+async function similarOwned(forPersonId: string, read: CandidateRead): Promise<SimilarItem[]> {
   if (!read.categoryId) return [];
   const items = await db.item.findMany({
     where: { ownerId: forPersonId, categoryId: read.categoryId, retiredAt: null, OR: [{ colors: { some: { id: { in: read.colorIds } } } }, ...(read.fabricName ? [{ fabrics: { some: { name: read.fabricName } } }] : [])] },
@@ -167,7 +167,7 @@ async function recommend(forPersonId: string, read: CandidateRead, verdict: Verd
   return out;
 }
 
-export async function assertCanShop(viewer: Viewer, forPersonId: string) {
+async function assertCanShop(viewer: Viewer, forPersonId: string) {
   if (!(await canShopFor(viewer, forPersonId))) throw new ShopError("You can shop for yourself, your kids, or people who let you.", 403);
 }
 

@@ -104,7 +104,7 @@ function extraData(kind: ListKind, input: EntryInput, forCreate: boolean): AnyRo
 }
 
 /** How many things reference this entry. Deleting is blocked when > 0. Extended as new relations arrive. */
-export async function inUseCount(kind: ListKind, id: string): Promise<{ count: number; what: string }> {
+async function inUseCount(kind: ListKind, id: string): Promise<{ count: number; what: string }> {
   switch (kind) {
     case "category": return { count: await db.item.count({ where: { categoryId: id } }), what: "items" };
     case "subcategory": return { count: await db.item.count({ where: { subcategoryId: id } }), what: "items" };
@@ -134,11 +134,6 @@ export async function listEntries(kind: ListKind, opts: { parentId?: string; inc
   if (def.parent && opts.parentId) where[def.parent.field] = opts.parentId;
   const rows = await delegateFor(kind).findMany({ where, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] });
   return rows.map((r) => toEntry(kind, r));
-}
-
-export async function getEntry(kind: ListKind, id: string): Promise<ListEntry | null> {
-  const row = await delegateFor(kind).findUnique({ where: { id } });
-  return row ? toEntry(kind, row) : null;
 }
 
 export async function createEntry(kind: ListKind, input: EntryInput): Promise<ListEntry> {

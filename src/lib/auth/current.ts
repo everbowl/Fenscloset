@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { SESSION_COOKIE, createSession, destroySession, validateSession, type SessionWithPerson } from "@/lib/auth/session";
 import type { Person } from "@/generated/prisma/client";
 
-export class ForbiddenError extends Error {
+class ForbiddenError extends Error {
   constructor(message = "Forbidden") {
     super(message);
     this.name = "ForbiddenError";

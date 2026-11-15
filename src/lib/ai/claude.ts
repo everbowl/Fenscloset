@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-export const MODEL = "claude-opus-5-5";
+const MODEL = "claude-opus-5-5";
 
 export class AiError extends Error {
   constructor(public readonly code: "no_key" | "refusal" | "bad_json" | "api", message: string) {

@@ -115,7 +115,7 @@ export async function fashnTryOn(person: Buffer, garment: Buffer, category: Fash
 }
 
 /** Dev/test stand-in: the body photo with the garment pasted on, warmer than Google's mock so a comparison shows two pictures. */
-export async function mockFashn(person: Buffer, garment: Buffer): Promise<Buffer> {
+async function mockFashn(person: Buffer, garment: Buffer): Promise<Buffer> {
   const g = await sharp(garment).flatten({ background: "#ffffff" }).resize(260, 260, { fit: "inside" }).png().toBuffer();
   return sharp(person).rotate().resize(600, 800, { fit: "cover" }).modulate({ hue: 20, saturation: 1.1 }).composite([{ input: g, left: 300, top: 160 }]).jpeg({ quality: 85 }).toBuffer();
 }

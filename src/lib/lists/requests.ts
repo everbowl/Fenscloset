@@ -4,7 +4,7 @@ import { LIST_DEFS, type ListKind } from "@/lib/lists/registry";
 export class RequestError extends Error {}
 
 /** "Jeff and Brittney": the admins, by first name, for the line after an ask. */
-export async function adminFirstNames(): Promise<string> {
+async function adminFirstNames(): Promise<string> {
   const admins = await db.person.findMany({ where: { role: "admin", status: { not: "removed" } }, select: { name: true }, orderBy: { createdAt: "asc" } });
   const names = admins.map((a) => a.name.split(" ")[0]).filter(Boolean);
   if (!names.length) return "An admin";
@@ -32,10 +32,6 @@ export type ListRequestView = { id: string; kind: ListKind; kindLabel: string; n
 export async function listOpenRequests(): Promise<ListRequestView[]> {
   const rows = await db.listRequest.findMany({ where: { status: "open" }, include: { requestedBy: { select: { name: true } } }, orderBy: { createdAt: "asc" } });
   return rows.map((r) => ({ id: r.id, kind: r.kind as ListKind, kindLabel: LIST_DEFS[r.kind as ListKind]?.label ?? r.kind, name: r.name, parentId: r.parentId, askedBy: r.requestedBy.name, createdAt: r.createdAt }));
-}
-
-export async function countOpenRequests(): Promise<number> {
-  return db.listRequest.count({ where: { status: "open" } });
 }
 
 export async function resolveRequest(id: string, status: "added" | "dismissed" | "open"): Promise<void> {

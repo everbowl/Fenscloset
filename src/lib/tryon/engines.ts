@@ -5,7 +5,7 @@
  */
 export type Engine = "google" | "fashn" | "kling";
 export type EngineRule = Engine | "compare";
-export const ENGINES: Engine[] = ["google", "fashn", "kling"];
+const ENGINES: Engine[] = ["google", "fashn", "kling"];
 export const ENGINE_RULE_KEY = "mirrorEngine";
 export const ENGINE_WORD: Record<Engine, string> = { google: "Google", fashn: "FASHN", kling: "Kling" };
 const ENGINE_KEYS: Record<Engine, string> = { google: "Google service account", fashn: "FASHN_API_KEY", kling: "KLING_API_KEY" };

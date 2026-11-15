@@ -6,11 +6,11 @@ Private, mobile-first family closet app. Catalog clothes with photos, get daily 
 - Implementation plans: `docs/superpowers/plans/`
 
 ## Stack
-Next.js 16 (App Router, TypeScript) · Prisma 7 + PostgreSQL · Railway (app, Postgres, bucket) · Claude API · Resend · Twilio · Open-Meteo · Google Calendar · PWA.
+Next.js 16 (App Router, TypeScript) · Prisma 7 + PostgreSQL · Railway (app, Postgres, bucket) · Claude API · remove.bg · Serper (store search) · the mirror: Google Vertex, FASHN, Kling · Resend · Twilio · Open-Meteo · Google Calendar · PWA.
 
 ## Local development
 ```bash
-cp .env.example .env            # fill in what you have; DATABASE_URL must point at a Postgres 16
+cp .env.example .env            # every variable the app reads, with what each is for; DATABASE_URL must point at a Postgres 16
 npm install
 npm run db:migrate              # applies migrations
 npm run db:seed                 # 4 people, Family closet, default lists, rules
@@ -28,5 +28,5 @@ PW_CHROMIUM=/path/to/chromium npm run test:e2e   # Playwright (iPhone 15 + deskt
 
 ## Deploy (Railway)
 `railway.json` builds with Railpack and starts with `npx prisma migrate deploy && npm run start`.
-Set every variable from `.env.example` in Railway > Variables. Health check: `/api/health`.
+Set every variable from `.env.example` in Railway > Variables (the mirror needs at least one engine key: the Google service account, `FASHN_API_KEY` or `KLING_API_KEY`). Health check: `/api/health`.
 First deploy: run the seed once (`npm run db:seed`) from a Railway shell or one-off command.

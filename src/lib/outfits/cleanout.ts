@@ -7,7 +7,7 @@ import { countsOf, laundrySummary } from "@/lib/items/copies";
 /** Pieces not worn for `notWornMonths` (never worn counts from the day they were added). KEEP snoozes 3 months; DONATE/SELL retire. */
 export type CleanOutItem = { id: string; name: string; thumbKey: string | null; categoryName: string | null; lastWornAt: Date | null; createdAt: Date; wearCount: number };
 
-export async function cleanOutCutoff(now = new Date()): Promise<{ months: number; cutoff: Date }> {
+async function cleanOutCutoff(now = new Date()): Promise<{ months: number; cutoff: Date }> {
   const months = await getRuleNumber("notWornMonths", 6);
   const cutoff = new Date(now); cutoff.setMonth(cutoff.getMonth() - months);
   return { months, cutoff };

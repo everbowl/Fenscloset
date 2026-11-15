@@ -5,7 +5,7 @@ import { setPassword } from "@/lib/auth/change-password";
 import { destroyAllSessionsFor } from "@/lib/auth/session";
 import { appUrl, renderEmail, sendEmail } from "@/lib/email";
 
-export const RESET_TTL_MS = 60 * 60 * 1000; // 60 minutes
+const RESET_TTL_MS = 60 * 60 * 1000; // 60 minutes
 
 /** Creates a single-use reset token for a known email. Returns null (silently) for unknown emails. */
 export async function createResetToken(emailRaw: string): Promise<{ token: string; personId: string } | null> {

@@ -85,7 +85,6 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
   const [words, setWords] = useState("");
   const [error, setError] = useState<string>();
   const [added, setAdded] = useState<number>(0);
-  const [batchId, setBatchId] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [busy, setBusy] = useState<"lookup" | "words" | "photos" | "add" | null>(null);
 
@@ -159,7 +158,7 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
       });
       setBusy(null);
       if (!r.ok) { setError(r.error); return; }
-      setAdded(r.value.count); setBatchId(r.value.batchId);
+      setAdded(r.value.count);
       router.refresh();
     });
   }

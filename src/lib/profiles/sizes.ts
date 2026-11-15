@@ -43,5 +43,3 @@ export async function likelySizes(ownerId: string): Promise<LikelySizes | null> 
   const waist = Math.round(weightLb / (Math.max(10, divX10) / 10) - (heightIn - 70) / 2);
   return { letter, waist: String(Math.max(22, Math.min(60, waist))), dress: DRESS_BY_LETTER[letter], from: { heightIn, weightLb } };
 }
-
-export { likelyFor, measurementOptions, formatMeasurement } from "@/lib/profiles/size-options";

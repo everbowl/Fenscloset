@@ -30,7 +30,7 @@ export type ItemEdits = {
   sizeText?: string | null;
 };
 
-export function applyEdits(tags: TagResult, edits: ItemEdits): TagResult {
+function applyEdits(tags: TagResult, edits: ItemEdits): TagResult {
   const next = { ...tags };
   if (edits.name !== undefined) next.name = edits.name.trim().slice(0, 80) || tags.name;
   if (edits.categoryId !== undefined) { next.categoryId = edits.categoryId; if (edits.subcategoryId === undefined) next.subcategoryId = null; }

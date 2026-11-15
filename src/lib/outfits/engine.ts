@@ -27,7 +27,7 @@ export class OutfitError extends Error {
 
 export type Piece = { id: string; name: string; label: string; thumbKey: string | null; ownerId: string; /** Category name, so the board can stack top over bottom over shoes. */ category?: string | null };
 /** Why a look works, in plain lines the Today screen lists under the one-sentence reason. */
-export type Why = { weather: string[]; dressCode: string; color: string; taste: string };
+type Why = { weather: string[]; dressCode: string; color: string; taste: string };
 export type Board = { itemIds: string[]; reason: string; why?: Why };
 export type BoardView = Board & { pieces: Piece[]; index: number; wornFitId: string | null };
 
@@ -183,10 +183,6 @@ export async function composeLooks(opts: { cands: Candidate[]; inputs: Inputs; s
   }
   if (opts.visual === false) return boards.slice(0, count);
   return rankVisually(boards.slice(0, draft), cands, inputs, count, opts.style);
-}
-
-function toPiece(c: Candidate): Piece {
-  return { id: c.id, name: c.name, label: (c.subcategory ?? c.category ?? "piece").toUpperCase(), thumbKey: c.thumbKey, ownerId: c.ownerId };
 }
 
 async function piecesFor(boards: Board[]): Promise<Map<string, Piece>> {

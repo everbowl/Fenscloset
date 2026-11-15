@@ -25,7 +25,7 @@ export type WantView = {
 };
 
 /** Matches kept per want, newest first. */
-export const MAX_MATCHES = 30;
+const MAX_MATCHES = 30;
 /** A search asked for by hand, or by the sweep, reuses a store answer only this old (the Shop's usual cache is a day). */
 const FRESH_HOURS = 1;
 const DEFAULT_SWEEP_HOURS = 24;
@@ -116,7 +116,7 @@ export async function searchWant(wantId: string, hooks: LookupHooks & { maxAgeHo
 }
 
 /** The search as a background job (src/lib/jobs.ts), one per want at a time; its result is the want's id. */
-export function startWantSearch(viewer: Viewer, wantId: string, fresh: boolean): Job<string> {
+function startWantSearch(viewer: Viewer, wantId: string, fresh: boolean): Job<string> {
   return startJob<string>(["want", wantId].join("|"), viewer.id, async (step) => { await searchWant(wantId, { step, maxAgeHours: fresh ? FRESH_HOURS : undefined }); return wantId; });
 }
 

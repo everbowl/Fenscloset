@@ -10,7 +10,7 @@ import type { Viewer } from "@/lib/people/visibility";
  * (categoryId null = any); Brand.url holds the link, once, for all.
  */
 
-export type MyBrandSize = { categoryId: string | null; categoryName: string | null; size: string };
+type MyBrandSize = { categoryId: string | null; categoryName: string | null; size: string };
 export type MyBrand = { brandId: string; name: string; url: string | null; sizes: MyBrandSize[] };
 export { sizeFor } from "@/lib/profiles/size-options";
 

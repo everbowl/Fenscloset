@@ -67,7 +67,6 @@ export async function getItemDetail(itemId: string) {
     },
   });
 }
-export type ItemDetail = NonNullable<Awaited<ReturnType<typeof getItemDetail>>>;
 
 import { loadTagLists, type Named, type TagLists } from "@/lib/ai/tag-item";
 
@@ -89,7 +88,7 @@ export async function loadItemLists(viewerId: string): Promise<ItemLists> {
 
 // ---------- Closet views: filters and sorts (Shop v2 item 5) ----------
 
-export type FacetOption = { id: string; name: string; count: number; /** a color's swatch */ hex?: string };
+type FacetOption = { id: string; name: string; count: number; /** a color's swatch */ hex?: string };
 export type Facet = { key: FacetKey; label: string; options: FacetOption[] };
 export type ClosetViewData = {
   items: ItemCardData[];
