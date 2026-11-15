@@ -90,7 +90,7 @@ export function asExtras(extra: Buffer | ExtraGarment[] | undefined): ExtraGarme
 /** How an extra garment is keyed in a cached picture's itemIds: the Shop's by its source, a look's by its own id. */
 export const extraKeys = (extras: ExtraGarment[], source: string) => extras.map((g) => (g.id === "extra" ? `extra:${source}` : `extra:${g.id}`));
 /** Top, dress, bottom, shoes, outer layer: the order the engines dress in. A garment without a category goes first. */
-export const byMirrorOrder = <T extends { category: string | null }>(gs: T[]): T[] => [...gs].sort((a, b) => ORDER.indexOf(a.category ?? "") - ORDER.indexOf(b.category ?? ""));
+const byMirrorOrder = <T extends { category: string | null }>(gs: T[]): T[] => [...gs].sort((a, b) => ORDER.indexOf(a.category ?? "") - ORDER.indexOf(b.category ?? ""));
 /** Progress reports while a look is dressed ("Dressing you · Oxford", "Checking the picture…"), shown in the mirror while it runs. */
 export type DressingHooks = { step?: (step: string) => void };
 
@@ -250,7 +250,7 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
         const garment = await sharp(g.buf).flatten({ background: "#ffffff" }).resize(1024, 1024, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
         let out: { data: Buffer };
         try {
-          out = by === "fashn" ? await fashnTryOn(person, garment, fashnCategory(g.category) ?? "auto") : by === "kling" ? await klingTryOn(person, garment) : await googleTryOn(person, garment);
+          out = by === "fashn" ? await fashnTryOn(person, garment, fashnCategory(g.category) ?? "auto") : by === "kling" ? await klingTryOn(person, garment, personId) : await googleTryOn(person, garment);
         } catch (e) {
           if (e instanceof TryOnModelError) throw new TryOnError(e.message, 502);
           if (e instanceof FashnError || e instanceof KlingError) {

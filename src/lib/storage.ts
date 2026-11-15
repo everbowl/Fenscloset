@@ -150,6 +150,16 @@ export async function signUpload(opts: { ownerId: string; kind?: PhotoKeyKind; c
   return { key, url, method: "PUT", headers: { "Content-Type": opts.contentType }, expiresAt: exp };
 }
 
+/**
+ * A link an outside service can fetch the object from for `expiresInSec` (the mirror hands Kling its two pictures this
+ * way). On the bucket it is a presigned GET; in mock mode it is the app's own photo route, which only tests look at.
+ */
+export async function signDownload(key: string, expiresInSec = 900): Promise<string> {
+  if (!parseKey(key)) throw new Error("Bad key");
+  if (storageMode() === "s3") return getSignedUrl(s3(), new GetObjectCommand({ Bucket: bucket(), Key: key }), { expiresIn: expiresInSec });
+  return `${(process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "")}/api/photo/${key}`;
+}
+
 export function verifyUploadToken(key: string, contentType: string, exp: number, sig: string): boolean {
   if (!parseKey(key) || !IMAGE_TYPES[contentType] || !Number.isFinite(exp)) return false;
   if (exp * 1000 < Date.now()) return false;
