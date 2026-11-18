@@ -35,6 +35,7 @@ export async function processEntry(entryId: string): Promise<ProcessOutcome> {
     original = (await getObject(entry.originalKey)).body;
   } catch (e) {
     const msg = e instanceof NotFoundError ? "The photo never finished uploading." : (e as Error).message;
+    console.error(`import: entry ${entryId} failed before processing: ${msg}`);
     await db.importEntry.update({ where: { id: entryId }, data: { status: "failed", error: msg } });
     return { status: "failed", error: msg };
   }
@@ -93,14 +94,17 @@ export async function processEntry(entryId: string): Promise<ProcessOutcome> {
       try {
         const { createItemFromEntry } = await import("@/lib/items/service");
         await createItemFromEntry(ownerId, entryId);
+        console.log(`import: entry ${entryId} landed in the closet (${(entry.storeMeta as StoreMeta).name})`);
         return { status: "done" };
       } catch (e) { console.error("auto-add from store", e); }
     }
+    if (entry.storeMeta) console.log(`import: entry ${entryId} from a store waits for a confirm (${tags.categoryId ? "duplicate check" : "no category"})`);
     return { status: "needs_confirm" };
   } catch (e) {
     const msg = e instanceof AiError
       ? (e.code === "no_key" ? "Tagging is not set up yet (missing ANTHROPIC_API_KEY)." : `Tagging failed: ${e.message}`)
       : `Processing failed: ${(e as Error).message}`;
+    console.error(`import: entry ${entryId} failed: ${msg}`);
     await db.importEntry.update({ where: { id: entryId }, data: { status: "failed", error: msg } });
     return { status: "failed", error: msg };
   }
