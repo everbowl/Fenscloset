@@ -112,7 +112,8 @@ export async function klingTryOn(person: Buffer, garment: Buffer, personId: stri
     const taskId = started.data?.task_id;
     if (!taskId) throw new KlingError("Kling returned no task id.", 502);
     const pollMs = Number(process.env.KLING_POLL_MS ?? 2000);
-    const deadline = Date.now() + Number(process.env.KLING_TIMEOUT_MS ?? 180_000);
+    const startedAt = Date.now();
+    const deadline = startedAt + Number(process.env.KLING_TIMEOUT_MS ?? 180_000);
     while (Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, pollMs));
       const res = await fetchWithBackoff(fetchImpl, `${klingBase()}${KLING_QUERY_PATH}?task_ids=${encodeURIComponent(taskId)}`, { headers: { Authorization: headers.Authorization }, signal: AbortSignal.timeout(30_000) });
@@ -122,6 +123,7 @@ export async function klingTryOn(person: Buffer, garment: Buffer, personId: stri
       const task = q.data?.find((t) => t.id === taskId) ?? q.data?.[0];
       if (task?.status === "failed") { console.error(`kling: task ${taskId} failed: ${task.message}`); throw friendly(undefined, task.message); }
       if (task?.status === "succeed") {
+        console.log(`kling: task ${taskId} done in ${Math.round((Date.now() - startedAt) / 1000)}s`); // the one line a working Kling leaves in the logs
         const url = (task.outputs?.find((o) => o.type === "image") ?? task.outputs?.[0])?.url;
         if (!url) throw new KlingError("Kling returned no image.", 502);
         const pic = await fetchImpl(url, { signal: AbortSignal.timeout(30_000) });
