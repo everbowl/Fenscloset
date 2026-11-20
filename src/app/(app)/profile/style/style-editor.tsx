@@ -34,7 +34,7 @@ export function StyleEditor({ ownerId, style, colors, words, canEdit, canEditLis
       </section>
       <section>
         <p className="mono border-b border-ink pb-2 text-graphite">Never suggest</p>
-        {style.neverSuggest.length === 0 ? <p className="mono py-3 text-graphite">Nothing excluded · turn off “Suggest it” on a piece in <Link href="/closet" className="text-ink underline underline-offset-4">the closet</Link></p> : null}
+        {style.neverSuggest.length === 0 ? <p className="note py-3">Nothing excluded. Turn off “Suggest it” on a piece in <Link href="/closet" className="text-ink underline underline-offset-4">the closet</Link></p> : null}
         {style.neverSuggest.map((it) => (
           <div key={it.id} className="flex h-[42px] items-center justify-between border-b border-line">
             <Link href={`/closet/${it.id}`} className="truncate text-[14px]">{it.name ?? "Untitled piece"}</Link>

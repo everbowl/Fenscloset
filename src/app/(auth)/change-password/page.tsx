@@ -18,7 +18,7 @@ export default async function ChangePasswordPage() {
           <Banner tone="danger" title="You signed in with the one-time DEV password">0535 is now disabled. Set your real password to continue.</Banner>
         ) : null}
         <div className="flex flex-col gap-1">
-          <h1 className="serif text-[34px]">{person.mustChangePassword ? <>Set a new <em>password</em></> : <>Change <em>password</em></>}</h1>
+          <h1 className="serif text-[34px]">{person.mustChangePassword ? <>Set a new password</> : <>Change password</>}</h1>
           <p className="mono mono-11 normal-case text-graphite">Signed in as {person.email}</p>
         </div>
         <ChangePasswordForm email={person.email ?? ""} />

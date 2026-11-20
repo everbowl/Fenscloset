@@ -69,7 +69,7 @@ export function PersonEditor({ person, admins, smsReady, isSelf, bodyPhotos }: {
             <option value="admin">Admin (parent)</option>
             <option value="minor">Minor (under 18)</option>
           </Select>
-          {isSelf ? <p className="mono mt-1 normal-case text-[11px] text-graphite">You can&apos;t change your own role.</p> : null}
+          {isSelf ? <p className="note mt-1">You can&apos;t change your own role.</p> : null}
         </Field>
         {role === "minor" ? (
           <fieldset className="space-y-2">

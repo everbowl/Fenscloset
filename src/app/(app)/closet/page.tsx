@@ -20,6 +20,8 @@ import { bodyViewerNames } from "@/lib/profiles/service";
 import { likelySizes, sizeOptionsByCategory } from "@/lib/profiles/sizes";
 import { NeedsStrip } from "./needs-strip";
 import { LookTray } from "@/components/looks/look-tray";
+import { pendingAdds } from "@/lib/import/pending";
+import { TaggingCards } from "./tagging-cards";
 
 export const metadata = { title: "Closet" };
 export const dynamic = "force-dynamic";
@@ -49,6 +51,9 @@ export default async function ClosetPage({ searchParams }: { searchParams: Promi
   ]);
   const filtered = activeFilterCount(filters) > 0;
   const narrowed = Boolean(categoryId || q || filtered);
+  // Just added and not a card yet (Tagging, failed, waiting to confirm): the owner's own, in the whole-closet view.
+  const pending = mine && !narrowed ? await pendingAdds(person.id) : null;
+  const lead = pending && (pending.cards.length || pending.toConfirm) ? <TaggingCards pending={pending} /> : null;
   // Everything but the category rides along when a tab changes: the search, the sort, the filters.
   const keep = Object.fromEntries(Object.entries(sp).filter(([k, v]) => k !== "cat" && typeof v === "string")) as Record<string, string>;
 
@@ -61,8 +66,8 @@ export default async function ClosetPage({ searchParams }: { searchParams: Promi
       <ClosetPickProvider>
       <ClosetTools basePath="/closet" filters={filters} sort={sort} facets={facets} toggles={toggles} shown={shown} total={total} cat={categoryId} q={q} mirror={canMirror && items.length > 0} cleanOut={cleanOut} />
       {needs.length ? <NeedsStrip personId={person.id} needs={needs} sections={sections} isAdmin={isAdmin(person)} sizeOptions={sizeOptions} likely={likely} visibleTo={visibleTo} /> : null}
-      {items.length ? (
-        <ClosetGrid items={items} showOwner={view.kind === "family"} mirror={mirror} />
+      {items.length || lead ? (
+        <ClosetGrid items={items} showOwner={view.kind === "family"} mirror={mirror} lead={lead} />
       ) : (
         <div className="mt-4">
           <div className="grid grid-cols-2 gap-x-2.5 gap-y-[18px]">

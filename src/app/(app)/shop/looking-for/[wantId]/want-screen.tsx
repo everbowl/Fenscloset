@@ -51,14 +51,14 @@ export function WantScreen({ meId, want }: { meId: string; want: WantView }) {
       <div className="lg:col-start-2 lg:row-start-3">
         <p className="serif text-[26px] leading-[1.15]" data-testid="want-title">{want.text}</p>
         <p className="mono mt-1.5 text-graphite">{meta}</p>
-        {want.queries.length ? <p className="mono mt-1 text-graphite">Searching for: {want.queries.join(" · ")}</p> : null}
+        {want.queries.length ? <p className="note mt-1">Searching for: {want.queries.join(" · ")}</p> : null}
         {running ? (
           <div className="mt-4" data-testid="want-thinking" aria-live="polite">
             <p className="mono flex items-center justify-between gap-3 text-ink"><span>{s?.step ?? "Searching the stores…"}</span>{s ? <span className="shrink-0 text-graphite" aria-hidden>{secondsOf(s)}s</span> : null}</p>
-            <p className="mono mt-1 text-graphite">Usually 5 to 20 seconds. You can leave; the matches are kept here.</p>
+            <p className="note mt-1">Usually 5 to 20 seconds. You can leave; the matches are kept here.</p>
           </div>
         ) : (
-          <p className={cn("mono mt-4", justSearched ? "text-ink" : "text-graphite")} data-testid="want-checked" role={justSearched ? "status" : undefined} suppressHydrationWarning>{justSearched ? (fresh ? `✓ ${fresh} new` : "Nothing new since last time") : want.foundAt ? `Found ${ago(want.foundAt)}` : `Stores checked ${ago(want.lastSearchedAt)} · again every day`}</p>
+          <p className={cn("note mt-4", justSearched && "text-ink")} data-testid="want-checked" role={justSearched ? "status" : undefined} suppressHydrationWarning>{justSearched ? (fresh ? `✓ ${fresh} new` : "Nothing new since last time") : want.foundAt ? `Found ${ago(want.foundAt)}` : `Stores checked ${ago(want.lastSearchedAt)} · again every day`}</p>
         )}
         {undoable.pending ? <UndoStrip text={`${undoable.pending.text} · ${want.text}`} onUndo={undoable.undo} testId="want-undo" className="mt-4" /> : null}
         <div className={cn("mt-4 flex flex-wrap gap-2", undoable.pending && "hidden")}>
@@ -76,7 +76,7 @@ export function WantScreen({ meId, want }: { meId: string; want: WantView }) {
       </div>
 
       <section className="mt-6 lg:col-start-1 lg:row-start-3 lg:row-span-3 lg:mt-0" data-testid="want-matches">
-        <div className="flex items-end justify-between border-b border-ink pb-2">
+        <div className="flex flex-col gap-0.5 border-b border-ink pb-2 sm:flex-row sm:items-end sm:justify-between">
           <p className="mono text-graphite">{want.matches.length ? `${want.matches.length} ${want.matches.length === 1 ? "match" : "matches"} from ${stores} ${stores === 1 ? "store" : "stores"}` : "Matches"}</p>
           {fresh ? <p className="mono text-ink" data-testid="want-fresh">{fresh} new since you last looked</p> : null}
         </div>
@@ -101,7 +101,7 @@ export function WantScreen({ meId, want }: { meId: string; want: WantView }) {
         ) : !running ? (
           <p className="mono mt-4 text-graphite" data-testid="want-none">Nothing in the stores for this yet{want.maxPrice ? ` under $${want.maxPrice}` : ""}. The Shop keeps checking every day; tap Edit to widen the search.</p>
         ) : null}
-        {want.matches.length ? <p className="mono mt-4 text-graphite">Judge it: the Shop says buy it, maybe or skip it, and can show it on you.</p> : null}
+        {want.matches.length ? <p className="note mt-4">Judge it: the Shop says buy it, maybe or skip it, and can show it on you.</p> : null}
       </section>
 
       <WantSheet open={edit} onClose={() => setEdit(false)} title="Change it" value={want.text} onSave={(text) => void run(want.id, () => editWantAction(want.id, text))} />

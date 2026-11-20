@@ -77,7 +77,7 @@ export function ClosetTools({ basePath, filters, sort, facets, toggles, shown, t
         {sheet === "filter" ? <div data-testid="filter-sheet">
           <p className={cn("mono text-graphite transition-opacity", applying && "opacity-50")} aria-live="polite" data-testid="filter-count">{pieces}</p>
           {nothingToFilter ? (
-            <p className="mono mt-4 text-graphite">Nothing to filter yet · a piece's page is where its color, season and the rest get set</p>
+            <p className="note mt-4">Nothing to filter yet. A piece's page is where its color, season and the rest get set.</p>
           ) : null}
           {toggles.favorites || toggles.unworn || filters.favorites || filters.unworn ? (
             <Section label="Only">

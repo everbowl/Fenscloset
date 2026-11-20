@@ -57,7 +57,7 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, likely, canEdit
         {canEditLists ? <div className="pt-2"><InlineAdd kind="measurementKind" label="Add a measurement" onCreated={() => router.refresh()} /></div> : null}
         {likely ? (
           <p className="mono mt-3 text-graphite" data-testid="likely-sizes">Likely sizes from height and weight: Tops {likely.letter} · Bottoms {likely.waist} · Dresses {likely.dress}. A starting point, not a measurement; set the real ones under Brands.</p>
-        ) : !isMinor ? <p className="mono mt-3 text-graphite">Add height and weight to see likely sizes.</p> : null}
+        ) : !isMinor ? <p className="note mt-3">Add height and weight to see likely sizes.</p> : null}
       </section>
 
       {/* Sizes are edited in one place, the Brands page (Jeff, 31 Oct 2026, P1); here they are read. */}
@@ -72,7 +72,7 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, likely, canEdit
             <span className="flex-1 truncate">{s.size}{s.categoryName ? ` · ${s.categoryName}` : ""}</span>
           </div>
         ))}
-        {body.sizes.length === 0 ? <p className="mono py-3 text-graphite">No sizes yet{canEdit ? " · set them under Brands" : ""}</p> : null}
+        {body.sizes.length === 0 ? <p className="note py-3">No sizes yet{canEdit ? ". Set them under Brands." : "."}</p> : null}
       </section>
 
       <section>
@@ -86,7 +86,7 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, likely, canEdit
       <section>
         <p className="mono border-b border-ink pb-2 text-graphite">Full-body photos</p>
         {!body.photosAllowed ? (
-          <p className="mono py-3 text-graphite">Body photos need a parent&apos;s approval. A parent admin turns this on under People.</p>
+          <p className="note py-3">Body photos need a parent&apos;s approval. A parent admin turns this on under People.</p>
         ) : (
           <>
             {isMinor && body.photosApprovedBy ? <p className="mono py-2 text-graphite">Approved by {body.photosApprovedBy} · seen by {ownerFirst} and parents only</p> : null}

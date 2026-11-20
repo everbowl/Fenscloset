@@ -9,7 +9,7 @@ export default function ForgotPasswordPage() {
       <AuthHero />
       <main className="flex flex-1 flex-col gap-[22px] px-6 pb-7 pt-7">
         <div className="flex flex-col gap-1">
-          <h1 className="serif text-[34px]">Forgot your <em>password?</em></h1>
+          <h1 className="serif text-[34px]">Forgot your password?</h1>
           <p className="mono mono-11 text-graphite">We&apos;ll email you a link to pick a new one</p>
         </div>
         <ForgotForm />

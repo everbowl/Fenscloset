@@ -8,21 +8,26 @@ test.beforeAll(() => {
   execSync("npx tsx e2e/seed-closets.ts Jeff", { stdio: "ignore", env: { ...process.env, DATABASE_URL: E2E_DB, MOCK_S3: "true" } });
 });
 
-test("a top asks for a bottom, then shoes (the mannequin can wear them); the picture; other tops under it swap in and dress again", async ({ page }) => {
+test("a top offers a bottom and shoes on one panel (the mannequin can wear them); the picture; other tops under it swap in and dress again", async ({ page }) => {
   await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
   await page.goto("/closet");
   await page.getByRole("link", { name: /white tee/i }).first().click();
   await expect(page.getByTestId("see-on-me")).toContainText("See it on a mannequin"); // no body photo yet
   await page.getByTestId("see-on-me").click();
   await expect(page.getByTestId("complete-look")).toBeVisible();
-  await expect(page.getByTestId("complete-ask")).toHaveText("Add a bottom?");
   await expect(page.getByTestId("complete-chosen")).toContainText("white tee");
-  await expect(page.getByTestId("complete-skip")).toHaveText("Just the top");
-  await expect(page.getByTestId("complete-option")).toHaveCount(1); // the one pair of jeans
-  await page.getByTestId("complete-option").filter({ hasText: /dark jeans/i }).click();
-  await expect(page.getByTestId("complete-ask")).toHaveText("Add shoes?");
-  await expect(page.getByTestId("complete-skip")).toHaveText("No shoes");
-  await page.getByTestId("complete-option").filter({ hasText: /sneakers/i }).click();
+  await expect(page.getByTestId("complete-slot-bottom")).toBeVisible();
+  await expect(page.getByTestId("complete-slot-shoes")).toBeVisible();
+  await expect(page.getByTestId("complete-slot-top")).toHaveCount(0);
+  await expect(page.getByTestId("complete-picked-bottom")).toHaveText("No bottom");
+  await expect(page.getByTestId("complete-slot-bottom").getByTestId("complete-option")).toHaveCount(1); // the one pair of jeans
+  await expect(page.getByTestId("complete-go")).toContainText("See it on a mannequin");
+  await page.getByTestId("complete-slot-bottom").getByTestId("complete-option").filter({ hasText: /dark jeans/i }).click();
+  await expect(page.getByTestId("complete-picked-bottom")).toContainText("dark jeans");
+  await page.getByTestId("complete-slot-shoes").getByTestId("complete-option").filter({ hasText: /sneakers/i }).click();
+  await expect(page.getByTestId("complete-picked-shoes")).toContainText("sneakers");
+  await expect(page.getByTestId("complete-go")).toContainText(/white tee · .*dark jeans · .*sneakers/i);
+  await page.getByTestId("complete-go").click();
   await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId("mirror-pieces")).toHaveText(/white tee · .*dark jeans · .*sneakers/i);
   await expect(page.getByTestId("try-on-sheet")).toContainText("On a mannequin");
@@ -41,18 +46,23 @@ test("a top asks for a bottom, then shoes (the mannequin can wear them); the pic
   await expect(page.getByTestId("mirror-shop-go-with")).toHaveAttribute("href", /\/closet\/.+\/go-with/);
 });
 
-test("from the closet's picks a bottom asks for a top; both can be declined; the rows under the picture offer what is missing", async ({ page }) => {
+test("from the closet's picks a bottom offers a top and shoes; both can be left empty; a tap on a picked piece takes it off; the rows under the picture offer what is missing", async ({ page }) => {
   await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
   await page.goto("/closet");
   await page.getByTestId("closet-mirror").click();
   await page.getByTestId("item-card").filter({ hasText: /dark jeans/i }).click();
   await page.getByTestId("see-picked").click();
-  await expect(page.getByTestId("complete-ask")).toHaveText("Add a top?");
-  await expect(page.getByTestId("complete-option")).toHaveCount(4); // two tees, the blazer, the old parka
-  await expect(page.getByTestId("complete-skip")).toHaveText("Just the bottom");
-  await page.getByTestId("complete-skip").click();
-  await expect(page.getByTestId("complete-ask")).toHaveText("Add shoes?");
-  await page.getByTestId("complete-skip").click();
+  await expect(page.getByTestId("complete-slot-top")).toBeVisible();
+  await expect(page.getByTestId("complete-slot-top").getByTestId("complete-option")).toHaveCount(4); // two tees, the blazer, the old parka
+  await expect(page.getByTestId("complete-slot-shoes")).toBeVisible();
+  await expect(page.getByTestId("complete-picked-top")).toHaveText("No top");
+  // picked, then unpicked: the row says so and the button's line follows
+  await page.getByTestId("complete-slot-top").getByTestId("complete-option").first().click();
+  await expect(page.getByTestId("complete-picked-top")).toContainText("✓");
+  await page.getByTestId("complete-slot-top").getByTestId("complete-option").first().click();
+  await expect(page.getByTestId("complete-picked-top")).toHaveText("No top");
+  await expect(page.getByTestId("complete-go")).toContainText(/dark jeans/i);
+  await page.getByTestId("complete-go").click();
   await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId("mirror-pieces")).toHaveText(/dark jeans/i);
   await expect(page.getByTestId("mirror-row-top")).toContainText("Add a top");
@@ -62,18 +72,21 @@ test("from the closet's picks a bottom asks for a top; both can be declined; the
   await page.getByTestId("mirror-row-shoes").getByTestId("mirror-swap").first().click();
   await expect(page.getByTestId("mirror-pieces")).toHaveText(/dark jeans · .*sneakers/i, { timeout: 20_000 });
   await expect(page.getByTestId("mirror-row-shoes")).toHaveCount(0);
-  // a top and a bottom picked together ask only about shoes
+  // a top and a bottom picked together offer only shoes
   await page.keyboard.press("Escape");
   await page.getByTestId("item-card").filter({ hasText: /white tee/i }).click();
   await page.getByTestId("see-picked").click();
-  await expect(page.getByTestId("complete-ask")).toHaveText("Add shoes?");
+  await expect(page.getByTestId("complete-slot-shoes")).toBeVisible();
+  await expect(page.getByTestId("complete-slot-top")).toHaveCount(0);
+  await expect(page.getByTestId("complete-slot-bottom")).toHaveCount(0);
   await page.getByTestId("complete-option").first().click();
+  await page.getByTestId("complete-go").click();
   await expect(page.getByTestId("mirror-pieces")).toContainText("white tee", { timeout: 20_000 });
   await expect(page.getByTestId("mirror-pieces")).toContainText("dark jeans");
   await expect(page.getByTestId("mirror-pieces")).toContainText("sneakers");
 });
 
-test("on your own photo with FASHN there is no shoes question, and a line says why; a one-piece asks nothing", async ({ page }) => {
+test("on your own photo with FASHN there is no shoes row, and a line says why", async ({ page }) => {
   await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
   await page.goto("/profile/body");
   const buffer = Buffer.from(await (await import("sharp")).default({ create: { width: 300, height: 400, channels: 3, background: { r: 120, g: 110, b: 100 } } }).jpeg().toBuffer());
@@ -84,10 +97,12 @@ test("on your own photo with FASHN there is no shoes question, and a line says w
   await page.getByRole("link", { name: /white tee/i }).first().click();
   await expect(page.getByTestId("see-on-me")).toContainText("See it on me");
   await page.getByTestId("see-on-me").click();
-  await expect(page.getByTestId("complete-ask")).toHaveText("Add a bottom?");
+  await expect(page.getByTestId("complete-slot-bottom")).toBeVisible();
+  await expect(page.getByTestId("complete-slot-shoes")).toHaveCount(0); // FASHN can't place shoes on your own photo
   await expect(page.getByTestId("complete-shoes-note")).toContainText("Shoes can’t go in this picture yet");
   await page.getByTestId("complete-option").first().click();
-  await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 }); // straight to the picture: no shoes question on FASHN
+  await page.getByTestId("complete-go").click();
+  await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId("mirror-pieces")).toHaveText(/white tee · .*dark jeans/i);
   await expect(page.getByTestId("try-on-sheet")).toContainText("dressed by FASHN");
   await expect(page.getByTestId("mirror-row-shoes")).toHaveCount(0);

@@ -35,7 +35,7 @@ export function SectionPick({ personId, forName, mine, section, sections, isAdmi
     return (
       <div className={cn("border-y border-ink py-3", className)} data-testid="shop-section-ask">
         <p className="mono text-ink">Which section {mine ? "do you" : `does ${forName}`} shop in?</p>
-        <p className="mono mt-1 text-graphite">Every store search carries it, so the other section stays out.</p>
+        <p className="note mt-1">Every store search carries it, so the other section stays out.</p>
         {pills}
         {note}
         {sheet}

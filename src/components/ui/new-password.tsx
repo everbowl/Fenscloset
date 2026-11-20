@@ -21,7 +21,7 @@ export function NewPasswordField({ id = "password", name = "password", label = "
   return (
     <Field label={label} htmlFor={id} error={error}>
       <PasswordInput id={id} name={name} autoComplete="new-password" required minLength={8} value={v} onChange={(e) => setV(e.target.value)} aria-describedby={`${id}-strength`} aria-invalid={error ? true : undefined} />
-      <p id={`${id}-strength`} className={cn("mono mt-1", s.ok ? "text-ink" : "text-graphite")} aria-live="polite" data-testid="password-strength">{s.word || "At least 8 characters · tap Show to check it"}</p>
+      <p id={`${id}-strength`} className={cn("note mt-1", s.ok && "text-ink")} aria-live="polite" data-testid="password-strength">{s.word || "At least 8 characters · tap Show to check it"}</p>
     </Field>
   );
 }

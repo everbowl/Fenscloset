@@ -13,7 +13,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <AuthHero tall />
       <main className="safe-bottom flex flex-1 flex-col gap-[22px] px-6 pb-7 pt-[30px]">
         <div className="flex flex-col gap-1">
-          <h1 className="serif text-[38px]">Welcome <em>home</em></h1>
+          <h1 className="serif text-[38px]">Welcome home</h1>
           <p className="mono mono-11 text-graphite">The Fenster family wardrobe</p>
         </div>
         <LoginForm next={next} prefillEmail={isDevMode() ? DEV_ADMIN_EMAIL : undefined} />

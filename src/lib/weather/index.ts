@@ -49,15 +49,23 @@ export function conditionWord(code: number): string {
 
 /** A failed lookup is not tried again for a short while: Today renders several times at once, and each render would hit the service again. */
 const RETRY_AFTER_MS = 2 * 60 * 1000;
+/** When the service is down, a forecast this old still beats "Weather is unavailable" on Today (Railway sees Open-Meteo time out now and then). */
+const STALE_OK_MS = 24 * 60 * 60 * 1000;
 const failures = new Map<string, { at: number; error: Error }>();
 
 async function cached<T>(key: string, ttlMs: number | null, fetcher: () => Promise<T>): Promise<T> {
   const hit = await db.weatherCache.findUnique({ where: { key } });
   if (hit && (ttlMs === null || Date.now() - hit.fetchedAt.getTime() < ttlMs)) return hit.payload as T;
+  // The last good answer, when the service fails: Today keeps showing the weather it had an hour ago.
+  const stale = hit && Date.now() - hit.fetchedAt.getTime() < STALE_OK_MS ? (hit.payload as T) : null;
   const failed = failures.get(key);
-  if (failed && Date.now() - failed.at < RETRY_AFTER_MS) throw failed.error;
+  if (failed && Date.now() - failed.at < RETRY_AFTER_MS) { if (stale !== null) return stale; throw failed.error; }
   let payload: T;
-  try { payload = await fetcher(); } catch (e) { failures.set(key, { at: Date.now(), error: e as Error }); throw e; }
+  try { payload = await fetcher(); } catch (e) {
+    failures.set(key, { at: Date.now(), error: e as Error });
+    if (stale !== null) { console.error(`weather: ${(e as Error).message}; using the forecast from ${Math.round((Date.now() - hit!.fetchedAt.getTime()) / 60000)} min ago`); return stale; }
+    throw e;
+  }
   failures.delete(key);
   await db.weatherCache.upsert({ where: { key }, update: { payload: payload as object, fetchedAt: new Date() }, create: { key, payload: payload as object } });
   return payload;
@@ -93,6 +101,15 @@ type OpenMeteo = {
   daily: { temperature_2m_max: number[]; temperature_2m_min: number[] };
 };
 
+/** Open-Meteo answers in well under a second, except when it doesn't: one timed-out call is tried once more before giving up. */
+async function fetchTwice(url: string): Promise<Response> {
+  try { return await fetch(url, { signal: AbortSignal.timeout(8000) }); }
+  catch (e) {
+    if ((e as Error).name !== "TimeoutError") throw e;
+    return fetch(url, { signal: AbortSignal.timeout(8000) });
+  }
+}
+
 async function fetchForecast(c: Coords): Promise<OpenMeteo> {
   const q = new URLSearchParams({
     latitude: c.lat.toFixed(3), longitude: c.lon.toFixed(3),
@@ -101,7 +118,7 @@ async function fetchForecast(c: Coords): Promise<OpenMeteo> {
     daily: "temperature_2m_max,temperature_2m_min",
     temperature_unit: "fahrenheit", timezone: "auto", forecast_days: "2",
   });
-  const res = await fetch(`https://api.open-meteo.com/v1/forecast?${q}`, { signal: AbortSignal.timeout(8000) });
+  const res = await fetchTwice(`https://api.open-meteo.com/v1/forecast?${q}`);
   if (!res.ok) {
     console.error(`weather: Open-Meteo answered ${res.status} ${res.statusText}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
     throw new WeatherError("Weather is unavailable right now.", "unavailable");

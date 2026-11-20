@@ -42,7 +42,7 @@ export function SettingsEditor({ privacy, people, calendar }: { privacy: Privacy
       <section>
         <p className="mono border-b border-ink pb-2 text-graphite">Shopping</p>
         <Row label="Shops in" value={privacy.shopSection?.name ?? "Pick a section"} muted={!privacy.shopSection} onClick={() => setSheet("section")} testId="row-section" />
-        <p className="mono pt-2 text-graphite">Men's, Women's, Boys', Girls'… Every store search carries it, so the other section stays out.</p>
+        <p className="note pt-2">Men's, Women's, Boys', Girls'… Every store search carries it, so the other section stays out.</p>
       </section>
       <section>
         <p className="mono border-b border-ink pb-2 text-graphite">Privacy</p>
@@ -67,7 +67,7 @@ export function SettingsEditor({ privacy, people, calendar }: { privacy: Privacy
             <button type="button" role="switch" aria-checked={privacy.tryOn.enabled} disabled={!privacy.tryOn.configured} onClick={() => run(() => setTryOnEnabledAction(!privacy.tryOn.enabled))} className={`pill pill-sm shrink-0 ${privacy.tryOn.enabled ? "pill-solid" : ""}`} data-testid="tryon-toggle">{privacy.tryOn.enabled ? "On" : "Off"}</button>
           </div>
           {privacy.tryOn.enabled && !privacy.tryOn.hasBodyPhoto ? <p className="mono pt-2 text-graphite">Add a full-body photo on your <Link href="/profile/body" className="text-ink">Body page</Link> so it has something to dress</p> : null}
-          <p className="mono pt-2 text-graphite">Pictures are yours alone. Never for kids.</p>
+          <p className="note pt-2">Pictures are yours alone. Never for kids.</p>
         </section>
       ) : null}
       <section>

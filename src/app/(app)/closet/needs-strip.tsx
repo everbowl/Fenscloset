@@ -67,7 +67,7 @@ export function NeedsStrip({ personId, needs, sections, isAdmin, sizeOptions, li
         <div key={n.key} className="flex flex-col gap-2 border-t border-line py-2.5" data-testid={`need-${n.key}`}>
           <div>
             <p className="text-[15px] leading-snug">{n.title}</p>
-            <p className="mono mt-0.5 text-graphite">{n.detail}</p>
+            <p className="note mt-0.5">{n.detail}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {action(n)}

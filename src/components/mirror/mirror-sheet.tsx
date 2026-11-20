@@ -11,6 +11,8 @@ import { addBodyPhotoAction } from "@/app/(app)/profile/actions";
 import type { TryOnState, TryOnView } from "@/lib/tryon";
 import { ENGINE_WORD } from "@/lib/tryon/engines";
 import { shoesPlaceable, slotOf, SLOT_WORD, type Slot } from "@/lib/tryon/complete";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 import type { Mirror } from "./use-mirror";
 
 /**
@@ -19,6 +21,13 @@ import type { Mirror } from "./use-mirror";
  * again", and the body photo right there (Jeff, 19 Oct 2026: the mirror must never send him away to
  * fix something it needs). Shared by Today, the closet's pick mode and a piece's page.
  */
+/** The line under the panel's button: what the mirror is about to dress. */
+function completeSub(m: Mirror): string {
+  const p = m.pending!;
+  const picks = p.ask.map((s) => p.picks[s]).filter((id): id is string => Boolean(id));
+  return m.piecesOf([...p.itemIds, ...picks]).map((x) => x.name).join(" · ");
+}
+
 /** "Google, FASHN and Kling" for the line under a comparison. */
 const engineList = (v: TryOnView) => [v, ...(v.alts ?? [])].map((p) => ENGINE_WORD[p.engine ?? "google"]).join(", ").replace(/, ([^,]*)$/, " and $1");
 
@@ -77,7 +86,8 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
   const line = t && known.length && known.length === t.itemIds.length ? known.map((k) => k.name).join(" · ") : pieces;
 
   return (
-    <Sheet open={m.open} onClose={() => m.setOpen(false)} title={m.pending ? "Complete the look" : "In the mirror"}>
+    <Sheet open={m.open} onClose={() => m.setOpen(false)} title={m.pending ? "Complete the look" : "In the mirror"}
+      footer={m.pending ? <Button size="lg" shelf={false} className="w-full" sub={completeSub(m)} onClick={m.confirm} data-testid="complete-go">{m.pending.on === "me" ? "See it on me" : "See it on a mannequin"}</Button> : undefined}>
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPhoto} data-testid="mirror-body-photo" />
       {m.error ? (
         <div className="mb-3 flex flex-col gap-2">
@@ -92,7 +102,7 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
               <div className={`grid h-full gap-1 ${t.alts.length >= 2 ? "grid-cols-3" : "grid-cols-2"}`} data-testid="mirror-compare">
                 {[t, ...t.alts].map((p) => (
                   <figure key={p.id} className="flex h-full flex-col">
-                    <figcaption className="mono px-2 pt-2 text-[11px] uppercase tracking-[0.18em]">{admin ? ENGINE_WORD[p.engine ?? "google"] : `Option ${[t, ...(t.alts ?? [])].indexOf(p) + 1}`}</figcaption>
+                    <figcaption className="mono px-2 pt-2 tracking-[0.18em]">{admin ? ENGINE_WORD[p.engine ?? "google"] : `Option ${[t, ...(t.alts ?? [])].indexOf(p) + 1}`}</figcaption>
                     <img src={`/api/photo/${p.key}`} alt={admin ? `You wearing this look, by ${ENGINE_WORD[p.engine ?? "google"]}` : "You wearing this look"} className={`min-h-0 flex-1 object-contain ${m.busy ? "opacity-40" : ""}`} />
                     {/* G1: anyone keeps the column they like; the mirror shows it alone from then on. */}
                     {mine ? <button type="button" disabled={m.busy} onClick={() => void m.keep(p.id)} className="pill pill-sm mx-2 mb-2 mt-1.5" data-testid="mirror-keep">Keep this one</button> : null}
@@ -102,12 +112,12 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
             ) : t ? <img src={`/api/photo/${t.key}`} alt={t.mannequin ? "This look on a mannequin" : "You wearing this look"} className={`size-full object-contain ${m.busy ? "opacity-40" : ""}`} /> : <div className="mx-auto h-full w-[200px] py-10"><MirrorGlyph /></div>}
             {m.busy && m.progress ? (
               <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-paper/95 px-3 py-2.5" data-testid="mirror-progress" aria-live="polite">
-                <span className="mono text-[11px] uppercase tracking-[0.18em]">{m.progress.step}</span>
+                <span className="mono tracking-[0.18em]">{m.progress.step}</span>
                 <span className="mono shrink-0 text-graphite" aria-hidden>{secs}s</span>
               </div>
             ) : null}
           </div>
-          {m.busy ? <p className="mono text-graphite">Usually 20 to 60 seconds. You can leave this screen; the picture is kept and waits for you.</p> : null}
+          {m.busy ? <p className="note">Usually 20 to 60 seconds. You can leave this screen; the picture is kept and waits for you.</p> : null}
           <p className="mono text-graphite" data-testid="mirror-pieces">{line}</p>
           {t?.styling?.summary ? <p className="mono text-ink" data-testid="styling-summary">{t.styling.summary}{t.stylingFailed ? " · didn’t take this time, showing the plain try-on" : ""}</p> : null}
           {t ? <p className="mono text-ink">{t.mannequin ? `On a mannequin · No body photo used${mine ? "" : ` · ${personName}’s look`}` : t.alts?.length ? `On you${t.view === "back" ? " · from behind" : ""} · ${admin ? `${engineList(t)} side by side · pick the winner under Admin → Rules` : "side by side"} · Only you can see these pictures` : `On you${t.view === "back" ? " · from behind" : ""}${t.kept ? " · your pick" : ""}${admin && t.engine && t.engine !== "google" ? ` · dressed by ${ENGINE_WORD[t.engine]}` : ""} · Only you can see this picture`}{t.cached ? " · saved from before" : ""}</p> : null}
@@ -117,7 +127,7 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
           {t ? (
             <div className="flex items-center justify-between gap-3">
               <button type="button" disabled={m.busy} onClick={m.redo} className="pill pill-sm shrink-0" data-testid="redo-tryon" title="Throw away the saved pictures of this look and dress it from scratch">{m.busy ? "Dressing…" : "Dress again"}</button>
-              <span className="mono text-graphite">{t.kept ? "Not right? Dress again compares the engines afresh" : "Not right? Dress it from scratch"}</span>
+              <span className="note">{t.kept ? "Not right? Dress again compares the engines afresh." : "Not right? Dress it from scratch."}</span>
             </div>
           ) : null}
           {views.length ? (
@@ -133,7 +143,7 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
           {/* The body photo, right here: a plain fitted t-shirt and pants, because the model swaps the clothes it can see (swimwear gave it nothing to swap). */}
           {photoRow ? (
             <div className="flex items-center justify-between gap-3 border-t border-line pt-3" data-testid="mirror-photo-row">
-              <span className="mono text-graphite">{tryOnState === "ready" ? "Your body photo · a plain fitted t-shirt and pants work best" : "See it on you · add a full-body photo in a plain fitted t-shirt and pants"}</span>
+              <span className="note">{tryOnState === "ready" ? "Your body photo. A plain fitted t-shirt and pants work best." : "See it on you: add a full-body photo in a plain fitted t-shirt and pants."}</span>
               <button type="button" disabled={m.busy || saving} onClick={() => fileRef.current?.click()} className="pill pill-sm shrink-0" data-testid="retake-body-photo">{saving ? "Saving…" : tryOnState === "ready" ? "Retake" : "Add photo"}</button>
             </div>
           ) : null}
@@ -162,40 +172,59 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
   );
 }
 
-const TAG = "mono absolute left-1 top-1 bg-ink px-1 py-0.5 text-[10px] text-paper";
+const TAG = "mono absolute left-1 top-1 bg-ink px-1 py-0.5 text-[11px] text-paper";
 
 /**
- * Before the mirror dresses a piece from the closet (Jeff, 24 Oct 2026): "Add a bottom?" for a top, "Add a top?" for a
- * bottom, "Add shoes?" when the picture can show them; the closet's pieces for that slot as thumbnails, the Shop's
- * suggestions first, and a way to go without. The last answer dresses the look.
+ * Before the mirror dresses a piece from the closet (Jeff, 24 Oct 2026): what would complete the look, every slot on one
+ * panel (Jeff, 20 Nov 2026: one question at a time read as "it only asked about bottoms"). A bottom for a top, a top for
+ * a bottom, shoes when the picture can show them; the closet's pieces for each slot as thumbnails, the Shop's suggestions
+ * first; every row optional. The one button at the bottom dresses it.
  */
 function CompletePanel({ m }: { m: Mirror }) {
   const p = m.pending!;
   const chosen = m.piecesOf(p.itemIds);
-  const slot = p.ask[0];
-  const options = m.options(slot, p.itemIds);
-  const next = p.ask.slice(1);
   const shoesLeftOut = !shoesPlaceable(p.on, m.engine) && m.wardrobe.pieces.some((x) => slotOf(x.category) === "shoes");
   return (
-    <div className="flex flex-col gap-3" data-testid="complete-look">
-      <p className="mono text-graphite" data-testid="complete-chosen">{chosen.map((c) => c.name).join(" · ")}</p>
-      <p className="serif text-[28px] leading-none" data-testid="complete-ask">{SLOT_WORD[slot].ask}</p>
-      <div className="-mx-5 flex gap-2.5 overflow-x-auto px-5 pb-1">
-        {options.map((o) => (
-          <button key={o.id} type="button" onClick={() => m.choose(o)} className="w-[96px] shrink-0 text-left" data-testid="complete-option" aria-label={o.name}>
-            <span className="relative block h-[128px] overflow-hidden bg-bone">
-              {o.thumbKey ? <img src={`/api/photo/${o.thumbKey}`} alt="" className="size-full object-cover" /> : null}
-              {o.suggested ? <span className={TAG}>Goes with it</span> : o.isFavorite ? <span className={TAG}>Favorite</span> : null}
-            </span>
-            <span className="mt-1 block truncate text-[12px] font-medium">{o.name}</span>
-          </button>
-        ))}
+    <div className="flex flex-col gap-5" data-testid="complete-look">
+      <div className="flex items-center gap-3">
+        <span className="flex shrink-0 gap-1">
+          {chosen.slice(0, 3).map((c) => <span key={c.id} className="block h-[64px] w-[48px] overflow-hidden bg-bone">{c.thumbKey ? <img src={`/api/photo/${c.thumbKey}`} alt="" className="size-full object-cover" /> : null}</span>)}
+        </span>
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="mono text-graphite">Starting with</span>
+          <span className="text-[15px] leading-snug" data-testid="complete-chosen">{chosen.map((c) => c.name).join(" · ")}</span>
+        </span>
       </div>
-      <div className="flex items-center justify-between gap-3">
-        <button type="button" onClick={() => m.choose(null)} className="pill pill-sm shrink-0" data-testid="complete-skip">{SLOT_WORD[slot].skip(chosen)}</button>
-        <span className="mono text-right text-graphite">{next.length ? `Then: ${next.map((s) => (s === "shoes" ? "shoes" : `a ${s}`)).join(", ")}` : p.on === "me" ? "Then the mirror dresses you" : "Then the mannequin wears it"}</span>
-      </div>
-      {shoesLeftOut ? <p className="mono text-graphite" data-testid="complete-shoes-note">Shoes can’t go in this picture yet. The mannequin can show them.</p> : null}
+      <p className="note text-ink">Tap what goes with it. Every row is optional: leave it empty and the mirror dresses what you picked.</p>
+      {p.ask.map((slot) => {
+        const options = m.options(slot, p.itemIds);
+        const pickedId = p.picks[slot] ?? null;
+        const picked = pickedId ? m.piecesOf([pickedId])[0] : null;
+        return (
+          <div key={slot} data-testid={`complete-slot-${slot}`}>
+            <div className="flex items-baseline justify-between gap-3 border-b border-ink pb-1.5">
+              <span className="mono text-ink">{SLOT_WORD[slot].label}</span>
+              <span className={cn("mono truncate", picked ? "text-ink" : "text-graphite")} data-testid={`complete-picked-${slot}`}>{picked ? `✓ ${picked.name}` : SLOT_WORD[slot].none}</span>
+            </div>
+            <div className="-mx-5 mt-2.5 flex gap-2.5 overflow-x-auto px-5 pb-1">
+              {options.map((o) => {
+                const on = o.id === pickedId;
+                return (
+                  <button key={o.id} type="button" aria-pressed={on} onClick={() => m.pick(slot, o)} className={cn("w-[96px] shrink-0 text-left", on && "outline outline-2 -outline-offset-2 outline-ink")} data-testid="complete-option" aria-label={o.name}>
+                    <span className="relative block h-[128px] overflow-hidden bg-bone">
+                      {o.thumbKey ? <img src={`/api/photo/${o.thumbKey}`} alt="" className="size-full object-cover" /> : null}
+                      {o.suggested ? <span className={TAG}>Goes with</span> : o.isFavorite ? <span className={TAG}>Favorite</span> : null}
+                      {on ? <span className="mono absolute bottom-1 right-1 flex size-6 items-center justify-center bg-ink text-paper" aria-hidden>✓</span> : null}
+                    </span>
+                    <span className="mt-1 block truncate text-[12px] font-medium">{o.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+      {shoesLeftOut ? <p className="note" data-testid="complete-shoes-note">Shoes can’t go in this picture yet. The mannequin can show them.</p> : null}
     </div>
   );
 }
@@ -223,7 +252,7 @@ function GoWithRows({ m }: { m: Mirror }) {
   if (!filled.length) return null;
   return (
     <div className="flex flex-col gap-4 border-t border-line pt-3" data-testid="mirror-go-with">
-      <p className="mono text-graphite">To go with it · tap a piece and the mirror dresses it again</p>
+      <p className="note">To go with it: tap a piece and the mirror dresses it again.</p>
       {filled.map((r) => (
         <div key={r.slot} data-testid={`mirror-row-${r.slot}`}>
           <p className="mono text-ink">{r.title}</p>
@@ -232,7 +261,7 @@ function GoWithRows({ m }: { m: Mirror }) {
               <button key={o.id} type="button" disabled={m.busy} onClick={() => m.swap(o)} className="w-[84px] shrink-0 text-left" data-testid="mirror-swap" aria-label={o.name}>
                 <span className="relative block h-[112px] overflow-hidden bg-bone">
                   {o.thumbKey ? <img src={`/api/photo/${o.thumbKey}`} alt="" className="size-full object-cover" /> : null}
-                  {o.suggested ? <span className={TAG}>Goes with it</span> : o.isFavorite ? <span className={TAG}>Favorite</span> : null}
+                  {o.suggested ? <span className={TAG}>Goes with</span> : o.isFavorite ? <span className={TAG}>Favorite</span> : null}
                 </span>
                 <span className="mt-1 block truncate text-[12px]">{o.name}</span>
               </button>

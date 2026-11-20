@@ -70,7 +70,7 @@ test.describe("closet", () => {
     await expect(page.getByTestId("pick-bar")).toContainText("2 picked");
     await page.getByTestId("see-picked").click();
     // the mirror may first ask to complete the look (shoes…); e2e/mirror-complete.spec.ts covers the asking
-    while (await page.getByTestId("complete-skip").isVisible()) await page.getByTestId("complete-skip").click();
+    if (await page.getByTestId("complete-go").isVisible()) await page.getByTestId("complete-go").click(); // the panel: nothing picked, just the piece
     await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole("dialog")).toContainText("White crew tee · Dark jeans");
     await expect(page.getByTestId("try-on-sheet")).toContainText("No body photo used");
@@ -80,7 +80,7 @@ test.describe("closet", () => {
     await page.getByTestId("pick-cancel").click();
     await page.getByTestId("item-card").filter({ hasText: "White crew tee" }).click();
     await page.getByTestId("see-on-me").click();
-    while (await page.getByTestId("complete-skip").isVisible()) await page.getByTestId("complete-skip").click();
+    if (await page.getByTestId("complete-go").isVisible()) await page.getByTestId("complete-go").click(); // the panel: nothing picked, just the piece
     await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole("dialog")).toContainText("White crew tee");
   });

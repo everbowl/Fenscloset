@@ -46,13 +46,11 @@ export function LookScreen({ look, meId, tryOn, mannequin, backPhoto, engine, ad
     setBusy(key);
     start(async () => { const r = await fn(); setBusy(null); if (!r.ok) { toast.error(r.error ?? "Something went wrong."); return; } then?.(); router.refresh(); });
   };
-  const words = (look.name ?? "New look").trim().split(" ");
-  const last = words.pop() ?? "";
 
   return (
     <div data-testid="look" className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-14">
       <div className="lg:col-span-2">
-        <PageHeader eyebrow={<span className="text-graphite" data-testid="look-eyebrow">{mine ? "My look" : `${look.personName}’s look`}{saved ? " · saved under Fits" : " · not saved yet"}</span>} title={words.join(" ")} accent={last} />
+        <PageHeader eyebrow={<span className="text-graphite" data-testid="look-eyebrow">{mine ? "My look" : `${look.personName}’s look`}{saved ? " · saved under Fits" : " · not saved yet"}</span>} title={(look.name ?? "New look").trim()} />
       </div>
 
       <section className="lg:col-start-1" data-testid="look-pieces">
@@ -68,11 +66,11 @@ export function LookScreen({ look, meId, tryOn, mannequin, backPhoto, engine, ad
             {p.kind === "store" && p.url ? <a href={p.url} target="_blank" rel="noreferrer" className="pill pill-sm shrink-0" aria-label={`Buy ${p.name}`}>Buy ↗</a> : null}
             {look.canEdit ? <button type="button" onClick={() => run(`rm-${p.id}`, () => removePieceAction(look.id, p.id))} disabled={busy !== null} className="flex size-11 shrink-0 items-center justify-center text-[22px] leading-none text-graphite" aria-label={`Take out ${p.name}`} data-testid="look-remove">×</button> : null}
           </div>
-        )) : <p className="mono py-6 text-graphite" data-testid="look-empty">Nothing in this look yet. Tap ADD TO A LOOK on a store find, or add from the closet.</p>}
+        )) : <p className="note py-6" data-testid="look-empty">Nothing in this look yet. Tap Add to a look on a store find, or add from the closet.</p>}
         <p className="mono mt-2 text-graphite" data-testid="look-line">
           {look.pieces.length} of {MAX_LOOK_PIECES}{look.toBuy ? ` · ${look.toBuy} to buy${look.total !== null ? ` · about $${look.total}` : ""}` : ""}
         </p>
-        {look.pieces.length > 3 ? <p className="mono mt-1 text-graphite">The mirror dresses up to three of them: a top, a bottom, shoes. The rest stay on the list.</p> : null}
+        {look.pieces.length > 3 ? <p className="note mt-1">The mirror dresses up to three of them: a top, a bottom, shoes. The rest stay on the list.</p> : null}
       </section>
 
       <aside className="mt-6 flex flex-col gap-2 lg:col-start-2 lg:mt-0">
@@ -83,7 +81,7 @@ export function LookScreen({ look, meId, tryOn, mannequin, backPhoto, engine, ad
         ) : null}
         {look.canEdit ? <button type="button" onClick={() => { setPicked([]); setSheet("closet"); }} className="pill h-[50px] w-full" data-testid="look-add-closet">Add from {mine ? "my" : `${look.personName}’s`} closet</button> : null}
         {look.canEdit ? <button type="button" onClick={() => setSheet("name")} className="pill h-[50px] w-full" data-testid={saved ? "look-rename" : "look-save"}>{saved ? "Rename" : "Name and save"}</button> : null}
-        {saved ? <Link href="/fits" className="mono text-graphite underline underline-offset-4">All looks under Fits</Link> : <p className="mono text-graphite">Saved looks live under Fits → Looks.</p>}
+        {saved ? <Link href="/fits" className="mono text-graphite underline underline-offset-4">All looks under Fits</Link> : <p className="note">Saved looks live under Fits → Looks.</p>}
         {look.canEdit ? <button type="button" onClick={() => setSheet("remove")} className="pill pill-sm pill-quiet self-start" data-testid="look-delete">{saved ? "Remove look" : "Start over"}</button> : null}
       </aside>
 

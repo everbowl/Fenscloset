@@ -244,7 +244,7 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
           {added === 0 ? <Button size="lg" onClick={add} disabled={pending || !total} sub={total ? `${chosen.length} ${chosen.length === 1 ? "color" : "colors"}${sizeAll ? ` · size ${sizeAll}` : ""}` : "Tap + on a color first"} data-testid="add-to-closet">{busy === "add" ? "Adding…" : `Add ${total || ""} to closet`.replace("  ", " ")}</Button> : null}
           {added > 0 ? (
             <div className="flex items-center justify-between border-y border-ink py-2.5" data-testid="added-strip">
-              <span className="flex flex-col"><span className="mono tracking-[0.1em]">{added} added to the closet</span><span className="mono text-graphite">Tagging takes a few seconds each · same color and size become one card</span></span>
+              <span className="flex flex-col"><span className="mono tracking-[0.1em]">{added} added to the closet</span><span className="note">Tagging takes a few seconds each. The same color and size become one card. Watch them land in the closet.</span></span>
               <div className="flex gap-4"><button type="button" onClick={again} className="pill" data-testid="add-another-color">More of this</button><Link href="/closet" className="pill pill-solid" data-testid="check-it">See closet →</Link></div>
             </div>
           ) : null}
@@ -328,7 +328,7 @@ function ReceiptTab() {
   return (
     <div className="mt-5 flex flex-col gap-5">
       <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onFiles} data-testid="receipt-file" />
-      <p className="mono text-graphite">Screenshots of order emails or photos of paper receipts, as many as you like. Each is read once and deleted; only the pieces and prices are kept.</p>
+      <p className="note">Screenshots of order emails or photos of paper receipts, as many as you like. Each is read once and deleted; only the pieces and prices are kept.</p>
       <Button size="lg" onClick={() => fileRef.current?.click()} disabled={busy === "add"} sub={groups.length ? "Add more receipts" : "Pick several at once"} data-testid="pick-receipt">Upload receipts</Button>
       {reading ? <p className="mono text-ink" role="status" data-testid="receipt-progress">Reading {groups.length - reading + 1} of {groups.length} receipts…</p> : null}
       {error ? <Banner tone="danger" title={error} /> : null}
@@ -362,7 +362,7 @@ function ReceiptTab() {
           ))}
           {done ? (
             <div className="flex items-center justify-between border-y border-ink py-2.5" data-testid="added-strip">
-              <span className="flex flex-col"><span className="mono tracking-[0.1em]">{done.count} added to the closet{done.skipped ? ` · ${done.skipped} skipped` : ""}</span><span className="mono text-graphite">Tagging takes a few seconds each</span></span>
+              <span className="flex flex-col"><span className="mono tracking-[0.1em]">{done.count} added to the closet{done.skipped ? ` · ${done.skipped} skipped` : ""}</span><span className="note">Tagging takes a few seconds each. Watch them land in the closet.</span></span>
               <Link href="/closet" className="pill pill-solid" data-testid="check-it">See closet →</Link>
             </div>
           ) : (

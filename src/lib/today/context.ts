@@ -40,7 +40,7 @@ export async function loadTodayContext(viewer: Viewer, personId: string, now = n
     if (!weather && person.savedZip) weather = await getWeather(await geocodeZip(person.savedZip), now);
     if (!weather) weatherNote = "none";
   } catch (e) {
-    console.error("weather", e);
+    console.error(`weather: ${(e as Error).message}`); // one line, not the whole error table
     weatherNote = "failed";
   }
   const [plan, checkIn] = await Promise.all([getPlan(personId, date, tz, now), getCheckIn(viewer, personId, date)]);

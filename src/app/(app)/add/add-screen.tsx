@@ -70,11 +70,11 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
             <button type="button" aria-label="Take a photo" className="flex w-[64px] shrink-0 items-center justify-center rounded-full border-2 border-ink bg-paper text-ink active:bg-bone lg:hidden" onClick={() => cameraRef.current?.click()}><CameraIcon /></button>
           </div>
           <Link href="/add/store?tab=link" className="flex min-h-[64px] w-full items-center justify-between border border-ink px-5 text-left" data-testid="add-by-link">
-            <span><span className="mono block text-[12px] uppercase tracking-[0.16em]">From a store link</span><span className="mono mt-1 block text-[11px] text-graphite">Paste the product page · how many in each color and size, or say it in words</span></span>
+            <span><span className="mono block text-[12px] uppercase tracking-[0.16em]">From a store link</span><span className="note mt-1 block">Paste the product page. Say how many in each color and size, or tell it in words.</span></span>
             <span className="mono">→</span>
           </Link>
           <Link href="/add/store?tab=receipt" className="flex min-h-[64px] w-full items-center justify-between border border-ink px-5 text-left" data-testid="add-by-receipt">
-            <span><span className="mono block text-[12px] uppercase tracking-[0.16em]">From a receipt</span><span className="mono mt-1 block text-[11px] text-graphite">Receipts or order emails, as many as you like · the stores' own photos</span></span>
+            <span><span className="mono block text-[12px] uppercase tracking-[0.16em]">From a receipt</span><span className="note mt-1 block">Receipts or order emails, as many as you like. The stores' own photos.</span></span>
             <span className="mono">→</span>
           </Link>
         </div>
@@ -91,7 +91,7 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
       <div {...drop} className={`relative h-[300px] bg-bone ${over ? "outline outline-2 -outline-offset-4 outline-dashed outline-ink" : ""}`}>
         <div className="flex h-full flex-col items-center justify-center gap-2.5 px-6 text-center">
           <span className="mono mono-11" aria-live="polite">{upload.pending > 0 ? `Uploading · ${upload.pending} left` : working > 0 ? `Tagging · ${working} left` : ready > 0 ? `${ready} ready to confirm` : "All done"}</span>
-          <span className="mono text-graphite">{ready > 0 && working > 0 ? `${working} still tagging · start confirming` : working > 0 || upload.pending > 0 ? "Keep this open or come back later" : ready > 0 ? "One tap each" : "Nothing waiting"}</span>
+          <span className="note">{ready > 0 && working > 0 ? `${working} still tagging. Start confirming.` : working > 0 || upload.pending > 0 ? "Keep this open or come back later." : ready > 0 ? "One tap each." : "Nothing waiting."}</span>
         </div>
         <div className="absolute inset-x-0 bottom-0 h-[3px] bg-black/[0.12]"><div className="h-[3px] bg-ink transition-[width] duration-150" style={{ width: `${progress}%` }} /></div>
       </div>
@@ -132,7 +132,7 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
         </button>
         <button type="button" aria-label="Take a photo" className="flex size-[60px] shrink-0 items-center justify-center rounded-full border-2 border-ink bg-paper text-ink active:bg-bone lg:hidden" onClick={() => cameraRef.current?.click()}><CameraIcon /></button>
       </div>
-      <p className="mono mt-4 text-center text-graphite">Progress is saved · you can leave and come back</p>
+      <p className="note mt-4 text-center">Progress is saved. You can leave and come back.</p>
       <div className="mt-5 border-t border-ink pt-4" data-testid="add-from-store">
           <p className="mono text-graphite">Or add from a store</p>
           <div className="mt-2 grid grid-cols-2 gap-2">

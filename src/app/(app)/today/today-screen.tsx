@@ -208,16 +208,17 @@ export function TodayScreen(p: Props) {
             <span className="mono text-ink" data-testid="weather-date">{p.dateLabel}</span>
             <span className="flex items-baseline gap-1"><span className="serif text-[40px] leading-none">{p.weather.nowF}°</span><span className="mono">now</span></span>
           </span>
-          <span className="flex flex-1 flex-col justify-center gap-0.5 px-4 py-2">
-            <span className="text-[16px] font-medium">{p.weather.condition} · {p.weather.tonightF}° tonight</span>
-            <span className="mono">High {p.weather.highF}° · Low {p.weather.lowF}°{p.weather.rainChance >= 20 ? ` · Rain ${p.weather.rainChance}%` : " · No rain"}</span>
+          <span className="flex min-w-0 flex-1 flex-col justify-center gap-1 px-4 py-2">
+            <span className="text-[16px] font-medium leading-snug">{p.weather.condition} · {p.weather.tonightF}° tonight</span>
+            <span className="mono">High {p.weather.highF}° · Low {p.weather.lowF}°</span>
+            <span className="mono">{p.weather.rainChance >= 20 ? `Rain ${p.weather.rainChance}%` : "No rain"}{p.canDress ? <span className="text-graphite"> · {p.savedZip ?? "Set a zip"} ›</span> : null}</span>
           </span>
-          {p.canDress ? <span className="mono flex items-center px-3 text-ink">{p.savedZip ?? "Zip"} ›</span> : null}
         </WeatherBlock>
       ) : null}
       {p.weatherNote && p.canDress ? (
-        <div className="mb-4 flex flex-col gap-2.5 border-y border-ink py-3 lg:col-start-2">
-          <span className="mono">{p.weatherNote === "failed" ? "Weather is unavailable right now" : "Where are you today?"}</span>
+        <div className="mb-4 flex flex-col gap-2.5 border-y border-ink py-3 lg:col-start-2" data-testid="weather-note">
+          <span className="text-[16px] font-medium">{p.weatherNote === "failed" ? "The weather didn’t load." : "Where are you today?"}</span>
+          <span className="note">{p.weatherNote === "failed" ? "The looks are built without it this time. It is tried again in a couple of minutes, or set another zip." : "The looks follow the weather where you are."}</span>
           <span className="flex flex-wrap gap-2">
             {p.weatherNote === "none" ? <button type="button" onClick={askLocation} disabled={busy === "location"} className="pill pill-sm">{busy === "location" ? "Finding…" : "Use my location"}</button> : null}
             <button type="button" onClick={() => setSheet("zip")} className="pill pill-sm" data-testid="enter-zip">{p.savedZip ? "Change zip" : "Enter zip"}</button>
@@ -233,7 +234,7 @@ export function TodayScreen(p: Props) {
             </div>
             {busy === "regen" ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-paper/70" data-testid="refreshing">
-                <span className="mono mono-11 bg-paper px-3 py-2" aria-live="polite">{slow ? "Taking longer than usual" : "Building fresh looks"}<span aria-hidden> · {buildSecs}s</span></span>
+                <span className="mono mono-11 bg-paper px-3 py-2" aria-live="polite">{slow ? "Taking longer than usual" : "Building fresh looks"}<span aria-hidden className="text-graphite"> · {buildSecs}s</span></span>
                 {slow ? <button type="button" onClick={() => buildLooks("regen", () => regenerateAction(p.personId))} className="pill pill-sm" data-testid="build-retry">Try again</button> : null}
               </div>
             ) : null}
@@ -257,7 +258,7 @@ export function TodayScreen(p: Props) {
             <div className="mt-4 flex flex-col gap-2 lg:col-start-2">
               {worn && !flashWorn ? (
                 <div className="flex min-h-[60px] items-center justify-between gap-3 border-y border-ink bg-bone px-4 py-3" data-testid="wearing-this">
-                  <span className="flex min-w-0 flex-col gap-0.5"><span className="mono text-[13px] uppercase tracking-[0.18em]">✓ Wearing this</span><span className="mono text-graphite">On {whose} Fits calendar</span></span>
+                  <span className="flex min-w-0 flex-col gap-0.5"><span className="mono mono-11 tracking-[0.18em]">✓ Wearing this</span><span className="note">On {whose} Fits calendar</span></span>
                   <span className="flex shrink-0 gap-1.5">
                     <Link href="/fits" className="pill pill-sm" data-testid="see-fits">See Fits</Link>
                     <button type="button" disabled={busy !== null} onClick={() => run("unwear", () => deleteFitAction(board!.wornFitId!))} className="pill pill-sm pill-quiet" data-testid="unwear">Undo</button>
@@ -281,32 +282,40 @@ export function TodayScreen(p: Props) {
                   {m.tryOn ? <img src={`/api/photo/${m.tryOn.key}`} alt="" className="size-full object-cover" /> : <MirrorGlyph />}
                 </span>
                 <span className="flex flex-col gap-1">
-                  <span className="mono text-[13px] uppercase tracking-[0.18em] text-ink">{m.busy ? "Dressing…" : "Look in the mirror"}</span>
+                  <span className="mono mono-11 tracking-[0.18em] text-ink">{m.busy ? "Dressing…" : "Look in the mirror"}</span>
                   <span className="text-[15px] leading-snug">{p.tryOn === "ready" ? "This look on you." : `This look on a mannequin${p.mine ? "" : ` for ${p.personName}`}.`}</span>
                   <span className="mono text-ink">Tap to see it →</span>
                 </span>
               </button>
               {p.tryOn === "off" ? (
-                <Link href="/profile/settings" className="mono mt-2 flex h-[42px] items-center justify-between border-b border-ink text-ink" data-testid="try-on-off"><span>Want the mirror to show you? Turn on try-on</span><span>→</span></Link>
+                <Link href="/profile/settings" className="mt-2 flex min-h-[44px] items-center justify-between gap-3 border-b border-ink text-[15px] text-ink" data-testid="try-on-off"><span>Want the mirror to show you? Turn on try-on</span><span aria-hidden>→</span></Link>
               ) : p.tryOn === "no_photo" ? (
-                <Link href="/profile/body" className="mono mt-2 flex h-[42px] items-center justify-between border-b border-ink text-ink" data-testid="try-on-photo"><span>Want the mirror to show you? Add a body photo</span><span>→</span></Link>
+                <Link href="/profile/body" className="mt-2 flex min-h-[44px] items-center justify-between gap-3 border-b border-ink text-[15px] text-ink" data-testid="try-on-photo"><span>Want the mirror to show you? Add a body photo</span><span aria-hidden>→</span></Link>
               ) : null}
             </div>
           ) : null}
         </>
       ) : (
         <>
-          <div className="grid grid-cols-2 grid-rows-[196px_196px] gap-1.5 lg:col-start-1 lg:row-start-1 lg:row-span-6 lg:grid-rows-[200px_200px]">
+          {/* Before the first looks: the board's shape, breathing while they build (Jeff, 20 Nov 2026: four empty boxes and an italic line said nothing). */}
+          <div className={cn("grid grid-cols-2 grid-rows-[196px_196px] gap-1.5 lg:col-start-1 lg:row-start-1 lg:row-span-6 lg:grid-rows-[200px_200px]", busy === "regen" && "animate-pulse")} aria-hidden>
             <div className="row-span-2 bg-bone" /><div className="bg-bone" />
             <div className="grid grid-cols-2 gap-1.5"><div className="bg-bone" /><div className="bg-bone" /></div>
           </div>
-          <div className="mt-3.5 flex flex-col gap-1 lg:col-start-2 lg:mt-0">
-            <p className="mono text-graphite">{busy === "regen" ? "Building" : "No looks yet"}</p>
-            <p className="serif text-[21px] italic leading-[1.3]">
-              {busy === "regen" ? "Three looks for today are on their way. About half a minute." : p.enoughClothes ? (p.canDress ? "Something went wrong building today’s looks." : `${p.personName} hasn’t opened Today yet.`) : p.mine ? "Add clothes with the + button and your first three looks will appear here." : `${p.personName}’s closet needs a few more pieces first.`}
-            </p>
-            {busy === "regen" ? <p className="mono text-graphite" data-testid="refreshing">Building today’s looks…</p> : null}
-            {!p.enoughClothes && p.mine && busy !== "regen" ? <Link href="/add" className="pill mt-3 self-start" data-testid="empty-add-clothes">+ Add clothes</Link> : null}
+          <div className="mt-3.5 flex flex-col gap-2 lg:col-start-2 lg:mt-0">
+            {busy === "regen" ? (
+              <>
+                <p className="mono text-ink" aria-live="polite" data-testid="refreshing">{slow ? "Taking longer than usual" : `Building ${p.evening ? "tonight’s" : "today’s"} looks`}<span aria-hidden className="text-graphite"> · {buildSecs}s</span></p>
+                <p className="note">Three looks, picked for the weather and the plan. About half a minute. You can leave; they will be here when you come back.</p>
+                {slow ? <button type="button" onClick={() => buildLooks("regen", () => regenerateAction(p.personId))} className="pill self-start" data-testid="build-retry">Try again</button> : null}
+              </>
+            ) : (
+              <>
+                <p className="serif text-[26px] leading-tight">No looks yet</p>
+                <p className="note">{p.enoughClothes ? (p.canDress ? "Something went wrong building today’s looks." : `${p.personName} hasn’t opened Today yet.`) : p.mine ? "Add clothes with the + button and your first three looks will appear here." : `${p.personName}’s closet needs a few more pieces first.`}</p>
+                {!p.enoughClothes && p.mine ? <Link href="/add" className="pill mt-2 self-start" data-testid="empty-add-clothes">+ Add clothes</Link> : null}
+              </>
+            )}
           </div>
           {p.enoughClothes && p.canDress && busy !== "regen" ? <Button variant="secondary" className="mt-4 w-full lg:col-start-2" disabled={busy !== null} onClick={() => buildLooks("regen", () => regenerateAction(p.personId))}>Try again</Button> : null}
         </>
@@ -334,8 +343,8 @@ export function TodayScreen(p: Props) {
 
       <Link href="/today/together" className="mt-[18px] flex items-center justify-between border border-ink px-4 py-3.5 hover:bg-bone lg:col-start-2" data-testid="together-link">
         <span className="flex flex-col gap-0.5">
-          <span className="serif text-[22px]">Going out <em>together?</em></span>
-          <span className="mono text-ink">Dress two or more people · Coordinate, Match or Contrast</span>
+          <span className="serif text-[22px]">Going out together?</span>
+          <span className="note text-ink">Dress two or more people. Coordinate, match or contrast.</span>
         </span>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden><path d="M4 12h16M14 6l6 6-6 6" /></svg>
       </Link>
@@ -343,8 +352,8 @@ export function TodayScreen(p: Props) {
       {p.lookingForNew > 0 ? (
         <Link href={`/shop/looking-for?for=${p.personId}`} className="mt-3 flex items-center justify-between border border-ink px-4 py-3.5 hover:bg-bone lg:col-start-2" data-testid="looking-for-strip">
           <span className="flex flex-col gap-0.5">
-            <span className="serif text-[22px]">Something <em>turned up</em></span>
-            <span className="mono text-ink">{p.lookingForNew} new {p.lookingForNew === 1 ? "match" : "matches"} for what {p.mine ? "you’re" : `${p.personName} is`} looking for</span>
+            <span className="serif text-[22px]">Something turned up</span>
+            <span className="note text-ink">{p.lookingForNew} new {p.lookingForNew === 1 ? "match" : "matches"} for what {p.mine ? "you’re" : `${p.personName} is`} looking for</span>
           </span>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden><path d="M4 12h16M14 6l6 6-6 6" /></svg>
         </Link>
@@ -353,8 +362,8 @@ export function TodayScreen(p: Props) {
       {p.cleanOutCount > 0 && p.canDress ? (
         <Link href="/closet/clean-out?from=today" className="mt-3 flex items-center justify-between border border-ink px-4 py-3.5 hover:bg-bone lg:col-start-2" data-testid="clean-out-link">
           <span className="flex flex-col gap-0.5">
-            <span className="serif text-[22px]">Time for a <em>clean-out?</em></span>
-            <span className="mono text-ink">{p.cleanOutCount} {p.cleanOutCount === 1 ? "piece" : "pieces"} not worn in a while</span>
+            <span className="serif text-[22px]">Time for a clean-out?</span>
+            <span className="note text-ink">{p.cleanOutCount} {p.cleanOutCount === 1 ? "piece" : "pieces"} not worn in a while</span>
           </span>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden><path d="M4 12h16M14 6l6 6-6 6" /></svg>
         </Link>
@@ -379,7 +388,7 @@ export function TodayScreen(p: Props) {
 
       {/* Swap: tap the piece to replace. */}
       <Sheet open={sheet === "swap"} onClose={() => setSheet(null)} title="Change a piece">
-        <p className="mono mb-2 text-graphite">Swap it for another, or take it off the look.</p>
+        <p className="note mb-2">Swap it for another, or take it off the look.</p>
         <div className="flex flex-col">
           {board?.pieces.map((x) => (
             <div key={x.id} className="flex h-12 items-center gap-3 border-b border-line">

@@ -32,17 +32,18 @@ export function Sheet({ open, onClose, title, children, footer }: { open: boolea
       // The native close event also fires when we close programmatically; only report user dismissals (Esc).
       onClose={() => { if (openRef.current) onClose(); }}
       onClick={(e) => { if (e.target === ref.current) onClose(); }}
-      className="sheet m-0 h-auto max-h-[90dvh] w-full max-w-none self-end justify-self-center bg-paper text-ink sm:max-w-[420px] sm:self-center sm:border sm:border-ink"
+      className="sheet m-0 h-auto max-h-[90dvh] w-full max-w-none flex-col self-end justify-self-center bg-paper text-ink open:flex sm:max-w-[420px] sm:self-center sm:border sm:border-ink"
     >
-      <div aria-hidden className="mx-auto mt-2 h-1 w-9 bg-graphite/60 sm:hidden" />
-      <div className="flex h-14 items-center justify-between border-b border-ink px-5">
+      <div aria-hidden className="mx-auto mt-2 h-1 w-9 shrink-0 bg-graphite/60 sm:hidden" />
+      <div className="flex h-14 shrink-0 items-center justify-between border-b border-ink px-5">
         <h2 id={titleId} className="serif text-[24px]">{title}</h2>
         <button type="button" onClick={onClose} aria-label="Close" className="-mr-3 flex size-11 items-center justify-center active:text-graphite">
           <X className="size-[18px]" strokeWidth={1.6} />
         </button>
       </div>
-      <div className={footer ? "max-h-[calc(90dvh-3.5rem-4.5rem)] overflow-y-auto px-5 py-5" : "safe-bottom max-h-[calc(90dvh-3.5rem)] overflow-y-auto px-5 py-5"}>{children}</div>
-      {footer ? <div className="safe-bottom border-t border-line bg-paper px-5 py-3">{footer}</div> : null}
+      {/* The body takes what is left of the 90dvh and scrolls; the header and the footer (the one button that matters) always stay in view. */}
+      <div className={footer ? "min-h-0 flex-1 overflow-y-auto px-5 py-5" : "safe-bottom min-h-0 flex-1 overflow-y-auto px-5 py-5"}>{children}</div>
+      {footer ? <div className="safe-bottom shrink-0 border-t border-line bg-paper px-5 py-3">{footer}</div> : null}
     </dialog>
   );
 }

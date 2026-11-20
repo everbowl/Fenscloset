@@ -22,7 +22,7 @@ export function TasteMemory({ ownerId, lines, canEdit }: { ownerId: string; line
         {canEdit && shown.length ? <button type="button" disabled={pending} onClick={() => { setHidden(["all"]); undoable.start("Forgotten · everything it learned", () => forget(), () => setHidden([])); }} className="pill pill-sm pill-quiet" data-testid="forget-all">Forget all</button> : null}
       </div>
       {undoable.pending ? <UndoStrip text={undoable.pending.text} onUndo={undoable.undo} testId="taste-undo" className="mt-2" /> : null}
-      {shown.length === 0 && !undoable.pending ? <p className="mono py-3 text-graphite">Nothing yet · it learns from WEAR THIS, swaps and the looks you pass on</p> : null}
+      {shown.length === 0 && !undoable.pending ? <p className="note py-3">Nothing yet. It learns from Wear this, swaps and the looks you pass on.</p> : null}
       {shown.map((l) => (
         <div key={l.key} className="flex min-h-[42px] items-center justify-between gap-3 border-b border-line py-2" data-testid="taste-line">
           <Link href={`/closet/${l.itemIds[0]}`} className="text-[14px] leading-snug">{l.text}</Link>

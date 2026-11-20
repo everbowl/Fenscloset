@@ -87,7 +87,7 @@ export function CleanOutList({ items, stacks = [], canDecide }: { items: Row[]; 
           ))}
         </section>
       ) : null}
-      {empty ? <p className="serif text-[21px] italic leading-[1.3]">{last ? "That’s the list. Nice." : "Everything in this closet has been worn recently. Nice."}</p> : (
+      {empty ? <p className="serif text-[26px] leading-tight">{last ? "That’s the list. Nice." : "Everything in this closet has been worn recently. Nice."}</p> : (
       <div className="flex flex-col">
         {shown.map((it) => (
           <div key={it.id} className="flex flex-col gap-2.5 border-b border-line py-3 sm:flex-row sm:items-center sm:gap-3" data-testid="clean-out-row">
@@ -107,7 +107,7 @@ export function CleanOutList({ items, stacks = [], canDecide }: { items: Row[]; 
             ) : null}
           </div>
         ))}
-        {shown.length === 0 ? <p className="serif mt-4 text-[21px] italic leading-[1.3]">That’s the list. Nice.</p> : null}
+        {shown.length === 0 ? <p className="serif mt-4 text-[26px] leading-tight">That’s the list. Nice.</p> : null}
       </div>
       )}
       {!empty ? <p className="mt-4 text-[14px] leading-snug text-graphite">Keep hides a piece from this list for 3 months. Donate and Sell retire it from the closet; the wear history stays, and a retired piece can always be brought back from its own page.</p> : null}

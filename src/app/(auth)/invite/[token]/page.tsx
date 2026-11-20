@@ -21,8 +21,8 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
         ) : (
           <>
             <div className="flex flex-col gap-1">
-              <h1 className="serif text-[38px]">Welcome, <em>{invite.name.split(" ")[0]}</em></h1>
-              <p className="mono mono-11 text-graphite">Set a password and your closet is ready</p>
+              <h1 className="serif text-[38px]">Welcome, {invite.name.split(" ")[0]}</h1>
+              <p className="note">Set a password and your closet is ready.</p>
             </div>
             <AcceptForm token={token} name={invite.name} email={invite.email} />
           </>

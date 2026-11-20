@@ -51,6 +51,23 @@ describe("weather", () => {
     fetchSpy.mockRestore(); forgetWeatherFailures();
   });
 
+  it("when the service fails, a forecast from the last day is used instead of nothing; a timed-out call is tried once more", async () => {
+    forgetWeatherFailures();
+    await db.weatherCache.create({ data: { key: "wx:41.00,-73.00", payload: sample, fetchedAt: new Date(Date.now() - 3 * 60 * 60 * 1000) } }); // three hours old: past the hour, inside the day
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("busy", { status: 503, statusText: "Service Unavailable" }));
+    const w = await getWeather({ lat: 41, lon: -73 }, new Date("2026-10-18T21:00:00Z"));
+    expect(w.nowF).toBe(68); // the stale forecast, not an error
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const again = await getWeather({ lat: 41, lon: -73 }, new Date("2026-10-18T21:00:00Z"));
+    expect(again.nowF).toBe(68); expect(fetchSpy).toHaveBeenCalledTimes(1); // inside the retry-after window: no call, still the stale answer
+    fetchSpy.mockRestore(); forgetWeatherFailures();
+    const timeout = Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" });
+    const slow = vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(timeout).mockResolvedValueOnce(new Response(JSON.stringify(sample), { status: 200 }));
+    expect((await getWeather({ lat: 42, lon: -73 }, new Date("2026-10-18T21:00:00Z"))).nowF).toBe(68);
+    expect(slow).toHaveBeenCalledTimes(2);
+    slow.mockRestore(); forgetWeatherFailures();
+  });
+
   it("date helpers follow the household time zone", () => {
     const d = new Date("2026-10-19T05:30:00Z"); // still Oct 18, 10:30 PM in Los Angeles
     expect(dayKey(d, "America/Los_Angeles")).toBe("2026-10-18");

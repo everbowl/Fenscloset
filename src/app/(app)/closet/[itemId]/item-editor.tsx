@@ -67,9 +67,7 @@ function ToggleRow({ label, on, onWord, offWord, onChange, testId }: { label: st
 const hostOf = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; } };
 
 function Title({ name }: { name: string }) {
-  const words = name.trim().split(" ");
-  const last = words.pop();
-  return <h1 className="serif text-[34px]">{words.join(" ")}{words.length ? " " : ""}<em>{last}</em></h1>;
+  return <h1 className="serif text-[34px]">{name.trim()}</h1>;
 }
 
 /** Item detail: photo, serif title, mono meta, then every tag as a 42px row that edits in place. */
@@ -340,7 +338,7 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
       <TextSheet open={sheet === "url"} onClose={() => setSheet(null)} title="Link" label="Where you bought it" kind="url" value={it.purchaseUrl ?? ""} placeholder="https://" onSave={(v) => save({ purchaseUrl: v }, { purchaseUrl: v.trim() || null })} />
       {/* How the piece is made: the mirror offers Buttons / Sleeves / Hood chips only when a piece in the look has them. */}
       <Sheet open={sheet === "made"} onClose={() => setSheet(null)} title="Made with">
-        <p className="mono mb-3 text-graphite">The mirror asks how to show these: buttons open, sleeves rolled, hood up.</p>
+        <p className="note mb-3">The mirror asks how to show these: buttons open, sleeves rolled, hood up.</p>
         <div className="flex flex-col" role="listbox" aria-multiselectable>
           {FEATURE_KEYS.map((f) => {
             const on = it.features.includes(f);

@@ -61,7 +61,7 @@ export function LookingForScreen({ meId, people, forPersonId, wants, section, se
         ) : null}
         {open.length === 0 && !pendingNew ? (
           <div data-testid="looking-for-empty">
-            <p className="serif text-[21px] italic leading-[1.3]">Nothing on {forPersonId === meId ? "your" : `${forName}’s`} list yet. Tap one to start from it, or add your own.</p>
+            <p className="note text-ink text-[16px]">Nothing on {forPersonId === meId ? "your" : `${forName}’s`} list yet. Tap one to start from it, or add your own.</p>
             <ul className="mt-4 flex flex-col gap-2">
               {["navy cashmere crewneck under $200", "white leather sneakers, size 10", "a rain jacket that packs small"].map((ex) => (
                 <li key={ex}><button type="button" onClick={() => { setPrefill(ex); setSheet("add"); }} className="tap flex h-12 w-full items-center justify-between border-b border-line text-left text-[15px]" data-testid="want-example"><span>“{ex}”</span><span className="mono text-graphite">Use it</span></button></li>
@@ -105,7 +105,7 @@ export function LookingForScreen({ meId, people, forPersonId, wants, section, se
         <div className="flex flex-col" role="listbox">
           {people.map((p) => <button key={p.id} type="button" role="option" aria-selected={p.id === forPersonId} onClick={() => { setSheet(null); startFor(async () => { await rememberShopForAction(p.id); router.push(`/shop/looking-for?for=${p.id}`); }); }} className="tap w-full flex h-12 items-center justify-between border-b border-line text-[15px]"><span>{p.id === meId ? `${p.name} (me)` : p.name}</span><span className={cn("mono", p.id === forPersonId ? "text-ink" : "text-transparent")}>✓</span></button>)}
         </div>
-        <p className="mono mt-4 text-graphite">You can keep a list for yourself, your kids, and anyone who allowed it in their Settings.</p>
+        <p className="note mt-4">You can keep a list for yourself, your kids, and anyone who allowed it in their Settings.</p>
       </Sheet>
     </div>
   );

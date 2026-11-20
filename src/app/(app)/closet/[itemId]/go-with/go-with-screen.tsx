@@ -81,7 +81,7 @@ export function GoWithScreen({ itemId, name, thumbKey, fresh, initial }: { itemI
         {busy ? (
           <div className="mt-4" data-testid="go-with-thinking" aria-live="polite">
             <p className="mono flex items-center justify-between gap-3 text-ink"><span>{progress?.step ?? "Looking at the closet…"}</span><span className="shrink-0 text-graphite" aria-hidden>{secs}s</span></p>
-            <p className="mono mt-1 text-graphite">Usually 15 to 40 seconds. You can leave this screen; the answer is kept on this page.</p>
+            <p className="note mt-1">Usually 15 to 40 seconds. You can leave this screen; the answer is kept on this page.</p>
           </div>
         ) : error ? (
           <button type="button" onClick={() => void run(Boolean(view))} className="pill mt-4" data-testid="go-with-retry">Try again</button>
@@ -94,7 +94,7 @@ export function GoWithScreen({ itemId, name, thumbKey, fresh, initial }: { itemI
         <section className="mt-6 lg:col-start-1 lg:row-start-3 lg:row-span-3 lg:mt-0" data-testid="go-with-result">
           <div className="border-y border-ink py-2.5">
             <p className="mono text-ink">{view.needCategory ? `Would complete it · ${view.needCategory}` : "Already covered"}</p>
-            <p className="serif mt-1.5 text-[21px] italic leading-[1.3]">{view.reason}</p>
+            <p className="mt-1.5 text-[16px] leading-snug">{view.reason}</p>
           </div>
           {view.products.length ? (
             <div className="mt-6" data-testid="go-with-products">
@@ -118,10 +118,10 @@ export function GoWithScreen({ itemId, name, thumbKey, fresh, initial }: { itemI
                   </div>
                 ))}
               </div>
-              <p className="mono mt-1 text-graphite">Judge it: the Shop says buy it, maybe or skip it, and can show it on you.</p>
+              <p className="note mt-2">Judge it: the Shop says buy it, maybe or skip it, and can show it on you.</p>
             </div>
           ) : (
-            <p className="mono mt-6 text-graphite" data-testid="go-with-no-products">Nothing in the stores right now for this. Try <Link href={`/shop?for=${view.forPersonId}`} className="text-ink underline underline-offset-4">the Shop</Link> with a link or a photo.</p>
+            <p className="note mt-6" data-testid="go-with-no-products">Nothing in the stores right now for this. Try <Link href={`/shop?for=${view.forPersonId}`} className="text-ink underline underline-offset-4">the Shop</Link> with a link or a photo.</p>
           )}
           {view.closetLooks.length ? (
             <div className="mt-6 space-y-6" data-testid="go-with-looks">
@@ -136,11 +136,11 @@ export function GoWithScreen({ itemId, name, thumbKey, fresh, initial }: { itemI
                     ))}
                   </div>
                   <p className="mono mt-2 text-graphite">{b.pieces.map((x) => x.label).join(" · ")}</p>
-                  <p className="serif mt-1 text-[21px] italic leading-[1.3]">{b.reason}</p>
+                  <p className="mt-1 text-[16px] leading-snug">{b.reason}</p>
                 </div>
               ))}
             </div>
-          ) : <p className="mono mt-6 text-graphite">Nothing else in the closet to pair it with yet.</p>}
+          ) : <p className="note mt-6">Nothing else in the closet to pair it with yet.</p>}
         </section>
       ) : null}
     </div>

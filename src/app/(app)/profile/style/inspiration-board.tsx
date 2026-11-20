@@ -70,7 +70,7 @@ export function InspirationBoard({ ownerId, looks, canEdit, isMinor }: { ownerId
         {open ? (
           <div className="flex flex-col gap-3" data-testid="inspiration-sheet">
             <div className="h-[220px] overflow-hidden bg-bone"><img src={`/api/photo/${open.key}`} alt="" className="size-full object-cover" /></div>
-            <p className="serif text-[21px] italic leading-[1.3]">{open.notes.summary}</p>
+            <p className="text-[16px] leading-snug">{open.notes.summary}</p>
             <Row k="Words" v={open.notes.words.join(", ")} />
             <Row k="Shapes" v={open.notes.silhouettes.join("; ")} />
             <Row k="Colors" v={open.notes.colorPairs.join("; ")} />

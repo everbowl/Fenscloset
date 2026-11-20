@@ -67,7 +67,7 @@ export function TogetherScreen({ meId, people, canDressIds, occasions, isAdmin, 
             <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Mode">
               {MODES.map((m) => <button key={m.key} type="button" role="radio" aria-checked={mode === m.key} onClick={() => setMode(m.key)} className={cn("pill h-[46px]", mode === m.key && "pill-solid")} data-testid={`mode-${m.key}`}>{m.label}</button>)}
             </div>
-            <p className="mono mt-2 text-graphite">{MODES.find((m) => m.key === mode)?.blurb}</p>
+            <p className="note mt-2">{MODES.find((m) => m.key === mode)?.blurb}</p>
           </section>
           <section>
             <p className="mono border-b border-ink pb-2 text-graphite">Plan</p>
@@ -79,7 +79,7 @@ export function TogetherScreen({ meId, people, canDressIds, occasions, isAdmin, 
             <button type="button" onClick={() => setSheet("text")} className="pill pill-sm mt-2">Something else…</button>
           </section>
           <Button size="lg" className="w-full" busy={busy === "dress"} disabled={busy !== null || ids.length < 2} sub="One look for each person" onClick={() => run("dress", () => dressTogetherAction({ personIds: ids, mode, occasionId, occasionText: occasionId ? null : text }))} data-testid="dress-us">{busy === "dress" ? "Thinking…" : "Dress us"}</Button>
-          {ids.length < 2 ? <p className="mono text-center text-graphite">Pick at least two people</p> : null}
+          {ids.length < 2 ? <p className="note text-center">Pick at least two people.</p> : null}
         </div>
       ) : null}
 

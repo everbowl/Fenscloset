@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useClosetPick } from "./pick-context";
 import { ItemCard } from "@/components/item-card";
@@ -21,7 +21,7 @@ const PICK_MAX = 3;
  * pieces and have it show me in mirror"). Tap Mirror, tap pieces, tap "See it on me": the same mirror
  * sheet as Today opens and dresses them. Pieces the model can't place (hats, bags, jewelry) say so.
  */
-export function ClosetGrid({ items, showOwner, mirror }: { items: ItemCardData[]; showOwner: boolean; mirror: MirrorConfig | null }) {
+export function ClosetGrid({ items, showOwner, mirror, lead }: { items: ItemCardData[]; showOwner: boolean; mirror: MirrorConfig | null; /** The first cells: pieces still being tagged (TaggingCards). */ lead?: ReactNode }) {
   const { picking, setPicking } = useClosetPick(); // the Mirror pill in the tools row starts it (F1)
   const [picked, setPicked] = useState<string[]>([]);
   const m = useMirror(mirror?.personId ?? "", mirror?.wardrobe, mirror?.engine);
@@ -42,7 +42,7 @@ export function ClosetGrid({ items, showOwner, mirror }: { items: ItemCardData[]
       const r = await addPickedToLookAction(mirror.personId, picked);
       setAdding(false);
       if (!r.ok) { toast.error(r.error); return; }
-      toast.ok(`In the look · ${r.count} ${r.count === 1 ? "piece" : "pieces"}`);
+      toast.ok(`In the look · ${r.count} ${r.count === 1 ? "piece" : "pieces"}`, r.lookId ? { label: "Open the look", href: `/looks/${r.lookId}` } : undefined);
       stop(); router.refresh();
     });
   };
@@ -56,6 +56,7 @@ export function ClosetGrid({ items, showOwner, mirror }: { items: ItemCardData[]
         </div>
       ) : null}
       <div className="mt-4 grid grid-cols-2 gap-x-2.5 gap-y-[18px] lg:grid-cols-4 lg:gap-x-4 lg:gap-y-7">
+        {lead}
         {items.map((it) => (
           <ItemCard key={it.id} item={it} showOwner={showOwner}
             pick={picking ? { on: picked.includes(it.id), placeable: mirrorCanPlace(it.categoryName), full, onToggle: () => toggle(it.id) } : undefined} />

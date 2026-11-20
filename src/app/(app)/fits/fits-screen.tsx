@@ -20,8 +20,7 @@ import { RatingRow } from "./rating-row";
 type ClosetPiece = { id: string; name: string; thumbKey: string | null; categoryName: string | null };
 
 function Title({ title }: { title: string }) {
-  const words = title.trim().split(" "); const last = words.pop();
-  return <p className="serif text-[30px] leading-none">{words.join(" ")}{words.length ? " " : ""}<em>{last}</em></p>;
+  return <p className="serif text-[30px] leading-none">{title.trim()}</p>;
 }
 
 export function FitsScreen(p: {
@@ -98,7 +97,7 @@ export function FitsScreen(p: {
                 </Link>
               ))}
             </div>
-          ) : <p className="mono py-2 text-graphite">Things to buy and things you own, together on you. Tap ADD TO A LOOK on a store find.</p>}
+          ) : <p className="note py-2">Things to buy and things you own, together on you. Tap Add to a look on a store find.</p>}
         </section>
       ) : null}
       <div className="lg:col-start-1">
@@ -164,7 +163,7 @@ export function FitsScreen(p: {
         )) : (
           <section className="flex flex-col gap-3" data-testid="fit-empty">
             <p className="mono text-graphite">{monoDate(p.selected)}{p.scope === "family" ? "" : ` · ${p.personName.toUpperCase()}`}</p>
-            <p className="serif text-[30px] leading-none">Nothing <em>yet</em></p>
+            <p className="serif text-[30px] leading-none">Nothing yet</p>
             <div className="flex h-[160px] items-center justify-center bg-bone"><span className="mono text-graphite">{canSaveHere ? "Nothing worn this day yet" : "Nothing saved this day"}</span></div>
             {canSaveHere ? (
               <Button className="h-[50px] w-full" onClick={() => { setPicked([]); setPickTitle(""); setSheet({ kind: "pick" }); }} data-testid="save-the-fit">Save the fit</Button>

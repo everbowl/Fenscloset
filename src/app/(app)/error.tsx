@@ -9,7 +9,7 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
   return (
     <div className="flex flex-col items-start gap-4 pt-6" data-testid="app-error">
       <p className="mono text-graphite">Something went wrong</p>
-      <h1 className="serif text-[44px] leading-none">Something <em>slipped</em></h1>
+      <h1 className="serif text-[44px] leading-none">Something slipped</h1>
       <p className="max-w-sm text-[15px] leading-snug text-graphite">The page didn’t load right. Nothing you saved is lost.</p>
       <div className="mt-2 flex gap-2">
         <button type="button" onClick={reset} className="pill pill-solid h-[50px] px-6">Try again</button>

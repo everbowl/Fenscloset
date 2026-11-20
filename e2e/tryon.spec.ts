@@ -75,7 +75,7 @@ test("try-on: on by default, needs a body photo, then a picture of the look on y
   await page.getByTestId("item-card").filter({ hasNotText: "Not in the mirror" }).first().click();
   await page.getByTestId("see-picked").click();
   // one piece picked: the mirror asks to complete the look first (e2e/mirror-complete.spec.ts covers the asking); go without
-  while (await page.getByTestId("complete-skip").isVisible()) await page.getByTestId("complete-skip").click();
+  if (await page.getByTestId("complete-go").isVisible()) await page.getByTestId("complete-go").click(); // the panel: nothing picked, just the piece
   await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId("try-on-sheet")).toContainText("Only you can see this picture");
   const beforeRetake = await page.getByTestId("try-on-sheet").locator("img").first().getAttribute("src");

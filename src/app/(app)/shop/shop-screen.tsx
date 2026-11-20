@@ -199,7 +199,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
         {/* Shop v2 item 2 (Jeff, 23 Oct 2026): "state what I'm looking for so the shopping tool lets me know". */}
         <Link href={`/shop/looking-for?for=${forPersonId}`} className="tap flex items-center justify-between border border-ink px-4 py-3" data-testid="looking-for-link">
           <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="serif text-[22px]">Looking for <em>something?</em></span>
+            <span className="serif text-[22px]">Looking for something?</span>
             <span className={cn("mono", lookingFor.newMatches ? "text-ink" : "text-graphite")} data-testid="looking-for-line">{lookingFor.newMatches ? `${lookingFor.newMatches} new ${lookingFor.newMatches === 1 ? "match" : "matches"} · ${lookingFor.wants} on the list` : lookingFor.wants ? `${lookingFor.wants} on the list · nothing new yet` : "Tell the Shop what to find; it checks the stores every day"}</span>
           </span>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden className="shrink-0"><path d="M4 12h16M14 6l6 6-6 6" /></svg>
@@ -214,7 +214,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
           </div>
           <div className="mt-4 border-y border-ink py-2.5" aria-live="polite">
             <p className="mono flex items-center justify-between gap-3 text-ink"><span>{progress?.step ?? "Looking at it…"}</span><span className="shrink-0 text-graphite" aria-hidden>{secs}s</span></p>
-            <p className="mono mt-1 text-graphite">Usually 15 to 40 seconds. You can leave this screen; the answer is kept under Recent.</p>
+            <p className="note mt-1">Usually 15 to 40 seconds. You can leave this screen; the answer is kept under Recent.</p>
           </div>
         </section>
       ) : selected && hidden === selected.id && undoable.pending ? (
@@ -231,7 +231,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
           </div>
           <div className="rise mt-4 border-y-2 border-ink py-3" data-testid="verdict" data-call={selected.verdict.call}>
             <p className="serif text-[44px] leading-none" data-testid="verdict-word">{CALL_WORD[selected.verdict.call]}</p>
-            <p className="serif mt-2 text-[21px] italic leading-[1.3]">{selected.verdict.reason}</p>
+            <p className="mt-2 text-[16px] leading-snug">{selected.verdict.reason}</p>
             {selected.verdict.sizeNote ? <p className="mono mt-1.5 text-graphite">{selected.verdict.sizeNote}</p> : null}
             {!selected.verdict.usedBodyData ? <p className="mono mt-1.5 flex flex-wrap items-center gap-2 text-graphite">Judged on style and closet only{forMe ? <Link href="/profile/body" className="pill pill-sm" data-testid="add-my-sizes">Add my sizes</Link> : null}</p> : null}
           </div>
@@ -273,7 +273,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
                     })}
                   </div>
                   <p className="mono mt-2 text-graphite">{b.pieces.map((x) => x.label).join(" · ")}</p>
-                  <p className="serif mt-1 text-[21px] italic leading-[1.3]">{b.reason}</p>
+                  <p className="mt-1 text-[16px] leading-snug">{b.reason}</p>
                 </div>
               ))}
             </div>
@@ -320,10 +320,10 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
         <section className="order-3 mt-6 lg:mt-0" data-testid="shop-empty">
           <ol className="grid grid-cols-3 gap-2" aria-label="How it works">
             {[["01", "Show it", "A store link, a screenshot, or a photo"], ["02", "The verdict", "Buy it, maybe, or skip it, with one reason"], ["03", "Wear it", "What you own that goes with it"]].map(([n, t, d]) => (
-              <li key={n} className="flex min-h-[150px] flex-col justify-between border border-ink p-3"><span className="mono text-graphite">{n}</span><span><span className="serif block text-[22px] leading-none">{t}</span><span className="mono mt-1.5 block text-graphite">{d}</span></span></li>
+              <li key={n} className="flex min-h-[150px] flex-col justify-between border border-ink p-3"><span className="mono text-graphite">{n}</span><span><span className="serif block text-[22px] leading-none">{t}</span><span className="note mt-1.5 block text-[13px] text-graphite">{d}</span></span></li>
             ))}
           </ol>
-          <p className="serif mt-3.5 text-[21px] italic leading-[1.3]">Thinking about something? Show it to the Shop before you pay.</p>
+          <p className="note mt-3.5 text-ink text-[16px]">Thinking about something? Show it to the Shop before you pay.</p>
         </section>
       )}
 
@@ -337,7 +337,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
         {brandFeed.brands.length ? <p className="mono mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-graphite" data-testid="brand-feed-brands" suppressHydrationWarning><span>{brandFeed.brands.join(" · ")}{brandFeed.lastFetchedAt ? ` · checked ${ago(brandFeed.lastFetchedAt)}` : ""}</span>{forMe ? <Link href="/profile/brands" className="pill pill-sm" data-testid="brand-feed-add">+ Add brand</Link> : null}</p> : null}
         {!brandFeed.brands.length ? (
           <div className="mt-3" data-testid="brand-feed-none">
-            <p className="serif text-[21px] italic leading-[1.3]">{forPersonId === meId ? "Pick the brands you love and the Shop shows what’s new from them, every day." : `When ${forName} picks favorite brands in their Profile, what’s new from them shows here every day.`}</p>
+            <p className="note text-ink text-[16px]">{forPersonId === meId ? "Pick the brands you love and the Shop shows what’s new from them, every day." : `When ${forName} picks favorite brands in their Profile, what’s new from them shows here every day.`}</p>
             {forPersonId === meId ? <Link href="/profile/brands" className="pill mt-3" data-testid="brand-feed-pick">Pick my brands</Link> : null}
           </div>
         ) : brandFeed.products.length ? (
@@ -358,7 +358,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
               </div>
             ))}
           </div>
-        ) : feedBusy ? null : <p className="mono mt-3 text-graphite" data-testid="brand-feed-empty">Nothing from these brands in the stores right now. Refresh to look again.</p>}
+        ) : feedBusy ? null : <p className="note mt-3" data-testid="brand-feed-empty">Nothing from these brands in the stores right now. Refresh to look again.</p>}
       </section>
 
       </div>
@@ -394,7 +394,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
         <div className="flex flex-col" role="listbox">
           {people.map((p) => <button key={p.id} type="button" role="option" aria-selected={p.id === forPersonId} onClick={() => { setSheet(null); start(async () => { await rememberShopForAction(p.id); router.push(`/shop?for=${p.id}`); }); }} className="tap flex h-12 w-full items-center justify-between border-b border-line text-[15px]"><span>{p.id === meId ? `${p.name} (me)` : p.name}</span><span className={cn("mono", p.id === forPersonId ? "text-ink" : "text-transparent")}>✓</span></button>)}
         </div>
-        <p className="mono mt-4 text-graphite">You can shop for yourself, your kids, and anyone who allowed it in their Settings. The pick is remembered.</p>
+        <p className="note mt-4">You can shop for yourself, your kids, and anyone who allowed it in their Settings. The pick is remembered.</p>
       </Sheet>
       <TextSheet open={sheet === "link"} onClose={() => setSheet(null)} title="Paste a link" label="Store link" kind="url" submitLabel="Judge it" value="" placeholder="https://www.everlane.com/products/…" onSave={(v) => run("link", () => lookupLinkAction(forPersonId, v))} />
     </div>

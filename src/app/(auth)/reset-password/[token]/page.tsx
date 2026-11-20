@@ -21,7 +21,7 @@ export default async function ResetPasswordPage({ params }: { params: Promise<{ 
         ) : (
           <>
             <div className="flex flex-col gap-1">
-              <h1 className="serif text-[34px]">Choose a new <em>password</em></h1>
+              <h1 className="serif text-[34px]">Choose a new password</h1>
               <p className="mono mono-11 normal-case text-graphite">for {peek.email}</p>
             </div>
             <ResetForm token={token} />

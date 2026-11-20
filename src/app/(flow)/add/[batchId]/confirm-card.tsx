@@ -38,9 +38,7 @@ type Props = {
 type SheetKind = "category" | "subcategory" | "color" | "fabric" | "season" | "formality" | "brand" | "size" | "rename" | "camera" | "match" | null;
 
 function Title({ name }: { name: string }) {
-  const words = name.trim().split(" ");
-  const last = words.pop();
-  return <h1 className="serif text-[34px]">{words.join(" ")}{words.length ? " " : ""}<em>{last}</em></h1>;
+  return <h1 className="serif text-[34px]">{name.trim()}</h1>;
 }
 
 const nameOf = (xs: Named[], id: string | null) => xs.find((x) => x.id === id)?.name ?? null;
@@ -238,13 +236,13 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
         </div>
       ) : null}
 
-      {bgFailed ? <p className="mono mx-5 mt-3 text-graphite">Background could not be removed · the original photo is used</p> : null}
+      {bgFailed ? <p className="note mx-5 mt-3">Background could not be removed. The original photo is used.</p> : null}
       {skipped ? <UndoStrip text={`Skipped · ${skipped.name}`} onUndo={unskip} testId="skipped-undo" className="mx-5 mt-3" /> : null}
 
       {(tags.pieceCount ?? 1) > 1 && !splitHidden ? (
         <div className="mx-5 mt-3 border-y border-ink py-2.5" data-testid="split-ask">
           <p className="mono">Looks like {tags.pieceCount} pieces in this photo</p>
-          <p className="mono mt-0.5 text-graphite">Each gets its own card · the same color twice becomes one card with ×2</p>
+          <p className="note mt-0.5">Each gets its own card. The same color twice becomes one card with ×2.</p>
           <div className="mt-2 flex gap-2">
             <button type="button" onClick={split} disabled={pending} className="pill pill-sm pill-solid" data-testid="split-now">Split into {tags.pieceCount}</button>
             <button type="button" onClick={() => setSplitHidden(true)} className="pill pill-sm pill-quiet" data-testid="split-no">It’s one piece</button>

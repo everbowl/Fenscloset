@@ -20,20 +20,20 @@ test("a look from a store find and the closet: the tray, the look screen, the ma
   await expect(page.getByTestId("want-match").first()).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId("look-tray")).toHaveCount(0);
   await page.getByTestId("want-add-look").first().click();
-  await expect(page.getByTestId("want-add-look").first()).toHaveText("In the look ✓");
-  await expect(page.getByTestId("look-tray")).toContainText("Look · 1 piece");
+  await expect(page.getByTestId("want-add-look").first()).toContainText("In the look ✓");
+  await expect(page.getByTestId("look-tray")).toContainText("1 piece so far");
   // the same find again is kept once
   await page.reload();
   await page.getByTestId("want-add-look").first().click();
-  await expect(page.getByTestId("look-tray")).toContainText("Look · 1 piece");
+  await expect(page.getByTestId("look-tray")).toContainText("1 piece so far");
 
   // the closet's pick mode adds what Jeff owns
   await page.goto("/closet");
-  await expect(page.getByTestId("look-tray")).toContainText("Look · 1 piece");
+  await expect(page.getByTestId("look-tray")).toContainText("1 piece so far");
   await page.getByTestId("closet-mirror").click();
   await page.getByTestId("item-card").filter({ hasText: /dark jeans/i }).click();
   await page.getByTestId("pick-add-look").click();
-  await expect(page.getByTestId("look-tray")).toContainText("Look · 2 pieces");
+  await expect(page.getByTestId("look-tray")).toContainText("2 pieces so far");
 
   // the look screen: the pieces with Buy on the store find, more from the closet, the mannequin
   await page.getByTestId("look-tray").click();

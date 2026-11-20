@@ -51,12 +51,24 @@ html, body {
   font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  font-size: 11px;
+  font-size: 12px; /* was 11px: too small to read at arm's length (Jeff, 20 Nov 2026) */
   line-height: 1.4;
 }
-.mono-11 { font-size: 12px; }
-.mono-12 { font-size: 12px; }
-.mono-13 { font-size: 13px; }
+/* One step louder than .mono: a counter, a tab, a banner title. */
+.mono-11 { font-size: 13px; }
+.mono-12 { font-size: 13px; }
+.mono-13 { font-size: 14px; }
+
+/* A sentence of help or explanation: plain sans, sentence case, never the uppercase mono (Jeff, 20 Nov 2026: "text
+   should be clean, simple and clear"). Labels stay mono; anything longer than a few words is a note. */
+.note {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.45;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--graphite);
+}
 
 /* Every tappable thing reads as a button (Jeff, 23 Oct 2026: "all buttons should be louder and apparent"): a text
    action is an outlined pill. .pill-solid for the one that matters most in its row; .pill-quiet for the way out
@@ -82,14 +94,14 @@ html, body {
 @media (hover: hover) { .tap:hover { background: var(--bone); } }
 .tap:active { background: var(--line); }
 
-/* Editorial serif heading; wrap the accent word in <em>. */
+/* Editorial serif heading. No italics anywhere in the app (Jeff, 20 Nov 2026): the accent word is set like the rest. */
 .serif {
   font-family: var(--font-serif);
   font-weight: 400;
   line-height: 0.95;
   letter-spacing: -0.005em;
 }
-.serif em { font-style: italic; }
+em, i, .italic { font-style: normal; }
 
 /* Wide-set wordmark. */
 .wordmark {
