@@ -66,6 +66,12 @@ describe("weather", () => {
     expect((await getWeather({ lat: 42, lon: -73 }, new Date("2026-10-18T21:00:00Z"))).nowF).toBe(68);
     expect(slow).toHaveBeenCalledTimes(2);
     slow.mockRestore(); forgetWeatherFailures();
+    // with an older forecast in hand a timed-out call is not tried again: the old forecast stands in at once (Today waits for this)
+    await db.weatherCache.create({ data: { key: "wx:43.00,-73.00", payload: sample, fetchedAt: new Date(Date.now() - 2 * 60 * 60 * 1000) } });
+    const once = vi.spyOn(globalThis, "fetch").mockRejectedValue(timeout);
+    expect((await getWeather({ lat: 43, lon: -73 }, new Date("2026-10-18T21:00:00Z"))).nowF).toBe(68);
+    expect(once).toHaveBeenCalledTimes(1);
+    once.mockRestore(); forgetWeatherFailures();
   });
 
   it("date helpers follow the household time zone", () => {
