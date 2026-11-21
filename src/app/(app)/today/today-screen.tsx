@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { Suspense, use, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button, Icons } from "@/components/ui/button";
@@ -23,10 +23,14 @@ import { deleteFitAction } from "../fits/actions";
 import { InlineAdd } from "@/components/lists/inline-add";
 import { monoDate } from "@/lib/dates";
 
+/** What the weather cell shows: the forecast, or why there is none (nothing saved yet, or the lookup failed). */
+export type WeatherView = { weather: { condition: string; source: string; nowF: number; tonightF: number; highF: number; lowF: number; rainChance: number } | null; note: "none" | "failed" | null };
+
 type Props = {
   personId: string; personName: string; mine: boolean; canDress: boolean; isAdmin: boolean;
   date: string; evening: boolean; contextLine: string; dateLabel: string;
-  weather: { condition: string; source: string; nowF: number; tonightF: number; highF: number; lowF: number; rainChance: number } | null; weatherNote: "none" | "failed" | null; savedZip: string | null;
+  /** The forecast: a promise while it is on its way (the cell breathes, the rest of the page is already there), a plain answer when there is nowhere to ask about. */
+  weather: WeatherView | Promise<WeatherView>; savedZip: string | null;
   plan: { source: string; label: string | null; occasionId: string | null }; calendarConnected: boolean; calendarConfigured: boolean;
   checkIn: { source: "taps" | "selfie"; answers: { scaleId: string; optionId: string }[] } | null; scales: Scale[];
   occasions: { id: string; name: string }[];
@@ -202,29 +206,10 @@ export function TodayScreen(p: Props) {
       />
       </div>
 
-      {p.weather ? (
-        <WeatherBlock onClick={p.canDress ? () => setSheet("zip") : undefined} className="mb-4 flex w-full items-stretch border border-ink text-left lg:col-start-2">
-          <span className="flex flex-col gap-1 border-r border-ink px-4 py-2.5">
-            <span className="mono text-ink" data-testid="weather-date">{p.dateLabel}</span>
-            <span className="flex items-baseline gap-1"><span className="serif text-[40px] leading-none">{p.weather.nowF}°</span><span className="mono">now</span></span>
-          </span>
-          <span className="flex min-w-0 flex-1 flex-col justify-center gap-1 px-4 py-2">
-            <span className="text-[16px] font-medium leading-snug">{p.weather.condition} · {p.weather.tonightF}° tonight</span>
-            <span className="mono">High {p.weather.highF}° · Low {p.weather.lowF}°</span>
-            <span className="mono">{p.weather.rainChance >= 20 ? `Rain ${p.weather.rainChance}%` : "No rain"}{p.canDress ? <span className="text-graphite"> · {p.savedZip ?? "Set a zip"} ›</span> : null}</span>
-          </span>
-        </WeatherBlock>
-      ) : null}
-      {p.weatherNote && p.canDress ? (
-        <div className="mb-4 flex flex-col gap-2.5 border-y border-ink py-3 lg:col-start-2" data-testid="weather-note">
-          <span className="text-[16px] font-medium">{p.weatherNote === "failed" ? "The weather didn’t load." : "Where are you today?"}</span>
-          <span className="note">{p.weatherNote === "failed" ? "The looks are built without it this time. It is tried again in a couple of minutes, or set another zip." : "The looks follow the weather where you are."}</span>
-          <span className="flex flex-wrap gap-2">
-            {p.weatherNote === "none" ? <button type="button" onClick={askLocation} disabled={busy === "location"} className="pill pill-sm">{busy === "location" ? "Finding…" : "Use my location"}</button> : null}
-            <button type="button" onClick={() => setSheet("zip")} className="pill pill-sm" data-testid="enter-zip">{p.savedZip ? "Change zip" : "Enter zip"}</button>
-          </span>
-        </div>
-      ) : null}
+      {/* The weather streams in after the page paints: the one outside call on this screen never holds the rest of it. */}
+      <Suspense fallback={<WeatherPending dateLabel={p.dateLabel} />}>
+        <WeatherArea weather={p.weather} dateLabel={p.dateLabel} canDress={p.canDress} savedZip={p.savedZip} finding={busy === "location"} onZip={() => setSheet("zip")} onLocation={askLocation} />
+      </Suspense>
 
       {boards.length ? (
         <>
@@ -369,7 +354,7 @@ export function TodayScreen(p: Props) {
         </Link>
       ) : null}
 
-      {p.weather ? <p className="mono mt-5 text-graphite lg:col-start-2">Weather by Open-Meteo</p> : null}
+      <Suspense fallback={null}><WeatherCredit weather={p.weather} /></Suspense>
 
       {/* Check-in: taps on each scale, or a selfie read by Claude. */}
       <CheckInSheet open={sheet === "checkin"} onClose={() => setSheet(null)} scales={p.scales} current={p.checkIn} busy={busy} isAdmin={p.isAdmin} mine={p.mine} personName={p.personName}
@@ -413,6 +398,66 @@ export function TodayScreen(p: Props) {
 /** The weather card: a button when the zip can be changed, a plain block for someone just looking. */
 function WeatherBlock({ onClick, className, children }: { onClick?: () => void; className: string; children: React.ReactNode }) {
   return onClick ? <button type="button" onClick={onClick} className={cn(className, "tap")} data-testid="weather-block">{children}</button> : <div className={className} data-testid="weather-block">{children}</div>;
+}
+
+function isThenable<T>(v: T | Promise<T>): v is Promise<T> { return typeof (v as Promise<T> | null)?.then === "function"; }
+
+/** The forecast may still be on its way: `use` waits for it inside the Suspense boundary; a plain answer is read as it is. */
+function useWeather(w: WeatherView | Promise<WeatherView>): WeatherView {
+  return isThenable(w) ? use(w) : w;
+}
+
+type WeatherAreaProps = { weather: WeatherView | Promise<WeatherView>; dateLabel: string; canDress: boolean; savedZip: string | null; finding: boolean; onZip: () => void; onLocation: () => void };
+
+/** The forecast cell, or the question to ask when there is none (nothing saved yet, or the lookup failed). */
+function WeatherArea({ weather, dateLabel, canDress, savedZip, finding, onZip, onLocation }: WeatherAreaProps) {
+  const { weather: w, note } = useWeather(weather);
+  if (w) {
+    return (
+      <WeatherBlock onClick={canDress ? onZip : undefined} className="mb-4 flex w-full items-stretch border border-ink text-left lg:col-start-2">
+        <span className="flex flex-col gap-1 border-r border-ink px-4 py-2.5">
+          <span className="mono text-ink" data-testid="weather-date">{dateLabel}</span>
+          <span className="flex items-baseline gap-1"><span className="serif text-[40px] leading-none">{w.nowF}°</span><span className="mono">now</span></span>
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col justify-center gap-1 px-4 py-2">
+          <span className="text-[16px] font-medium leading-snug">{w.condition} · {w.tonightF}° tonight</span>
+          <span className="mono">High {w.highF}° · Low {w.lowF}°</span>
+          <span className="mono">{w.rainChance >= 20 ? `Rain ${w.rainChance}%` : "No rain"}{canDress ? <span className="text-graphite"> · {savedZip ?? "Set a zip"} ›</span> : null}</span>
+        </span>
+      </WeatherBlock>
+    );
+  }
+  if (!note || !canDress) return null;
+  return (
+    <div className="mb-4 flex flex-col gap-2.5 border-y border-ink py-3 lg:col-start-2" data-testid="weather-note">
+      <span className="text-[16px] font-medium">{note === "failed" ? "The weather didn’t load." : "Where are you today?"}</span>
+      <span className="note">{note === "failed" ? "The looks are built without it this time. It is tried again in a couple of minutes, or set another zip." : "The looks follow the weather where you are."}</span>
+      <span className="flex flex-wrap gap-2">
+        {note === "none" ? <button type="button" onClick={onLocation} disabled={finding} className="pill pill-sm">{finding ? "Finding…" : "Use my location"}</button> : null}
+        <button type="button" onClick={onZip} className="pill pill-sm" data-testid="enter-zip">{savedZip ? "Change zip" : "Enter zip"}</button>
+      </span>
+    </div>
+  );
+}
+
+/** The forecast cell's shape while the forecast is on its way: the date is known, the numbers breathe. Same height as the cell, so nothing moves when it lands. */
+function WeatherPending({ dateLabel }: { dateLabel: string }) {
+  return (
+    <div className="mb-4 flex w-full animate-pulse items-stretch border border-ink lg:col-start-2" data-testid="weather-pending" aria-busy="true" aria-label="Getting the weather">
+      <span className="flex flex-col gap-1 border-r border-ink px-4 py-2.5">
+        <span className="mono text-ink">{dateLabel}</span>
+        <span className="h-10 w-20 bg-bone" />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col justify-center gap-2 px-4 py-2">
+        <span className="h-4 w-3/4 bg-bone" /><span className="h-3 w-1/2 bg-bone" /><span className="h-3 w-2/5 bg-bone" />
+      </span>
+    </div>
+  );
+}
+
+/** The source line at the foot of the page, once there is a forecast to credit. */
+function WeatherCredit({ weather }: { weather: WeatherView | Promise<WeatherView> }) {
+  return useWeather(weather).weather ? <p className="mono mt-5 text-graphite lg:col-start-2">Weather by Open-Meteo</p> : null;
 }
 
 function Tile({ piece, className }: { piece?: BoardView["pieces"][number]; className?: string }) {

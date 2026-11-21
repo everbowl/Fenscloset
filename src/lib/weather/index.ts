@@ -111,8 +111,8 @@ const PATIENT_MS = 6000;
 
 /**
  * Open-Meteo answers in well under a second, except when it doesn't. With an older forecast in hand, one short try and
- * the old forecast stands in; with nothing in hand, a longer try and one more before giving up. Today renders only after
- * this, so the worst case is what a person waits.
+ * the old forecast stands in; with nothing in hand, a longer try and one more before giving up. Today streams the
+ * weather in after the page has painted, so this is how long the forecast cell breathes, not how long the page waits.
  */
 async function fetchForecastResponse(url: string, haveStale: boolean): Promise<Response> {
   if (haveStale) return fetch(url, { signal: AbortSignal.timeout(QUICK_MS) });
@@ -139,9 +139,16 @@ async function fetchForecast(c: Coords, haveStale: boolean): Promise<OpenMeteo> 
   return (await res.json()) as OpenMeteo;
 }
 
+/** Dev and tests: the mock forecast takes this long to answer, so the screen's wait for the weather can be seen and tested. Unset in production. */
+async function mockDelay(): Promise<void> {
+  const ms = Number(process.env.MOCK_WEATHER_SLOW_MS ?? 0);
+  if (ms > 0) await new Promise((r) => setTimeout(r, ms));
+}
+
 /** Today's weather for coordinates. `now` is injectable for tests. */
 export async function getWeather(c: Coords, now = new Date()): Promise<Weather> {
   if (isMockWeather()) {
+    await mockDelay();
     return { nowF: 68, tonightF: 61, highF: 71, lowF: 58, rainChance: 0, condition: "Clear", timezone: "America/Los_Angeles", source: "mock" };
   }
   const key = `wx:${c.lat.toFixed(2)},${c.lon.toFixed(2)}`;

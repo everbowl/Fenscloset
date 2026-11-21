@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
 import { requirePerson, isAdmin } from "@/lib/auth/current";
 import { resolveView, VIEW_COOKIE } from "@/lib/people/visibility";
-import { loadTodayContext } from "@/lib/today/context";
+import { loadTodayBase } from "@/lib/today/context";
+import { loadWeather, type WeatherSlice } from "@/lib/today/weather";
 import { canDress, getSuggestion, type Suggestion } from "@/lib/outfits/engine";
 import { loadCandidates } from "@/lib/outfits/catalog";
 import { countCleanOut } from "@/lib/outfits/cleanout";
@@ -15,19 +16,28 @@ import { getConnection, isGoogleConfigured } from "@/lib/plans/google";
 import { monoDate } from "@/lib/dates";
 import { planLine } from "@/lib/plans";
 import { newMatchCount } from "@/lib/shop/wants";
-import { TodayScreen } from "./today-screen";
+import { TodayScreen, type WeatherView } from "./today-screen";
 
 export const metadata = { title: "Today" };
 export const dynamic = "force-dynamic";
+
+/** What the screen's weather cell gets: the numbers it shows, or the reason there are none. */
+function asWeatherView({ weather: w, weatherNote }: WeatherSlice): WeatherView {
+  return { weather: w ? { condition: w.condition, source: w.source, nowF: w.nowF, tonightF: w.tonightF, highF: w.highF, lowF: w.lowF, rainChance: w.rainChance } : null, note: weatherNote };
+}
 
 /** Screen 04. Looks belong to the person in the switcher (Family → yourself); only they or a parent can wear/swap. */
 export default async function TodayPage() {
   const me = await requirePerson();
   const view = await resolveView(me, (await cookies()).get(VIEW_COOKIE)?.value);
   const personId = view.kind === "person" ? view.personId : me.id;
-  const [ctx, dress, cand, scales, occasions, cleanOut, calendar] = await Promise.all([
-    loadTodayContext(me, personId), canDress(me, personId), loadCandidates(personId), getScales(), listEntries("occasion"), countCleanOut(personId),
-    getConnection(personId),
+  const ctx = await loadTodayBase(me, personId);
+  // The weather is the one outside call on this screen, so the page never waits for it: the promise is handed to the
+  // screen and streams in after the paint (21 Nov 2026: a slow minute for Open-Meteo was a slow minute for the whole
+  // screen). With nowhere to ask about, the answer is already in hand and nothing streams.
+  const weather: WeatherView | Promise<WeatherView> = ctx.loc || ctx.savedZip ? loadWeather(ctx).then(asWeatherView) : { weather: null, note: "none" };
+  const [dress, cand, scales, occasions, cleanOut, calendar] = await Promise.all([
+    canDress(me, personId), loadCandidates(personId), getScales(), listEntries("occasion"), countCleanOut(personId), getConnection(personId),
   ]);
   const [unrated, tryOn, lookingFor, wardrobe, engines] = await Promise.all([dress ? unratedRecentFit(personId, ctx.date) : null, tryOnState(me, personId), newMatchCount(me, personId), mirrorWardrobe(personId), mirrorEngines()]);
   const enough = cand.usable.length + cand.restingIds.length >= 2;
@@ -53,8 +63,7 @@ export default async function TodayPage() {
       evening={ctx.hour >= 16}
       contextLine={context}
       dateLabel={monoDate(ctx.date)}
-      weather={ctx.weather ? { condition: ctx.weather.condition, source: ctx.weather.source, nowF: ctx.weather.nowF, tonightF: ctx.weather.tonightF, highF: ctx.weather.highF, lowF: ctx.weather.lowF, rainChance: ctx.weather.rainChance } : null}
-      weatherNote={ctx.weatherNote}
+      weather={weather}
       savedZip={ctx.savedZip}
       plan={{ source: ctx.plan.source, label: ctx.plan.label, occasionId: ctx.plan.occasionId }}
       calendarConnected={Boolean(calendar)}

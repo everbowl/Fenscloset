@@ -56,7 +56,7 @@ export function klingToken(accessKey: string, secretKey: string, nowMs = Date.no
 }
 
 type CreateResponse = { code?: number; message?: string; request_id?: string; data?: { task_id?: string; status?: string } };
-type QueryTask = { id?: string; status?: string; message?: string; outputs?: { type?: string; url?: string }[] };
+type QueryTask = { id?: string; status?: string; message?: string; outputs?: { type?: string; url?: string }[]; billing?: { charge_type?: string; amount?: string; package_type?: string; cash_type?: string }[] };
 type QueryResponse = { code?: number; message?: string; data?: QueryTask[] };
 
 /** A message a person can act on, from Kling's codes and words. */
@@ -123,7 +123,9 @@ export async function klingTryOn(person: Buffer, garment: Buffer, personId: stri
       const task = q.data?.find((t) => t.id === taskId) ?? q.data?.[0];
       if (task?.status === "failed") { console.error(`kling: task ${taskId} failed: ${task.message}`); throw friendly(undefined, task.message); }
       if (task?.status === "succeed") {
-        console.log(`kling: task ${taskId} done in ${Math.round((Date.now() - startedAt) / 1000)}s`); // the one line a working Kling leaves in the logs
+        // The one line a working Kling leaves in the logs, with what the task cost (credits or cash), so the first live runs can be priced.
+        const cost = (task.billing ?? []).map((b) => `${b.amount ?? "?"} ${b.charge_type === "cash" ? (b.cash_type ?? "cash") : (b.package_type ?? "credits")}`).join(" + ");
+        console.log(`kling: task ${taskId} done in ${Math.round((Date.now() - startedAt) / 1000)}s${cost ? `, cost ${cost}` : ""}`);
         const url = (task.outputs?.find((o) => o.type === "image") ?? task.outputs?.[0])?.url;
         if (!url) throw new KlingError("Kling returned no image.", 502);
         const pic = await fetchImpl(url, { signal: AbortSignal.timeout(30_000) });

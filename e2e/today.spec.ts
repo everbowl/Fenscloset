@@ -97,6 +97,20 @@ test("morning flow: Jeff gets three looks, checks in, sets the plan, swaps, wear
   await expect(page.getByTestId("clean-out-row")).toHaveCount(0);
 });
 
+test("Today paints before the weather answers: the page is there at once, the forecast fills in", async ({ page }) => {
+  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  // `commit`: as soon as the response starts, before the stream ends. The shell (title, boards, strips) does not wait for
+  // Open-Meteo; the forecast cell breathes until the forecast lands (MOCK_WEATHER_SLOW_MS holds the mock back).
+  await page.goto("/today", { waitUntil: "commit" });
+  await expect(page.getByTestId("today")).toBeVisible();
+  await expect(page.getByTestId("weather-pending")).toBeVisible();
+  await expect(page.getByTestId("weather-block")).toHaveCount(0);
+  await expect(page.getByTestId("board").first()).toBeVisible(); // the looks are there while the weather is still on its way
+  await expect(page.getByTestId("weather-block")).toContainText("68°");
+  await expect(page.getByTestId("weather-pending")).toHaveCount(0);
+  await expect(page.getByText("Weather by Open-Meteo")).toBeVisible();
+});
+
 test("Brittney sees Jeff's shared fit in the family calendar and gets her own looks; together mode for three", async ({ page }) => {
   await loginAs(page, "brittney@example.com", JEFF_PASSWORD);
   await page.goto("/today");
