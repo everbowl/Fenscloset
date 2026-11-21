@@ -15,10 +15,10 @@ test("Jeff fills his body profile and settings; parents edit Mya's; Olivia is in
   await page.getByTestId("measure-waist").click();
   await page.getByTestId("measure-sheet").getByRole("option", { name: "32" }).click();
   await expect(page.getByTestId("measure-waist")).toContainText("32 in");
-  await page.getByTestId("add-size").click();
-  await page.getByRole("dialog").getByLabel("Size").fill("L");
-  await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
-  await expect(page.getByText(/^L$|L · /).first()).toBeVisible();
+  // sizes by brand are read here and edited on the Brands page (P1)
+  await expect(page.getByTestId("body-sizes")).toContainText("No sizes yet");
+  await page.getByTestId("edit-sizes").click();
+  await expect(page).toHaveURL(/\/profile\/brands$/);
 
   // settings: zip + privacy rows exist for an adult
   await page.goto("/profile/settings");
@@ -55,7 +55,6 @@ test("Jeff fills his body profile and settings; parents edit Mya's; Olivia is in
   const olivia = await ctx.newPage();
   await olivia.goto(url);
   await olivia.getByLabel("Choose a password").fill("olivia-rules-21");
-  await olivia.getByLabel("Type it again").fill("olivia-rules-21");
   await olivia.getByRole("button", { name: "Open my closet" }).click();
   await expect(olivia).toHaveURL(/\/today$/);
   await olivia.goto("/closet");
@@ -151,7 +150,7 @@ test("my brands & sizes: add Lululemon with a size per item type and a link, the
   await page.getByTestId("pick-photos").setInputFiles({ name: "tee2.jpg", mimeType: "image/jpeg", buffer });
   await expect(page.getByRole("link", { name: /Confirm 1 ready/ })).toBeVisible({ timeout: 30_000 });
   await page.getByRole("link", { name: /Confirm 1 ready/ }).click();
-  await expect(page.getByTestId("like-sheet")).toContainText("Is this another one of the same?");
+  await expect(page.getByTestId("like-sheet")).toContainText("Another one of these");
   await page.getByTestId("like-mirror").click();
   await expect(page.getByTestId("row-brand")).toContainText("Lululemon · L");
   await expect(page.getByTestId("duplicate-row")).toContainText("Details copied");

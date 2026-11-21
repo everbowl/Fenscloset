@@ -19,11 +19,11 @@ import type { EntryAiResult } from "@/lib/import/process";
  * UNTIDY_SET is recorded once every piece is done; a remove.bg failure leaves that piece for the next start.
  */
 export const UNTIDY_SET = "untidy-v1";
-export const UNTIDY_SINCE = new Date("2026-10-18T19:57:29Z");
+const UNTIDY_SINCE = new Date("2026-10-18T19:57:29Z");
 
 export type UntidyReport = { recut: number; skipped: number; failed: number; done: boolean; /** Why the last piece was left (remove.bg's word for it). */ lastError?: string };
 /** While pieces are left (remove.bg out of credits, say), the server tries again this often; Admin → Rules has a button for right now. */
-export const UNTIDY_RETRY_MS = 60 * 60_000;
+const UNTIDY_RETRY_MS = 60 * 60_000;
 
 type Quarter = 0 | 90 | 180 | 270;
 

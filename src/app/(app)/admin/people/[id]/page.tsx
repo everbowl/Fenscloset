@@ -14,7 +14,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
   const admins = (await listPeople()).filter((p) => p.role === "admin").map((p) => ({ id: p.id, name: p.name }));
   const bodyPhotos = person.role === "minor" ? await bodyPhotosAllowed(person.id) : null;
   return (
-    <div>
+    <div className="lg:max-w-[640px]">
       <PageHeader title={person.name} />
       <PersonEditor person={person} admins={admins} smsReady={smsConfigured()} isSelf={person.id === admin.id} bodyPhotos={bodyPhotos ? { allowed: bodyPhotos.allowed, approvedBy: bodyPhotos.approvedBy ?? null, isParent: person.guardianIds.includes(admin.id) } : null} />
     </div>

@@ -29,7 +29,7 @@ export class WeatherError extends Error {
 
 const FORECAST_TTL_MS = 60 * 60 * 1000;
 
-export function isMockWeather(): boolean {
+function isMockWeather(): boolean {
   return process.env.MOCK_WEATHER === "true";
 }
 
@@ -49,15 +49,27 @@ export function conditionWord(code: number): string {
 
 /** A failed lookup is not tried again for a short while: Today renders several times at once, and each render would hit the service again. */
 const RETRY_AFTER_MS = 2 * 60 * 1000;
+/** When the service is down, a forecast this old still beats "Weather is unavailable" on Today (Railway sees Open-Meteo time out now and then). */
+const STALE_OK_MS = 24 * 60 * 60 * 1000;
 const failures = new Map<string, { at: number; error: Error }>();
 
-async function cached<T>(key: string, ttlMs: number | null, fetcher: () => Promise<T>): Promise<T> {
+/**
+ * `fetcher` is told whether an older answer is in hand: with one, it must give up fast (Today waits for this before it
+ * renders; 20 Nov 2026 a Today load took 17 s on two 8 s timeouts in a row while a 94-minute-old forecast sat in the cache).
+ */
+async function cached<T>(key: string, ttlMs: number | null, fetcher: (opts: { haveStale: boolean }) => Promise<T>): Promise<T> {
   const hit = await db.weatherCache.findUnique({ where: { key } });
   if (hit && (ttlMs === null || Date.now() - hit.fetchedAt.getTime() < ttlMs)) return hit.payload as T;
+  // The last good answer, when the service fails: Today keeps showing the weather it had an hour ago.
+  const stale = hit && Date.now() - hit.fetchedAt.getTime() < STALE_OK_MS ? (hit.payload as T) : null;
   const failed = failures.get(key);
-  if (failed && Date.now() - failed.at < RETRY_AFTER_MS) throw failed.error;
+  if (failed && Date.now() - failed.at < RETRY_AFTER_MS) { if (stale !== null) return stale; throw failed.error; }
   let payload: T;
-  try { payload = await fetcher(); } catch (e) { failures.set(key, { at: Date.now(), error: e as Error }); throw e; }
+  try { payload = await fetcher({ haveStale: stale !== null }); } catch (e) {
+    failures.set(key, { at: Date.now(), error: e as Error });
+    if (stale !== null) { console.error(`weather: ${(e as Error).message}; using the forecast from ${Math.round((Date.now() - hit!.fetchedAt.getTime()) / 60000)} min ago`); return stale; }
+    throw e;
+  }
   failures.delete(key);
   await db.weatherCache.upsert({ where: { key }, update: { payload: payload as object, fetchedAt: new Date() }, create: { key, payload: payload as object } });
   return payload;
@@ -66,7 +78,7 @@ async function cached<T>(key: string, ttlMs: number | null, fetcher: () => Promi
 /** Tests: forget the failures that are waiting to be retried. */
 export function forgetWeatherFailures(): void { failures.clear(); }
 
-export function isValidZip(zip: string): boolean {
+function isValidZip(zip: string): boolean {
   return /^\d{5}$/.test(zip.trim());
 }
 
@@ -76,7 +88,7 @@ export async function geocodeZip(zip: string): Promise<Coords> {
   if (!isValidZip(z)) throw new WeatherError("Enter a 5-digit zip code.", "bad_zip");
   if (isMockWeather()) return { lat: 32.7157, lon: -117.1611, place: "San Diego" };
   return cached(`zip:${z}`, null, async () => {
-    const res = await fetch(`https://api.zippopotam.us/us/${z}`, { signal: AbortSignal.timeout(8000) });
+    const res = await fetch(`https://api.zippopotam.us/us/${z}`, { signal: AbortSignal.timeout(PATIENT_MS) });
     if (res.status === 404) throw new WeatherError("That zip code wasn't found.", "bad_zip");
     if (!res.ok) { console.error(`weather: Zippopotam answered ${res.status} ${res.statusText}`); throw new WeatherError("Zip lookup is unavailable right now.", "unavailable"); }
     const json = (await res.json()) as { places?: { latitude: string; longitude: string; "place name": string }[] };
@@ -93,7 +105,25 @@ type OpenMeteo = {
   daily: { temperature_2m_max: number[]; temperature_2m_min: number[] };
 };
 
-async function fetchForecast(c: Coords): Promise<OpenMeteo> {
+/** How long Today waits for Open-Meteo: a short try when an older forecast can stand in, else a longer one with one more try. */
+const QUICK_MS = 3000;
+const PATIENT_MS = 6000;
+
+/**
+ * Open-Meteo answers in well under a second, except when it doesn't. With an older forecast in hand, one short try and
+ * the old forecast stands in; with nothing in hand, a longer try and one more before giving up. Today streams the
+ * weather in after the page has painted, so this is how long the forecast cell breathes, not how long the page waits.
+ */
+async function fetchForecastResponse(url: string, haveStale: boolean): Promise<Response> {
+  if (haveStale) return fetch(url, { signal: AbortSignal.timeout(QUICK_MS) });
+  try { return await fetch(url, { signal: AbortSignal.timeout(PATIENT_MS) }); }
+  catch (e) {
+    if ((e as Error).name !== "TimeoutError") throw e;
+    return fetch(url, { signal: AbortSignal.timeout(PATIENT_MS) });
+  }
+}
+
+async function fetchForecast(c: Coords, haveStale: boolean): Promise<OpenMeteo> {
   const q = new URLSearchParams({
     latitude: c.lat.toFixed(3), longitude: c.lon.toFixed(3),
     current: "temperature_2m,weather_code",
@@ -101,7 +131,7 @@ async function fetchForecast(c: Coords): Promise<OpenMeteo> {
     daily: "temperature_2m_max,temperature_2m_min",
     temperature_unit: "fahrenheit", timezone: "auto", forecast_days: "2",
   });
-  const res = await fetch(`https://api.open-meteo.com/v1/forecast?${q}`, { signal: AbortSignal.timeout(8000) });
+  const res = await fetchForecastResponse(`https://api.open-meteo.com/v1/forecast?${q}`, haveStale);
   if (!res.ok) {
     console.error(`weather: Open-Meteo answered ${res.status} ${res.statusText}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
     throw new WeatherError("Weather is unavailable right now.", "unavailable");
@@ -109,13 +139,20 @@ async function fetchForecast(c: Coords): Promise<OpenMeteo> {
   return (await res.json()) as OpenMeteo;
 }
 
+/** Dev and tests: the mock forecast takes this long to answer, so the screen's wait for the weather can be seen and tested. Unset in production. */
+async function mockDelay(): Promise<void> {
+  const ms = Number(process.env.MOCK_WEATHER_SLOW_MS ?? 0);
+  if (ms > 0) await new Promise((r) => setTimeout(r, ms));
+}
+
 /** Today's weather for coordinates. `now` is injectable for tests. */
 export async function getWeather(c: Coords, now = new Date()): Promise<Weather> {
   if (isMockWeather()) {
+    await mockDelay();
     return { nowF: 68, tonightF: 61, highF: 71, lowF: 58, rainChance: 0, condition: "Clear", timezone: "America/Los_Angeles", source: "mock" };
   }
   const key = `wx:${c.lat.toFixed(2)},${c.lon.toFixed(2)}`;
-  const data = await cached(key, FORECAST_TTL_MS, () => fetchForecast(c));
+  const data = await cached(key, FORECAST_TTL_MS, ({ haveStale }) => fetchForecast(c, haveStale));
   return summarize(data, now);
 }
 

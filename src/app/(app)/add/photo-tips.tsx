@@ -24,7 +24,7 @@ export function PhotoTips({ tips, isAdmin }: { tips: AddTips; isAdmin: boolean }
   return (
     <section className="mt-5 border-t border-ink pt-3" data-testid="photo-tips">
       <div className="flex items-end justify-between">
-        <p className="serif text-[22px]">Before you <em>start</em></p>
+        <p className="serif text-[22px]">Before you start</p>
         <button type="button" onClick={() => toggle(true)} className="pill pill-sm pill-quiet" data-testid="hide-tips">Don’t show again</button>
       </div>
       <ol className="mt-2 space-y-1.5">

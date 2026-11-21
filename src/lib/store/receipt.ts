@@ -8,7 +8,7 @@ import { lookupProduct, type StoreProduct } from "@/lib/store/add";
  * only the item facts and prices are kept, never order numbers, addresses or card digits.
  */
 
-export type ReceiptLine = { name: string; color: string | null; size: string | null; quantity: number; priceText: string | null; url: string | null };
+type ReceiptLine = { name: string; color: string | null; size: string | null; quantity: number; priceText: string | null; url: string | null };
 export type Receipt = { storeName: string | null; orderDate: string | null; lines: ReceiptLine[] };
 export type MatchedLine = ReceiptLine & { picks: Product[] };
 

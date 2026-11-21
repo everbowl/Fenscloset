@@ -2,8 +2,12 @@ import { db } from "@/lib/db";
 import type { BodyView } from "@/generated/prisma/client";
 import { forgetTaste } from "@/lib/outfits/taste";
 import { isTryOnConfigured } from "@/lib/tryon";
+import { mirrorEngines } from "@/lib/tryon";
+import { type Engine } from "@/lib/tryon/engines";
 import { deleteObject, parseKey } from "@/lib/storage";
-import { bodyPhotosAllowed, canGrantBodyAccess, canSeeBodyData, type Viewer } from "@/lib/people/visibility";
+import { bodyPhotosAllowed, canGrantBodyAccess, canSeeBodyData, canShopFor, type Viewer } from "@/lib/people/visibility";
+import { sectionOf } from "@/lib/shop/section";
+import { listEntries } from "@/lib/lists/service";
 
 export class ProfileError extends Error {
   constructor(message: string, public readonly status = 400) {
@@ -33,7 +37,11 @@ export type PrivacyView = {
   parentIds: string[];
   canGrant: boolean;
   /** Virtual try-on (adults only): opted in, and whether the site has a provider. */
-  tryOn: { enabled: boolean; adult: boolean; configured: boolean; hasBodyPhoto: boolean };
+  tryOn: { enabled: boolean; adult: boolean; configured: boolean; hasBodyPhoto: boolean; /** Who receives the body photo to make the picture (the household's mirror rule). */ engines: Engine[] };
+  /** The part of a store this person shops in (Jeff, 2 Nov 2026), and the list to pick from. */
+  shopSection: { id: string; name: string } | null;
+  sections: { id: string; name: string }[];
+  isAdmin: boolean;
 };
 
 /** Only the owner (or a parent of a minor owner) edits a profile. */
@@ -126,6 +134,16 @@ export async function removeBodyPhoto(viewer: Viewer, ownerId: string, photoId: 
   await deleteObject(photo.bucketKey).catch(() => {});
 }
 
+/** "VISIBLE TO JEFF, BRITTNEY": the owner, a minor's parents and the granted viewers, by first name. */
+export async function bodyViewerNames(ownerId: string): Promise<string[]> {
+  const [owner, parents, grants] = await Promise.all([
+    db.person.findUniqueOrThrow({ where: { id: ownerId }, select: { name: true } }),
+    db.guardianLink.findMany({ where: { minorId: ownerId }, include: { parent: { select: { name: true } } } }),
+    db.bodyDataGrant.findMany({ where: { ownerId }, include: { viewer: { select: { name: true } } } }),
+  ]);
+  return [owner.name, ...parents.map((p) => p.parent.name), ...grants.map((g) => g.viewer.name)].map((n) => n.split(" ")[0]);
+}
+
 // ---------- Style ----------
 
 export async function getStyleProfile(ownerId: string): Promise<StyleProfileView> {
@@ -174,16 +192,30 @@ export async function updateFavorites(viewer: Viewer, ownerId: string, patch: { 
 // ---------- Privacy grants ----------
 
 export async function getPrivacy(ownerId: string): Promise<PrivacyView> {
-  const [p, body, shop, parents, canGrant, photo] = await Promise.all([
+  const [p, body, shop, parents, canGrant, photo, mirror, shopSection, sections] = await Promise.all([
     db.person.findUniqueOrThrow({ where: { id: ownerId }, select: { savedZip: true, role: true, tryOnEnabled: true } }),
     db.bodyDataGrant.findMany({ where: { ownerId }, select: { viewerId: true } }),
     db.shopForGrant.findMany({ where: { ownerId }, select: { shopperId: true } }),
     db.guardianLink.findMany({ where: { minorId: ownerId }, select: { parentId: true } }),
     canGrantBodyAccess(ownerId),
     db.bodyPhoto.findFirst({ where: { personId: ownerId }, select: { id: true } }),
+    mirrorEngines(),
+    sectionOf(ownerId),
+    listEntries("shopSection"),
   ]);
   return { savedZip: p.savedZip, bodyViewerIds: body.map((b) => b.viewerId), shopperIds: shop.map((s) => s.shopperId), parentIds: parents.map((g) => g.parentId), canGrant,
-    tryOn: { enabled: p.tryOnEnabled, adult: p.role !== "minor", configured: isTryOnConfigured(), hasBodyPhoto: Boolean(photo) } };
+    tryOn: { enabled: p.tryOnEnabled, adult: p.role !== "minor", configured: isTryOnConfigured(), hasBodyPhoto: Boolean(photo), engines: mirror.engines },
+    shopSection, sections: sections.map((x) => ({ id: x.id, name: x.name })), isAdmin: p.role === "admin" };
+}
+
+/** The section a person shops in: set by the person, a parent of a minor, or anyone allowed to shop for them (the ask on the Shop). */
+export async function setShopSection(viewer: Viewer, ownerId: string, sectionId: string | null): Promise<void> {
+  if (!(await canShopFor(viewer, ownerId))) throw new ProfileError("Only the person, a parent, or someone who shops for them picks their section.", 403);
+  if (sectionId) {
+    const row = await db.shopSection.findUnique({ where: { id: sectionId } });
+    if (!row || row.isArchived) throw new ProfileError("That section isn’t on the list anymore.", 404);
+  }
+  await db.person.update({ where: { id: ownerId }, data: { shopSectionId: sectionId } });
 }
 
 /** Only the owner changes grants (a parent does not hand out a minor's data). Minors cannot grant at all. */

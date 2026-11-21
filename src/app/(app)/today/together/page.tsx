@@ -5,6 +5,7 @@ import { dayKey } from "@/lib/dates";
 import { listEntries } from "@/lib/lists/service";
 import { latestTogether, togetherPeople } from "@/lib/outfits/together";
 import { TogetherScreen } from "./together-screen";
+import { rememberedShopFor } from "@/lib/shop/remember";
 
 export const metadata = { title: "Together" };
 export const dynamic = "force-dynamic";
@@ -18,6 +19,7 @@ export default async function TogetherPage({ searchParams }: { searchParams: Pro
   const session = s ? (await import("@/lib/outfits/together")).getTogether(me, s) : null;
   const shown = (await session) ?? latest;
   const minors = (await db.guardianLink.findMany({ where: { parentId: me.id }, select: { minorId: true } })).map((g) => g.minorId);
+  const remembered = await rememberedShopFor(); // N1: the last person picked under Shopping for starts picked here too
   return (
     <TogetherScreen
       meId={me.id}
@@ -25,6 +27,7 @@ export default async function TogetherPage({ searchParams }: { searchParams: Pro
       canDressIds={[me.id, ...minors]}
       occasions={occasions.map((o) => ({ id: o.id, name: o.name }))}
       isAdmin={isAdmin(me)}
+      remembered={remembered && people.some((p) => p.id === remembered) ? remembered : null}
       session={shown && shown.date === date ? shown : null}
     />
   );

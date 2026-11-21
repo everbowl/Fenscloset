@@ -12,7 +12,7 @@ import { accessToken, fetchWithBackoff } from "@/lib/tryon/google";
  * now, doesn't work and don't want it". Gone from the app; git history has them.
  */
 
-export class GoogleImageError extends Error {
+class GoogleImageError extends Error {
   constructor(message: string, public readonly status = 400) {
     super(message);
     this.name = "GoogleImageError";

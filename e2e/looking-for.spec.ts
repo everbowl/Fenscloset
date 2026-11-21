@@ -43,7 +43,7 @@ test("looking for: add a line, the stores are searched, the new count shows on t
   // opened once: nothing new any more, on the page, the list, the Shop and Today
   await page.goto(wantUrl);
   await expect(page.getByTestId("want-fresh")).toHaveCount(0);
-  await page.getByTestId("want-back").click();
+  await page.getByTestId("header-back").click();
   await expect(page.getByTestId("want-new")).toHaveCount(0);
   await page.goto("/today");
   await expect(page.getByTestId("looking-for-strip")).toHaveCount(0);
@@ -60,15 +60,15 @@ test("looking for: add a line, the stores are searched, the new count shows on t
   await expect(page.getByTestId("want-matches")).toContainText(/matches from/, { timeout: 20000 });
   await page.getByTestId("want-found").click();
   await expect(page.getByTestId("want-unfound")).toBeVisible();
-  await page.getByTestId("want-back").click();
+  await page.getByTestId("header-back").click();
   await expect(page.getByTestId("found-row")).toContainText("camel wool overcoat");
   await expect(page.getByTestId("looking-for-empty")).toBeVisible();
   await page.getByTestId("found-row").click();
   await page.getByTestId("want-unfound").click();
   await expect(page.getByTestId("want-found")).toBeVisible();
-  page.once("dialog", (d) => void d.accept());
   await page.getByTestId("want-delete").click();
-  await expect(page).toHaveURL(/\/shop\/looking-for\?for=/);
+  await expect(page.getByTestId("want-undo")).toContainText("Taken off the list"); // five seconds to change your mind
+  await expect(page).toHaveURL(/\/shop\/looking-for\?for=/, { timeout: 15_000 });
   await expect(page.getByTestId("looking-for-empty")).toBeVisible();
   await expect(page.getByTestId("want-row")).toHaveCount(0);
 });

@@ -24,10 +24,10 @@ export function Waiting({ working, added, total, batchId }: { working: number; a
           <span className="w-11" />
         </div>
         <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-          <span className="mono mono-11">Tagging {working}</span>
+          <span className="mono mono-11" aria-live="polite">Tagging · {working} left</span>
           <span className="mono text-graphite">The next piece will appear here</span>
         </div>
-        <div className="absolute inset-x-0 bottom-0 h-[3px] bg-black/[0.12]"><div className="h-[3px] bg-ink" style={{ width: `${total ? Math.round((added / total) * 100) : 0}%` }} /></div>
+        <div className="absolute inset-x-0 bottom-0 h-[3px] overflow-hidden bg-black/[0.12]"><div className="h-[3px] bg-ink transition-[width] duration-300" style={{ width: `${total ? Math.round((added / total) * 100) : 0}%` }} /><div aria-hidden className="absolute inset-y-0 w-1/4 animate-pulse bg-ink/40 motion-reduce:hidden" style={{ left: `${total ? Math.round((added / total) * 100) : 0}%` }} /></div>
       </div>
     </div>
   );

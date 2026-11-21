@@ -14,7 +14,7 @@ import path from "node:path";
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-export const PHOTO_KINDS = ["originals", "cutouts", "thumbs", "labels", "worn", "avatars", "bodies", "checkins", "fits", "shop", "inspo", "tryon", "mannequin"] as const;
+export const PHOTO_KINDS = ["originals", "cutouts", "thumbs", "labels", "worn", "avatars", "bodies", "checkins", "fits", "shop", "inspo", "tryon", "mannequin", "looks"] as const;
 export type PhotoKeyKind = (typeof PHOTO_KINDS)[number];
 export const IMAGE_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 const EXT_TYPES: Record<string, string> = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" };
@@ -148,6 +148,16 @@ export async function signUpload(opts: { ownerId: string; kind?: PhotoKeyKind; c
   const sig = uploadSig(key, opts.contentType, exp);
   const url = `/api/uploads/put?key=${encodeURIComponent(key)}&exp=${exp}&sig=${sig}`;
   return { key, url, method: "PUT", headers: { "Content-Type": opts.contentType }, expiresAt: exp };
+}
+
+/**
+ * A link an outside service can fetch the object from for `expiresInSec` (the mirror hands Kling its two pictures this
+ * way). On the bucket it is a presigned GET; in mock mode it is the app's own photo route, which only tests look at.
+ */
+export async function signDownload(key: string, expiresInSec = 900): Promise<string> {
+  if (!parseKey(key)) throw new Error("Bad key");
+  if (storageMode() === "s3") return getSignedUrl(s3(), new GetObjectCommand({ Bucket: bucket(), Key: key }), { expiresIn: expiresInSec });
+  return `${(process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "")}/api/photo/${key}`;
 }
 
 export function verifyUploadToken(key: string, contentType: string, exp: number, sig: string): boolean {

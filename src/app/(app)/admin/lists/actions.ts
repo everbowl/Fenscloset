@@ -76,3 +76,20 @@ export async function reorderEntriesAction(kind: string, orderedIds: string[]): 
     return { ok: false, error: message(e) };
   }
 }
+
+// ---------- "Ask Jeff to add it" (J1) ----------
+import { requirePerson } from "@/lib/auth/current";
+import { RequestError, requestListEntry, resolveRequest } from "@/lib/lists/requests";
+
+export async function requestEntryAction(kind: string, name: string, parentId?: string | null): Promise<{ ok: true; admins: string; already: boolean } | { ok: false; error: string }> {
+  const me = await requirePerson();
+  assertKind(kind);
+  try { const r = await requestListEntry(me.id, kind, name, parentId); revalidatePath("/admin/lists"); return { ok: true, ...r }; }
+  catch (e) { if (e instanceof RequestError) return { ok: false, error: e.message }; console.error(e); return { ok: false, error: "Couldn’t send the ask. Try again." }; }
+}
+
+export async function resolveRequestAction(id: string, status: "added" | "dismissed" | "open"): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireAdmin();
+  try { await resolveRequest(id, status); revalidatePath("/admin/lists"); return { ok: true }; }
+  catch (e) { console.error(e); return { ok: false, error: "Couldn’t update the ask. Try again." }; }
+}

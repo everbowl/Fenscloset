@@ -9,7 +9,7 @@ export function Field({ label, htmlFor, hint, error, children }: {
       <label htmlFor={htmlFor} className="mono tracking-[0.14em] text-graphite">{label}</label>
       {children}
       {error ? <p className="mono mt-1 border-t border-ink pt-2 text-ink" role="alert">— {error}</p>
-        : hint ? <p className="mono normal-case tracking-[0.08em] text-[11px] text-graphite pt-1">{hint}</p> : null}
+        : hint ? <p className="note pt-1">{hint}</p> : null}
     </div>
   );
 }

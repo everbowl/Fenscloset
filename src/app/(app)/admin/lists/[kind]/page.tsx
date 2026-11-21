@@ -20,7 +20,7 @@ export default async function ListKindPage({ params, searchParams }: { params: P
   const entries = await listEntries(kind, { parentId, includeArchived: true });
 
   return (
-    <div>
+    <div className="lg:max-w-[640px]">
       <PageHeader title={def.label} />
       <p className="-mt-2 mb-4 text-[13px] leading-snug text-graphite">{def.description}</p>
       {def.parent ? <ParentPicker label={def.parent.label} kind={kind} parents={parents} selected={parentId} /> : null}

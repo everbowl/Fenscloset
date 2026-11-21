@@ -82,9 +82,9 @@ export async function openBatch(personId: string): Promise<BatchSummary | null> 
   };
 }
 
-/** Closes a batch once nothing is left to confirm (or the person abandons it). */
+/** Closes a batch once nothing is left to confirm (or the person abandons it). Failed photos keep it open so they are not lost: Try again or Let them go. */
 export async function finishBatchIfDone(batchId: string): Promise<boolean> {
-  const left = await db.importEntry.count({ where: { batchId, status: { in: ["queued", "uploaded", "processing", "needs_confirm"] } } });
+  const left = await db.importEntry.count({ where: { batchId, status: { in: ["queued", "uploaded", "processing", "needs_confirm", "failed"] } } });
   if (left > 0) return false;
   await db.importBatch.update({ where: { id: batchId }, data: { status: "done" } });
   return true;

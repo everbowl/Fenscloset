@@ -17,7 +17,7 @@ export function isGoogleConfigured(): boolean {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) || process.env.MOCK_GOOGLE === "true";
 }
 
-export function redirectUri(): string {
+function redirectUri(): string {
   return `${(process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "")}/api/google/callback`;
 }
 

@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { cn } from "@/lib/cn";
+import { LinkPending } from "@/components/link-pending";
 import type { ItemCardData } from "@/lib/items/query";
 
 /** In the closet's pick mode a card is a toggle, not a link: picked, or why it can't be. */
@@ -13,6 +14,7 @@ export function ItemCard({ item, showOwner, pick }: { item: ItemCardData; showOw
     <>
       <div className="relative h-[214px] overflow-hidden bg-bone lg:h-[300px]">
         {item.thumbKey ? <img src={`/api/photo/${item.thumbKey}`} alt={item.name} className="size-full object-contain" loading="lazy" /> : null}
+        {item.copies > 1 ? <span className="mono absolute left-2 top-2 bg-ink px-1.5 py-0.5 text-paper" data-testid="copies-badge">{item.copiesWord}</span> : null}
         {pick?.on ? <span className="mono absolute right-2 top-2 flex size-7 items-center justify-center bg-ink text-paper" aria-hidden>✓</span> : null}
         {pick && !pick.placeable ? <span className="mono absolute inset-x-2 bottom-2 bg-paper px-1.5 py-1 text-center text-graphite">Not in the mirror</span> : null}
       </div>
@@ -32,8 +34,8 @@ export function ItemCard({ item, showOwner, pick }: { item: ItemCardData; showOw
     );
   }
   return (
-    <Link href={`/closet/${item.id}`} className="flex flex-col gap-2" data-testid="item-card">
-      {body}
+    <Link href={`/closet/${item.id}`} className="tap block" data-testid="item-card">
+      <LinkPending className="flex flex-col gap-2">{body}</LinkPending>
     </Link>
   );
 }

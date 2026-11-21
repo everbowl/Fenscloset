@@ -1,4 +1,4 @@
-import type { Engine } from "@/lib/tryon/engines";
+import { enginePlacesShoes, type Engine } from "@/lib/tryon/engines";
 
 /**
  * Completing a look before the mirror dresses it (Jeff, 24 Oct 2026: "make me select a top and bottom if it's not a
@@ -27,9 +27,9 @@ export function slotOf(category: string | null | undefined): Slot | "onePiece" |
   return null;
 }
 
-/** FASHN places tops, bottoms and one-pieces, not shoes; Google and the mannequin's image model can. */
+/** FASHN and Kling place tops, bottoms and one-pieces, not shoes; Google and the mannequin's image model can. */
 export function shoesPlaceable(on: "me" | "mannequin", engine: Engine): boolean {
-  return on === "mannequin" || engine !== "fashn";
+  return on === "mannequin" || enginePlacesShoes(engine);
 }
 
 /**
@@ -74,8 +74,9 @@ export function swapIn(itemIds: string[], piece: MirrorPiece, wardrobe: Wardrobe
   return [...kept, piece.id];
 }
 
-export const SLOT_WORD: Record<Slot, { ask: string; skip: (chosen: MirrorPiece[]) => string }> = {
-  top: { ask: "Add a top?", skip: (c) => (c.some((p) => slotOf(p.category) === "bottom") ? "Just the bottom" : "No top") },
-  bottom: { ask: "Add a bottom?", skip: (c) => (c.some((p) => slotOf(p.category) === "top") ? "Just the top" : "No bottom") },
-  shoes: { ask: "Add shoes?", skip: () => "No shoes" },
+/** The panel's words for a slot: its heading, what "nothing picked" is called, and the old one-question wording kept for the way out. */
+export const SLOT_WORD: Record<Slot, { ask: string; label: string; none: string; skip: (chosen: MirrorPiece[]) => string }> = {
+  top: { ask: "Add a top?", label: "A top", none: "No top", skip: (c) => (c.some((p) => slotOf(p.category) === "bottom") ? "Just the bottom" : "No top") },
+  bottom: { ask: "Add a bottom?", label: "A bottom", none: "No bottom", skip: (c) => (c.some((p) => slotOf(p.category) === "top") ? "Just the top" : "No bottom") },
+  shoes: { ask: "Add shoes?", label: "Shoes", none: "No shoes", skip: () => "No shoes" },
 };

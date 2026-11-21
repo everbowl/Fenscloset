@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { parseKey } from "@/lib/storage";
 import { MANNEQUIN_OWNER } from "@/lib/tryon/mannequin-key";
-import { canSeeBodyData } from "@/lib/people/visibility";
+import { canSeeBodyData, canShopFor } from "@/lib/people/visibility";
 import type { Role } from "@/generated/prisma/client";
 
 export type Viewer = { id: string; role: Role; status?: string };
@@ -27,6 +27,7 @@ export async function canViewKey(viewer: Viewer, key: string): Promise<boolean> 
   if (parsed.kind === "mannequin") return canSeeMannequinKey(viewer, parsed.ownerId); // no body in it: the person and a minor's parents
   if (parsed.kind === "fits") return canSeeFitPhotoKey(viewer, parsed.ownerId, key);
   if (parsed.kind === "shop") return canSeeShopKey(viewer, parsed.ownerId, key);
+  if (parsed.kind === "looks") return canShopFor(viewer, parsed.ownerId); // a store find in a look: whoever may build the look
   const owner = await db.person.findUnique({ where: { id: parsed.ownerId }, select: { id: true, role: true, status: true } });
   if (!owner || owner.status === "removed") return false;
   if (owner.role === "minor") {
@@ -44,7 +45,7 @@ export async function canViewKey(viewer: Viewer, key: string): Promise<boolean> 
  * Body photos follow the body-data rule, except a photo locked "only me": the owner alone sees it
  * (a minor's locked photo stays visible to their parents, per the minors rule).
  */
-export async function canSeeBodyPhotoKey(viewer: Viewer, ownerId: string, key: string): Promise<boolean> {
+async function canSeeBodyPhotoKey(viewer: Viewer, ownerId: string, key: string): Promise<boolean> {
   if (viewer.id === ownerId) return true;
   const photo = await db.bodyPhoto.findUnique({ where: { bucketKey: key }, select: { onlyMe: true } });
   if (photo?.onlyMe) {
@@ -56,7 +57,7 @@ export async function canSeeBodyPhotoKey(viewer: Viewer, ownerId: string, key: s
 }
 
 /** A look on the mannequin shows clothes, not a body: the person it was made for and a minor's parents see it; the shared mannequin itself is for any active member. */
-export async function canSeeMannequinKey(viewer: Viewer, ownerId: string): Promise<boolean> {
+async function canSeeMannequinKey(viewer: Viewer, ownerId: string): Promise<boolean> {
   if (ownerId === MANNEQUIN_OWNER) return true;
   if (viewer.id === ownerId) return true;
   return isParentOfMinor(viewer.id, ownerId);
@@ -67,7 +68,7 @@ async function isParentOfMinor(viewerId: string, minorId: string): Promise<boole
 }
 
 /** A fit photo is seen by the owner, the people tagged on the fit, and a minor owner's parents. */
-export async function canSeeFitPhotoKey(viewer: Viewer, ownerId: string, key: string): Promise<boolean> {
+async function canSeeFitPhotoKey(viewer: Viewer, ownerId: string, key: string): Promise<boolean> {
   if (viewer.id === ownerId) return true;
   if (await isParentOfMinor(viewer.id, ownerId)) return true;
   const fit = await db.fit.findUnique({ where: { photoKey: key }, select: { viewers: { where: { personId: viewer.id }, select: { personId: true } } } });
@@ -75,7 +76,7 @@ export async function canSeeFitPhotoKey(viewer: Viewer, ownerId: string, key: st
 }
 
 /** A shopping photo is seen by the shopper who uploaded it, the person it was for, and a minor target's parents. */
-export async function canSeeShopKey(viewer: Viewer, shopperId: string, key: string): Promise<boolean> {
+async function canSeeShopKey(viewer: Viewer, shopperId: string, key: string): Promise<boolean> {
   if (viewer.id === shopperId) return true;
   const lookup = await db.shoppingLookup.findFirst({ where: { imageKey: key }, select: { forPersonId: true } });
   if (!lookup) return false;

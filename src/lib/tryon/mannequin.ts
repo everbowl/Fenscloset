@@ -2,7 +2,7 @@ import sharp from "sharp";
 import { db } from "@/lib/db";
 import { getObject, newKey, objectExists, putObject } from "@/lib/storage";
 import { googleImage, isGoogleImageConfigured } from "@/lib/images/google-image";
-import { garmentImages, MAX_GARMENTS, mockTryOn, stylingFor, stylingView, TryOnError, type DressingHooks, type TryOnView } from "@/lib/tryon";
+import { asExtras, extraKeys, garmentImages, MAX_GARMENTS, mockTryOn, stylingFor, stylingView, TryOnError, type DressingHooks, type ExtraGarment, type TryOnView } from "@/lib/tryon";
 import { stylingSentence, type StylingChoice } from "@/lib/tryon/features";
 import { MANNEQUIN_BASE_KEY } from "@/lib/tryon/mannequin-key";
 import type { Viewer } from "@/lib/people/visibility";
@@ -49,19 +49,20 @@ async function assertCanDress(viewer: Viewer, personId: string) {
 }
 
 /** The look on the mannequin. `source` is "today" or "shop" for the record. `pick` is this call's styling change (pose, tuck…), remembered for the person. */
-export async function mannequinLook(viewer: Viewer, personId: string, itemIds: string[], source: string, extraGarment?: Buffer, fetchImpl: typeof fetch = fetch, pick?: StylingChoice, extraFeatures: string[] = [], fresh = false, hooks: DressingHooks = {}): Promise<TryOnView> {
+export async function mannequinLook(viewer: Viewer, personId: string, itemIds: string[], source: string, extraGarment?: Buffer | ExtraGarment[], fetchImpl: typeof fetch = fetch, pick?: StylingChoice, extraFeatures: string[] = [], fresh = false, hooks: DressingHooks = {}): Promise<TryOnView> {
   await assertCanDress(viewer, personId);
   if (!isMannequinConfigured()) throw new TryOnError("The mannequin isn’t set up on the site yet.");
   const ids = [...new Set(itemIds)].sort();
-  const cacheIds = extraGarment ? [...ids, `extra:${source}`].sort() : ids;
+  const extras = asExtras(extraGarment);
+  const cacheIds = [...ids, ...extraKeys(extras, source)].sort();
   if (fresh) await db.tryOn.deleteMany({ where: { personId, bodyPhotoKey: MANNEQUIN_BASE_KEY, itemIds: { equals: cacheIds } } }); // "Dress again"
   const { lists, styling } = await stylingFor(personId, ids, pick, extraFeatures);
   const view = stylingView(lists, styling);
   const hit = await db.tryOn.findFirst({ where: { personId, bodyPhotoKey: MANNEQUIN_BASE_KEY, itemIds: { equals: cacheIds }, styling: styling.key }, orderBy: { createdAt: "desc" } });
   if (hit) return { id: hit.id, key: hit.bucketKey, itemIds: hit.itemIds, createdAt: hit.createdAt.toISOString(), cached: true, mannequin: true, styling: view };
-  const garments = [...(extraGarment ? [{ id: "extra", buf: extraGarment }] : []), ...(await garmentImages(ids))].slice(0, MAX_GARMENTS);
+  const garments = [...extras, ...(await garmentImages(ids))].slice(0, MAX_GARMENTS);
   if (!garments.length) throw new TryOnError("None of these pieces has a photo the mannequin can wear.");
-  hooks.step?.(`Dressing the mannequin · ${garments.map((g) => ("name" in g ? g.name : "the new piece")).join(", ")}`);
+  hooks.step?.(`Dressing the mannequin · ${garments.map((g) => g.name).join(", ")}`);
   const base = await mannequinBase(fetchImpl);
   let picture: Buffer;
   if (process.env.MOCK_TRYON === "true") picture = await mockTryOn(base, garments.map((g) => g.buf));

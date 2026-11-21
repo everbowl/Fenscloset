@@ -25,17 +25,17 @@ test.describe("closet", () => {
     // search by brand
     await page.goto("/closet");
     await page.getByRole("button", { name: "Search" }).click();
-    await page.getByRole("textbox", { name: "Search" }).fill("levi");
-    await page.getByRole("textbox", { name: "Search" }).press("Enter");
+    await page.getByRole("searchbox", { name: "Search" }).fill("levi");
+    await page.getByRole("searchbox", { name: "Search" }).press("Enter");
     await expect(page.getByTestId("item-card")).toHaveCount(1);
 
     // item detail: laundry word changes with one tap and shows in the grid
     await page.getByTestId("item-card").click();
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Dark jeans");
-    await page.getByTestId("laundry-cycle").click();
-    await expect(page.getByText("Laundry · Laundry")).toBeVisible();
+    await page.getByTestId("laundry-dirty").click();
+    await expect(page.getByTestId("laundry-dirty")).toHaveAttribute("aria-checked", "true");
     await page.goto("/closet");
-    await expect(page.getByTestId("item-card").filter({ hasText: "Dark jeans" })).toContainText("Laundry");
+    await expect(page.getByTestId("item-card").filter({ hasText: "Dark jeans" })).toContainText("In the wash");
 
     // put it in the Family closet, then switch the header to FAMILY and see it there
     await page.getByTestId("item-card").filter({ hasText: "Dark jeans" }).click();
@@ -70,7 +70,7 @@ test.describe("closet", () => {
     await expect(page.getByTestId("pick-bar")).toContainText("2 picked");
     await page.getByTestId("see-picked").click();
     // the mirror may first ask to complete the look (shoes…); e2e/mirror-complete.spec.ts covers the asking
-    while (await page.getByTestId("complete-skip").isVisible()) await page.getByTestId("complete-skip").click();
+    if (await page.getByTestId("complete-go").isVisible()) await page.getByTestId("complete-go").click(); // the panel: nothing picked, just the piece
     await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole("dialog")).toContainText("White crew tee · Dark jeans");
     await expect(page.getByTestId("try-on-sheet")).toContainText("No body photo used");
@@ -80,7 +80,7 @@ test.describe("closet", () => {
     await page.getByTestId("pick-cancel").click();
     await page.getByTestId("item-card").filter({ hasText: "White crew tee" }).click();
     await page.getByTestId("see-on-me").click();
-    while (await page.getByTestId("complete-skip").isVisible()) await page.getByTestId("complete-skip").click();
+    if (await page.getByTestId("complete-go").isVisible()) await page.getByTestId("complete-go").click(); // the panel: nothing picked, just the piece
     await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole("dialog")).toContainText("White crew tee");
   });

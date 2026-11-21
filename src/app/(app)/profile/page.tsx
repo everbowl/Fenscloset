@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { isAdmin } from "@/lib/auth/current";
 import { PageHeader } from "@/components/ui/page-header";
-import { Button } from "@/components/ui/button";
 import { logoutAction } from "@/app/(auth)/login/actions";
 import { db } from "@/lib/db";
 import { canSeeBodyData } from "@/lib/people/visibility";
@@ -28,11 +27,10 @@ function Row({ href, label, meta, testId }: { href?: string; label: string; meta
 export default async function ProfilePage() {
   const { viewer, owner, mine } = await resolveProfileTarget();
   const seeBody = await canSeeBodyData(viewer, owner.id);
-  const [body, style, favs, colors, words, brands, stores, email] = await Promise.all([
+  const [body, style, favs, words, brands, stores, email] = await Promise.all([
     seeBody ? getBodyProfile(viewer, owner.id) : null,
     getStyleProfile(owner.id),
     getFavorites(owner.id),
-    db.color.findMany({ select: { id: true, name: true } }),
     db.styleWord.findMany({ select: { id: true, name: true } }),
     db.brand.findMany({ select: { id: true, name: true } }),
     db.store.findMany({ select: { id: true, name: true } }),
@@ -48,7 +46,7 @@ export default async function ProfilePage() {
   const favMeta = [names(brands, favs.brandIds, 2), names(stores, favs.storeIds, 1)].filter(Boolean).join(" · ") || "None yet";
 
   return (
-    <div>
+    <div className="lg:max-w-[640px]">
       <PageHeader title={owner.first} aside={roleLabel[owner.role]} />
       <p className="mono normal-case text-graphite -mt-2 mb-4">{mine ? email.email ?? "No email yet" : `${owner.first}'s profile`}</p>
       <section>
@@ -69,7 +67,7 @@ export default async function ProfilePage() {
       ) : null}
       {mine ? (
         <form action={logoutAction} className="mt-8">
-          <Button type="submit" variant="secondary" className="w-full">Log out</Button>
+          <button type="submit" className="pill pill-quiet h-[50px] w-full" data-testid="log-out">Log out</button>
         </form>
       ) : null}
       {!mine && !seeBody ? <p className="mono mt-6 text-graphite">{owner.first}&apos;s body profile is private</p> : null}

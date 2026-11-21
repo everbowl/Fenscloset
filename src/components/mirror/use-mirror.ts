@@ -5,13 +5,16 @@ import type { TryOnView } from "@/lib/tryon";
 import type { StylingChoice } from "@/lib/tryon/features";
 import type { Engine } from "@/lib/tryon/engines";
 import { candidatesFor, EMPTY_WARDROBE, missingSlots, shoesPlaceable, swapIn, type MirrorPiece, type Slot, type Wardrobe } from "@/lib/tryon/complete";
-import { dressAction, dressingStatusAction, type MirrorLook, type MirrorResult } from "@/app/(app)/mirror/actions";
+import { dressAction, dressingStatusAction, keepTryOnAction, type MirrorLook, type MirrorResult } from "@/app/(app)/mirror/actions";
 
 export type MirrorOn = "me" | "mannequin";
 export type MirrorView = "front" | "back";
 export type Mirror = ReturnType<typeof useMirror>;
-/** The mirror is asking to complete a look before dressing it: what is chosen so far and what it still asks for, in order. */
-export type Pending = { itemIds: string[]; on: MirrorOn; ask: Slot[] };
+/**
+ * The mirror is asking to complete a look before dressing it: the pieces chosen so far, the slots it offers (a bottom
+ * for a top, shoes…) all on one panel, and what has been picked for each (null: go without). One button dresses it.
+ */
+export type Pending = { itemIds: string[]; on: MirrorOn; ask: Slot[]; picks: Partial<Record<Slot, string | null>> };
 
 /** How often the screen asks after a dressing that is still running. */
 const POLL_MS = 2000;
@@ -19,6 +22,7 @@ const POLL_MS = 2000;
 function sameLook(a: MirrorLook, b: MirrorLook): boolean {
   if (a.kind === "today" && b.kind === "today") return a.suggestionId === b.suggestionId && a.index === b.index;
   if (a.kind === "closet" && b.kind === "closet") return [...a.itemIds].sort().join() === [...b.itemIds].sort().join();
+  if (a.kind === "look" && b.kind === "look") return a.lookId === b.lookId;
   return false;
 }
 
@@ -89,8 +93,9 @@ export function useMirror(personId: string, wardrobe: Wardrobe = EMPTY_WARDROBE,
   const piecesOf = useCallback((ids: string[]): MirrorPiece[] => ids.map((id) => wardrobe.pieces.find((p) => p.id === id)).filter((p): p is MirrorPiece => Boolean(p)), [wardrobe]);
 
   /**
-   * From a piece or the closet's picks: ask to complete the look first (a bottom for a top, a top for a bottom, shoes
-   * when the picture can show them), each with a way to decline; a one-piece or a full pick goes straight to the mirror.
+   * From a piece or the closet's picks: offer to complete the look first, every missing slot on one panel (a bottom for
+   * a top, a top for a bottom, shoes when the picture can show them), each optional (Jeff, 20 Nov 2026: one question
+   * at a time read as "it asked me only about bottoms"); a one-piece or a full pick goes straight to the mirror.
    */
   const begin = useCallback((req: { look: MirrorLook; on: MirrorOn }) => {
     if (req.look.kind !== "closet") { show(req); return; }
@@ -100,17 +105,20 @@ export function useMirror(personId: string, wardrobe: Wardrobe = EMPTY_WARDROBE,
     if (timer.current) clearTimeout(timer.current);
     seq.current++;
     setBusy(false); setProgress(null); setError(undefined);
-    setPending({ itemIds: req.look.itemIds, on: req.on, ask });
+    setPending({ itemIds: req.look.itemIds, on: req.on, ask, picks: {} });
     setOpen(true);
   }, [engine, piecesOf, show, wardrobe]);
 
-  /** Answer the current question: a piece, or null to go without. The last answer dresses the look. */
-  const choose = useCallback((piece: MirrorPiece | null) => {
+  /** A piece for a slot on the panel (a tap on the chosen one takes it off again), or null for none. */
+  const pick = useCallback((slot: Slot, piece: MirrorPiece | null) => {
+    setPending((p) => (p ? { ...p, picks: { ...p.picks, [slot]: piece && p.picks[slot] !== piece.id ? piece.id : null } } : p));
+  }, []);
+
+  /** "See it on me": the chosen pieces and the picks, dressed. */
+  const confirm = useCallback(() => {
     if (!pending) return;
-    const itemIds = piece ? [...pending.itemIds, piece.id] : pending.itemIds;
-    const ask = pending.ask.slice(1);
-    if (ask.length) setPending({ itemIds, on: pending.on, ask });
-    else void dress({ look: { kind: "closet", itemIds }, on: pending.on });
+    const extra = pending.ask.map((s) => pending.picks[s]).filter((id): id is string => Boolean(id));
+    void dress({ look: { kind: "closet", itemIds: [...pending.itemIds, ...extra] }, on: pending.on });
   }, [dress, pending]);
 
   /** Under the picture: another top, another bottom, shoes… the piece swaps in and the look is dressed again. */
@@ -120,8 +128,19 @@ export function useMirror(personId: string, wardrobe: Wardrobe = EMPTY_WARDROBE,
     void dress({ look: { kind: "closet", itemIds: swapIn(ids, piece, wardrobe) }, on, view });
   }, [dress, look, on, tryOn, view, wardrobe]);
 
+  /** Compare: keep one column (G1); the kept picture takes the comparison's place. */
+  const keep = useCallback(async (tryOnId: string) => {
+    seq.current++; if (timer.current) clearTimeout(timer.current);
+    setBusy(true); setError(undefined); setProgress({ step: "Keeping it…", startedAt: Date.now() });
+    let r: MirrorResult;
+    try { r = await keepTryOnAction({ personId, tryOnId }); } catch { r = { ok: false, error: "The mirror didn’t come back. Try again." }; }
+    setBusy(false); setProgress(null);
+    if (!r.ok) { setError(r.error); return; }
+    if ("tryOn" in r) setTryOn(r.tryOn);
+  }, [personId]);
+
   /** The closet's pieces that could fill a slot of the current look (or the pending one), best first. */
   const options = useCallback((slot: Slot, ids: string[]) => candidatesFor(slot, wardrobe, ids), [wardrobe]);
 
-  return { open, setOpen, tryOn, look, on, view, busy, progress, error, setError, dress, restyle, redo, switchTo, show, begin, pending, choose, swap, options, piecesOf, wardrobe, engine };
+  return { open, setOpen, tryOn, look, on, view, busy, progress, error, setError, dress, restyle, redo, switchTo, show, begin, pending, pick, confirm, swap, keep, options, piecesOf, wardrobe, engine };
 }

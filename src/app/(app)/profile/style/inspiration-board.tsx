@@ -4,7 +4,6 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Sheet } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
 import { Banner } from "@/components/ui/banner";
 import { shrinkPhoto } from "@/lib/import/client-queue";
 import type { InspirationView } from "@/lib/profiles/inspiration";
@@ -71,13 +70,13 @@ export function InspirationBoard({ ownerId, looks, canEdit, isMinor }: { ownerId
         {open ? (
           <div className="flex flex-col gap-3" data-testid="inspiration-sheet">
             <div className="h-[220px] overflow-hidden bg-bone"><img src={`/api/photo/${open.key}`} alt="" className="size-full object-cover" /></div>
-            <p className="serif text-[21px] italic leading-[1.3]">{open.notes.summary}</p>
+            <p className="text-[16px] leading-snug">{open.notes.summary}</p>
             <Row k="Words" v={open.notes.words.join(", ")} />
             <Row k="Shapes" v={open.notes.silhouettes.join("; ")} />
             <Row k="Colors" v={open.notes.colorPairs.join("; ")} />
             <Row k="Formality" v={open.notes.formality} />
             <Row k="Pieces" v={open.notes.pieces.join(", ")} />
-            {canEdit ? <Button variant="secondary" className="mt-2 w-full" disabled={busy !== null} onClick={() => remove(open.id)} data-testid="remove-inspiration">{busy === "remove" ? "Removing…" : "Remove this look"}</Button> : null}
+            {canEdit ? <button type="button" className="pill pill-quiet mt-2 h-[50px] w-full" disabled={busy !== null} onClick={() => remove(open.id)} data-testid="remove-inspiration">{busy === "remove" ? "Removing…" : "Remove this look"}</button> : null}
           </div>
         ) : null}
       </Sheet>

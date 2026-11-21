@@ -59,19 +59,20 @@ test("admin edits a list in place: add, rename, reorder, archive, blocked delete
 test("admin changes a rule", async ({ page }) => {
   await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
   await page.goto("/admin/rules");
-  await page.getByLabel("No-repeat window (days)").fill("21");
-  await page.locator("form", { has: page.getByLabel("No-repeat window (days)") }).getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("button", { name: "Saved" })).toBeVisible();
+  // a number saves when the field is left; "✓ Saved" shows beside the label
+  await page.getByLabel("Days before a piece repeats").fill("21");
+  await page.getByLabel("Days before a piece repeats").press("Enter");
+  await expect(page.getByTestId("rule-saved-noRepeatDays")).toHaveText("✓ Saved");
   await page.reload();
-  await expect(page.getByLabel("No-repeat window (days)")).toHaveValue("21");
-  // the button color is a hex with a swatch; nothing waits for a re-cut, so that upkeep row is not shown
-  await expect(page.getByLabel("Button color (hex)")).toHaveValue("#FF5A00");
+  await expect(page.getByLabel("Days before a piece repeats")).toHaveValue("21");
+  // the button color is a preset or any color; nothing waits for a re-cut, so that upkeep row is not shown
+  await expect(page.getByTestId("accent-orange")).toHaveAttribute("aria-checked", "true");
   await expect(page.getByTestId("untidy-photos")).toHaveCount(0);
-  await page.getByLabel("Button color (hex)").fill("#1A2B3C");
-  await page.getByTestId("rule-accentColor").getByRole("button", { name: "Save" }).click();
-  await expect(page.getByTestId("rule-accentColor").getByRole("button", { name: "Saved" })).toBeVisible();
+  await page.getByTestId("accent-blue").click();
+  await expect(page.getByTestId("rule-saved-accentColor")).toHaveText("✓ Saved");
   await page.reload();
-  await expect(page.getByLabel("Button color (hex)")).toHaveValue("#1A2B3C");
+  await expect(page.getByTestId("accent-blue")).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByTestId("rule-accentColor")).toContainText("#1D4ED8");
 });
 
 test("admin invites a new member; she accepts, lands in her closet, and cannot open admin", async ({ page, browser }) => {
@@ -91,7 +92,6 @@ test("admin invites a new member; she accepts, lands in her closet, and cannot o
   await sue.goto(url);
   await expect(sue.getByRole("heading", { name: "Welcome, Grandma" })).toBeVisible();
   await sue.getByLabel("Choose a password").fill("grandma-rules-1");
-  await sue.getByLabel("Type it again").fill("grandma-rules-1");
   await sue.getByRole("button", { name: "Open my closet" }).click();
   await expect(sue).toHaveURL(/\/today$/);
   await expect(sue.getByRole("heading", { name: /look/ })).toBeVisible();
@@ -112,8 +112,8 @@ test("admin re-invites a seeded family member and removes a person with the item
   await page.goto("/admin/people");
   await page.getByRole("link", { name: /Olivia/ }).click();
   await page.getByLabel("Email").first().fill("olivia@example.com");
-  await page.getByRole("button", { name: "Save details" }).click();
-  await expect(page.getByText("Details saved.")).toBeVisible();
+  await page.getByLabel("Email").first().blur(); // details save when the field is left
+  await expect(page.getByTestId("toast-ok")).toContainText("Details saved");
   await page.getByRole("button", { name: "Send invite" }).click();
   const sheet = page.getByRole("dialog");
   await sheet.getByRole("button", { name: "Create invite" }).click();
@@ -121,8 +121,8 @@ test("admin re-invites a seeded family member and removes a person with the item
   await sheet.getByRole("button", { name: "Done" }).click();
 
   await page.getByRole("button", { name: "Remove person" }).click();
-  await expect(page.getByText("What should happen to the clothes")).toBeVisible();
-  await page.getByRole("button", { name: "Move them to the Family closet" }).click();
+  await expect(page.getByText(/What happens to the pieces in Olivia/)).toBeVisible();
+  await page.getByRole("button", { name: /Move Olivia.s pieces to Family/ }).click();
   await expect(page).toHaveURL(/\/admin\/people$/);
   await expect(page.getByRole("link", { name: /Olivia/ })).toHaveCount(0);
 });

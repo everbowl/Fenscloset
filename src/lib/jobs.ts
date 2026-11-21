@@ -25,13 +25,18 @@ const FIRST_STEP = "Getting ready…";
 
 const randomId = () => `j_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
 
-/** Starts `fn` under `key` for `ownerId` (the person who may read it), or joins the job already running under that key. */
-export function startJob<T>(key: string, ownerId: string, fn: (step: (s: string) => void) => Promise<T>): Job<T> {
+/**
+ * Starts `fn` under `key` for `ownerId` (the person who may read it), or joins the job already running under that key.
+ * With `after`, a job already running is not joined but followed: the new job waits for it, then does the work
+ * again (a check-in saved while the day's looks were building: the looks must be built with it, not without it).
+ */
+export function startJob<T>(key: string, ownerId: string, fn: (step: (s: string) => void) => Promise<T>, { after = false }: { after?: boolean } = {}): Job<T> {
   const live = running.get(key);
-  if (live) return live as Job<T>;
+  if (live && !after) return live as Job<T>;
   const startedAt = Date.now();
   const job: Job<T> = { id: randomId(), key, ownerId, startedAt, status: { state: "running", step: FIRST_STEP, startedAt }, promise: Promise.resolve() };
-  job.promise = fn((s) => { if (job.status.state === "running") job.status = { state: "running", step: s, startedAt }; })
+  const work = () => fn((s) => { if (job.status.state === "running") job.status = { state: "running", step: s, startedAt }; });
+  job.promise = (live ? live.promise.then(work, work) : work())
     .then(
       (result) => { job.status = { state: "done", result }; },
       (e: unknown) => { job.status = { state: "failed", error: e instanceof Error ? e : new Error(String(e)) }; },

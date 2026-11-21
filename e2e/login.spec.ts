@@ -26,12 +26,11 @@ test("Jeff logs in with 0535 once, is forced to change it, then 0535 is dead", a
   await expect(page).toHaveURL(/\/change-password$/);
 
   await page.getByLabel("New password").fill("0535");
-  await page.getByLabel("Type it again").fill("0535");
   await page.getByRole("button", { name: "Save new password" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "DEV password" })).toBeVisible();
 
   await page.getByLabel("New password").fill("closet-rocks-2026");
-  await page.getByLabel("Type it again").fill("closet-rocks-2026");
+  await expect(page.getByTestId("password-strength")).toContainText("Strong enough");
   await page.getByRole("button", { name: "Save new password" }).click();
   await expect(page).toHaveURL(/\/today$/);
   await expect(page.getByRole("heading", { name: /look/ })).toBeVisible();

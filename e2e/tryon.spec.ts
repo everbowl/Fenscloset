@@ -75,7 +75,7 @@ test("try-on: on by default, needs a body photo, then a picture of the look on y
   await page.getByTestId("item-card").filter({ hasNotText: "Not in the mirror" }).first().click();
   await page.getByTestId("see-picked").click();
   // one piece picked: the mirror asks to complete the look first (e2e/mirror-complete.spec.ts covers the asking); go without
-  while (await page.getByTestId("complete-skip").isVisible()) await page.getByTestId("complete-skip").click();
+  if (await page.getByTestId("complete-go").isVisible()) await page.getByTestId("complete-go").click(); // the panel: nothing picked, just the piece
   await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId("try-on-sheet")).toContainText("Only you can see this picture");
   const beforeRetake = await page.getByTestId("try-on-sheet").locator("img").first().getAttribute("src");
@@ -84,19 +84,24 @@ test("try-on: on by default, needs a body photo, then a picture of the look on y
   await expect(page.getByTestId("try-on-sheet").locator("img").first()).not.toHaveAttribute("src", beforeRetake!, { timeout: 20_000 });
   await expect(page.getByTestId("try-on-sheet")).toContainText("Only you can see this picture");
 
-  // Compare (Admin → Rules → Mirror engine): Google and FASHN side by side, so the winner can be picked there
+  // Compare (Admin → Rules → Mirror engine): Google, FASHN and Kling side by side, so the winner can be picked there
   await page.keyboard.press("Escape");
   await page.goto("/admin/rules");
+  await page.getByTestId("rules-advanced").locator("summary").click(); // Mirror lives under Advanced
   await page.getByLabel("Mirror engine").selectOption("compare");
-  await page.getByTestId("rule-mirrorEngine").getByRole("button", { name: "Save" }).click();
-  await expect(page.getByTestId("rule-mirrorEngine").getByRole("button", { name: "Saved" })).toBeVisible();
+  await expect(page.getByTestId("rule-saved-mirrorEngine")).toHaveText("✓ Saved");
   await page.goto("/today");
   await page.getByTestId("try-on").click();
   await expect(page.getByTestId("mirror-compare")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("mirror-compare")).toContainText("Google");
   await expect(page.getByTestId("mirror-compare")).toContainText("FASHN");
+  await expect(page.getByTestId("mirror-compare")).toContainText("Kling");
   const pair = await page.getByTestId("mirror-compare").locator("img").evaluateAll((els) => els.map((e) => e.getAttribute("src")));
-  expect(pair).toHaveLength(2);
-  expect(pair[0]).not.toBe(pair[1]);
+  expect(pair).toHaveLength(3);
+  expect(new Set(pair).size).toBe(3);
   await expect(page.getByTestId("try-on-sheet")).toContainText("side by side");
+  // G1: keep one column and the mirror shows it alone
+  await page.getByTestId("mirror-keep").nth(1).click();
+  await expect(page.getByTestId("mirror-compare")).toHaveCount(0, { timeout: 20_000 });
+  await expect(page.getByTestId("try-on-sheet")).toContainText("your pick");
 });

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { inOtherSection } from "./section";
 import { db } from "@/lib/db";
 
 /**
@@ -17,9 +18,9 @@ export type Product = {
   query: string;
 };
 
-export type ProductPrefs = { favoriteStores: string[]; favoriteBrands: string[] };
+export type ProductPrefs = { favoriteStores: string[]; favoriteBrands: string[]; /** The section the person shops in (Men's, Women's…): results titled for another section are left out. */ section?: string | null };
 
-export const MAX_PRODUCTS = 12;
+const MAX_PRODUCTS = 12;
 const PER_QUERY = 10;
 const CACHE_HOURS = 24;
 
@@ -30,7 +31,7 @@ export function isProductSearchConfigured(): boolean {
 type RawShopping = { title?: string; source?: string; link?: string; price?: string | number; imageUrl?: string; position?: number };
 
 /** Deterministic products for tests and local dev. */
-export function mockProducts(query: string): RawShopping[] {
+function mockProducts(query: string): RawShopping[] {
   const stores = ["Nordstrom", "Everlane", "J.Crew", "Vuori"];
   return Array.from({ length: 6 }, (_, i) => ({
     title: `${query.replace(/\b\w/g, (c) => c.toUpperCase())} ${i + 1}`,
@@ -106,7 +107,7 @@ export async function searchProducts(queries: string[], prefs: ProductPrefs, fet
       if (p && !seen.has(p.url)) { seen.add(p.url); merged.push(p); }
     }
   }
-  return rankProducts(merged, prefs).slice(0, opts.limit ?? MAX_PRODUCTS);
+  return rankProducts(merged.filter((p) => !inOtherSection(p.title, prefs.section)), prefs).slice(0, opts.limit ?? MAX_PRODUCTS);
 }
 
 /** The dollars in a price label ("$128.00", "128 USD"), or null when there is no number. */

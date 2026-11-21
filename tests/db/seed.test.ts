@@ -25,12 +25,12 @@ describe("seed", () => {
     expect(first.people).toBe(4);
     expect(first.closets).toBe(5); // 4 personal + Family
     expect(first.scales).toBe(3);
-    expect(first.rules).toBe(14); // 3 originals + 8 size-band rules + button color + mirror engine + the Looking-for search interval
+    expect(first.rules).toBe(16); // 3 originals + the laundry cycle + the Not-now days + 8 size-band rules + button color + mirror engine + the Looking-for search interval
     // a rule that left the code (the Tidy and Smooth switch) is removed on the next deploy
     await db.rule.create({ data: { key: "photoRetouch", value: "off", label: "AI photo retouch", description: "gone" } });
     await seed();
     expect(await db.rule.findUnique({ where: { key: "photoRetouch" } })).toBeNull();
-    expect(await db.rule.count()).toBe(14);
+    expect(await db.rule.count()).toBe(16);
 
     const mya = await db.person.findFirstOrThrow({ where: { name: "Mya" }, include: { guardians: true } });
     expect(mya.role).toBe("minor");
@@ -73,7 +73,7 @@ describe("seed guard", () => {
 
   it("additive seed sets land once on a database that already has people, and never re-create what was removed after", async () => {
     await seed();
-    expect(await db.seedSet.count()).toBe(9);
+    expect(await db.seedSet.count()).toBe(10);
     expect(await db.brand.count()).toBeGreaterThan(150); // the national catalog is in the Brands list
     // the mirror's styling lists: untucked first, poses with "as photographed" first
     expect((await db.mirrorPose.findMany({ orderBy: { sortOrder: "asc" } }))[0].name).toBe("Standing, as photographed");
@@ -95,6 +95,16 @@ describe("seed guard", () => {
     await db.measurementKind.deleteMany({ where: { name: "Cup size" } });
     expect(await applySeedSets()).toEqual([]);
     expect(await db.measurementKind.count({ where: { name: "Cup size" } })).toBe(0);
+    // shop sections (2 Nov 2026): a database from before gets the list once and Jeff lands in Men's; a section an admin removed stays removed
+    await db.person.updateMany({ data: { shopSectionId: null } });
+    await db.shopSection.deleteMany({});
+    await db.seedSet.delete({ where: { name: "shop-sections-v1" } });
+    await seed();
+    expect((await db.shopSection.findMany({ orderBy: { sortOrder: "asc" } })).map((x) => x.name)).toEqual(["Men's", "Women's", "Boys'", "Girls'", "Unisex"]);
+    expect((await db.person.findUniqueOrThrow({ where: { email: "jeff@everbowl.com" }, include: { shopSection: true } })).shopSection?.name).toBe("Men's");
+    await db.shopSection.delete({ where: { name: "Unisex" } });
+    expect(await applySeedSets()).toEqual([]);
+    expect(await db.shopSection.count()).toBe(4);
     // shoes: a database seeded with plain numbers gets M / W side by side once
     const shoes = await db.category.findUniqueOrThrow({ where: { name: "Shoes" } });
     await db.sizeOption.create({ data: { categoryId: shoes.id, name: "10", sortOrder: 99 } });

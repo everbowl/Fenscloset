@@ -35,6 +35,7 @@ export async function processEntry(entryId: string): Promise<ProcessOutcome> {
     original = (await getObject(entry.originalKey)).body;
   } catch (e) {
     const msg = e instanceof NotFoundError ? "The photo never finished uploading." : (e as Error).message;
+    console.error(`import: entry ${entryId} failed before processing: ${msg}`);
     await db.importEntry.update({ where: { id: entryId }, data: { status: "failed", error: msg } });
     return { status: "failed", error: msg };
   }
@@ -86,18 +87,31 @@ export async function processEntry(entryId: string): Promise<ProcessOutcome> {
       where: { id: entryId },
       data: { status: "needs_confirm", cutoutKey, thumbKey, phash: hash, aiResult: JSON.parse(JSON.stringify(aiResult)), error: null },
     });
+    // C1 (Jeff, 3 Nov 2026): a piece with store facts (a link or a receipt, not a photo the person took) goes straight
+    // into the closet, no card; it is fixable on the piece page. Only a missing category still asks.
+    const meta = entry.storeMeta as { matched?: boolean } | null;
+    if (meta && !meta.matched && tags.categoryId) {
+      try {
+        const { createItemFromEntry } = await import("@/lib/items/service");
+        await createItemFromEntry(ownerId, entryId);
+        console.log(`import: entry ${entryId} landed in the closet (${(entry.storeMeta as StoreMeta).name})`);
+        return { status: "done" };
+      } catch (e) { console.error("auto-add from store", e); }
+    }
+    if (entry.storeMeta) console.log(`import: entry ${entryId} from a store waits for a confirm (${tags.categoryId ? "duplicate check" : "no category"})`);
     return { status: "needs_confirm" };
   } catch (e) {
     const msg = e instanceof AiError
       ? (e.code === "no_key" ? "Tagging is not set up yet (missing ANTHROPIC_API_KEY)." : `Tagging failed: ${e.message}`)
       : `Processing failed: ${(e as Error).message}`;
+    console.error(`import: entry ${entryId} failed: ${msg}`);
     await db.importEntry.update({ where: { id: entryId }, data: { status: "failed", error: msg } });
     return { status: "failed", error: msg };
   }
 }
 
 /** A piece from a store link or receipt: the store's name, brand, size and color win over the guess. */
-export function applyStoreMeta(tags: TagResult, meta: StoreMeta, lists: { brands: { id: string; name: string }[]; colors: { id: string; name: string }[] }): TagResult {
+function applyStoreMeta(tags: TagResult, meta: StoreMeta, lists: { brands: { id: string; name: string }[]; colors: { id: string; name: string }[] }): TagResult {
   const next = { ...tags };
   if (meta.name) next.name = meta.name.slice(0, 80);
   if (meta.brandText) {

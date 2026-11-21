@@ -6,6 +6,7 @@ import { candidateSelect, loadCandidates, styleContext, toCandidate, type Candid
 import { composeLooks, type Board, type Piece } from "@/lib/outfits/engine";
 import { ShopError, type LookupHooks } from "@/lib/shop/engine";
 import { searchProducts, type Product } from "@/lib/shop/products";
+import { sectionWord, withSection } from "@/lib/shop/section";
 
 /**
  * "Shop for something to go with it" (Jeff, 23 Oct 2026, Shop v2 item 1): from one piece in the closet, what would
@@ -37,13 +38,13 @@ async function anchor(viewer: Viewer, itemId: string): Promise<Candidate> {
 type Complete = { needCategory: string | null; reason: string; shoppingQueries: string[] };
 
 /** What would complete the piece, and the searches for it. */
-async function complete(piece: Candidate, closet: Candidate[], style: string, brands: string[]): Promise<Complete> {
+async function complete(piece: Candidate, closet: Candidate[], style: string, brands: string[], section: string | null = null): Promise<Complete> {
   const counts = new Map<string, number>();
   for (const c of closet) counts.set(c.category ?? "?", (counts.get(c.category ?? "?") ?? 0) + 1);
   const categories = [...new Set([...closet.map((c) => c.category).filter((x): x is string => Boolean(x)), "Tops", "Bottoms", "Shoes", "Outerwear", "Dresses"])].filter((c) => c !== piece.category);
   if (isMockAi()) {
     const need = piece.category === "Tops" ? "Bottoms" : "Tops";
-    return { needCategory: need, reason: `Mock: a ${need.toLowerCase()} piece would round out ${piece.name}.`, shoppingQueries: [`men's ${need === "Tops" ? "white oxford shirt" : "slim dark wash jeans"}`, `${brands[0] ?? "Everlane"} ${need.toLowerCase()}`] };
+    return { needCategory: need, reason: `Mock: a ${need.toLowerCase()} piece would round out ${piece.name}.`, shoppingQueries: [`${need === "Tops" ? "white oxford shirt" : "slim dark wash jeans"}`, `${brands[0] ?? "Everlane"} ${need.toLowerCase()}`] };
   }
   const schema = {
     type: "object",
@@ -61,6 +62,7 @@ async function complete(piece: Candidate, closet: Candidate[], style: string, br
       style ? `Style profile:\n${style}` : "Style profile: none set.",
       `Closet by category: ${[...counts.entries()].map(([k, v]) => `${k} ${v}`).join(", ") || "empty"}.`,
       brands.length ? `Favorite brands: ${brands.join(", ")}.` : "No favorite brands set.",
+      section ? `They shop the ${section} section: every search starts with "${sectionWord(section) ?? ""}".` : "Say who a search is for only when the piece makes it clear.",
     ].join("\n\n"),
     schema, effort: "medium", maxTokens: 400,
   });
@@ -75,15 +77,16 @@ export async function goWith(viewer: Viewer, itemId: string, hooks: LookupHooks 
   const [closet, style, person] = await Promise.all([
     loadCandidates(piece.ownerId, new Date(), { noRepeatDays: 0 }),
     styleContext(piece.ownerId),
-    db.person.findUniqueOrThrow({ where: { id: piece.ownerId }, select: { favoriteStores: { where: { isArchived: false }, select: { name: true } }, favoriteBrands: { where: { isArchived: false }, select: { name: true } } } }),
+    db.person.findUniqueOrThrow({ where: { id: piece.ownerId }, select: { favoriteStores: { where: { isArchived: false }, select: { name: true } }, favoriteBrands: { where: { isArchived: false }, select: { name: true } }, shopSection: { select: { name: true, isArchived: true } } } }),
   ]);
   const others = closet.usable.filter((c) => c.id !== piece.id);
   const brands = person.favoriteBrands.map((b) => b.name);
+  const section = person.shopSection && !person.shopSection.isArchived ? person.shopSection.name : null;
   step("Deciding what would complete it…");
-  const done = await complete(piece, others, style, brands);
+  const done = await complete(piece, others, style, brands, section);
   step("Searching the stores…");
   const [products, looks] = await Promise.all([
-    searchProducts(done.shoppingQueries, { favoriteStores: person.favoriteStores.map((s) => s.name), favoriteBrands: brands }),
+    searchProducts(withSection(done.shoppingQueries, section), { favoriteStores: person.favoriteStores.map((s) => s.name), favoriteBrands: brands, section }),
     others.length ? composeLooks({ cands: [piece, ...others], inputs: { weather: null, plan: { label: null, source: "none" }, checkIn: [], restingIds: [], noRepeatDays: 0 }, style, count: 2, extra: `Piece #1 "${piece.name}" is the one being shopped around: every look must include #1 and list it first.` }) : Promise.resolve([] as Board[]),
   ]);
   const row = await db.goWith.create({
