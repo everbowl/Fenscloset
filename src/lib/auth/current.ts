@@ -1,17 +1,10 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
 import { cache } from "react";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { SESSION_COOKIE, createSession, destroySession, validateSession, type SessionWithPerson } from "@/lib/auth/session";
 import type { Person } from "@/generated/prisma/client";
 import { cookieSecure } from "@/lib/app-url";
-
-class ForbiddenError extends Error {
-  constructor(message = "Forbidden") {
-    super(message);
-    this.name = "ForbiddenError";
-  }
-}
 
 /** The current session, memoised per request. */
 export const getCurrentSession = cache(async (): Promise<SessionWithPerson | null> => {
@@ -37,11 +30,20 @@ export function isAdmin(person: Pick<Person, "role">): boolean {
   return person.role === "admin";
 }
 
-/** Throws ForbiddenError for non-admins; pages catch it and render the 403 page. */
+/**
+ * The signed-in admin. For anyone else the page segment stops here with a 404, before any admin data loads (review A
+ * S3); the admin layout already shows "Admins only" in its place, so that is what the person sees (S4).
+ */
 export async function requireAdmin(): Promise<Person> {
   const person = await requirePerson();
-  if (!isAdmin(person)) throw new ForbiddenError();
+  if (!isAdmin(person)) notFound();
   return person;
+}
+
+/** For server actions: the signed-in admin, or null, so the action can answer with words instead of an error page. */
+export async function currentAdmin(): Promise<Person | null> {
+  const person = await requirePerson();
+  return isAdmin(person) ? person : null;
 }
 
 export async function signIn(personId: string, opts: { usedDevPassword?: boolean } = {}) {

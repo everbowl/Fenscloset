@@ -1,36 +1,44 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
-import { Card } from "@/components/ui/card";
+import { requireAdmin } from "@/lib/auth/current";
 import { listPeople } from "@/lib/people/service";
+import { listOpenInvites } from "@/lib/auth/invite";
 import { smsConfigured } from "@/lib/sms";
 import { InviteSheet } from "./invite-sheet";
+import { OpenInvites } from "./open-invites";
 
 export const metadata = { title: "People" };
 
 const roleLabel = { admin: "Admin", member: "Member", minor: "Minor" } as const;
 
 export default async function PeoplePage() {
-  const people = await listPeople();
+  await requireAdmin(); // before any data loads (review A S3)
+  const [people, invites] = await Promise.all([listPeople(), listOpenInvites()]);
   const admins = people.filter((p) => p.role === "admin").map((p) => ({ id: p.id, name: p.name }));
+  // Invites for people who already have a row show on that row ("Invite sent"); the rest would be invisible without this list (review A W6).
+  const waiting = invites.filter((i) => !i.personId);
   return (
     <div className="lg:max-w-[640px]">
       <PageHeader title="People" action={<InviteSheet admins={admins} smsReady={smsConfigured()} />} />
-      <Card className="divide-y divide-line border-x-0 border-b-0 border-t border-ink p-0">
+      <ul className="flex flex-col gap-2" data-testid="people-list">
         {people.map((p) => (
-          <Link key={p.id} href={`/admin/people/${p.id}`} className="flex items-center gap-3 py-3">
-            <span className="serif flex size-10 items-center justify-center bg-bone text-[20px]">{p.name[0]}</span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[15px] font-medium">{p.name} <span className="mono ml-2 text-graphite">{roleLabel[p.role]}</span></p>
-              <p className="mono truncate normal-case text-graphite">
-                {p.email ?? "No email yet"}
-                {p.hasPassword ? "" : p.pendingInvite ? " · Invite sent" : " · Needs an invite"}
-                {p.devPasswordActive ? " · DEV password active" : ""}
-              </p>
-            </div>
-            <span className="mono text-graphite">→</span>
-          </Link>
+          <li key={p.id}>
+            <Link href={`/admin/people/${p.id}`} className="card tap flex items-center gap-3 p-3">
+              <span aria-hidden className="flex size-11 shrink-0 items-center justify-center rounded-full bg-bone text-[17px] font-semibold">{p.name[0]}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[16px] font-medium leading-tight">{p.name}</span>
+                <span className="caption block truncate">
+                  {p.email ?? "No email yet"}
+                  {p.hasPassword ? "" : p.pendingInvite ? " · Invite sent" : " · Needs an invite"}
+                  {p.devPasswordActive ? " · DEV password active" : ""}
+                </span>
+              </span>
+              <span className="pill pill-sm pointer-events-none shrink-0">{roleLabel[p.role]}</span>
+            </Link>
+          </li>
         ))}
-      </Card>
+      </ul>
+      <OpenInvites invites={waiting.map((i) => ({ id: i.id, name: i.name, email: i.email, phone: i.phone, role: roleLabel[i.role], expiresAt: i.expiresAt.toISOString() }))} smsReady={smsConfigured()} />
     </div>
   );
 }

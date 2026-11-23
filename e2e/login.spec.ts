@@ -27,7 +27,9 @@ test("Jeff logs in with 0535 once, is forced to change it, then 0535 is dead", a
 
   await page.getByLabel("New password").fill("0535");
   await page.getByRole("button", { name: "Save new password" }).click();
-  await expect(page.getByRole("alert").filter({ hasText: "DEV password" })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "Pick a real one" })).toBeVisible();
+  // With 0535 spent and no real password yet there is no way out but setting one (review A A2).
+  await expect(page.getByTestId("change-password-signout")).toHaveCount(0);
 
   await page.getByLabel("New password").fill("closet-rocks-2026");
   await expect(page.getByTestId("password-strength")).toContainText("Strong enough");
@@ -45,6 +47,12 @@ test("Jeff logs in with 0535 once, is forced to change it, then 0535 is dead", a
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "don't match" })).toBeVisible();
   await expect(page).toHaveURL(/\/login$/);
+  // An unknown address gets the same line as a wrong password (review A S11).
+  await page.getByLabel("Email").fill("nobody@example.com");
+  await page.getByLabel("Password").fill("whatever-123");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "don't match" })).toBeVisible();
+  await page.getByLabel("Email").fill("jeff@everbowl.com");
 
   await page.getByLabel("Password").fill("closet-rocks-2026");
   await page.getByRole("button", { name: "Sign in" }).click();

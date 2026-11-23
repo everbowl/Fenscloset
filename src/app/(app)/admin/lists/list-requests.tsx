@@ -16,18 +16,25 @@ export function ListRequests({ requests }: { requests: ListRequestView[] }) {
   const [hidden, setHidden] = useState<string[]>([]);
   const shown = requests.filter((r) => !hidden.includes(r.id));
   if (!requests.length) return null;
-  const resolve = (id: string, status: "added" | "dismissed") => start(async () => { const r = await resolveRequestAction(id, status); if (!r.ok) toast.error(r.error); router.refresh(); });
+  // A row leaves the screen at once; if the server says no, it comes back with the error (review A W8).
+  const resolve = (id: string, status: "added" | "dismissed") => start(async () => {
+    const r = await resolveRequestAction(id, status);
+    if (!r.ok) { setHidden((h) => h.filter((x) => x !== id)); toast.error(r.error); }
+    router.refresh();
+  });
   return (
-    <section className="mb-7" data-testid="list-requests">
-      <h2 className="mono border-b border-ink pb-2 text-graphite">Asked for · {shown.length}</h2>
-      {undoable.pending ? <UndoStrip text={undoable.pending.text} onUndo={undoable.undo} testId="request-undo" className="mt-2" /> : null}
-      {shown.map((r) => (
-        <div key={r.id} className="flex min-h-[56px] items-center gap-3 border-b border-line py-2" data-testid="list-request">
-          <span className="min-w-0 flex-1"><span className="block truncate text-[15px] font-medium">{r.name}</span><span className="mono block truncate text-graphite">{r.kindLabel} · asked by {r.askedBy}</span></span>
-          <InlineAdd kind={r.kind} parentId={r.parentId ?? undefined} initialName={r.name} label="Add" testId={`request-add-${r.id}`} onCreated={() => { setHidden((h) => [...h, r.id]); resolve(r.id, "added"); toast.ok(`${r.name} added`); }} />
-          <button type="button" onClick={() => { setHidden((h) => [...h, r.id]); undoable.start(`Dismissed · ${r.name}`, () => resolve(r.id, "dismissed"), () => setHidden((h) => h.filter((x) => x !== r.id))); }} className="pill pill-sm pill-quiet" data-testid={`request-dismiss-${r.id}`}>Dismiss</button>
-        </div>
-      ))}
+    <section className="mb-6" data-testid="list-requests">
+      <h2 className="section mb-2">Asked for · {shown.length}</h2>
+      {undoable.pending ? <UndoStrip text={undoable.pending.text} onUndo={undoable.undo} testId="request-undo" className="mb-2" /> : null}
+      <div className="card divide-y divide-line">
+        {shown.map((r) => (
+          <div key={r.id} className="flex min-h-[60px] items-center gap-3 px-4 py-2" data-testid="list-request">
+            <span className="min-w-0 flex-1"><span className="block truncate text-[16px] font-medium">{r.name}</span><span className="caption block truncate">{r.kindLabel} · asked by {r.askedBy}</span></span>
+            <InlineAdd kind={r.kind} parentId={r.parentId ?? undefined} initialName={r.name} label="Add" testId={`request-add-${r.id}`} onCreated={() => { setHidden((h) => [...h, r.id]); resolve(r.id, "added"); toast.ok(`${r.name} added`); }} />
+            <button type="button" onClick={() => { setHidden((h) => [...h, r.id]); undoable.start(`Dismissed · ${r.name}`, () => resolve(r.id, "dismissed"), () => setHidden((h) => h.filter((x) => x !== r.id))); }} className="pill pill-sm pill-quiet" data-testid={`request-dismiss-${r.id}`}>Dismiss</button>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }

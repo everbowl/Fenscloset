@@ -9,9 +9,9 @@ export function ResetForm({ token }: { token: string }) {
   const bound = resetPasswordAction.bind(null, token);
   const [state, action, pending] = useActionState<ResetState, FormData>(bound, {});
   return (
-    <form action={action} className="space-y-4" noValidate>
+    <form action={action} className="flex flex-col gap-5" noValidate>
       <NewPasswordField label="New password" error={state.error} />
-      <Button type="submit" size="lg" className="w-full" disabled={pending}>{pending ? "Saving…" : "Save and sign in"}</Button>
+      <Button type="submit" size="lg" className="w-full" busy={pending} arrow={false}>{pending ? "Saving…" : "Save and sign in"}</Button>
     </form>
   );
 }

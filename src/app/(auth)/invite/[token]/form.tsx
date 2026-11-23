@@ -11,7 +11,7 @@ export function AcceptForm({ token, name, email }: { token: string; name: string
   const bound = acceptInviteAction.bind(null, token);
   const [state, action, pending] = useActionState<AcceptState, FormData>(bound, {});
   return (
-    <form action={action} className="space-y-4" noValidate>
+    <form action={action} className="flex flex-col gap-5" noValidate>
       <Field label="Your name" htmlFor="name"><Input id="name" name="name" defaultValue={name} autoComplete="name" required /></Field>
       {email ? (
         <Field label="Email" htmlFor="email" hint="You'll sign in with this."><Input id="email" name="username" value={email} readOnly autoComplete="username" /></Field>
@@ -19,7 +19,7 @@ export function AcceptForm({ token, name, email }: { token: string; name: string
         <Field label="Email" htmlFor="email" hint="You'll sign in with this."><Input id="email" name="email" type="email" inputMode="email" autoCapitalize="none" autoComplete="username" required /></Field>
       )}
       <NewPasswordField label="Choose a password" error={state.error} />
-      <Button type="submit" size="lg" className="w-full" disabled={pending}>{pending ? "Setting up…" : "Open my closet"}</Button>
+      <Button type="submit" size="lg" className="w-full" busy={pending} arrow={false}>{pending ? "Setting up…" : "Open my closet"}</Button>
     </form>
   );
 }

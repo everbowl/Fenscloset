@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { hashPassword } from "@/lib/auth/password";
+import { forgetDevBanner } from "@/lib/auth/dev-banner";
 import { DEV_PASSWORD } from "../../../prisma/seed-data";
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -16,4 +17,5 @@ export async function setPassword(personId: string, password: string): Promise<v
     where: { id: personId },
     data: { passwordHash: await hashPassword(password), mustChangePassword: false, devPasswordActive: false, status: "active" },
   });
+  forgetDevBanner();
 }

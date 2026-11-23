@@ -12,10 +12,26 @@ async function olivia() {
 describe("password reset", () => {
   beforeEach(resetDb);
 
-  it("returns null for unknown emails without throwing, and sending is a silent no-op", async () => {
+  it("returns null for unknown emails without throwing; sending says when the site cannot mail at all", async () => {
     expect(await createResetToken("nobody@example.com")).toBeNull();
-    await expect(sendResetEmail("nobody@example.com")).resolves.toBeUndefined();
-    expect(await db.passwordResetToken.count()).toBe(0);
+    const key = process.env.RESEND_API_KEY;
+    delete process.env.RESEND_API_KEY;
+    try {
+      // No mail service: the person is told, instead of "it's on its way" (review A A3).
+      await expect(sendResetEmail("nobody@example.com")).resolves.toEqual({ sent: false, reason: "not_configured" });
+      expect(await db.passwordResetToken.count()).toBe(0);
+    } finally {
+      if (key) process.env.RESEND_API_KEY = key;
+    }
+  });
+
+  it("using a token retires the person's other open tokens", async () => {
+    await olivia();
+    const a = await createResetToken("olivia@example.com");
+    const b = await createResetToken("olivia@example.com");
+    expect((await consumeResetToken(a!.token, "sunny-days-2026")).ok).toBe(true);
+    expect((await peekResetToken(b!.token)).valid).toBe(false);
+    expect((await consumeResetToken(b!.token, "another-pass-99")).ok).toBe(false);
   });
 
   it("works exactly once, sets the password, and signs out other sessions", async () => {

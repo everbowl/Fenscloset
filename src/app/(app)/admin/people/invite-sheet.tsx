@@ -1,13 +1,13 @@
 "use client";
 
-import { Check, Copy, Plus, Share2 } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
-import { Banner } from "@/components/ui/banner";
+import { InviteLink } from "./invite-link";
 import { invitePersonAction, type InviteResult } from "./actions";
 import type { Role } from "@/generated/prisma/client";
 
@@ -33,7 +33,6 @@ export function InviteSheet({ admins, smsReady, existing, trigger }: {
   const [sendEmail, setSendEmail] = useState(true);
   const [sendSms, setSendSms] = useState(false);
   const [result, setResult] = useState<InviteResult>();
-  const [copied, setCopied] = useState(false);
   const [pending, start] = useTransition();
 
   function submit(e: React.FormEvent) {
@@ -48,38 +47,19 @@ export function InviteSheet({ admins, smsReady, existing, trigger }: {
     });
   }
 
-  async function copy(url: string) {
-    try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* clipboard blocked */ }
-  }
-  async function share(url: string) {
-    if (navigator.share) { try { await navigator.share({ title: "Fen's Closet invite", text: `${name}, set up your closet:`, url }); } catch { /* cancelled */ } }
-    else copy(url);
-  }
-
   return (
     <>
       <span onClick={() => { setResult(undefined); setOpen(true); }}>
-        {trigger ?? <Button size="sm"><Plus className="size-3.5" strokeWidth={1.8} /> Add person</Button>}
+        {trigger ?? <Button size="sm" variant="secondary"><Plus className="size-3.5" strokeWidth={1.8} /> Add person</Button>}
       </span>
       <Sheet open={open} onClose={() => setOpen(false)} title={existing ? `Invite ${existing.name}` : "Add a person"}>
         {result?.ok ? (
-          <div className="space-y-4">
-            <Banner tone="success" title="Invite created">
-              {result.delivered.email ? `Email sent to ${email}. ` : ""}{result.delivered.sms ? `Text sent to ${phone}. ` : ""}
-              The link works for 7 days.
-            </Banner>
-            {result.deliveryError ? <Banner tone="danger">{result.deliveryError}</Banner> : null}
-            <div data-testid="invite-url" className="break-all bg-bone p-3 font-mono text-[11px]">{result.url}</div>
-            <div className="flex gap-2">
-              <Button variant="secondary" className="flex-1" onClick={() => copy(result.url)}>{copied ? <Check className="size-4" /> : <Copy className="size-4" />} {copied ? "Copied" : "Copy link"}</Button>
-              <Button className="flex-1" onClick={() => share(result.url)}><Share2 className="size-4" /> Share…</Button>
-            </div>
-            <Button variant="ghost" className="w-full" onClick={() => setOpen(false)}>Done</Button>
-          </div>
+          <InviteLink result={result} name={name} email={email} phone={phone} onDone={() => setOpen(false)} />
         ) : (
-          <form onSubmit={submit} className="space-y-4">
-            {result && !result.ok ? <Banner tone="danger">{result.error}</Banner> : null}
-            <Field label="Name" htmlFor="inv-name"><Input id="inv-name" value={name} onChange={(e) => setName(e.target.value)} required autoFocus={!existing} /></Field>
+          <form onSubmit={submit} className="flex flex-col gap-4">
+            {result && !result.ok ? <p className="text-[15px] leading-snug" role="alert">— {result.error}</p> : null}
+            {/* No autoFocus: iPhones ignore focus that is not a tap and scroll the sheet oddly (review A I4). */}
+            <Field label="Name" htmlFor="inv-name"><Input id="inv-name" value={name} onChange={(e) => setName(e.target.value)} required /></Field>
             <Field label="Email" htmlFor="inv-email" hint="They'll sign in with this."><Input id="inv-email" type="email" inputMode="email" autoCapitalize="none" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
             <Field label="Mobile number" htmlFor="inv-phone" hint="For the text-message invite."><Input id="inv-phone" type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 123-4567" /></Field>
             <Field label="Role" htmlFor="inv-role">
@@ -90,8 +70,8 @@ export function InviteSheet({ admins, smsReady, existing, trigger }: {
               </Select>
             </Field>
             {role === "minor" ? (
-              <fieldset className="space-y-2">
-                <legend className="mono tracking-[0.14em] text-graphite">Parent admins</legend>
+              <fieldset className="flex flex-col gap-1">
+                <legend className="mono text-graphite">Parent admins</legend>
                 {admins.map((a) => (
                   <label key={a.id} className="flex h-11 items-center gap-3 text-[15px]">
                     <input type="checkbox" className="size-5 accent-black" checked={guardianIds.includes(a.id)}
@@ -101,13 +81,13 @@ export function InviteSheet({ admins, smsReady, existing, trigger }: {
                 ))}
               </fieldset>
             ) : null}
-            <fieldset className="space-y-2">
-              <legend className="mono tracking-[0.14em] text-graphite">Send the invite by</legend>
-              <label className="flex h-11 items-center gap-3 text-[15px]"><input type="checkbox" className="size-5 accent-black" checked={sendEmail && Boolean(email)} onChange={(e) => setSendEmail(e.target.checked)} disabled={!email} /> Email{email ? "" : <span className="mono ml-2 text-graphite">add an email above</span>}</label>
-              <label className="flex h-11 items-center gap-3 text-[15px]"><input type="checkbox" className="size-5 accent-black" checked={sendSms} onChange={(e) => setSendSms(e.target.checked)} disabled={!phone || !smsReady} /> Text message{!smsReady ? <span className="mono ml-2 text-graphite">texting isn’t set up yet</span> : phone ? "" : <span className="mono ml-2 text-graphite">add a number above</span>}</label>
-              <p className="text-[13px] leading-snug text-graphite">You&apos;ll always get a link to copy or share yourself.</p>
+            <fieldset className="flex flex-col gap-1">
+              <legend className="mono text-graphite">Send the invite by</legend>
+              <label className="flex h-11 items-center gap-3 text-[15px]"><input type="checkbox" className="size-5 accent-black" checked={sendEmail && Boolean(email)} onChange={(e) => setSendEmail(e.target.checked)} disabled={!email} /> Email{email ? "" : <span className="caption">add an email above</span>}</label>
+              <label className="flex h-11 items-center gap-3 text-[15px]"><input type="checkbox" className="size-5 accent-black" checked={sendSms} onChange={(e) => setSendSms(e.target.checked)} disabled={!phone || !smsReady} /> Text message{!smsReady ? <span className="caption">texting isn&apos;t set up yet</span> : phone ? "" : <span className="caption">add a number above</span>}</label>
+              <p className="note">You&apos;ll always get a link to copy or share yourself.</p>
             </fieldset>
-            <Button type="submit" className="w-full" disabled={pending || !name}>{pending ? "Creating…" : "Create invite"}</Button>
+            <Button type="submit" className="w-full" busy={pending} disabled={!name}>{pending ? "Creating…" : "Create invite"}</Button>
           </form>
         )}
       </Sheet>

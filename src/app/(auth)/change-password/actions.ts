@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { requirePerson, getCurrentSession } from "@/lib/auth/current";
 import { setPassword, validateNewPassword } from "@/lib/auth/change-password";
 import { db } from "@/lib/db";
-import { SESSION_COOKIE } from "@/lib/auth/session";
+import { SESSION_COOKIE } from "@/lib/auth/cookies";
 import { cookies } from "next/headers";
 import { hashToken } from "@/lib/auth/tokens";
 

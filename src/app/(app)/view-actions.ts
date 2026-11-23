@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { requirePerson } from "@/lib/auth/current";
-import { VIEW_COOKIE } from "@/lib/people/visibility";
+import { VIEW_COOKIE } from "@/lib/auth/cookies";
 import { cookieSecure } from "@/lib/app-url";
 
 /** Remembers which closet the person is browsing (their own, someone else's, or Family). */

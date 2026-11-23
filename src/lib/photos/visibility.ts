@@ -5,6 +5,7 @@ import { canSeeBodyData, canShopFor } from "@/lib/people/visibility";
 import type { Role } from "@/generated/prisma/client";
 
 export type Viewer = { id: string; role: Role; status?: string };
+type Owner = { id: string; role: Role; status: string };
 
 /**
  * Who may see a photo (Q13 A + privacy rules):
@@ -28,8 +29,16 @@ export async function canViewKey(viewer: Viewer, key: string): Promise<boolean> 
   if (parsed.kind === "fits") return canSeeFitPhotoKey(viewer, parsed.ownerId, key);
   if (parsed.kind === "shop") return canSeeShopKey(viewer, parsed.ownerId, key);
   if (parsed.kind === "looks") return canShopFor(viewer, parsed.ownerId); // a store find in a look: whoever may build the look
-  const owner = await db.person.findUnique({ where: { id: parsed.ownerId }, select: { id: true, role: true, status: true } });
-  if (!owner || owner.status === "removed") return false;
+  let owner: Owner | null = await db.person.findUnique({ where: { id: parsed.ownerId }, select: { id: true, role: true, status: true } });
+  if (!owner || owner.status === "removed") {
+    // A removed person's pieces may have moved to the Family closet (people/service.ts removePerson) while their photos kept
+    // the old key, so the piece's owner today decides (review A W2). Avatars and anything not on a piece stay dark.
+    if (parsed.kind === "avatars") return false;
+    const photo = await db.itemPhoto.findUnique({ where: { bucketKey: key }, select: { item: { select: { owner: { select: { id: true, role: true, status: true } } } } } });
+    owner = photo?.item.owner ?? null;
+    if (!owner || owner.status === "removed") return false;
+    if (owner.id === viewer.id) return true;
+  }
   if (owner.role === "minor") {
     const link = await db.guardianLink.findUnique({ where: { minorId_parentId: { minorId: owner.id, parentId: viewer.id } } });
     if (link) return true;

@@ -2,9 +2,10 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
 import { seed } from "../../prisma/seed";
-import { login } from "@/lib/auth/login";
+import { hasUsablePassword, login } from "@/lib/auth/login";
 import { hashPassword } from "@/lib/auth/password";
 import { setPassword, validateNewPassword } from "@/lib/auth/change-password";
+import { checkRateLimit, MAX_TRIES, noteFailure, clearRateLimit, rateLimitKey, resetRateLimits } from "@/lib/auth/rate-limit";
 
 describe("login + DEV MODE 0535 rule", () => {
   beforeEach(async () => {
@@ -13,7 +14,7 @@ describe("login + DEV MODE 0535 rule", () => {
     await seed();
   });
 
-  it("lets Jeff in once with 0535, then disables it", async () => {
+  it("lets Jeff in once with 0535, then says it was used until a real password is saved", async () => {
     const first = await login("Jeff@Everbowl.com", "0535");
     expect(first.ok).toBe(true);
     if (!first.ok) return;
@@ -22,9 +23,33 @@ describe("login + DEV MODE 0535 rule", () => {
     const jeff = await db.person.findUniqueOrThrow({ where: { email: "jeff@everbowl.com" } });
     expect(jeff.devPasswordActive).toBe(false);
     expect(jeff.devPasswordUsedAt).not.toBeNull();
+    // The consumed hash stays until the new password lands (review A A2), but it is not a password anyone can use.
+    expect(jeff.passwordHash).not.toBeNull();
+    expect(hasUsablePassword(jeff)).toBe(false);
 
     const second = await login("jeff@everbowl.com", "0535");
-    expect(second).toEqual({ ok: false, reason: "invalid" });
+    expect(second).toEqual({ ok: false, reason: "dev_used" });
+    expect(await login("jeff@everbowl.com", "anything-else")).toEqual({ ok: false, reason: "dev_used" });
+  });
+
+  it("two phones at once: only one consumes 0535", async () => {
+    const [a, b] = await Promise.all([login("jeff@everbowl.com", "0535"), login("jeff@everbowl.com", "0535")]);
+    expect([a.ok, b.ok].filter(Boolean)).toHaveLength(1);
+    const loser = a.ok ? b : a;
+    expect(loser).toEqual({ ok: false, reason: "dev_used" });
+  });
+
+  it("rate limit: five tries, then a wait, then clear on success", () => {
+    resetRateLimits();
+    const key = rateLimitKey("1.2.3.4", "Jeff@Everbowl.com");
+    expect(key).toBe("1.2.3.4|jeff@everbowl.com");
+    for (let i = 0; i < MAX_TRIES; i++) { expect(checkRateLimit(key).ok).toBe(true); noteFailure(key); }
+    const refused = checkRateLimit(key);
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) expect(refused.minutesLeft).toBeGreaterThan(0);
+    expect(checkRateLimit(rateLimitKey("5.6.7.8", "jeff@everbowl.com")).ok).toBe(true); // another network is its own count
+    clearRateLimit(key);
+    expect(checkRateLimit(key).ok).toBe(true);
   });
 
   it("refuses 0535 when DEV_MODE is off, even if the seed left it active", async () => {

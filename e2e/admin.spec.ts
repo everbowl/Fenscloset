@@ -112,8 +112,8 @@ test("admin re-invites a seeded family member and removes a person with the item
   await page.goto("/admin/people");
   await page.getByRole("link", { name: /Olivia/ }).click();
   await page.getByLabel("Email").first().fill("olivia@example.com");
-  await page.getByLabel("Email").first().blur(); // details save when the field is left
-  await expect(page.getByTestId("toast-ok")).toContainText("Details saved");
+  await page.getByLabel("Email").first().blur(); // details save when the field is left; "✓ Saved" lands beside the heading, not in a toast the keyboard would hide
+  await expect(page.getByTestId("details-saved")).toHaveText("✓ Saved");
   await page.getByRole("button", { name: "Send invite" }).click();
   const sheet = page.getByRole("dialog");
   await sheet.getByRole("button", { name: "Create invite" }).click();
