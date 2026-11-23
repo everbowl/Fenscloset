@@ -15,7 +15,7 @@ import { buttonClass, type Size, type Variant } from "./button-class";
  */
 export { buttonClass };
 /** The bone band a big button sits on (Q11 D "warm paper"). It wraps the button rather than being a pseudo on it: the button animates (a stacking context of its own), and a -z pseudo inside it would paint over the orange. */
-const SHELF = "block relative before:absolute before:-inset-x-5 before:-inset-y-3 before:-z-10 before:bg-bone before:content-['']";
+const SHELF = "block relative";
 function Shelf({ children, className }: { children: ReactNode; className?: string }) {
   return <span className={cn(SHELF, className)}>{children}</span>;
 }
@@ -40,7 +40,7 @@ export function Button({
     const t = setTimeout(() => setShowFlash(false), 900);
     return () => clearTimeout(t);
   }, [flash]);
-  const withShelf = shelf ?? big;
+  const withShelf = shelf ?? false; // v2: no bone shelf; the button stands on the page
   // Width and flex classes belong to the outermost box: on the shelf when there is one, so `flex-1` and `w-full` still work.
   const parts = (className ?? "").split(/\s+/).filter(Boolean);
   const layout = parts.filter((c) => /^(flex-1|w-full|grow|shrink-0|self-\w+|mt-\d+|mb-\d+|lg:col-start-\d|lg:w-\w+)$/.test(c));
@@ -52,9 +52,9 @@ export function Button({
         <>
           {busy ? <span aria-hidden className="size-2 shrink-0 animate-pulse rounded-full bg-current" /> : icon ? <span aria-hidden className="shrink-0">{icon}</span> : null}
           {sub ? (
-            <span className="flex min-w-0 flex-col items-start gap-0.5 text-left normal-case tracking-normal">
-              <span className="font-mono uppercase tracking-[0.16em]">{children}</span>
-              <span className="mono text-[11px] tracking-[0.12em]">{sub}</span>
+            <span className="flex min-w-0 flex-col items-start gap-0 text-left">
+              <span className="text-[16px] font-semibold leading-tight">{children}</span>
+              <span className="text-[13px] font-medium leading-tight opacity-75">{sub}</span>
             </span>
           ) : children}
           {withArrow && !busy ? <span aria-hidden className="ml-1 transition-transform duration-100 group-active:translate-x-1">→</span> : null}

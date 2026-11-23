@@ -50,12 +50,12 @@ export function ClosetGrid({ items, showOwner, mirror, lead }: { items: ItemCard
   return (
     <>
       {canMirror && picking ? (
-        <div className="mono mt-4 flex items-center justify-between border-y border-ink py-2.5" data-testid="pick-bar" aria-live="polite">
+        <div className="card mt-3 flex items-center justify-between gap-2 px-4 py-2.5 text-[14px]" data-testid="pick-bar" aria-live="polite">
           <span>{picked.length ? `${picked.length} picked` : `Tap the pieces · ${onMe ? "they go on you" : "they go on a mannequin"}`} · up to {PICK_MAX}</span>
           <button type="button" onClick={stop} className="pill pill-sm" data-testid="pick-cancel">Cancel</button>
         </div>
       ) : null}
-      <div className="mt-4 grid grid-cols-2 gap-x-2.5 gap-y-[18px] lg:grid-cols-4 lg:gap-x-4 lg:gap-y-7">
+      <div className="mt-3 grid grid-cols-3 gap-x-2 gap-y-4 lg:grid-cols-5 lg:gap-x-4 lg:gap-y-6">
         {lead}
         {items.map((it) => (
           <ItemCard key={it.id} item={it} showOwner={showOwner}
@@ -63,7 +63,7 @@ export function ClosetGrid({ items, showOwner, mirror, lead }: { items: ItemCard
         ))}
       </div>
       {picking ? (
-        <div className="fixed inset-x-0 bottom-[calc(76px_+_env(safe-area-inset-bottom))] z-30 border-t border-ink bg-paper px-5 py-3 lg:bottom-0 lg:py-4">
+        <div className="fixed inset-x-0 bottom-[calc(76px_+_env(safe-area-inset-bottom))] z-30 border-t border-line bg-paper/95 px-5 py-3 backdrop-blur lg:bottom-0 lg:py-4">
           <div className="mx-auto flex max-w-[440px] flex-col gap-2 lg:max-w-[1040px]">
             <Button size="lg" className="w-full" disabled={!picked.length || m.busy} shelf={false} sub={picked.length ? names : "Tap pieces in the grid"}
               onClick={() => mirror && m.begin({ look: { kind: "closet", itemIds: picked }, on: onMe ? "me" : "mannequin" })} data-testid="see-picked">

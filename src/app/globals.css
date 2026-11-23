@@ -1,16 +1,17 @@
 @import "tailwindcss";
 
-/* Brand: Fen's Closet identity v1. Black, Paper, Bone, Graphite. Archivo (wide) for the wordmark,
-   Instrument Serif for editorial headings, IBM Plex Mono for labels. No rounded corners. */
+/* Fen's Closet v2 (docs/redesign-2026-11-23.md, section 3). White, one ink, a soft stage for images. Archivo for
+   everything you read, Instrument Serif for the greeting and the wordmark only. Round corners, pills, no rules
+   between everything. The old mono-uppercase voice is gone; the class names stay so every screen moves at once. */
 :root {
-  --black: #000000;
+  --black: #0b0b0b;
   --paper: #ffffff;
-  --bone: #f2f0eb;
-  --graphite: #454545; /* was #6b6b6b: too faint on paper (Jeff, 19 Oct 2026) */
-  --line: #e5e3de;
+  --bone: #f4f4f2;      /* the stage an image sits on, a pressed row, a quiet pill */
+  --graphite: #5a5a57;  /* secondary text; passes 7:1 on white */
+  --line: #e9e8e4;      /* hairlines and card edges */
   --danger: #b91c1c;
-  --accent: #FF5A00; /* main buttons; overridden per household from Admin → Rules */
-  --stone: #bdb8ad; /* the base a pill button sits on (Q11 D) */
+  --accent: #FF5A00;    /* the one colored button per screen; the household changes it under Admin → Rules */
+  --stone: #d9d7d1;     /* kept for the few places that still name it */
 }
 
 @theme inline {
@@ -29,9 +30,9 @@
   --color-accent-foreground: var(--black); /* black on orange (Jeff, 31 Oct 2026, B1) */
   --color-danger: var(--danger);
   --font-sans: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --font-mono: "Archivo Variable", ui-sans-serif, system-ui, sans-serif; /* nothing reads in mono any more */
   --font-serif: "Instrument Serif", Georgia, serif;
-  --radius: 0px;
+  --radius: 16px;
 }
 
 html { color-scheme: light; }
@@ -42,93 +43,117 @@ html, body {
   font-family: var(--font-sans);
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
+img { -webkit-user-drag: none; }
 
-/* Brand text styles live in the components layer so Tailwind utilities (e.g. normal-case) can override them. */
 @layer components {
-/* Mono uppercase label, the brand's secondary voice. */
+/* Captions and labels: the old mono voice, now a plain small label. Sentence case. */
 .mono {
-  font-family: var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 12px; /* was 11px: too small to read at arm's length (Jeff, 20 Nov 2026) */
-  line-height: 1.4;
+  font-family: var(--font-sans);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
 }
-/* One step louder than .mono: a counter, a tab, a banner title. */
-.mono-11 { font-size: 13px; }
-.mono-12 { font-size: 13px; }
-.mono-13 { font-size: 14px; }
+.mono-11 { font-size: 14px; }
+.mono-12 { font-size: 14px; }
+.mono-13 { font-size: 15px; }
 
-/* A sentence of help or explanation: plain sans, sentence case, never the uppercase mono (Jeff, 20 Nov 2026: "text
-   should be clean, simple and clear"). Labels stay mono; anything longer than a few words is a note. */
+/* A sentence of help: a shade lighter, never smaller than 15px. */
 .note {
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.45;
   letter-spacing: 0;
   text-transform: none;
   color: var(--graphite);
 }
 
-/* Every tappable thing reads as a button (Jeff, 23 Oct 2026: "all buttons should be louder and apparent"): a text
-   action is an outlined pill. .pill-solid for the one that matters most in its row; .pill-quiet for the way out
-   (Not now, Skip, Remove); .pill-sm in tight rows and overlays. Utilities (mt-4, w-full, h-[50px]) still win. */
+/* Type scale: title 28, section 20, body 17, secondary 15, caption 13. */
+.title { font-size: 28px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.1; }
+.section { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; }
+.caption { font-size: 13px; color: var(--graphite); line-height: 1.35; }
+
+/* Surfaces: a card is white with a hairline; a stage is the soft gray an image sits on. */
+.card { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; }
+.stage { background: var(--bone); border-radius: 16px; }
+
+/* Pills: every tappable word is a pill. Quiet gray by default, black for the one that leads a row, bare for the way out. */
 .pill {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem;
-  height: 2.5rem; padding: 0 1rem; border-radius: 9999px; border: 2px solid var(--black);
-  background: var(--paper); color: var(--black); white-space: nowrap; cursor: pointer;
-  font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.12em; font-size: 12px; font-weight: 500; line-height: 1;
+  height: 2.5rem; padding: 0 1rem; border-radius: 9999px; border: 0;
+  background: var(--bone); color: var(--black); white-space: nowrap; cursor: pointer;
+  font-family: var(--font-sans); text-transform: none; letter-spacing: 0; font-size: 14px; font-weight: 500; line-height: 1;
+  transition: background-color 0.1s, transform 0.1s;
 }
-/* Hover only where there is a pointer: on a phone a :hover sticks after the tap. The press is the feedback. */
-@media (hover: hover) { .pill:hover { background: var(--bone); } .pill-solid:hover { background: var(--graphite); } }
-.pill:active { background: var(--line); transform: translateY(1px); }
-.pill:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+@media (hover: hover) { .pill:hover { background: #ebeae6; } .pill-solid:hover { background: #2a2a2a; } }
+.pill:active { background: #e2e1dc; transform: scale(0.98); }
+.pill:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 .pill-solid { background: var(--black); color: var(--paper); }
 .pill-solid:active { background: var(--black); }
-.pill-quiet { border-color: var(--graphite); color: var(--graphite); }
-/* Small pills stay 36px to the eye and 44px to the finger: the hit area reaches 4px past each edge. */
-.pill-sm { position: relative; height: 2.25rem; padding: 0 0.75rem; font-size: 11px; }
-.pill-sm::after { content: ""; position: absolute; inset: -4px; }
-/* A tappable row, card or cell: a touch of bone while pressed. */
-.tap { -webkit-tap-highlight-color: transparent; }
-@media (hover: hover) { .tap:hover { background: var(--bone); } }
-.tap:active { background: var(--line); }
+.pill-quiet { background: transparent; color: var(--graphite); box-shadow: inset 0 0 0 1px var(--line); }
+.pill-accent { background: var(--accent); color: var(--black); }
+/* Small pills stay 34px to the eye and 44px to the finger: the hit area reaches 5px past each edge. */
+.pill-sm { position: relative; height: 2.125rem; padding: 0 0.75rem; font-size: 13px; }
+.pill-sm::after { content: ""; position: absolute; inset: -5px; }
+/* A selected chip in a row of chips. */
+.pill[aria-pressed="true"], .pill[aria-current], .pill-on { background: var(--black); color: var(--paper); }
 
-/* Editorial serif heading. No italics anywhere in the app (Jeff, 20 Nov 2026): the accent word is set like the rest. */
+/* A tappable row, card or cell: a touch of gray while pressed. */
+.tap { -webkit-tap-highlight-color: transparent; transition: background-color 0.1s; }
+@media (hover: hover) { .tap:hover { background: var(--bone); } }
+.tap:active { background: #ebeae6; }
+
+/* The greeting and the wordmark are the only serif on the site. */
 .serif {
   font-family: var(--font-serif);
   font-weight: 400;
-  line-height: 0.95;
+  line-height: 1;
   letter-spacing: -0.005em;
 }
 em, i, .italic { font-style: normal; }
 
-/* Wide-set wordmark. */
 .wordmark {
   font-family: var(--font-sans);
   font-weight: 600;
   font-stretch: 125%;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   white-space: nowrap;
 }
+
+/* A pinned wait card: what is happening, how long it usually takes, and that you can leave. Sits above the tab bar. */
+.wait {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom) + 12px);
+  width: calc(100% - 40px); max-width: 440px; z-index: 35;
+  background: var(--black); color: var(--paper); border-radius: 16px; padding: 12px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+@media (min-width: 1024px) { .wait { bottom: 24px; } }
 }
 
 .safe-top { padding-top: env(safe-area-inset-top); }
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
 
-/* Native <dialog> as a bottom sheet: it slides up in a beat, the page behind it stays put. */
-dialog.sheet { border: 0; padding: 0; overscroll-behavior: contain; }
-dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.45); }
+/* Native <dialog> as a bottom sheet: rounded top, slides up in a beat, the page behind it stays put. */
+dialog.sheet { border: 0; padding: 0; overscroll-behavior: contain; border-radius: 20px 20px 0 0; }
+@media (min-width: 640px) { dialog.sheet { border-radius: 20px; } }
+dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.4); }
 @keyframes sheet-up { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes sheet-backdrop { from { opacity: 0; } to { opacity: 1; } }
-dialog.sheet[open] { animation: sheet-up 0.2s cubic-bezier(0.2, 0.7, 0.2, 1); }
+dialog.sheet[open] { animation: sheet-up 0.22s cubic-bezier(0.2, 0.7, 0.2, 1); }
 dialog.sheet[open]::backdrop { animation: sheet-backdrop 0.2s ease-out; }
 @media (prefers-reduced-motion: reduce) { dialog.sheet[open], dialog.sheet[open]::backdrop { animation: none; } }
 /* While a sheet is open the page behind it does not scroll (iOS scrolls the page through the backdrop). */
 html.sheet-open, html.sheet-open body { overflow: hidden; }
 
-/* Motion for the main buttons (Q11): the big button rises in a beat after the page; the press sinks it onto its base. */
-@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-.rise { animation: rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) 0.12s both; }
+/* The main button rises in a beat after the page. */
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.rise { animation: rise 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) 0.1s both; }
 @media (prefers-reduced-motion: reduce) { .rise { animation: none; } }
+
+/* Horizontal strips (chips, the looks pager) hide their scrollbar and snap. */
+.strip { display: flex; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.strip::-webkit-scrollbar { display: none; }

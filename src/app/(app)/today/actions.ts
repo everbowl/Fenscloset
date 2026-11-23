@@ -12,6 +12,7 @@ import { CheckInError, saveSelfie, saveTaps } from "@/lib/checkins/service";
 import { PlanError, setPlan } from "@/lib/plans";
 import { IMAGE_TYPES } from "@/lib/storage";
 import { jobStatus, settled, startJob, type JobStatus } from "@/lib/jobs";
+import { cookieSecure } from "@/lib/app-url";
 
 export type Result = { ok: true } | { ok: false; error: string };
 /** Building looks: done, or a job to poll with looksStatusAction. */
@@ -48,7 +49,7 @@ async function run(fn: () => Promise<unknown>): Promise<Result> {
 export async function setLocationAction(lat: number, lon: number): Promise<Result> {
   await requirePerson();
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return { ok: false, error: "No location." };
-  (await cookies()).set(LOCATION_COOKIE, `${lat.toFixed(3)},${lon.toFixed(3)}`, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 12 * 3600 });
+  (await cookies()).set(LOCATION_COOKIE, `${lat.toFixed(3)},${lon.toFixed(3)}`, { httpOnly: true, sameSite: "lax", secure: cookieSecure(), path: "/", maxAge: 12 * 3600 });
   revalidatePath("/today");
   return { ok: true };
 }

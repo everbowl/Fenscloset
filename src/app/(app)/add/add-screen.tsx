@@ -55,56 +55,57 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
   const hasBatch = Boolean(batch) || upload.active || upload.pending > 0 || upload.held > 0;
   const progress = total ? Math.round(((settled + ready) / total) * 100) : 0;
 
-  if (!loaded) return <div className="lg:max-w-[560px]"><PageHeader title="Add" accent="clothes" /><div className="h-[380px] bg-bone" /></div>;
+  if (!loaded) return <div className="lg:max-w-[560px]"><PageHeader title="Add clothes" /><div className="stage h-[380px]" /></div>;
 
   if (!hasBatch) {
-    // Jeff, 31 Oct 2026 (I1): "From photos" opens the camera roll at once; the tips stay right here on the Add screen.
+    // Three ways in (Alta's "Add to closet" sheet, docs/redesign-2026-11-23.md): photos first and colored, the store link and the receipt as quiet cards.
     return (
       <div className="lg:max-w-[560px]" {...drop}>
         {inputs}
-        <PageHeader title="Add" accent="clothes" />
-        <p className="mono text-graphite">How are you adding?</p>
-        <div className={`mt-4 flex flex-col gap-4 ${over ? "outline outline-2 -outline-offset-4 outline-dashed outline-ink" : ""}`} data-testid="add-doors">
-          <div className="flex items-stretch gap-2.5">
-            <Button size="lg" className="flex-1 min-h-[72px] justify-start" icon={<Icons.camera />} sub="Hanger or flat-lay shots · one piece each" onClick={() => pickRef.current?.click()} data-testid="door-photo">From photos</Button>
-            <button type="button" aria-label="Take a photo" className="flex w-[64px] shrink-0 items-center justify-center rounded-full border-2 border-ink bg-paper text-ink active:bg-bone lg:hidden" onClick={() => cameraRef.current?.click()}><CameraIcon /></button>
+        <PageHeader title="Add clothes" />
+        <div className={`flex flex-col gap-2.5 ${over ? "outline outline-2 -outline-offset-4 outline-dashed outline-ink rounded-2xl" : ""}`} data-testid="add-doors">
+          <div className="flex items-stretch gap-2">
+            <Button size="lg" className="min-h-[64px] flex-1 justify-start" icon={<Icons.camera />} sub="Hanger or flat-lay shots, one piece each" onClick={() => pickRef.current?.click()} data-testid="door-photo">Add with photos</Button>
+            <button type="button" aria-label="Take a photo" className="flex w-16 shrink-0 items-center justify-center rounded-full bg-bone text-ink active:bg-[#e2e1dc] lg:hidden" onClick={() => cameraRef.current?.click()}><CameraIcon /></button>
           </div>
-          <Link href="/add/store?tab=link" className="flex min-h-[64px] w-full items-center justify-between border border-ink px-5 text-left" data-testid="add-by-link">
-            <span><span className="mono block text-[12px] uppercase tracking-[0.16em]">From a store link</span><span className="note mt-1 block">Paste the product page. Say how many in each color and size, or tell it in words.</span></span>
-            <span className="mono">→</span>
+          <Link href="/add/store?tab=link" className="card tap flex min-h-[64px] w-full items-center justify-between gap-3 px-4 py-3 text-left" data-testid="add-by-link">
+            <span><span className="block text-[16px] font-semibold">Paste a store link</span><span className="note mt-0.5 block">The product page. Say how many in each color and size.</span></span>
+            <span className="text-graphite">›</span>
           </Link>
-          <Link href="/add/store?tab=receipt" className="flex min-h-[64px] w-full items-center justify-between border border-ink px-5 text-left" data-testid="add-by-receipt">
-            <span><span className="mono block text-[12px] uppercase tracking-[0.16em]">From a receipt</span><span className="note mt-1 block">Receipts or order emails, as many as you like. The stores' own photos.</span></span>
-            <span className="mono">→</span>
+          <Link href="/add/store?tab=receipt" className="card tap flex min-h-[64px] w-full items-center justify-between gap-3 px-4 py-3 text-left" data-testid="add-by-receipt">
+            <span><span className="block text-[16px] font-semibold">Forward a receipt</span><span className="note mt-0.5 block">Receipts or order emails, as many as you like. The stores’ own photos.</span></span>
+            <span className="text-graphite">›</span>
           </Link>
         </div>
-        <p className="mono mt-4 text-center text-graphite">Then confirm each piece with one tap</p>
+        <p className="caption mt-4 text-center">Then confirm each piece with one tap.</p>
         {tips}
       </div>
     );
   }
 
+  const stageLine = upload.pending > 0 ? `Uploading · ${upload.pending} left` : working > 0 ? `Tagging · ${working} left` : ready > 0 ? `${ready} ready to confirm` : "All done";
   return (
     <div className="lg:max-w-[560px]">
       {inputs}
-      <PageHeader title="Add" accent="clothes" aside={<span data-testid="batch-counter">{pad(settled + ready)} / {pad(total)}</span>} />
-      <div {...drop} className={`relative h-[300px] bg-bone ${over ? "outline outline-2 -outline-offset-4 outline-dashed outline-ink" : ""}`}>
-        <div className="flex h-full flex-col items-center justify-center gap-2.5 px-6 text-center">
-          <span className="mono mono-11" aria-live="polite">{upload.pending > 0 ? `Uploading · ${upload.pending} left` : working > 0 ? `Tagging · ${working} left` : ready > 0 ? `${ready} ready to confirm` : "All done"}</span>
-          <span className="note">{ready > 0 && working > 0 ? `${working} still tagging. Start confirming.` : working > 0 || upload.pending > 0 ? "Keep this open or come back later." : ready > 0 ? "One tap each." : "Nothing waiting."}</span>
+      <PageHeader title="Add clothes" aside={<span data-testid="batch-counter">{pad(settled + ready)} / {pad(total)}</span>} />
+      <div {...drop} className={`stage relative overflow-hidden ${over ? "outline outline-2 -outline-offset-4 outline-dashed outline-ink" : ""}`}>
+        <div className="flex min-h-[220px] flex-col items-center justify-center gap-2 px-6 py-8 text-center">
+          {working > 0 || upload.active ? <span aria-hidden className="size-2.5 animate-pulse rounded-full bg-ink" /> : null}
+          <span className="text-[18px] font-semibold" aria-live="polite">{stageLine}</span>
+          <span className="note">{ready > 0 && working > 0 ? `${working} still tagging. Start confirming.` : working > 0 || upload.pending > 0 ? "Keep this open or come back later; progress is saved." : ready > 0 ? "One tap each." : "Nothing waiting."}</span>
         </div>
-        <div className="absolute inset-x-0 bottom-0 h-[3px] bg-black/[0.12]"><div className="h-[3px] bg-ink transition-[width] duration-150" style={{ width: `${progress}%` }} /></div>
+        <div className="absolute inset-x-0 bottom-0 h-1 bg-black/[0.08]"><div className="h-1 bg-ink transition-[width] duration-150" style={{ width: `${progress}%` }} /></div>
       </div>
 
       {upload.held > 0 ? (
         <Banner tone="danger" title={`No connection · ${upload.held} photo${upload.held > 1 ? "s" : ""} waiting`} className="mt-4" data-testid="held-banner">
-          <p className="text-[13px]">They’ll be added the moment you’re back online.</p>
+          <p className="text-[14px]">They’ll be added the moment you’re back online.</p>
           <button type="button" onClick={() => void retryHeld()} className="pill mt-3">Try now</button>
         </Banner>
       ) : null}
       {upload.failed.length > 0 ? (
         <Banner tone="danger" title={`${upload.failed.length} photo${upload.failed.length > 1 ? "s" : ""} did not upload`} className="mt-4">
-          <p className="text-[13px]">{plainError(upload.failed[0].error)}</p>
+          <p className="text-[14px]">{plainError(upload.failed[0].error)}</p>
           <div className="mt-3 flex gap-2">
             <button type="button" onClick={retryFailedUploads} className="pill">Try again</button>
             <button type="button" onClick={() => void dropFailedUploads()} className="pill pill-quiet" data-testid="drop-failed">Remove these</button>
@@ -113,7 +114,7 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
       ) : null}
       {batch && batch.failed.length > 0 ? (
         <Banner tone="danger" title={`${batch.failed.length} photo${batch.failed.length > 1 ? "s" : ""} could not be tagged`} className="mt-4">
-          <p className="text-[13px]">{plainError(batch.failed[0].error)}</p>
+          <p className="text-[14px]">{plainError(batch.failed[0].error)}</p>
           <div className="mt-3 flex gap-2">
             <RetryAll ids={batch.failed.map((f) => f.id)} />
             {ready === 0 && working === 0 && !upload.active ? <LetThemGoHere batchId={batch.id} count={batch.failed.length} /> : null}
@@ -121,25 +122,24 @@ export function AddScreen({ tips }: { tips?: ReactNode }) {
         </Banner>
       ) : null}
 
-      <div className="mt-5 flex items-center gap-2.5">
+      <div className="mt-4 flex items-center gap-2">
         {batch && ready > 0 ? (
-          <Link href={`/add/${batch.id}`} className={buttonClass({ size: "lg", className: "flex-1" })} data-testid="confirm-ready"><Icons.check /><span className="flex flex-col items-start gap-0.5 text-left"><span>Confirm {ready} ready</span><span className="mono text-[11px] tracking-[0.12em]">One tap each</span></span></Link>
+          <Link href={`/add/${batch.id}`} className={buttonClass({ size: "lg", className: "flex-1" })} data-testid="confirm-ready"><Icons.check /><span className="flex flex-col items-start text-left"><span>Confirm {ready} ready</span><span className="text-[13px] font-medium opacity-75">One tap each</span></span></Link>
         ) : (
           <Button size="lg" className="flex-1" busy={working > 0 || upload.active} disabled>{working > 0 || upload.active ? "Tagging…" : "Nothing to confirm"}</Button>
         )}
-        <button type="button" aria-label="Add more photos" className="flex size-[60px] shrink-0 items-center justify-center rounded-full border-2 border-ink bg-paper text-ink active:bg-bone" onClick={() => pickRef.current?.click()}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><path d="M12 4v16M4 12h16" /></svg>
+        <button type="button" aria-label="Add more photos" className="flex size-[54px] shrink-0 items-center justify-center rounded-full bg-bone text-ink active:bg-[#e2e1dc]" onClick={() => pickRef.current?.click()}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M12 4v16M4 12h16" /></svg>
         </button>
-        <button type="button" aria-label="Take a photo" className="flex size-[60px] shrink-0 items-center justify-center rounded-full border-2 border-ink bg-paper text-ink active:bg-bone lg:hidden" onClick={() => cameraRef.current?.click()}><CameraIcon /></button>
+        <button type="button" aria-label="Take a photo" className="flex size-[54px] shrink-0 items-center justify-center rounded-full bg-bone text-ink active:bg-[#e2e1dc] lg:hidden" onClick={() => cameraRef.current?.click()}><CameraIcon /></button>
       </div>
-      <p className="note mt-4 text-center">Progress is saved. You can leave and come back.</p>
-      <div className="mt-5 border-t border-ink pt-4" data-testid="add-from-store">
-          <p className="mono text-graphite">Or add from a store</p>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <Link href="/add/store?tab=link" className="pill h-[54px] w-full" data-testid="add-by-link">By link</Link>
-            <Link href="/add/store?tab=receipt" className="pill h-[54px] w-full" data-testid="add-by-receipt">By receipt</Link>
-          </div>
+      <div className="mt-5" data-testid="add-from-store">
+        <p className="caption">Or add from a store</p>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <Link href="/add/store?tab=link" className="pill h-12 w-full text-[15px]" data-testid="add-by-link">Paste a link</Link>
+          <Link href="/add/store?tab=receipt" className="pill h-12 w-full text-[15px]" data-testid="add-by-receipt">Forward a receipt</Link>
         </div>
+      </div>
     </div>
   );
 }

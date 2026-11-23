@@ -12,12 +12,13 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${PORT}`,
     trace: "retain-on-failure",
-    // The container ships Chromium at a fixed path; locally Playwright's own download is used.
-    launchOptions: process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {},
   },
+  // The container ships Chromium at a fixed path; locally Playwright's own download is used. WebKit is Playwright's own.
   projects: [
-    { name: "iphone", use: { ...devices["iPhone 15"], browserName: "chromium", isMobile: true, hasTouch: true } },
-    { name: "desktop", use: { ...devices["Desktop Chrome"] } },
+    { name: "iphone", use: { ...devices["iPhone 15"], browserName: "chromium", isMobile: true, hasTouch: true, launchOptions: process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {} } },
+    // Safari's engine, the one the family's phones run (22 Nov 2026: a sheet rendered empty on an iPhone and only WebKit showed it).
+    { name: "iphone-webkit", use: { ...devices["iPhone 15"], browserName: "webkit" } },
+    { name: "desktop", use: { ...devices["Desktop Chrome"], launchOptions: process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {} } },
   ],
   webServer: {
     command: `npm run build >/dev/null 2>&1 && npx next start -p ${PORT}`,

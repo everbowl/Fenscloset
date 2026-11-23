@@ -58,13 +58,13 @@ export function NeedsStrip({ personId, needs, sections, isAdmin, sizeOptions, li
   };
 
   return (
-    <section className="mt-4 border-y border-ink py-2" data-testid="needs" aria-label="What’s needed">
-      <div className="flex items-center justify-between py-1">
-        <h2 className="mono tracking-[0.1em]">What’s needed</h2>
-        <span className="mono text-graphite" data-testid="needs-count">{live.length}</span>
+    <section className="card mt-3 px-4 py-3" data-testid="needs" aria-label="What’s needed">
+      <div className="flex items-center justify-between">
+        <h2 className="text-[16px] font-semibold">{live.length === 1 ? "One thing to finish" : `${live.length} things to finish`}</h2>
+        <span className="sr-only" data-testid="needs-count">{live.length}</span>
       </div>
       {rows.map((n) => (
-        <div key={n.key} className="flex flex-col gap-2 border-t border-line py-2.5" data-testid={`need-${n.key}`}>
+        <div key={n.key} className="flex flex-col gap-2 border-t border-line py-3 first-of-type:border-t-0" data-testid={`need-${n.key}`}>
           <div>
             <p className="text-[15px] leading-snug">{n.title}</p>
             <p className="note mt-0.5">{n.detail}</p>
@@ -75,8 +75,8 @@ export function NeedsStrip({ personId, needs, sections, isAdmin, sizeOptions, li
           </div>
         </div>
       ))}
-      {live.length > SHOWN ? <button type="button" onClick={() => setAll((a) => !a)} className="mono mt-1 py-2 text-graphite underline underline-offset-4" data-testid="needs-more">{all ? "Fewer" : `${live.length - SHOWN} more`}</button> : null}
-      {shownError ? <p className="mono mt-1 text-danger" role="alert">{shownError}</p> : null}
+      {live.length > SHOWN ? <button type="button" onClick={() => setAll((a) => !a)} className="caption mt-1 py-2 underline underline-offset-4" data-testid="needs-more">{all ? "Fewer" : `${live.length - SHOWN} more`}</button> : null}
+      {shownError ? <p className="mt-1 text-[14px] text-danger" role="alert">{shownError}</p> : null}
       {upload.input}
       <PhotoPrivacySheet open={Boolean(ask)} onClose={() => setAsk(null)} visibleTo={visibleTo} testIdPrefix="need-photo" onPick={(onlyMe) => { const v = ask; setAsk(null); if (v) upload.pick(v, onlyMe); }} />
       {sizing?.brandId ? (

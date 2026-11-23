@@ -4,8 +4,8 @@
 import Link from "next/link";
 import { Suspense, use, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { PageHeader } from "@/components/ui/page-header";
-import { Button, Icons } from "@/components/ui/button";
+import { ChevronDown, Cloud, CloudRain, CloudSun, Snowflake, Sun, Users, Sparkles, Archive } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { Sheet } from "@/components/ui/sheet";
 import { TextSheet } from "@/components/items/row-editor";
@@ -26,11 +26,15 @@ import { monoDate } from "@/lib/dates";
 /** What the weather cell shows: the forecast, or why there is none (nothing saved yet, or the lookup failed). */
 export type WeatherView = { weather: { condition: string; source: string; nowF: number; tonightF: number; highF: number; lowF: number; rainChance: number } | null; note: "none" | "failed" | null };
 
+/** One day of the week strip: the last six days and today, with the fit worn that day when there is one. */
+export type WeekDay = { key: string; weekday: string; day: number; today: boolean; thumbKey: string | null; fitId: string | null };
+
 type Props = {
   personId: string; personName: string; mine: boolean; canDress: boolean; isAdmin: boolean;
-  date: string; evening: boolean; contextLine: string; dateLabel: string;
-  /** The forecast: a promise while it is on its way (the cell breathes, the rest of the page is already there), a plain answer when there is nowhere to ask about. */
+  date: string; evening: boolean; hour: number; contextLine: string; dateLabel: string;
+  /** The forecast: a promise while it is on its way (the chip breathes, the rest of the page is already there), a plain answer when there is nowhere to ask about. */
   weather: WeatherView | Promise<WeatherView>; savedZip: string | null;
+  week: WeekDay[];
   plan: { source: string; label: string | null; occasionId: string | null }; calendarConnected: boolean; calendarConfigured: boolean;
   checkIn: { source: "taps" | "selfie"; answers: { scaleId: string; optionId: string }[] } | null; scales: Scale[];
   occasions: { id: string; name: string }[];
@@ -56,9 +60,15 @@ type Props = {
   engine: Engine;
 };
 
-const pad = (n: number) => String(n).padStart(2, "0");
+/** "Tops" from "TOPS": the engine's labels arrive shouted; the screen reads them in sentence case. */
+const sentence = (s: string) => s.length ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
+/** "Saturday, Nov 21" from the mono date "SAT, NOV 21". */
+function longDate(key: string): string {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" });
+}
 
-/** Today (screen 04): context line, title + counter, swipeable boards, piece list, reason, actions, Together strip. */
+/** Today (screen 04, v2): greeting and weather, the week, the look as a flat-lay, one colored button, the mirror, the rest as small cards. */
 export function TodayScreen(p: Props) {
   const router = useRouter();
   const [, start] = useTransition();
@@ -140,8 +150,7 @@ export function TodayScreen(p: Props) {
     });
   }
 
-  // The board under the person's eyes drives the counter and the text: each board reports when it is
-  // (mostly) in view. Programmatic moves jump without animation so the two can never drift apart.
+  // The board under the person's eyes drives the dots and the text: each board reports when it is (mostly) in view.
   const indexRef = useRef(index);
   indexRef.current = index;
   useEffect(() => {
@@ -176,7 +185,7 @@ export function TodayScreen(p: Props) {
     );
   }
 
-  // Seconds since the build started, for the overlay; after ~90s say so and offer Try again.
+  // Seconds since the build started, for the wait card; after ~90s say so and offer Try again.
   const [buildStartedAt, setBuildStartedAt] = useState<number | null>(p.needsLooks ? Date.now() : null);
   const [buildSecs, setBuildSecs] = useState(0);
   useEffect(() => {
@@ -194,47 +203,62 @@ export function TodayScreen(p: Props) {
   const whose = p.mine ? "your" : `${p.personName}’s`;
   const worn = Boolean(board?.wornFitId);
   const [flashWorn, setFlashWorn] = useState(false); // "✓ Worn" for a beat before the button turns into the Fits link
-  const title = p.evening ? "Tonight’s" : "Today’s";
+  const building = busy === "regen" || busy === "more";
+  const greeting = p.mine ? `${p.hour < 5 ? "Up late" : p.hour < 12 ? "Good morning" : p.hour < 17 ? "Good afternoon" : "Good evening"}, ${p.personName}` : `${p.personName}’s ${p.evening ? "evening" : "day"}`;
+  const planLabel = p.plan.label ?? "Everyday";
+  const checkInLabel = p.checkIn ? (p.checkIn.source === "selfie" ? "Checked in · selfie" : "Checked in") : "Check in";
 
   return (
     <div data-testid="today" className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-14">
-      <div className="lg:col-start-2">
-      <PageHeader
-        eyebrow={<span className="text-ink" data-testid="context-line">{p.mine ? p.contextLine : `${p.personName.toUpperCase()} · ${p.contextLine}`}</span>}
-        title={title} accent="look"
-        aside={boards.length ? `${pad(index + 1)} / ${pad(boards.length)}` : undefined}
-      />
+      {/* Greeting on the left, the weather beside it. The weather streams in after the page paints. */}
+      <div className="flex items-start justify-between gap-3 lg:col-start-2">
+        <div className="min-w-0">
+          <h1 className="serif text-[32px] leading-none" data-testid="greeting">{greeting}</h1>
+          <p className="caption mt-2" data-testid="weather-date">{longDate(p.date)}<span className="sr-only"> · {p.dateLabel}</span></p>
+        </div>
+        <Suspense fallback={<WeatherChipPending />}>
+          <WeatherArea weather={p.weather} canDress={p.canDress} savedZip={p.savedZip} finding={busy === "location"} onZip={() => setSheet("zip")} onLocation={askLocation} />
+        </Suspense>
       </div>
 
-      {/* The weather streams in after the page paints: the one outside call on this screen never holds the rest of it. */}
-      <Suspense fallback={<WeatherPending dateLabel={p.dateLabel} />}>
-        <WeatherArea weather={p.weather} dateLabel={p.dateLabel} canDress={p.canDress} savedZip={p.savedZip} finding={busy === "location"} onZip={() => setSheet("zip")} onLocation={askLocation} />
-      </Suspense>
+      <WeekStrip days={p.week} className="mt-3 lg:col-start-2" />
+
+      {/* Today's suggestions: the plan on the left, the check-in on the right; tap either to change it. */}
+      <div className="mt-4 flex items-center justify-between gap-2 lg:col-start-2" data-testid="context-line">
+        <span className="sr-only">{p.contextLine}</span>
+        {p.canDress ? (
+          <>
+            <button type="button" onClick={() => setSheet("plan")} className="tap -ml-1 flex min-h-11 min-w-0 items-center gap-1 rounded-full px-1 text-[20px] font-semibold" data-testid="edit-plan">
+              <span className="truncate">{planLabel}</span><ChevronDown className="size-4 shrink-0 text-graphite" strokeWidth={2.5} />
+            </button>
+            <button type="button" onClick={() => setSheet("checkin")} className={cn("pill pill-sm shrink-0", p.checkIn && "pill-on")} data-testid="check-in">{checkInLabel}</button>
+          </>
+        ) : (
+          <span className="text-[20px] font-semibold">{planLabel}</span>
+        )}
+      </div>
 
       {boards.length ? (
         <>
-          <div className="relative lg:col-start-1 lg:row-start-1 lg:row-span-3">
-            <div ref={scroller} tabIndex={0} aria-label="Looks" onKeyDown={(e) => { if (e.key === "ArrowRight" && index < boards.length - 1) goTo(index + 1); if (e.key === "ArrowLeft" && index > 0) goTo(index - 1); }} className="-mx-5 flex snap-x snap-mandatory overflow-x-auto outline-none [scrollbar-width:none] focus-visible:outline-2 focus-visible:outline-ink lg:mx-0" data-testid="boards">
-              {boards.map((b, i) => <Board key={i} index={i} board={b} active={i === index} />)}
+          <div className="relative mt-3 lg:col-start-1 lg:row-start-1 lg:row-span-3 lg:mt-0">
+            <div ref={scroller} tabIndex={0} aria-label="Looks" onKeyDown={(e) => { if (e.key === "ArrowRight" && index < boards.length - 1) goTo(index + 1); if (e.key === "ArrowLeft" && index > 0) goTo(index - 1); }} className="strip -mx-5 snap-x snap-mandatory outline-none focus-visible:outline-2 focus-visible:outline-ink lg:mx-0">
+              {boards.map((b, i) => <Board key={i} index={i} board={b} active={i === index} dim={building} />)}
             </div>
-            {busy === "regen" ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-paper/70" data-testid="refreshing">
-                <span className="mono mono-11 bg-paper px-3 py-2" aria-live="polite">{slow ? "Taking longer than usual" : "Building fresh looks"}<span aria-hidden className="text-graphite"> · {buildSecs}s</span></span>
-                {slow ? <button type="button" onClick={() => buildLooks("regen", () => regenerateAction(p.personId))} className="pill pill-sm" data-testid="build-retry">Try again</button> : null}
-              </div>
-            ) : null}
           </div>
-          {/* The pager: the counter is in the title; these move the strip, and the keyboard does too. */}
+          {/* Dots say where you are; the arrows are for a keyboard and a desktop. */}
           {boards.length > 1 ? (
-            <div className="mt-2 flex items-center justify-center gap-3 lg:col-start-1 lg:row-start-4" data-testid="board-pager">
+            <div className="mt-3 flex items-center justify-center gap-4 lg:col-start-1 lg:row-start-4" data-testid="board-pager">
               <button type="button" aria-label="Previous look" disabled={index === 0} onClick={() => goTo(index - 1)} className="pill pill-sm px-3 disabled:opacity-30">‹</button>
-              <span className="mono text-graphite" aria-hidden>{index + 1} of {boards.length}</span>
+              <span className="flex items-center gap-2" aria-hidden>
+                {boards.map((_, i) => <span key={i} className={cn("block size-2 rounded-full transition-colors", i === index ? "bg-ink" : "bg-line")} />)}
+              </span>
+              <span className="sr-only">{index + 1} of {boards.length}</span>
               <button type="button" aria-label="Next look" disabled={index >= boards.length - 1} onClick={() => goTo(index + 1)} className="pill pill-sm px-3 disabled:opacity-30">›</button>
             </div>
           ) : null}
           {board ? (
-            <div className="mt-3.5 flex flex-col gap-2 lg:col-start-2 lg:mt-0">
-              <p className="mono text-ink" data-testid="piece-list">{board.pieces.map((x) => x.label).join(" · ")}</p>
+            <div className="mt-3 flex flex-col gap-1.5 lg:col-start-2 lg:mt-0">
+              <p className="caption" data-testid="piece-list">{board.pieces.map((x) => sentence(x.label)).join(" · ")}</p>
               <p className="text-[17px] leading-snug" data-testid="reason">{board.reason}</p>
               {board.why ? <WhyList why={board.why} /> : null}
             </div>
@@ -242,15 +266,15 @@ export function TodayScreen(p: Props) {
           {p.canDress ? (
             <div className="mt-4 flex flex-col gap-2 lg:col-start-2">
               {worn && !flashWorn ? (
-                <div className="flex min-h-[60px] items-center justify-between gap-3 border-y border-ink bg-bone px-4 py-3" data-testid="wearing-this">
-                  <span className="flex min-w-0 flex-col gap-0.5"><span className="mono mono-11 tracking-[0.18em]">✓ Wearing this</span><span className="note">On {whose} Fits calendar</span></span>
+                <div className="card flex min-h-[60px] items-center justify-between gap-3 px-4 py-3" data-testid="wearing-this">
+                  <span className="flex min-w-0 flex-col"><span className="text-[16px] font-semibold">✓ Wearing this</span><span className="caption">On {whose} Fits calendar</span></span>
                   <span className="flex shrink-0 gap-1.5">
                     <Link href="/fits" className="pill pill-sm" data-testid="see-fits">See Fits</Link>
                     <button type="button" disabled={busy !== null} onClick={() => run("unwear", () => deleteFitAction(board!.wornFitId!))} className="pill pill-sm pill-quiet" data-testid="unwear">Undo</button>
                   </span>
                 </div>
               ) : (
-                <Button size="lg" className="w-full" icon={<Icons.shirt />} sub={`Lands on ${whose} Fits calendar`} flash={flashWorn ? "✓ Worn" : null} busy={busy === "wear"} disabled={busy !== null}
+                <Button size="lg" className="w-full" sub={`Lands on ${whose} Fits calendar`} flash={flashWorn ? "✓ Worn" : null} busy={busy === "wear"} disabled={busy !== null}
                   onClick={() => run("wear", () => wearAction(p.personId, p.suggestion!.id, index), () => { setFlashWorn(true); setTimeout(() => setFlashWorn(false), 900); })} data-testid="wear-this">{busy === "wear" ? "Saving…" : "Wear this"}</Button>
               )}
               <div className="grid grid-cols-2 gap-2">
@@ -260,101 +284,76 @@ export function TodayScreen(p: Props) {
             </div>
           ) : null}
           {p.canDress && (p.tryOn === "ready" || p.mannequin) ? (
-            <div className="mt-5 lg:col-start-1 lg:row-start-5 lg:row-span-4 lg:mt-4 lg:self-start" data-testid="mirror">
+            <div className="mt-4 lg:col-start-1 lg:row-start-5 lg:row-span-4 lg:self-start" data-testid="mirror">
               <button type="button" disabled={busy !== null} onClick={() => m.show({ look: { kind: "today", suggestionId: p.suggestion!.id, index }, on: p.tryOn === "ready" ? "me" : "mannequin" })}
-                className="flex w-full items-center gap-5 border border-ink p-3 text-left disabled:opacity-60" data-testid={p.tryOn === "ready" ? "try-on" : "see-on-mannequin"}>
-                <span className="relative h-[150px] w-[100px] shrink-0 overflow-hidden rounded-t-[60px] border-2 border-ink bg-paper">
-                  {m.tryOn ? <img src={`/api/photo/${m.tryOn.key}`} alt="" className="size-full object-cover" /> : <MirrorGlyph />}
+                className="card tap flex w-full items-center gap-4 p-3 text-left disabled:opacity-60" data-testid={p.tryOn === "ready" ? "try-on" : "see-on-mannequin"}>
+                <span className="stage relative h-[132px] w-[96px] shrink-0 overflow-hidden rounded-xl">
+                  {m.tryOn ? <img src={`/api/photo/${m.tryOn.key}`} alt="" className="size-full object-cover" /> : <span className="flex size-full items-center justify-center p-3"><MirrorGlyph /></span>}
+                  {m.busy ? <span className="absolute inset-0 flex items-center justify-center bg-paper/60"><span className="size-2.5 animate-pulse rounded-full bg-ink" /></span> : null}
                 </span>
-                <span className="flex flex-col gap-1">
-                  <span className="mono mono-11 tracking-[0.18em] text-ink">{m.busy ? "Dressing…" : "Look in the mirror"}</span>
-                  <span className="text-[15px] leading-snug">{p.tryOn === "ready" ? "This look on you." : `This look on a mannequin${p.mine ? "" : ` for ${p.personName}`}.`}</span>
-                  <span className="mono text-ink">Tap to see it →</span>
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="text-[17px] font-semibold">{m.busy ? "Dressing you…" : p.tryOn === "ready" ? "See it on you" : "See it on a mannequin"}</span>
+                  <span className="note">{p.tryOn === "ready" ? "This look, on your photo." : `This look on the mannequin${p.mine ? "" : ` for ${p.personName}`}.`}</span>
+                  <span className="caption text-ink">Tap to open the mirror ›</span>
                 </span>
               </button>
               {p.tryOn === "off" ? (
-                <Link href="/profile/settings" className="mt-2 flex min-h-[44px] items-center justify-between gap-3 border-b border-ink text-[15px] text-ink" data-testid="try-on-off"><span>Want the mirror to show you? Turn on try-on</span><span aria-hidden>→</span></Link>
+                <Link href="/profile/settings" className="tap mt-2 flex min-h-11 items-center justify-between gap-3 rounded-xl px-1 text-[15px]" data-testid="try-on-off"><span>Want the mirror to show you? Turn on try-on</span><span aria-hidden className="text-graphite">›</span></Link>
               ) : p.tryOn === "no_photo" ? (
-                <Link href="/profile/body" className="mt-2 flex min-h-[44px] items-center justify-between gap-3 border-b border-ink text-[15px] text-ink" data-testid="try-on-photo"><span>Want the mirror to show you? Add a body photo</span><span aria-hidden>→</span></Link>
+                <Link href="/profile/body" className="tap mt-2 flex min-h-11 items-center justify-between gap-3 rounded-xl px-1 text-[15px]" data-testid="try-on-photo"><span>Want the mirror to show you? Add a body photo</span><span aria-hidden className="text-graphite">›</span></Link>
               ) : null}
             </div>
           ) : null}
         </>
       ) : (
         <>
-          {/* Before the first looks: the board's shape, breathing while they build (Jeff, 20 Nov 2026: four empty boxes and an italic line said nothing). */}
-          <div className={cn("grid grid-cols-2 grid-rows-[196px_196px] gap-1.5 lg:col-start-1 lg:row-start-1 lg:row-span-6 lg:grid-rows-[200px_200px]", busy === "regen" && "animate-pulse")} aria-hidden>
-            <div className="row-span-2 bg-bone" /><div className="bg-bone" />
-            <div className="grid grid-cols-2 gap-1.5"><div className="bg-bone" /><div className="bg-bone" /></div>
+          {/* Before the first looks: a look's shape on the stage, breathing while they build. */}
+          <div className={cn("stage relative mt-3 aspect-square w-full overflow-hidden lg:col-start-1 lg:row-start-1 lg:row-span-6 lg:mt-0 lg:aspect-[4/5]", building && "animate-pulse")} aria-hidden>
+            <span className="absolute left-[24%] top-[6%] h-[44%] w-[52%] rounded-2xl bg-paper/70" />
+            <span className="absolute left-[26%] top-[48%] h-[44%] w-[48%] rounded-2xl bg-paper/70" />
+            <span className="absolute left-[64%] top-[70%] h-[18%] w-[30%] rounded-2xl bg-paper/70" />
+            {building ? <span className="absolute inset-x-0 bottom-5 text-center text-[15px] font-medium text-graphite">Considering the weather…</span> : null}
           </div>
-          <div className="mt-3.5 flex flex-col gap-2 lg:col-start-2 lg:mt-0">
-            {busy === "regen" ? (
+          <div className="mt-3 flex flex-col gap-2 lg:col-start-2 lg:mt-0">
+            {!building ? (
               <>
-                <p className="mono text-ink" aria-live="polite" data-testid="refreshing">{slow ? "Taking longer than usual" : `Building ${p.evening ? "tonight’s" : "today’s"} looks`}<span aria-hidden className="text-graphite"> · {buildSecs}s</span></p>
-                <p className="note">Three looks, picked for the weather and the plan. About half a minute. You can leave; they will be here when you come back.</p>
-                {slow ? <button type="button" onClick={() => buildLooks("regen", () => regenerateAction(p.personId))} className="pill self-start" data-testid="build-retry">Try again</button> : null}
-              </>
-            ) : (
-              <>
-                <p className="serif text-[26px] leading-tight">No looks yet</p>
+                <p className="section">No looks yet</p>
                 <p className="note">{p.enoughClothes ? (p.canDress ? "Something went wrong building today’s looks." : `${p.personName} hasn’t opened Today yet.`) : p.mine ? "Add clothes with the + button and your first three looks will appear here." : `${p.personName}’s closet needs a few more pieces first.`}</p>
                 {!p.enoughClothes && p.mine ? <Link href="/add" className="pill mt-2 self-start" data-testid="empty-add-clothes">+ Add clothes</Link> : null}
+                {p.enoughClothes && p.canDress ? <Button variant="secondary" className="mt-2 w-full" disabled={busy !== null} onClick={() => buildLooks("regen", () => regenerateAction(p.personId))}>Try again</Button> : null}
               </>
-            )}
+            ) : null}
           </div>
-          {p.enoughClothes && p.canDress && busy !== "regen" ? <Button variant="secondary" className="mt-4 w-full lg:col-start-2" disabled={busy !== null} onClick={() => buildLooks("regen", () => regenerateAction(p.personId))}>Try again</Button> : null}
         </>
       )}
 
-      {p.canDress ? (
-        <div className="mt-[18px] flex flex-col border-t border-ink lg:col-start-2" data-testid="day-strips">
-          <div className="flex min-h-[56px] items-center justify-between gap-3 border-b border-line py-2">
-            <span className="flex min-w-0 flex-col gap-0.5"><span className="mono text-graphite">Check-in</span><span className="truncate text-[14px]">{p.checkIn ? (p.checkIn.source === "selfie" ? "From a selfie" : `${p.checkIn.answers.length} ${p.checkIn.answers.length === 1 ? "answer" : "answers"} today`) : p.mine ? "How are you looking today?" : `How is ${p.personName} looking today?`}</span></span>
-            <button type="button" onClick={() => setSheet("checkin")} className="pill pill-sm shrink-0" data-testid="check-in">{p.checkIn ? "Change" : "Check in"}</button>
-          </div>
-          <div className="flex min-h-[56px] items-center justify-between gap-3 border-b border-line py-2">
-            <span className="flex min-w-0 flex-col gap-0.5"><span className="mono text-graphite">Plan</span><span className="truncate text-[14px]">{p.plan.label ?? (p.calendarConnected ? "Nothing on the calendar" : "Nothing planned")}</span></span>
-            <button type="button" onClick={() => setSheet("plan")} className="pill pill-sm shrink-0" data-testid="edit-plan">{p.plan.label ? "Change" : "Set a plan"}</button>
-          </div>
-        </div>
-      ) : null}
-
       {p.unrated ? (
-        <div className="mt-[18px] border-t border-ink pt-3 lg:col-start-2" data-testid="yesterday-strip">
-          <p className="mono text-graphite">{monoDate(p.unrated.date)} · {p.unrated.title}</p>
+        <div className="card mt-4 px-4 py-3 lg:col-start-2" data-testid="yesterday-strip">
+          <p className="caption">{monoDate(p.unrated.date)} · {p.unrated.title}</p>
           <RatingRow compact rating={null} disabled={busy !== null} onRate={(r) => { if (r) run("rate", () => rateAction(p.unrated!.id, r)); }} />
         </div>
       ) : null}
 
-      <Link href="/today/together" className="mt-[18px] flex items-center justify-between border border-ink px-4 py-3.5 hover:bg-bone lg:col-start-2" data-testid="together-link">
-        <span className="flex flex-col gap-0.5">
-          <span className="serif text-[22px]">Going out together?</span>
-          <span className="note text-ink">Dress two or more people. Coordinate, match or contrast.</span>
-        </span>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden><path d="M4 12h16M14 6l6 6-6 6" /></svg>
-      </Link>
-
-      {p.lookingForNew > 0 ? (
-        <Link href={`/shop/looking-for?for=${p.personId}`} className="mt-3 flex items-center justify-between border border-ink px-4 py-3.5 hover:bg-bone lg:col-start-2" data-testid="looking-for-strip">
-          <span className="flex flex-col gap-0.5">
-            <span className="serif text-[22px]">Something turned up</span>
-            <span className="note text-ink">{p.lookingForNew} new {p.lookingForNew === 1 ? "match" : "matches"} for what {p.mine ? "you’re" : `${p.personName} is`} looking for</span>
-          </span>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden><path d="M4 12h16M14 6l6 6-6 6" /></svg>
-        </Link>
-      ) : null}
-
-      {p.cleanOutCount > 0 && p.canDress ? (
-        <Link href="/closet/clean-out?from=today" className="mt-3 flex items-center justify-between border border-ink px-4 py-3.5 hover:bg-bone lg:col-start-2" data-testid="clean-out-link">
-          <span className="flex flex-col gap-0.5">
-            <span className="serif text-[22px]">Time for a clean-out?</span>
-            <span className="note text-ink">{p.cleanOutCount} {p.cleanOutCount === 1 ? "piece" : "pieces"} not worn in a while</span>
-          </span>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden><path d="M4 12h16M14 6l6 6-6 6" /></svg>
-        </Link>
-      ) : null}
+      {/* Together, Looking for, Clean-out: small cards in a row. */}
+      <div className="mt-4 grid grid-cols-3 gap-2 lg:col-start-2">
+        <SmallCard href="/today/together" icon={<Users className="size-5" strokeWidth={1.8} />} title="Together" sub="Dress two or more" testId="together-link" />
+        {p.lookingForNew > 0 ? <SmallCard href={`/shop/looking-for?for=${p.personId}`} icon={<Sparkles className="size-5" strokeWidth={1.8} />} title="Looking for" sub={`${p.lookingForNew} new ${p.lookingForNew === 1 ? "match" : "matches"}`} testId="looking-for-strip" /> : null}
+        {p.cleanOutCount > 0 && p.canDress ? <SmallCard href="/closet/clean-out?from=today" icon={<Archive className="size-5" strokeWidth={1.8} />} title="Clean-out" sub={`${p.cleanOutCount} not worn in a while`} testId="clean-out-link" /> : null}
+      </div>
 
       <Suspense fallback={null}><WeatherCredit weather={p.weather} /></Suspense>
+
+      {/* The wait card: what is happening, how long it usually takes, and that you can leave. */}
+      {building ? (
+        <div className="wait flex items-center gap-3" role="status" aria-live="polite" data-testid="refreshing">
+          <span aria-hidden className="size-2.5 shrink-0 animate-pulse rounded-full bg-paper" />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="text-[15px] font-semibold">{slow ? "Taking longer than usual" : busy === "more" ? "Finding more looks" : `Building ${p.evening ? "tonight’s" : "today’s"} looks`}<span className="font-normal opacity-70"> · {buildSecs}s</span></span>
+            <span className="text-[13px] opacity-80">Usually about 30 seconds. You can leave; they’ll be here.</span>
+          </span>
+          {slow ? <button type="button" onClick={() => buildLooks("regen", () => regenerateAction(p.personId))} className="pill pill-sm shrink-0 bg-paper text-ink" data-testid="build-retry">Try again</button> : null}
+        </div>
+      ) : null}
 
       {/* Check-in: taps on each scale, or a selfie read by Claude. */}
       <CheckInSheet open={sheet === "checkin"} onClose={() => setSheet(null)} scales={p.scales} current={p.checkIn} busy={busy} isAdmin={p.isAdmin} mine={p.mine} personName={p.personName}
@@ -363,7 +362,7 @@ export function TodayScreen(p: Props) {
 
       {/* Plan: the occasion list (admins add right here), free text, or back to the calendar. */}
       <Sheet open={sheet === "plan"} onClose={() => setSheet(null)} title="Today’s plan">
-        <p className="mono mb-3 text-graphite">{p.plan.source === "calendar" ? `From your calendar: ${p.plan.label}` : p.plan.source === "pick" ? `Picked: ${p.plan.label}` : p.calendarConnected ? "Nothing on your calendar today" : p.calendarConfigured ? <>Pick a plan, or <Link href="/profile/settings" className="text-ink underline underline-offset-4">connect Google Calendar</Link></> : "Pick a plan"}</p>
+        <p className="note mb-3">{p.plan.source === "calendar" ? `From your calendar: ${p.plan.label}` : p.plan.source === "pick" ? `Picked: ${p.plan.label}` : p.calendarConnected ? "Nothing on your calendar today" : p.calendarConfigured ? <>Pick a plan, or <Link href="/profile/settings" className="text-ink underline">connect your calendar</Link>.</> : "Pick a plan for today."}</p>
         <PlanPicker occasions={p.occasions} selected={p.plan.occasionId} isAdmin={p.isAdmin} busy={busy !== null && busy !== "regen"}
           onPick={(id) => saveThenRefresh(() => setPlanAction(p.personId, { occasionId: id }))}
           onText={() => setSheet("planText")}
@@ -376,28 +375,50 @@ export function TodayScreen(p: Props) {
         <p className="note mb-2">Swap it for another, or take it off the look.</p>
         <div className="flex flex-col">
           {board?.pieces.map((x) => (
-            <div key={x.id} className="flex h-12 items-center gap-3 border-b border-line">
-              <span className="size-9 shrink-0 bg-bone">{x.thumbKey ? <img src={`/api/photo/${x.thumbKey}`} alt="" className="size-full object-contain" /> : null}</span>
-              <span className="min-w-0 flex-1"><span className="block truncate text-[15px]">{x.name}</span><span className="mono text-graphite">{x.label}</span></span>
+            <div key={x.id} className="flex h-14 items-center gap-3 border-b border-line">
+              <span className="stage size-10 shrink-0 overflow-hidden rounded-lg">{x.thumbKey ? <img src={`/api/photo/${x.thumbKey}`} alt="" className="size-full object-contain" /> : null}</span>
+              <span className="min-w-0 flex-1"><span className="block truncate text-[16px]">{x.name}</span><span className="caption">{sentence(x.label)}</span></span>
               <button type="button" disabled={busy !== null} onClick={() => run("swap", () => swapAction(p.personId, index, x.id), () => setSheet(null))} className="pill pill-sm" data-testid={`swap-${x.id}`}>Swap</button>
               {(board?.pieces.length ?? 0) > 2 ? <button type="button" disabled={busy !== null} onClick={() => run("swap", () => removeAction(p.personId, index, x.id), () => setSheet(null))} className="pill pill-sm pill-quiet" data-testid={`remove-${x.id}`}>Remove</button> : null}
             </div>
           ))}
         </div>
-        {busy === "swap" ? <p className="mono mt-3 text-graphite">Thinking…</p> : null}
+        {busy === "swap" ? <p className="note mt-3">Thinking…</p> : null}
       </Sheet>
 
       {/* See it on: the look on your own body photo (yours alone), or on the shared mannequin (no body in it). */}
-      <MirrorSheet m={m} pieces={board?.pieces.map((x) => x.label).join(" · ") ?? ""} mine={p.mine} personId={p.personId} personName={p.personName} tryOnState={p.tryOn} backPhoto={p.backPhoto} mannequinAvailable={p.mannequinAvailable} admin={p.isAdmin} />
+      <MirrorSheet m={m} pieces={board?.pieces.map((x) => sentence(x.label)).join(" · ") ?? ""} mine={p.mine} personId={p.personId} personName={p.personName} tryOnState={p.tryOn} backPhoto={p.backPhoto} mannequinAvailable={p.mannequinAvailable} admin={p.isAdmin} />
 
       <TextSheet open={sheet === "zip"} onClose={() => setSheet(null)} title="Weather for your zip" label="Zip code" kind="zip" value={p.savedZip ?? ""} placeholder="92101" onSave={(v) => run("zip", () => setZipAction(v))} />
     </div>
   );
 }
 
-/** The weather card: a button when the zip can be changed, a plain block for someone just looking. */
-function WeatherBlock({ onClick, className, children }: { onClick?: () => void; className: string; children: React.ReactNode }) {
-  return onClick ? <button type="button" onClick={onClick} className={cn(className, "tap")} data-testid="weather-block">{children}</button> : <div className={className} data-testid="weather-block">{children}</div>;
+/** A small card in the row under the look: an icon, a title, one line, a chevron. */
+function SmallCard({ href, icon, title, sub, testId }: { href: string; icon: React.ReactNode; title: string; sub: string; testId: string }) {
+  return (
+    <Link href={href} className="card tap flex min-h-[96px] flex-col justify-between rounded-2xl p-3" data-testid={testId}>
+      <span className="text-ink">{icon}</span>
+      <span className="flex flex-col"><span className="text-[15px] font-semibold leading-tight">{title}</span><span className="caption leading-tight">{sub}</span></span>
+    </Link>
+  );
+}
+
+/** The last six days and today: a worn fit shows as its picture, today is the filled dot, each day opens Fits. */
+function WeekStrip({ days, className }: { days: WeekDay[]; className?: string }) {
+  if (!days.length) return null;
+  return (
+    <div className={cn("grid grid-cols-7 gap-1", className)} data-testid="week-strip" aria-label="This week">
+      {days.map((d) => (
+        <Link key={d.key} href={d.fitId ? `/fits/${d.fitId}` : "/fits"} className="flex flex-col items-center gap-1.5" aria-label={`${d.weekday} ${d.day}${d.fitId ? ", worn" : ""}`} aria-current={d.today ? "date" : undefined}>
+          <span className={cn("text-[11px] font-medium", d.today ? "text-ink" : "text-graphite")}>{d.weekday}</span>
+          <span className={cn("flex size-8 items-center justify-center overflow-hidden rounded-full text-[13px] font-semibold", d.today ? "bg-ink text-paper" : d.thumbKey ? "bg-bone" : "bg-paper text-graphite ring-1 ring-inset ring-line")}>
+            {d.thumbKey && !d.today ? <img src={`/api/photo/${d.thumbKey}`} alt="" className="size-full object-cover" /> : d.day}
+          </span>
+        </Link>
+      ))}
+    </div>
+  );
 }
 
 function isThenable<T>(v: T | Promise<T>): v is Promise<T> { return typeof (v as Promise<T> | null)?.then === "function"; }
@@ -407,32 +428,42 @@ function useWeather(w: WeatherView | Promise<WeatherView>): WeatherView {
   return isThenable(w) ? use(w) : w;
 }
 
-type WeatherAreaProps = { weather: WeatherView | Promise<WeatherView>; dateLabel: string; canDress: boolean; savedZip: string | null; finding: boolean; onZip: () => void; onLocation: () => void };
+function WeatherIcon({ condition, className }: { condition: string; className?: string }) {
+  const c = condition.toLowerCase();
+  const props = { className, strokeWidth: 1.8, "aria-hidden": true as const };
+  if (c.includes("snow")) return <Snowflake {...props} />;
+  if (c.includes("rain") || c.includes("drizzle") || c.includes("shower") || c.includes("thunder")) return <CloudRain {...props} />;
+  if (c.includes("partly")) return <CloudSun {...props} />;
+  if (c.includes("cloud") || c.includes("fog")) return <Cloud {...props} />;
+  return <Sun {...props} />;
+}
 
-/** The forecast cell, or the question to ask when there is none (nothing saved yet, or the lookup failed). */
-function WeatherArea({ weather, dateLabel, canDress, savedZip, finding, onZip, onLocation }: WeatherAreaProps) {
+type WeatherAreaProps = { weather: WeatherView | Promise<WeatherView>; canDress: boolean; savedZip: string | null; finding: boolean; onZip: () => void; onLocation: () => void };
+
+/** The weather chip beside the greeting: the number now, the condition and tonight under it. With no forecast, the way to get one. */
+function WeatherArea({ weather, canDress, savedZip, finding, onZip, onLocation }: WeatherAreaProps) {
   const { weather: w, note } = useWeather(weather);
   if (w) {
-    return (
-      <WeatherBlock onClick={canDress ? onZip : undefined} className="mb-4 flex w-full items-stretch border border-ink text-left lg:col-start-2">
-        <span className="flex flex-col gap-1 border-r border-ink px-4 py-2.5">
-          <span className="mono text-ink" data-testid="weather-date">{dateLabel}</span>
-          <span className="flex items-baseline gap-1"><span className="serif text-[40px] leading-none">{w.nowF}°</span><span className="mono">now</span></span>
+    const inner = (
+      <>
+        <WeatherIcon condition={w.condition} className="size-6 shrink-0" />
+        <span className="flex flex-col items-start leading-tight">
+          <span className="text-[22px] font-semibold leading-none">{w.nowF}°</span>
+          <span className="caption whitespace-nowrap">{w.condition} · {w.tonightF}° tonight</span>
+          <span className="caption whitespace-nowrap">H {w.highF}° · L {w.lowF}°{w.rainChance >= 20 ? ` · Rain ${w.rainChance}%` : ""}</span>
         </span>
-        <span className="flex min-w-0 flex-1 flex-col justify-center gap-1 px-4 py-2">
-          <span className="text-[16px] font-medium leading-snug">{w.condition} · {w.tonightF}° tonight</span>
-          <span className="mono">High {w.highF}° · Low {w.lowF}°</span>
-          <span className="mono">{w.rainChance >= 20 ? `Rain ${w.rainChance}%` : "No rain"}{canDress ? <span className="text-graphite"> · {savedZip ?? "Set a zip"} ›</span> : null}</span>
-        </span>
-      </WeatherBlock>
+      </>
     );
+    const cls = "flex shrink-0 items-center gap-2 rounded-2xl py-1 pl-1 pr-2 text-left";
+    return canDress
+      ? <button type="button" onClick={onZip} className={cn(cls, "tap")} data-testid="weather-block" aria-label={`Weather ${w.nowF} degrees, ${w.condition}. Change zip`}>{inner}</button>
+      : <div className={cls} data-testid="weather-block">{inner}</div>;
   }
-  if (!note || !canDress) return null;
+  if (!canDress) return null;
   return (
-    <div className="mb-4 flex flex-col gap-2.5 border-y border-ink py-3 lg:col-start-2" data-testid="weather-note">
-      <span className="text-[16px] font-medium">{note === "failed" ? "The weather didn’t load." : "Where are you today?"}</span>
-      <span className="note">{note === "failed" ? "The looks are built without it this time. It is tried again in a couple of minutes, or set another zip." : "The looks follow the weather where you are."}</span>
-      <span className="flex flex-wrap gap-2">
+    <div className="flex shrink-0 flex-col items-end gap-1.5" data-testid="weather-note">
+      <span className="caption text-right">{note === "failed" ? "Weather didn’t load" : "Where are you today?"}</span>
+      <span className="flex gap-1.5">
         {note === "none" ? <button type="button" onClick={onLocation} disabled={finding} className="pill pill-sm">{finding ? "Finding…" : "Use my location"}</button> : null}
         <button type="button" onClick={onZip} className="pill pill-sm" data-testid="enter-zip">{savedZip ? "Change zip" : "Enter zip"}</button>
       </span>
@@ -440,75 +471,65 @@ function WeatherArea({ weather, dateLabel, canDress, savedZip, finding, onZip, o
   );
 }
 
-/** The forecast cell's shape while the forecast is on its way: the date is known, the numbers breathe. Same height as the cell, so nothing moves when it lands. */
-function WeatherPending({ dateLabel }: { dateLabel: string }) {
+/** The chip's shape while the forecast is on its way. */
+function WeatherChipPending() {
   return (
-    <div className="mb-4 flex w-full animate-pulse items-stretch border border-ink lg:col-start-2" data-testid="weather-pending" aria-busy="true" aria-label="Getting the weather">
-      <span className="flex flex-col gap-1 border-r border-ink px-4 py-2.5">
-        <span className="mono text-ink">{dateLabel}</span>
-        <span className="h-10 w-20 bg-bone" />
-      </span>
-      <span className="flex min-w-0 flex-1 flex-col justify-center gap-2 px-4 py-2">
-        <span className="h-4 w-3/4 bg-bone" /><span className="h-3 w-1/2 bg-bone" /><span className="h-3 w-2/5 bg-bone" />
-      </span>
+    <div className="flex shrink-0 animate-pulse items-center gap-2 py-1 pr-2" data-testid="weather-pending" aria-busy="true" aria-label="Getting the weather">
+      <span className="size-6 rounded-full bg-bone" />
+      <span className="flex flex-col gap-1.5"><span className="h-5 w-10 rounded bg-bone" /><span className="h-3 w-24 rounded bg-bone" /><span className="h-3 w-16 rounded bg-bone" /></span>
     </div>
   );
 }
 
 /** The source line at the foot of the page, once there is a forecast to credit. */
 function WeatherCredit({ weather }: { weather: WeatherView | Promise<WeatherView> }) {
-  return useWeather(weather).weather ? <p className="mono mt-5 text-graphite lg:col-start-2">Weather by Open-Meteo</p> : null;
+  return useWeather(weather).weather ? <p className="caption mt-5 lg:col-start-2">Weather by Open-Meteo</p> : null;
 }
 
-function Tile({ piece, className }: { piece?: BoardView["pieces"][number]; className?: string }) {
-  return (
-    <div className={cn("overflow-hidden bg-paper", className)}>
-      {piece?.thumbKey ? <img src={`/api/photo/${piece.thumbKey}`} alt={piece.name} className="size-full object-contain" /> : piece ? <div className="flex size-full items-center justify-center border border-dashed border-ink p-3 text-center"><span className="mono text-ink">{piece.name}<br /><span className="text-graphite">No photo yet</span></span></div> : null}
-    </div>
-  );
-}
-
-/**
- * The board fits its pieces, never shows an empty box: one piece fills it; two stack, top over bottom;
- * three put the hero on the left with two on the right; four or more use the 2×2 with the hero tall.
- * Pieces past the fourth live in the piece list.
- */
-/** Where a piece sits in the stack: what you wear on top first, shoes last; anything else (bags, hats, jewelry) in a small row under. */
+/** Where a piece sits on the stage: outer layer, top or dress, bottom, shoes; anything else (bags, hats, jewelry) is an accessory. */
 const STACK: Record<string, number> = { Outerwear: 0, Tops: 1, Activewear: 1, Dresses: 1, Swimwear: 1, Sleepwear: 1, Bottoms: 2, Shoes: 3 };
 function slotOf(p: Piece): number { return p.category && p.category in STACK ? STACK[p.category] : 4; }
-/** Width and height of each slot as a share of the board, so the top sits over the bottom with the shoes under, like an outfit laid out on a bed. */
-const SLOT = [
-  { w: "w-[74%]", h: "h-[210px] lg:h-[176px]", mt: "" },           // outerwear
-  { w: "w-[70%]", h: "h-[200px] lg:h-[168px]", mt: "-mt-10 lg:-mt-8" },  // top / dress
-  { w: "w-[62%]", h: "h-[200px] lg:h-[168px]", mt: "-mt-7 lg:-mt-6" },   // bottom
-  { w: "w-[40%]", h: "h-[104px] lg:h-[88px]", mt: "-mt-4 lg:-mt-3" },    // shoes
-];
 
 /**
- * The board lays the look out as an outfit (Jeff, 19 Oct 2026): the top over the bottom, shoes
- * under, each centered and slightly overlapping, white behind, no boxes. Accessories sit in a small
- * row at the end. One piece alone fills the board.
+ * The look laid out on the stage like clothes on a bed (Alta's and Whering's flat-lays, docs/redesign-2026-11-23.md): the top
+ * up, the bottom under it, shoes low on the right, an outer layer up on the right, accessories low on the left. Positions are
+ * shares of the stage, so the same look reads the same on every phone.
  */
-function Board({ board, index, active }: { board: BoardView; index: number; active: boolean }) {
+type Spot = { left: number; top: number; width: number; height: number };
+function layout(pieces: Piece[]): { piece: Piece; spot: Spot }[] {
+  const by = (slot: number) => pieces.filter((p) => slotOf(p) === slot);
+  const outer = by(0)[0], top = by(1)[0], bottom = by(2)[0], shoes = by(3)[0];
+  const extras = [...by(0).slice(1), ...by(1).slice(1), ...by(2).slice(1), ...by(3).slice(1), ...by(4)];
+  const out: { piece: Piece; spot: Spot }[] = [];
+  const hasOuter = Boolean(outer);
+  if (top) out.push({ piece: top, spot: { left: hasOuter ? 6 : 22, top: 4, width: 54, height: 46 } });
+  if (outer) out.push({ piece: outer, spot: { left: 54, top: 8, width: 42, height: 44 } });
+  if (bottom) out.push({ piece: bottom, spot: { left: top ? 24 : 26, top: top ? 44 : 10, width: 48, height: top ? 52 : 70 } });
+  if (shoes) out.push({ piece: shoes, spot: { left: 66, top: 70, width: 30, height: 24 } });
+  extras.slice(0, 3).forEach((p, i) => out.push({ piece: p, spot: { left: 4, top: 54 + i * 15, width: 20, height: 14 } }));
+  return out;
+}
+
+function Board({ board, index, active, dim }: { board: BoardView; index: number; active: boolean; dim: boolean }) {
   const n = board.pieces.length;
-  const sorted = [...board.pieces].sort((a, b) => slotOf(a) - slotOf(b));
-  const stacked = sorted.filter((p) => slotOf(p) < 4);
-  const extras = sorted.filter((p) => slotOf(p) === 4);
+  const placed = layout(board.pieces);
+  const single = n === 1 ? board.pieces[0] : null;
   return (
     <div className="w-[92%] shrink-0 snap-center px-5 first:ml-[4%] last:mr-[4%] lg:w-full lg:px-0 lg:first:ml-0 lg:last:mr-0" aria-hidden={!active} data-testid="board" data-index={index} data-pieces={n}>
-      {n <= 1 ? (
-        <Tile piece={board.pieces[0]} className="h-[400px] lg:h-[406px]" />
-      ) : (
-        <div className="flex flex-col items-center" data-testid="outfit-stack">
-          {stacked.map((p, i) => { const sl = SLOT[slotOf(p)]; return <Tile key={p.id} piece={p} className={`${sl.w} ${sl.h} ${i === 0 ? "" : sl.mt}`} />; })}
-          {extras.length ? <div className="mt-2 flex w-full justify-center gap-2">{extras.map((p) => <Tile key={p.id} piece={p} className="h-[88px] w-[28%] lg:h-[72px]" />)}</div> : null}
-        </div>
-      )}
+      <div className={cn("stage relative aspect-square w-full overflow-hidden transition-opacity lg:aspect-[4/5]", dim && "opacity-50")} data-testid="outfit-stack">
+        {single ? (
+          single.thumbKey ? <img src={`/api/photo/${single.thumbKey}`} alt={single.name} className="absolute inset-[8%] size-[84%] object-contain" loading={active ? "eager" : "lazy"} decoding="async" /> : <span className="absolute inset-0 flex items-center justify-center p-6 text-center text-[16px]">{single.name}</span>
+        ) : placed.map(({ piece, spot }) => (
+          <span key={piece.id} className="absolute" style={{ left: `${spot.left}%`, top: `${spot.top}%`, width: `${spot.width}%`, height: `${spot.height}%` }}>
+            {piece.thumbKey ? <img src={`/api/photo/${piece.thumbKey}`} alt={piece.name} className="size-full object-contain" loading={active ? "eager" : "lazy"} decoding="async" /> : <span className="flex size-full items-center justify-center rounded-xl bg-paper/70 p-2 text-center text-[12px] leading-tight">{piece.name}</span>}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
 
-/** Plain bullets under the sentence: weather by name with the numbers, then dress code, color, and what the person reaches for. */
+/** Plain lines under the sentence: weather by name with the numbers, then dress code, color, and what the person reaches for. */
 function WhyList({ why }: { why: NonNullable<BoardView["why"]> }) {
   // Folded on a phone, open on a desktop (A1): the sentence is the reason; this is the receipt.
   const [open, setOpen] = useState(false);
@@ -521,12 +542,12 @@ function WhyList({ why }: { why: NonNullable<BoardView["why"]> }) {
   ].filter((r) => r.lines.length);
   if (!rows.length) return null;
   return (
-    <details open={open} onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)} className="group border-t border-line pt-1" data-testid="why-details">
-      <summary className="mono flex min-h-9 cursor-pointer list-none items-center justify-between text-graphite [&::-webkit-details-marker]:hidden"><span>Why this look</span><span className="group-open:hidden">Show</span><span className="hidden group-open:inline">Hide</span></summary>
+    <details open={open} onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)} className="group" data-testid="why-details">
+      <summary className="caption flex min-h-9 cursor-pointer list-none items-center justify-between [&::-webkit-details-marker]:hidden"><span>Why this look</span><span className="group-open:hidden">Show</span><span className="hidden group-open:inline">Hide</span></summary>
       <ul className="flex flex-col gap-1.5 pb-1 pt-1" data-testid="why">
         {rows.map((r) => (
-          <li key={r.label} className="grid grid-cols-[86px_minmax(0,1fr)] gap-x-3 text-[14px] leading-snug">
-            <span className="mono pt-0.5 text-graphite">{r.label}</span>
+          <li key={r.label} className="grid grid-cols-[86px_minmax(0,1fr)] gap-x-3 text-[15px] leading-snug">
+            <span className="caption pt-0.5">{r.label}</span>
             <span className="flex flex-col gap-0.5">{r.lines.map((l, i) => <span key={i}>{l}</span>)}</span>
           </li>
         ))}

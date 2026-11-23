@@ -15,7 +15,14 @@ export type ItemCardData = {
   status: string;
   ownerId: string;
   ownerName: string;
+  /** The brand, bold on the card when there is one (Alta's closet grid). */
+  brandName: string | null;
+  /** Added in the last 7 days: the card carries a "New" tag (Whering's wardrobe). */
+  isNew: boolean;
 };
+
+const NEW_FOR_MS = 7 * 24 * 60 * 60 * 1000;
+const isNew = (createdAt: Date) => Date.now() - createdAt.getTime() < NEW_FOR_MS;
 
 export function statusWord(it: { laundryStatus: LaundryStatus; wearCount: number }): string {
   if (it.laundryStatus === "dirty") return "In the wash";
@@ -28,6 +35,8 @@ const cardSelect = {
   id: true, name: true, ownerId: true, laundryStatus: true, wearCount: true, copies: true, dirtyCopies: true, cleanersCopies: true,
   owner: { select: { name: true } },
   category: { select: { name: true } },
+  brand: { select: { name: true } },
+  createdAt: true,
   photos: { where: { kind: "thumb" as const }, take: 1, select: { bucketKey: true } },
 };
 
@@ -47,6 +56,7 @@ export async function listClosetItems(view: ClosetView, opts: { categoryId?: str
   return items.map((it) => ({
     id: it.id, name: it.name ?? "Untitled piece", thumbKey: it.photos[0]?.bucketKey ?? null, categoryName: it.category?.name ?? null,
     status: statusWord(it), copies: it.copies, copiesWord: copiesWord(countsOf(it)), ownerId: it.ownerId, ownerName: it.owner.name.split(" ")[0],
+    brandName: it.brand?.name ?? null, isNew: isNew(it.createdAt),
   }));
 }
 
@@ -147,6 +157,7 @@ export async function loadClosetView(view: ClosetView, opts: { categoryId?: stri
   const all: ViewItem[] = rows.map((it) => ({
     id: it.id, name: it.name ?? "Untitled piece", thumbKey: it.photos[0]?.bucketKey ?? null, categoryName: it.category?.name ?? null,
     status: statusWord(it), copies: it.copies, copiesWord: copiesWord(countsOf(it)), ownerId: it.ownerId, ownerName: it.owner.name.split(" ")[0],
+    brandName: it.brand?.name ?? null, isNew: isNew(it.createdAt),
     colorIds: it.colors.map((x) => x.id), brandId: it.brandId, seasonIds: it.seasons.map((x) => x.id), occasionIds: it.occasions.map((x) => x.id),
     formalityIds: it.formalities.map((x) => x.id), fabricIds: it.fabrics.map((x) => x.id), patternIds: it.patterns.map((x) => x.id), tagIds: it.tags.map((x) => x.id),
     closetIds: it.closets.map((x) => x.closetId), laundryStatus: it.laundryStatus, isFavorite: it.isFavorite, storePhoto: it.storePhoto, wearCount: it.wearCount, lastWornAt: it.lastWornAt,
@@ -164,7 +175,7 @@ export async function loadClosetView(view: ClosetView, opts: { categoryId?: stri
     if (options.length) facets.push({ key, label: FACET_LABEL[key], options });
   }
   return {
-    items: kept.map(({ id, name, thumbKey, categoryName, status, ownerId, ownerName, copies, copiesWord }) => ({ id, name, thumbKey, categoryName, status, ownerId, ownerName, copies, copiesWord })),
+    items: kept.map(({ id, name, thumbKey, categoryName, status, ownerId, ownerName, copies, copiesWord, brandName, isNew }) => ({ id, name, thumbKey, categoryName, status, ownerId, ownerName, copies, copiesWord, brandName, isNew })),
     shown: kept.length, total, facets, toggles: toggleCounts(all, opts.filters),
   };
 }

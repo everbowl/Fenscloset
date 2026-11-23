@@ -4,6 +4,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { SESSION_COOKIE, createSession, destroySession, validateSession, type SessionWithPerson } from "@/lib/auth/session";
 import type { Person } from "@/generated/prisma/client";
+import { cookieSecure } from "@/lib/app-url";
 
 class ForbiddenError extends Error {
   constructor(message = "Forbidden") {
@@ -50,7 +51,7 @@ export async function signIn(personId: string, opts: { usedDevPassword?: boolean
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: cookieSecure(),
     path: "/",
     expires: expiresAt,
   });

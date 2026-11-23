@@ -69,17 +69,17 @@ export default async function ClosetPage({ searchParams }: { searchParams: Promi
       {items.length || lead ? (
         <ClosetGrid items={items} showOwner={view.kind === "family"} mirror={mirror} lead={lead} />
       ) : (
-        <div className="mt-4">
-          <div className="grid grid-cols-2 gap-x-2.5 gap-y-[18px]">
-            {[0, 1].map((i) => <div key={i} className="flex flex-col gap-2"><div className="h-[214px] bg-bone" /><div className="h-3 w-24 bg-bone" /></div>)}
+        <div className="mt-3">
+          <div className="grid grid-cols-3 gap-x-2 gap-y-4">
+            {[0, 1, 2].map((i) => <div key={i} className="flex flex-col gap-2"><div className="stage aspect-[4/5] rounded-xl" /><div className="h-3 w-16 rounded bg-bone" /></div>)}
           </div>
-          <p className="mono mt-6 text-center text-graphite" data-testid="closet-empty">
+          <p className="note mt-6 text-center" data-testid="closet-empty">
             {q ? `Nothing matches “${q}”` : filtered ? "Nothing matches these filters" : total === 0 ? (mine ? "Nothing here yet · tap + to add clothes" : "Nothing here yet") : "Nothing in this category"}
           </p>
           {q ? <div className="mt-4 text-center"><Link href={`/closet${closetQuery({ sort, cat: categoryId, filters })}`} className="pill" data-testid="empty-clear-search">Clear search</Link></div>
             : filtered ? <div className="mt-4 text-center"><Link href={`/closet${closetQuery({ sort, cat: categoryId, q })}`} className="pill" data-testid="empty-clear-filters">Clear filters</Link></div>
             : categoryId && total > 0 ? <div className="mt-4 text-center"><Link href={`/closet${closetQuery({ sort, q, filters })}`} className="pill" data-testid="empty-see-all">See all {total}</Link></div> : null}
-          {mine && total === 0 ? <div className="mt-4 text-center"><Link href="/add" className="pill pill-solid h-[50px] px-6">Add clothes</Link></div> : null}
+          {mine && total === 0 ? <div className="mt-4 text-center"><Link href="/add" className="pill pill-solid h-12 px-6 text-[15px]">Add clothes</Link></div> : null}
         </div>
       )}
       </ClosetPickProvider>

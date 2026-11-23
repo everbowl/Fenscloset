@@ -22,8 +22,8 @@ export function PersonMenu({ views, current, isAdmin, logout, setView }: {
   const router = useRouter();
   const label = views.find((v) => v.key === current)?.label ?? views[0]?.label ?? "";
   const Row = ({ href, label }: { href: string; label: string }) => (
-    <Link href={href} onClick={() => setOpen(false)} className="flex h-12 items-center justify-between border-b border-line text-[15px]">
-      {label}<span className="mono text-graphite">→</span>
+    <Link href={href} onClick={() => setOpen(false)} className="tap flex h-12 items-center justify-between rounded-xl px-1 text-[16px]">
+      {label}<span className="text-graphite">›</span>
     </Link>
   );
   function choose(key: string) {
@@ -31,26 +31,27 @@ export function PersonMenu({ views, current, isAdmin, logout, setView }: {
   }
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} aria-label={`${label} menu`} className="mono mono-11 flex h-11 items-center gap-1.5 px-2">
-        {label} <ChevronDown className="size-2.5" strokeWidth={2.5} />
+      <button type="button" onClick={() => setOpen(true)} aria-label={`${label} menu`} className="flex h-11 items-center gap-2 rounded-full pl-1 pr-2 text-[15px] font-semibold active:bg-bone">
+        <span aria-hidden className="flex size-8 items-center justify-center rounded-full bg-bone text-[13px] font-semibold text-ink">{label.slice(0, 1).toUpperCase()}</span>
+        {label} <ChevronDown className="size-3.5 text-graphite" strokeWidth={2.5} />
       </button>
       <Sheet open={open} onClose={() => setOpen(false)} title="Viewing">
         <div className="flex flex-col" role="listbox" aria-label="Closet to view">
           {views.map((v) => (
-            <button key={v.key} type="button" role="option" aria-selected={v.key === current} disabled={pending} onClick={() => choose(v.key)} className="flex h-12 items-center justify-between border-b border-line text-[15px]">
+            <button key={v.key} type="button" role="option" aria-selected={v.key === current} disabled={pending} onClick={() => choose(v.key)} className="tap flex h-12 items-center justify-between rounded-xl px-1 text-[16px]">
               <span>{v.label}{v.key === "family" ? " closet" : ""}</span>
               <span className={cn("mono", v.key === current ? "text-ink" : "text-transparent")}>{v.key === current ? "✓" : "·"}</span>
             </button>
           ))}
         </div>
         <div className="flex flex-col pt-5">
-          <p className="mono pb-2 text-graphite">You</p>
+          <p className="caption pb-2">You</p>
           <Row href="/profile" label="Profile" />
           <Row href="/change-password" label="Change password" />
           <Row href="/help" label="Help · how to use it" />
           {isAdmin ? (
             <>
-              <p className="mono pt-5 pb-2 text-graphite">Admin</p>
+              <p className="caption pt-5 pb-2">Admin</p>
               <Row href="/admin/people" label="People" />
               <Row href="/admin/lists" label="Lists" />
               <Row href="/admin/rules" label="Rules" />

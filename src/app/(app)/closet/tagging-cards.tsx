@@ -29,10 +29,10 @@ export function TaggingCards({ pending }: { pending: PendingAdds }) {
     <>
       {pending.toConfirm ? (
         <Link href={`/add/${pending.toConfirm.batchId}`} className="tap flex flex-col gap-2" data-testid="to-confirm-card">
-          <span className="flex h-[214px] flex-col items-center justify-center gap-2 border border-dashed border-ink bg-bone p-4 text-center lg:h-[300px]">
-            <span className="serif text-[30px] leading-none">{pending.toConfirm.count}</span>
-            <span className="mono text-ink">{pending.toConfirm.count === 1 ? "photo" : "photos"} tagged</span>
-            <span className="note text-ink">Tap to look them over and confirm</span>
+          <span className="stage flex aspect-[4/5] flex-col items-center justify-center gap-1 rounded-xl p-3 text-center">
+            <span className="text-[28px] font-semibold leading-none">{pending.toConfirm.count}</span>
+            <span className="text-[13px] font-medium">{pending.toConfirm.count === 1 ? "photo" : "photos"} tagged</span>
+            <span className="caption">Tap to confirm</span>
           </span>
           <span className="pill pill-sm pill-solid w-full">Confirm →</span>
         </Link>
@@ -62,9 +62,9 @@ function TaggingCard({ card }: { card: PendingAdds["cards"][number] }) {
   };
   return (
     <div className="flex flex-col gap-2" data-testid={card.status === "failed" ? "tagging-failed-card" : "tagging-card"} aria-live="polite">
-      <div className={`relative h-[214px] overflow-hidden bg-bone lg:h-[300px] ${card.status === "tagging" ? "animate-pulse" : ""}`}>
+      <div className={`stage relative aspect-[4/5] overflow-hidden rounded-xl ${card.status === "tagging" ? "animate-pulse" : ""}`}>
         <img src={`/api/photo/${card.photoKey}`} alt={card.name ?? "Just added"} className="size-full object-contain" loading="lazy" />
-        <span className="mono absolute left-2 top-2 bg-ink px-1.5 py-0.5 text-paper">{card.status === "failed" ? "Didn’t tag" : "Tagging…"}</span>
+        <span className="absolute left-1.5 top-1.5 rounded-full bg-ink px-1.5 py-0.5 text-[11px] font-semibold text-paper">{card.status === "failed" ? "Didn’t tag" : "Tagging…"}</span>
       </div>
       <div className="flex flex-col gap-[3px]">
         <div className="truncate text-[13px] font-medium">{card.name ?? "Just added"}</div>
