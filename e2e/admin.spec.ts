@@ -94,7 +94,7 @@ test("admin invites a new member; she accepts, lands in her closet, and cannot o
   await sue.getByLabel("Choose a password").fill("grandma-rules-1");
   await sue.getByRole("button", { name: "Open my closet" }).click();
   await expect(sue).toHaveURL(/\/today$/);
-  await expect(sue.getByRole("heading", { name: /look/ })).toBeVisible();
+  await expect(sue.getByTestId("greeting")).toBeVisible(); // Today greets by name on v2
 
   await sue.goto("/admin/people");
   await expect(sue.getByRole("heading", { name: "Admins only" })).toBeVisible();

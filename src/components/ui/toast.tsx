@@ -11,7 +11,19 @@ type Action = { label: string; href: string };
 type Toast = { id: number; text: string; tone: Tone; action?: Action };
 const listeners = new Set<(t: Toast) => void>();
 let seq = 0;
-function emit(text: string, tone: Tone, action?: Action) { const t = { id: ++seq, text, tone, action }; listeners.forEach((l) => l(t)); }
+/** Toasts fired before any host is listening (a page's own effect runs before the layout's host subscribes): kept a few seconds and shown when the host arrives. */
+const pending: { t: Toast; at: number }[] = [];
+const PENDING_MS = 5000;
+function emit(text: string, tone: Tone, action?: Action) {
+  const t = { id: ++seq, text, tone, action };
+  if (!listeners.size) { pending.push({ t, at: Date.now() }); return; }
+  listeners.forEach((l) => l(t));
+}
+function subscribe(l: (t: Toast) => void) {
+  listeners.add(l);
+  const now = Date.now();
+  for (const p of pending.splice(0)) if (now - p.at < PENDING_MS) l(p.t);
+}
 
 /**
  * `toast.error("Couldn't save. Try again.")` or `toast.ok("Saved")` from anywhere on the client; the host above the tab
@@ -48,7 +60,7 @@ export function ToastHost() {
       setItems((x) => [...x.slice(-1), t]);
       timers.current.set(t.id, setTimeout(() => dismiss(t.id), t.tone === "error" || t.action ? STAY_MS.long : STAY_MS.ok));
     };
-    listeners.add(l);
+    subscribe(l);
     return () => { listeners.delete(l); timers.current.forEach(clearTimeout); timers.current.clear(); };
   }, []);
 

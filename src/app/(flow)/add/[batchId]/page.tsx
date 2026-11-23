@@ -45,7 +45,7 @@ export default async function ConfirmPage({ params, searchParams }: { params: Pr
         <Link href="/add" aria-label="Back to add" className="-ml-3 flex size-11 items-center justify-center">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden><path d="M5 5l14 14M19 5 5 19" /></svg>
         </Link>
-        <h1 className="serif mt-6 text-[44px]">All done</h1>
+        <h1 className="title mt-6">All done</h1>
         <p className="mono mt-3 text-graphite">{added} added to your closet</p>
         {summary && summary.counts.failed > 0 ? <FailedActions batchId={batchId} ids={summary.failed.map((f) => f.id)} error={summary.failed[0].error} /> : null}
         <div className="mt-auto flex flex-col gap-2.5">

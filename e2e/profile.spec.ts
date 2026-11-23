@@ -49,9 +49,7 @@ test("Jeff fills his body profile and settings; parents edit Mya's; Olivia is in
   const sheet = page.getByRole("dialog");
   await sheet.getByRole("textbox", { name: "Email" }).fill("olivia@example.com");
   await sheet.getByRole("button", { name: "Create invite" }).click();
-  const refusal = sheet.getByRole("alert");
-  await expect(page.getByTestId("invite-url").or(refusal)).toBeVisible({ timeout: 20_000 });
-  if (await refusal.count()) throw new Error(`invite refused: ${await refusal.textContent()}`);
+  await expect(page.getByTestId("invite-url")).toBeVisible({ timeout: 20_000 }); // the link always comes, even when no email could be sent
   const url = (await page.getByTestId("invite-url").textContent())!.trim();
 
   const ctx = await browser.newContext();
@@ -146,7 +144,8 @@ test("my brands & sizes: add Lululemon with a size per item type and a link, the
   await expect(page.getByTestId("row-brand")).toContainText("Lululemon · L");
   await expect(page.getByTestId("my-brand-pills")).toHaveCount(0);
   await page.getByTestId("confirm-next").click();
-  await expect(page.getByRole("heading", { name: /All done/ })).toBeVisible();
+  // the last card of a batch lands in the closet with "N added · see them"; a batch with leftovers shows All done
+  await expect(page.getByTestId("toast-ok").or(page.getByRole("heading", { name: /All done/ }))).toBeVisible({ timeout: 15_000 });
 
   // the same photo again: "Another one like this?" → Yes copies the details (brand, size, name) onto the new piece
   await page.goto("/add");
@@ -158,7 +157,7 @@ test("my brands & sizes: add Lululemon with a size per item type and a link, the
   await expect(page.getByTestId("row-brand")).toContainText("Lululemon · L");
   await expect(page.getByTestId("duplicate-row")).toContainText("Details copied");
   await page.getByTestId("confirm-next").click();
-  await expect(page.getByRole("heading", { name: /All done/ })).toBeVisible();
+  await expect(page.getByTestId("toast-ok").or(page.getByRole("heading", { name: /All done/ }))).toBeVisible({ timeout: 15_000 });
 
   // the new piece carries the brand's store link; "Added · another?" strip is on the item after its own photo
   await page.goto("/closet");
