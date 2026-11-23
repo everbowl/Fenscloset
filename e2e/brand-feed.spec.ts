@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { E2E_DB, JEFF_PASSWORD, loginAs, resetAndSeed } from "./helpers";
 
 test.describe.configure({ mode: "serial" });

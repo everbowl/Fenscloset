@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { JEFF_PASSWORD, loginAs, resetAndSeed } from "./helpers";
 
 test.describe("help", () => {

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { DEV_ADMIN_EMAIL } from "../src/lib/auth/dev-mode";
 import { JEFF_PASSWORD, loginAs, resetAndSeed } from "./helpers";
 
