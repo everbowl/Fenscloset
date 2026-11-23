@@ -27,16 +27,40 @@ function tx<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBReque
     const r = fn(t.objectStore(STORE));
     r.onsuccess = () => resolve(r.result);
     r.onerror = () => reject(r.error);
+    // Safari can abort the transaction without firing the request's error (a Blob it would not serialize): never hang on it.
+    t.onabort = () => { reject(t.error ?? new Error("IndexedDB transaction aborted")); db.close(); };
+    t.onerror = () => reject(t.error ?? new Error("IndexedDB error"));
     t.oncomplete = () => db.close();
   }));
 }
 
+/** What sits in the object store: the file itself, or, when the browser refused to store it, its bytes and type. */
+type StoredUpload = Omit<PendingUpload, "blob"> & { blob?: Blob; bytes?: ArrayBuffer; type?: string };
+
+function hydrate(s: StoredUpload | undefined): PendingUpload | undefined {
+  if (!s) return undefined;
+  const { blob, bytes, type, ...rest } = s;
+  return { ...rest, blob: blob ?? new Blob([bytes ?? new ArrayBuffer(0)], { type: type || "image/jpeg" }) };
+}
+
 export const pendingStore = {
-  add: (p: PendingUpload) => tx<IDBValidKey>("readwrite", (s) => s.add(p)),
+  /**
+   * Safari sometimes refuses to put a picked File into IndexedDB as it is ("Error preparing Blob/File data to be stored in
+   * object store", WebKit, seen on iOS photo picks): then the photo's bytes go in instead and come back out as a Blob.
+   */
+  add: async (p: PendingUpload): Promise<IDBValidKey> => {
+    try { return await tx<IDBValidKey>("readwrite", (s) => s.add(p)); }
+    catch (first) {
+      const bytes = await p.blob.arrayBuffer().catch(() => { throw first; });
+      const { blob, ...rest } = p;
+      const stored: StoredUpload = { ...rest, bytes, type: blob.type };
+      return tx<IDBValidKey>("readwrite", (s) => s.add(stored));
+    }
+  },
   /** Just the ids, in order: the loop never reads every photo's bytes to learn how many are left (review B B17). */
   keys: () => tx<IDBValidKey[]>("readonly", (s) => s.getAllKeys()).then((ks) => ks.map(Number)),
-  get: (id: number) => tx<PendingUpload | undefined>("readonly", (s) => s.get(id)),
-  all: () => tx<PendingUpload[]>("readonly", (s) => s.getAll()),
+  get: (id: number) => tx<StoredUpload | undefined>("readonly", (s) => s.get(id)).then(hydrate),
+  all: () => tx<StoredUpload[]>("readonly", (s) => s.getAll()).then((l) => l.map(hydrate).filter((x): x is PendingUpload => Boolean(x))),
   remove: (id: number) => tx<undefined>("readwrite", (s) => s.delete(id)),
   clear: () => tx<undefined>("readwrite", (s) => s.clear()),
 };

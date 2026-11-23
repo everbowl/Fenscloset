@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { createBatch, pendingStore, uploadOne } from "@/lib/import/client-queue";
+import { createBatch, pendingStore, uploadOne, type PendingUpload } from "@/lib/import/client-queue";
 import type { BatchSummary } from "@/lib/import/service";
 
 type UploadState = { pending: number; done: number; failed: { name: string; error: string }[]; active: boolean; /** Photos picked with no connection: added the moment it comes back. */ held: number };
@@ -32,6 +32,21 @@ export function ImportQueueProvider({ children }: { children: ReactNode }) {
   const pumping = useRef(false);
   const failedIds = useRef(new Set<number>());
   const refreshing = useRef<Promise<void> | null>(null);
+  /**
+   * Photos the browser would not keep in IndexedDB at all (Safari in some private windows, a storage quota hit): they wait
+   * here, under negative ids, and upload from memory. Lost if the tab closes first, which is the pre-IndexedDB behavior, and
+   * better than a pick that sits at "3 left" forever.
+   */
+  const memory = useRef(new Map<number, PendingUpload>());
+  const nextMemoryId = useRef(-1);
+  const store = useMemo(() => ({
+    keys: async (): Promise<number[]> => {
+      const stored = await pendingStore.keys().catch(() => [] as number[]);
+      return [...stored, ...memory.current.keys()];
+    },
+    get: (id: number): Promise<PendingUpload | undefined> => (id < 0 ? Promise.resolve(memory.current.get(id)) : pendingStore.get(id)),
+    remove: async (id: number) => { if (id < 0) memory.current.delete(id); else await pendingStore.remove(id); },
+  }), []);
 
   const refresh = useCallback(async () => {
     if (refreshing.current) return refreshing.current; // one request in flight at a time
@@ -56,7 +71,7 @@ export function ImportQueueProvider({ children }: { children: ReactNode }) {
     pumping.current = true;
     try {
       for (;;) {
-        const ids = (await pendingStore.keys()).filter((id) => !failedIds.current.has(id));
+        const ids = (await store.keys()).filter((id) => !failedIds.current.has(id));
         if (!ids.length) break;
         let left = ids.length;
         let inFlight = 0;
@@ -69,14 +84,14 @@ export function ImportQueueProvider({ children }: { children: ReactNode }) {
             if (id === undefined) return;
             left--; inFlight++; show();
             try {
-              const p = await pendingStore.get(id);
+              const p = await store.get(id);
               if (!p) continue; // removed meanwhile
               await uploadOne({ ...p, id });
-              await pendingStore.remove(id);
+              await store.remove(id);
               setUpload((u) => ({ ...u, done: u.done + 1 }));
             } catch (e) {
               failedIds.current.add(id);
-              const p = await pendingStore.get(id).catch(() => undefined);
+              const p = await store.get(id).catch(() => undefined);
               setUpload((u) => ({ ...u, failed: [...u.failed, { name: p?.name ?? "Photo", error: (e as Error).message }] }));
             } finally { inFlight--; show(); void refresh(); }
           }
@@ -88,7 +103,7 @@ export function ImportQueueProvider({ children }: { children: ReactNode }) {
       setUpload((u) => ({ ...u, active: false, pending: 0 }));
       void refresh();
     }
-  }, [refresh]);
+  }, [refresh, store]);
 
   const addFiles = useCallback(async (files: File[]) => {
     const images = files.filter((f) => f.type.startsWith("image/") || /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name));
@@ -103,7 +118,11 @@ export function ImportQueueProvider({ children }: { children: ReactNode }) {
     }
     setUpload((u) => ({ ...u, active: true, pending: u.pending + images.length }));
     // The raw files go in as they are (review B B18): fast, and nothing is lost if Safari is backgrounded now.
-    for (const [i, f] of images.entries()) await pendingStore.add({ batchId: b.batchId, order: b.startOrder + i, blob: f, name: f.name });
+    for (const [i, f] of images.entries()) {
+      const item: PendingUpload = { batchId: b.batchId, order: b.startOrder + i, blob: f, name: f.name };
+      try { await pendingStore.add(item); }
+      catch { memory.current.set(nextMemoryId.current--, item); }
+    }
     void pump();
     await refresh();
   }, [pump, refresh]);
@@ -115,13 +134,13 @@ export function ImportQueueProvider({ children }: { children: ReactNode }) {
   }, [pump]);
   const dropFailedUploads = useCallback(async () => {
     const ids = [...failedIds.current];
-    for (const id of ids) await pendingStore.remove(id);
+    for (const id of ids) await store.remove(id).catch(() => undefined);
     failedIds.current.clear();
     setUpload((u) => ({ ...u, failed: [] }));
     // Those picks will never arrive: take them back out of the batch's count (review B B9).
     if (ids.length) await createBatch(-ids.length).catch(() => undefined);
     void refresh();
-  }, [refresh]);
+  }, [refresh, store]);
   const retryHeld = useCallback(async () => {
     const files = held.current.splice(0);
     setUpload((u) => ({ ...u, held: 0 }));

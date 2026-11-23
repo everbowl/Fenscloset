@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
-import { JEFF_PASSWORD, loginAs, resetAndSeed } from "./helpers";
+import { JEFF_PASSWORD, loginAs, resetAndSeed, settle } from "./helpers";
 
 test.describe("add from a store", () => {
   test.beforeAll(() => resetAndSeed({ jeffReady: true }));
@@ -50,6 +50,7 @@ test.describe("add from a store", () => {
 
     // the pieces land in the closet on their own once tagged (C1); two of the same color and size are one card with ×2 (F)
     // 2 link rows (Oatmeal 1, Black 1) + 2 receipts × 2 lines; the page is server-rendered, so reload until the tagging is through
+    await settle(page);
     await expect.poll(async () => { await page.goto("/closet"); return page.getByTestId("item-card").count(); }, { timeout: 40_000, intervals: [1000] }).toBe(6);
     await expect(page.getByTestId("copies-badge").first()).toContainText("×2"); // the receipt's "Crew Tee ×2"
     await page.getByTestId("item-card").filter({ has: page.getByTestId("copies-badge") }).first().click();

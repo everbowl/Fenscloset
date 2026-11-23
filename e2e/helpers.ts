@@ -19,4 +19,15 @@ export async function loginAs(page: Page, email: string, password: string) {
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL(/\/(today|change-password)$/);
+  await settle(page);
+}
+
+/**
+ * Wait for the router's follow-up work after a navigation. A server action that set a cookie and redirected makes Next.js
+ * refresh the new page's data right after the URL changes; a hard page.goto() inside that window aborts the fetch, and the
+ * router falls back to a full navigation to the current URL, which WebKit reports as "interrupted by another navigation".
+ * No person navigates that fast after a sign-in, so this is the harness waiting its turn.
+ */
+export async function settle(page: Page) {
+  await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => undefined);
 }
