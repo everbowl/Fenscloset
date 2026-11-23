@@ -3,6 +3,9 @@ import { clock } from "@/lib/dates";
 import { nextEventToday } from "@/lib/plans/google";
 import type { Viewer } from "@/lib/people/visibility";
 
+/** True when the person's Google connection exists but Google refused its token: Today and Settings say "Calendar needs reconnecting" (review D 5.2). */
+export { calendarNeedsReconnect } from "@/lib/plans/google";
+
 /**
  * "What's the plan today?" — the occasion that shapes the looks.
  * Order: the person's own pick for the day (DayPlan) → the next Google Calendar event → nothing (the engine assumes everyday).
@@ -32,7 +35,7 @@ export async function getPlan(personId: string, date: string, tz: string, now = 
     const ev = await nextEventToday(personId, tz, now);
     if (ev) return { source: "calendar", occasionId: null, label: ev.summary, at: ev.allDay ? null : ev.start };
   } catch (e) {
-    console.error("calendar", e);
+    console.error(`calendar: ${(e as Error).message}`); // one line; the failure is remembered for 10 min in src/lib/plans/google.ts
   }
   return { source: "none", occasionId: null, label: null };
 }

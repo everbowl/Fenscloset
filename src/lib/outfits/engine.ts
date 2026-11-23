@@ -2,20 +2,23 @@ import { db } from "@/lib/db";
 import { AiError, isMockAi, structured } from "@/lib/ai/claude";
 import { getObject } from "@/lib/storage";
 import { toAiImage } from "@/lib/images/thumb";
-import { describe, loadCandidates, styleContext, type Candidate } from "@/lib/outfits/catalog";
+import { describe, loadCandidates, styleContext, type Candidate, type CandidateSet } from "@/lib/outfits/catalog";
 import { weatherLine, type Weather } from "@/lib/weather";
 import type { Plan } from "@/lib/plans";
 import type { CheckInView } from "@/lib/checkins/service";
 import type { Viewer } from "@/lib/people/visibility";
 import type { Prisma } from "@/generated/prisma/client";
-import { fromDayKey } from "@/lib/dates";
+import { dayKey, hourIn, isEvening, wornDateToInstant } from "@/lib/dates";
+import { getTimezone } from "@/lib/rules";
+import type { Step } from "@/lib/jobs";
 import { recordPassed, recordSwap, recordWorn } from "@/lib/outfits/taste";
 
 /**
- * Three looks for one person and one day, from their own closet. A text-only pass (tags, not photos; plan A1)
- * drafts a few more looks than needed, then a vision pass looks at the actual cutouts and keeps the best ones
- * (clashing colors or patterns, mismatched formality, or a dull mix get dropped). Boards are stored on
- * OutfitSuggestion.outfits so a reload shows the same three.
+ * Three looks for one person and one day, from their own closet. The first look is drafted alone from the tags (a
+ * quick text pass) and saved at once, so the screen has a board in about ten seconds; two more are then drafted with a
+ * couple of spares and a vision pass looks at the actual cutouts and keeps the best (clashing colors or patterns,
+ * mismatched formality, or a dull mix get dropped). Boards are stored on OutfitSuggestion.outfits so a reload shows
+ * the same three (review D §0: the old build ran two medium-effort calls and saved nothing for 20 to 40 seconds).
  */
 
 export class OutfitError extends Error {
@@ -43,7 +46,7 @@ export type Suggestion = { id: string; date: string; inputs: Inputs; boards: Boa
 
 const SYSTEM = `You are a personal stylist for one family's private closet app. You only ever pick from the numbered pieces you are given; never invent pieces.
 Build complete, wearable outfits: a top and a bottom (or a dress), shoes, and up to two layers/accessories when they help. 3 to 6 pieces each.
-Match the weather and the plan. Use the style profile and check-in (tan, hair, skin) to steer colors and effort. Prefer favorites and pieces not worn in a while; vary the three looks.
+Match the weather and the plan. Use the style profile and check-in (tan, hair, skin) to steer colors and effort. Prefer favorites and pieces not worn in a while; vary the looks.
 For each look write:
 - reason: ONE plain sentence (max 18 words) saying what the look is and why it suits today. Plain prose, no flourish, no emoji.
 - why.weather: 2 or 3 short lines that quote the numbers (now, tonight, high, low, rain chance) and say what they rule in or out: sleeves, layers, fabric weight, shoes.
@@ -80,9 +83,15 @@ const SCHEMA = {
   required: ["outfits"], additionalProperties: false,
 } as const;
 
+/** Thinking counts toward max_tokens and a cut-off answer is cut-off JSON (review D 1.2): room for the thinking and the whole answer. */
+const TOKENS = { draft: 4500, rank: 1500, swap: 1200, remove: 1200 };
+
 function contextLines(inputs: Inputs): string {
+  const w = inputs.weather;
   return [
-    inputs.weather ? `Weather: ${weatherLine(inputs.weather)}, ${inputs.weather.condition}, now ${inputs.weather.nowF}°, tonight ${inputs.weather.tonightF}°, high ${inputs.weather.highF}°, low ${inputs.weather.lowF}°, rain chance ${inputs.weather.rainChance}%` : "Weather: unknown (no zip or location yet)",
+    w
+      ? `Weather: ${weatherLine(w)}, ${w.condition}, now ${w.nowF}°, tonight ${w.tonightF}°, high ${w.highF}°, low ${w.lowF}°, rain chance ${w.rainChance}%${w.stale ? " (an older forecast standing in; the weather service was down)" : ""}`
+      : "Weather: unknown (no zip or location yet, or the service was down)",
     inputs.plan.label ? `Plan: ${inputs.plan.label}` : "Plan: nothing special (everyday)",
     inputs.checkIn.length ? `Check-in: ${inputs.checkIn.map((c) => `${c.scale} ${c.option}`).join(", ")}` : null,
   ].filter(Boolean).join("\n");
@@ -108,7 +117,7 @@ function mockWhy(): Why {
 
 const DRAFT_EXTRA = 2;
 
-const RANK_SYSTEM = `You are a personal stylist judging outfit candidates by LOOKING at the clothes. For each look you get its pieces' photos, labelled "Look N".
+const RANK_SYSTEM = `You are a personal stylist judging outfit candidates by LOOKING at the clothes. Each piece's photo is shown once, labelled with the look numbers it belongs to.
 Keep the looks that work best together in real life: colors and patterns that sit well side by side, matching formality, a clear silhouette. Drop a look when two pieces clash, the formality is mixed up, or it is a duller copy of another look.
 Return exactly the number asked for, best first, each with a fresh reason: ONE plain sentence (max 18 words) saying what the look is and why it suits today. Plain prose, no flourish, no emoji.`;
 
@@ -133,7 +142,13 @@ export async function rankVisually(boards: Board[], cands: Candidate[], inputs: 
     try { thumbs.set(id, await toAiImage((await getObject(key)).body)); } catch { /* no photo: judged by its tags */ }
   }));
   if (thumbs.size < Math.ceil(ids.length / 2)) return boards.slice(0, count);
-  const images = boards.flatMap((b, i) => b.itemIds.flatMap((id) => { const t = thumbs.get(id); const c = byId.get(id); return t && c ? [{ label: `Look ${i + 1}: ${c.name} (${[c.category, c.subcategory].filter(Boolean).join("/") || "piece"})`, ...t }] : []; }));
+  // Each photo once, labelled with every look it is in (review D 2.1: a piece in three looks was sent three times).
+  const images = ids.flatMap((id) => {
+    const t = thumbs.get(id); const c = byId.get(id);
+    if (!t || !c) return [];
+    const looks = boards.flatMap((b, i) => (b.itemIds.includes(id) ? [i + 1] : []));
+    return [{ label: `${c.name} (${[c.category, c.subcategory].filter(Boolean).join("/") || "piece"}) — in ${looks.length === 1 ? "Look" : "Looks"} ${looks.join(", ")}`, ...t }];
+  });
   const prompt = [
     contextLines(inputs),
     style ? `Style profile:\n${style}` : null,
@@ -141,7 +156,7 @@ export async function rankVisually(boards: Board[], cands: Candidate[], inputs: 
     `Keep the best ${count}.`,
   ].filter(Boolean).join("\n\n");
   try {
-    const out = await structured<{ keep: { look: number; reason: string }[] }>({ system: RANK_SYSTEM, prompt, images, schema: RANK_SCHEMA, effort: "medium", maxTokens: 800 });
+    const out = await structured<{ keep: { look: number; reason: string }[] }>({ system: RANK_SYSTEM, prompt, images, schema: RANK_SCHEMA, effort: "medium", maxTokens: TOKENS.rank });
     const kept: Board[] = [];
     for (const k of out.keep) {
       const b = boards[k.look - 1];
@@ -156,8 +171,11 @@ export async function rankVisually(boards: Board[], cands: Candidate[], inputs: 
   }
 }
 
-/** Ask Claude for `count` looks from `cands`, skipping any combination already in `exclude`. Drafts a couple extra, then the vision pass keeps the best. */
-export async function composeLooks(opts: { cands: Candidate[]; inputs: Inputs; style: string; count: number; excludeBoards?: Board[]; extra?: string; now?: Date; visual?: boolean }): Promise<Board[]> {
+/**
+ * Ask Claude for `count` looks from `cands`, skipping any combination already in `exclude`. With `visual` (the default)
+ * it drafts a couple extra and the vision pass keeps the best; `visual: false` is the quick text-only pass.
+ */
+export async function composeLooks(opts: { cands: Candidate[]; inputs: Inputs; style: string; count: number; excludeBoards?: Board[]; extra?: string; now?: Date; visual?: boolean; effort?: "low" | "medium" | "high" }): Promise<Board[]> {
   const { cands, inputs, count } = opts;
   if (cands.length < 2) return [];
   const codes = new Map<string, Candidate>();
@@ -173,9 +191,9 @@ export async function composeLooks(opts: { cands: Candidate[]; inputs: Inputs; s
     opts.extra ?? null,
     shown.length ? `Already shown, do not repeat these combinations: ${shown.join(" | ")}` : null,
     `Pieces:\n${catalog}`,
-    `Return ${draft} looks.`,
+    `Return ${draft} ${draft === 1 ? "look" : "looks"}.`,
   ].filter(Boolean).join("\n\n");
-  const out = await structured<{ outfits: { codes: string[]; reason: string; why?: Partial<Why> }[] }>({ system: SYSTEM, prompt, schema: SCHEMA, effort: "medium", maxTokens: 3200 });
+  const out = await structured<{ outfits: { codes: string[]; reason: string; why?: Partial<Why> }[] }>({ system: SYSTEM, prompt, schema: SCHEMA, effort: opts.effort ?? "low", maxTokens: TOKENS.draft });
   const boards: Board[] = [];
   for (const o of out.outfits) {
     const ids = [...new Set(o.codes.map((code) => codes.get(code.trim())?.id).filter((x): x is string => Boolean(x)))];
@@ -191,10 +209,10 @@ async function piecesFor(boards: Board[]): Promise<Map<string, Piece>> {
   return new Map(items.map((it) => [it.id, { id: it.id, name: it.name ?? "Untitled piece", label: (it.subcategory?.name ?? it.category?.name ?? "piece").toUpperCase(), thumbKey: it.photos[0]?.bucketKey ?? null, ownerId: it.ownerId, category: it.category?.name ?? null }]));
 }
 
-async function view(row: { id: string; date: string; inputs: Prisma.JsonValue; outfits: Prisma.JsonValue }): Promise<Suggestion> {
+async function view(row: { id: string; personId: string; date: string; inputs: Prisma.JsonValue; outfits: Prisma.JsonValue }): Promise<Suggestion> {
   const boards = row.outfits as Board[];
-  const pieces = await piecesFor(boards);
-  const fits = await db.fit.findMany({ where: { outfitSuggestionId: row.id }, select: { id: true, items: { select: { itemId: true } } } });
+  // The day's fit, whichever build it came from: a rebuild after a check-in used to lose "Wearing this" (review D 2.2).
+  const [pieces, fits] = await Promise.all([piecesFor(boards), db.fit.findMany({ where: { personId: row.personId, date: row.date }, select: { id: true, items: { select: { itemId: true } } } })]);
   const views = boards.map<BoardView>((b, index) => {
     const key = [...b.itemIds].sort().join(",");
     const fit = fits.find((f) => f.items.map((i) => i.itemId).sort().join(",") === key);
@@ -221,20 +239,47 @@ export function inputsFrom(ctx: DayContext, cand: { restingIds: string[]; noRepe
   };
 }
 
-/** Build (or rebuild) the three looks for a day. */
-export async function generateSuggestion(personId: string, date: string, ctx: DayContext): Promise<Suggestion> {
+/** The step the screen reads as "board 1 is saved, show it" (the job carries it as `partial`). */
+export const FIRST_LOOK_READY = "First look ready";
+
+/** How many looks a day gets. */
+const LOOKS = 3;
+
+/**
+ * Build (or rebuild) the day's looks. `step` reports where it is to the job (src/lib/jobs.ts). The first look is drafted
+ * alone, text only, and saved right away (`partial`), then two more are drafted and judged by their photos, and the row
+ * is updated. A small closet lets resting pieces back in and says so in the reason.
+ */
+export async function generateSuggestion(personId: string, date: string, ctx: DayContext, step: Step = () => {}): Promise<Suggestion> {
   const now = ctx.now ?? new Date();
-  const cand = await loadCandidates(personId, now);
+  step("Reading the closet…");
+  const [cand, style] = await Promise.all([loadCandidates(personId, now), styleContext(personId)]);
   const inputs = inputsFrom(ctx, cand);
-  let boards = await composeLooks({ cands: cand.usable, inputs, style: await styleContext(personId), count: 3, now });
-  if (boards.length < 3 && cand.restingIds.length) {
-    // Not enough fresh pieces: let resting ones back in and say so in the reason.
-    const everything = await loadCandidates(personId, now, { noRepeatDays: 0 });
-    const more = await composeLooks({ cands: everything.usable, inputs: { ...inputs, restingIds: [] }, style: await styleContext(personId), count: 3 - boards.length, excludeBoards: boards, extra: "Some pieces were worn recently; it is fine to repeat them today because the closet is small.", now });
-    boards = [...boards, ...more.map((b) => ({ ...b, reason: `${b.reason} (Repeats a recent piece: not much else is clean.)` }))];
+  const everything = (c: CandidateSet) => [...c.usable, ...c.resting];
+  const REPEATS = "Some pieces were worn recently; it is fine to repeat them today because the closet is small.";
+  const sayRepeats = (b: Board): Board => ({ ...b, reason: `${b.reason} (Repeats a recent piece: not much else is clean.)` });
+
+  step("Drafting the first look…");
+  let boards = await composeLooks({ cands: cand.usable, inputs, style, count: 1, visual: false, effort: "low", now });
+  if (!boards.length && cand.resting.length) {
+    // Not enough fresh pieces for even one look: let resting ones back in (one load serves both tries; review D 2.6).
+    boards = (await composeLooks({ cands: everything(cand), inputs: { ...inputs, restingIds: [] }, style, count: 1, visual: false, effort: "low", extra: REPEATS, now })).map(sayRepeats);
   }
   const row = await db.outfitSuggestion.create({ data: { personId, date, inputs: inputs as object, outfits: boards as object[] } });
-  return view(row);
+  if (boards.length) step(FIRST_LOOK_READY, { partial: true });
+
+  step("Two more looks…");
+  const first = boards;
+  let more = first.length ? await composeLooks({ cands: cand.usable, inputs, style, count: LOOKS - first.length, excludeBoards: first, now }) : [];
+  if (first.length + more.length < LOOKS && cand.resting.length) {
+    const filler = await composeLooks({ cands: everything(cand), inputs: { ...inputs, restingIds: [] }, style, count: LOOKS - first.length - more.length, excludeBoards: [...first, ...more], extra: REPEATS, now });
+    more = [...more, ...filler.map(sayRepeats)];
+  }
+  // Build on the row as it stands now: the screen showed the first look while these built, and a swap on it must stay.
+  const current = await db.outfitSuggestion.findUnique({ where: { id: row.id }, select: { outfits: true } });
+  const kept = (current?.outfits as Board[] | null) ?? first;
+  const updated = await db.outfitSuggestion.update({ where: { id: row.id }, data: { outfits: [...kept, ...more] as object[] } });
+  return view(updated);
 }
 
 /** Today's looks, generating them on first open. */
@@ -243,22 +288,35 @@ export async function getOrGenerate(personId: string, date: string, ctx: DayCont
 }
 
 /** MORE LOOKS: three new boards that avoid the combinations already shown, appended to the day's suggestion. */
-export async function moreLooks(personId: string, date: string, ctx: DayContext): Promise<Suggestion> {
+export async function moreLooks(personId: string, date: string, ctx: DayContext, step: Step = () => {}): Promise<Suggestion> {
   const row = await db.outfitSuggestion.findFirst({ where: { personId, date, togetherSessionId: null }, orderBy: { createdAt: "desc" } });
-  if (!row) return generateSuggestion(personId, date, ctx);
+  if (!row) return generateSuggestion(personId, date, ctx, step);
   const now = ctx.now ?? new Date();
-  const cand = await loadCandidates(personId, now);
+  step("Reading the closet…");
+  const [cand, style] = await Promise.all([loadCandidates(personId, now), styleContext(personId)]);
   const shown = row.outfits as Board[];
   const inputs = inputsFrom(ctx, cand);
-  await recordPassed(personId, date, shown);
-  const more = await composeLooks({ cands: cand.usable, inputs, style: await styleContext(personId), count: 3, excludeBoards: shown, now });
+  step("Finding three more looks…");
+  const more = await composeLooks({ cands: cand.usable, inputs, style, count: 3, excludeBoards: shown, now });
   if (!more.length) throw new OutfitError("No more combinations in the closet today. Add clothes or do laundry.");
   const updated = await db.outfitSuggestion.update({ where: { id: row.id }, data: { outfits: [...shown, ...more] as object[] } });
+  // Only now are the shown looks "passed": taste memory must not learn from a build that failed (review D 2.7).
+  await recordPassed(personId, date, shown);
   return view(updated);
 }
 
+/** A swap or a removal needs no fresh weather: the look's own inputs (what it was built against) carry the day. */
+type DayHint = { now?: Date };
+function inputsForEdit(row: { inputs: Prisma.JsonValue }, ctx: DayContext | DayHint, cand: CandidateSet): Inputs {
+  const stored = row.inputs as Partial<Inputs> | null;
+  if (stored && typeof stored === "object" && stored.plan && Array.isArray(stored.checkIn)) {
+    return { weather: stored.weather ?? null, plan: stored.plan, checkIn: stored.checkIn, restingIds: cand.restingIds, noRepeatDays: cand.noRepeatDays };
+  }
+  return inputsFrom("plan" in ctx ? ctx : { weather: null, plan: { source: "none", occasionId: null, label: null }, checkIn: null }, cand);
+}
+
 /** SWAP ONE PIECE: replace `itemId` on board `index` with one piece of the same category, with a fresh reason. */
-export async function swapPiece(personId: string, date: string, index: number, itemId: string, ctx: DayContext): Promise<Suggestion> {
+export async function swapPiece(personId: string, date: string, index: number, itemId: string, ctx: DayContext | DayHint): Promise<Suggestion> {
   const row = await db.outfitSuggestion.findFirst({ where: { personId, date, togetherSessionId: null }, orderBy: { createdAt: "desc" } });
   if (!row) throw new OutfitError("No looks yet today.");
   const boards = row.outfits as Board[];
@@ -267,8 +325,13 @@ export async function swapPiece(personId: string, date: string, index: number, i
   const now = ctx.now ?? new Date();
   const cand = await loadCandidates(personId, now);
   const current = cand.usable.find((c) => c.id === itemId) ?? (await db.item.findUnique({ where: { id: itemId }, select: { category: { select: { name: true } } } }).then((it) => (it ? { category: it.category?.name ?? null } : null)));
-  const sameCat = cand.usable.filter((c) => c.id !== itemId && !board.itemIds.includes(c.id) && c.category === (current?.category ?? null));
-  if (!sameCat.length) throw new OutfitError("Nothing else clean in that category today.");
+  const cat = current?.category ?? null;
+  const sameCat = cand.usable.filter((c) => c.id !== itemId && !board.itemIds.includes(c.id) && c.category === cat);
+  if (!sameCat.length) {
+    // Say why (review D 2.9): the others may be clean but resting.
+    const resting = cand.resting.filter((c) => c.id !== itemId && c.category === cat).length;
+    throw new OutfitError(resting ? `The other ${resting === 1 ? "piece" : "pieces"} in that category ${resting === 1 ? "is" : "are"} resting (worn in the last ${cand.noRepeatDays} days).` : "Nothing else clean in that category today.");
+  }
   const keep = board.itemIds.filter((id) => id !== itemId);
   const keepCands = cand.usable.filter((c) => keep.includes(c.id));
   let replacement: Candidate; let reason: string; let why: Why = board.why ?? mockWhy();
@@ -277,21 +340,29 @@ export async function swapPiece(personId: string, date: string, index: number, i
   } else {
     const codes = new Map<string, Candidate>(sameCat.map((c, i) => [`#${i + 1}`, c]));
     const prompt = [
-      contextLines(inputsFrom(ctx, cand)),
+      contextLines(inputsForEdit(row, ctx, cand)),
       `The person keeps: ${keepCands.map((c) => c.name).join(", ") || "nothing yet"}.`,
       `Pick ONE replacement from these pieces (same category as the one they are swapping out) and write a short reason for the whole look:\n${[...codes.entries()].map(([code, c]) => describe(c, code, now)).join("\n")}`,
     ].join("\n\n");
-    const out = await structured<{ code: string; reason: string; why?: Partial<Why> }>({ system: SYSTEM, prompt, schema: { type: "object", properties: { code: { type: "string" }, reason: { type: "string" }, why: WHY_SCHEMA }, required: ["code", "reason", "why"], additionalProperties: false }, effort: "low", maxTokens: 700 });
+    const out = await structured<{ code: string; reason: string; why?: Partial<Why> }>({ system: SYSTEM, prompt, schema: { type: "object", properties: { code: { type: "string" }, reason: { type: "string" }, why: WHY_SCHEMA }, required: ["code", "reason", "why"], additionalProperties: false }, effort: "low", maxTokens: TOKENS.swap });
     replacement = codes.get(out.code.trim()) ?? sameCat[0]; reason = out.reason.trim(); why = cleanWhy(out.why);
   }
   await recordSwap(personId, date, itemId, replacement.id, board.itemIds);
-  const next = boards.map((b, i) => (i === index ? { itemIds: b.itemIds.map((id) => (id === itemId ? replacement.id : id)), reason, why } : b));
+  // The row as it is now (the day's other looks may have landed while Claude thought), with this one look changed.
+  const latest = await currentBoards(row.id, boards);
+  const next = latest.map((b, i) => (i === index && b.itemIds.includes(itemId) ? { itemIds: b.itemIds.map((id) => (id === itemId ? replacement.id : id)), reason, why } : b));
   const updated = await db.outfitSuggestion.update({ where: { id: row.id }, data: { outfits: next as object[] } });
   return view(updated);
 }
 
+/** The boards on the row right now, so an edit never writes back a stale list over looks that landed meanwhile. */
+async function currentBoards(rowId: string, fallback: Board[]): Promise<Board[]> {
+  const fresh = await db.outfitSuggestion.findUnique({ where: { id: rowId }, select: { outfits: true } });
+  return (fresh?.outfits as Board[] | null) ?? fallback;
+}
+
 /** REMOVE a piece from board `index` (a look keeps at least two pieces). The reason is rewritten for what is left. */
-export async function removePiece(personId: string, date: string, index: number, itemId: string, ctx: DayContext): Promise<Suggestion> {
+export async function removePiece(personId: string, date: string, index: number, itemId: string, ctx: DayContext | DayHint): Promise<Suggestion> {
   const row = await db.outfitSuggestion.findFirst({ where: { personId, date, togetherSessionId: null }, orderBy: { createdAt: "desc" } });
   if (!row) throw new OutfitError("No looks yet today.");
   const boards = row.outfits as Board[];
@@ -308,15 +379,16 @@ export async function removePiece(personId: string, date: string, index: number,
     reason = `Mock: without ${gone?.name ?? "that piece"}.`;
   } else {
     const prompt = [
-      contextLines(inputsFrom(ctx, cand)),
+      contextLines(inputsForEdit(row, ctx, cand)),
       `The person took ${gone?.name ?? "a piece"} off this look on purpose. The look is now: ${keepCands.map((c, i) => describe(c, `#${i + 1}`, now)).join("; ")}.`,
       "Write the reason and why for the look as it is now. Do not suggest adding anything back.",
     ].join("\n\n");
-    const out = await structured<{ reason: string; why?: Partial<Why> }>({ system: SYSTEM, prompt, schema: { type: "object", properties: { reason: { type: "string" }, why: WHY_SCHEMA }, required: ["reason", "why"], additionalProperties: false }, effort: "low", maxTokens: 600 });
+    const out = await structured<{ reason: string; why?: Partial<Why> }>({ system: SYSTEM, prompt, schema: { type: "object", properties: { reason: { type: "string" }, why: WHY_SCHEMA }, required: ["reason", "why"], additionalProperties: false }, effort: "low", maxTokens: TOKENS.remove });
     reason = out.reason.trim() || board.reason; why = cleanWhy(out.why);
   }
   await recordSwap(personId, date, itemId, null, board.itemIds);
-  const next = boards.map((b, i) => (i === index ? { itemIds: keep, reason, why } : b));
+  const latest = await currentBoards(row.id, boards);
+  const next = latest.map((b, i) => (i === index && b.itemIds.includes(itemId) ? { itemIds: b.itemIds.filter((id) => id !== itemId), reason, why } : b));
   const updated = await db.outfitSuggestion.update({ where: { id: row.id }, data: { outfits: next as object[] } });
   return view(updated);
 }
@@ -333,45 +405,68 @@ export async function assertCanDress(viewer: Viewer, personId: string) {
 
 /**
  * WEAR THIS: log every piece as worn today, bump wear counts, and put the look on the Fits calendar.
- * Returns the fit id. Wearing a second look the same day replaces the first fit (and its wear log).
+ * Returns the fit id. Wearing a second look the same day replaces the first fit (and its wear log). With no `title`,
+ * the look's own plan names the fit, else the time of day does.
  */
-export async function wearBoard(viewer: Viewer, personId: string, suggestionId: string, index: number, title: string, now = new Date()): Promise<string> {
+export async function wearBoard(viewer: Viewer, personId: string, suggestionId: string, index: number, title: string | null, now = new Date()): Promise<string> {
   await assertCanDress(viewer, personId);
-  const row = await db.outfitSuggestion.findFirst({ where: { id: suggestionId, personId } });
+  const [row, tz] = await Promise.all([db.outfitSuggestion.findFirst({ where: { id: suggestionId, personId } }), getTimezone()]);
   if (!row) throw new OutfitError("No looks yet today.");
+  // A Today left open past midnight still shows yesterday's boards (review D 2.8): the screen refreshes on this error.
+  if (row.date !== dayKey(now, tz)) throw new OutfitError("Those looks are from another day. Here are today’s.");
   const boards = row.outfits as Board[];
   const board = boards[index];
   if (!board) throw new OutfitError("That look isn't here anymore.");
+  const name = title ?? (row.inputs as Partial<Inputs> | null)?.plan?.label ?? (isEvening(hourIn(now, tz)) ? "Tonight’s look" : "Today’s look");
   await recordPassed(personId, row.date, boards.filter((_, i) => i !== index));
-  return wearItems(personId, row.date, board.itemIds, { title, outfitSuggestionId: row.id, now });
+  return wearItems(personId, row.date, board.itemIds, { title: name, outfitSuggestionId: row.id, now });
+}
+
+type Tx = Prisma.TransactionClient;
+
+/**
+ * Set `lastWornAt` on `itemIds` from their wear logs: the latest `wornOn` as local noon in the household zone (or `now`
+ * when that day is today), null when a piece has no wears left. One query for the latest days, one update per distinct
+ * day (review D 2.3/2.4/2.5: the old loop wrote UTC midnight, or `now` for a past day, two round trips per piece).
+ */
+export async function relastWorn(tx: Tx, itemIds: string[], now: Date, tz: string): Promise<void> {
+  const ids = [...new Set(itemIds)];
+  if (!ids.length) return;
+  const latest = await tx.wearLog.groupBy({ by: ["itemId"], where: { itemId: { in: ids } }, _max: { wornOn: true } });
+  const dayOf = new Map(latest.map((l) => [l.itemId, l._max.wornOn]));
+  const today = dayKey(now, tz);
+  const byDay = new Map<string | null, string[]>();
+  for (const id of ids) { const d = dayOf.get(id) ?? null; byDay.set(d, [...(byDay.get(d) ?? []), id]); }
+  for (const [day, group] of byDay) {
+    await tx.item.updateMany({ where: { id: { in: group } }, data: { lastWornAt: day === null ? null : day === today ? now : wornDateToInstant(day, tz) } });
+  }
 }
 
 export async function wearItems(personId: string, date: string, itemIds: string[], opts: { title: string; outfitSuggestionId?: string; now?: Date; fitId?: string }): Promise<string> {
   const now = opts.now ?? new Date();
-  const items = await db.item.findMany({ where: { id: { in: itemIds }, retiredAt: null }, select: { id: true } });
+  const [items, tz] = await Promise.all([db.item.findMany({ where: { id: { in: itemIds }, retiredAt: null }, select: { id: true } }), getTimezone()]);
   if (!items.length) throw new OutfitError("Those pieces are gone from the closet.");
   const ids = items.map((i) => i.id);
   await recordWorn(personId, date, ids);
+  // Batched (review D 2.5): a five-piece look used to be ~20 round trips inside Prisma's 5 s transaction window.
   return db.$transaction(async (tx) => {
     const existing = opts.fitId ? await tx.fit.findUnique({ where: { id: opts.fitId } }) : await tx.fit.findFirst({ where: { personId, date }, orderBy: { createdAt: "asc" } });
+    const touched = new Set(ids);
     if (existing) {
       // undo the previous log for the day before re-counting
-      const old = await tx.wearLog.findMany({ where: { fitId: existing.id } });
+      const old = await tx.wearLog.findMany({ where: { fitId: existing.id }, select: { itemId: true } });
+      const oldIds = [...new Set(old.map((w) => w.itemId))];
       await tx.wearLog.deleteMany({ where: { fitId: existing.id } });
       await tx.fitItem.deleteMany({ where: { fitId: existing.id } });
-      for (const w of old) {
-        const prev = await tx.wearLog.findFirst({ where: { itemId: w.itemId }, orderBy: { wornOn: "desc" }, select: { wornOn: true } });
-        await tx.item.update({ where: { id: w.itemId }, data: { wearCount: { decrement: 1 }, lastWornAt: prev ? fromDayKey(prev.wornOn) : null } });
-      }
+      if (oldIds.length) await tx.item.updateMany({ where: { id: { in: oldIds } }, data: { wearCount: { decrement: 1 } } });
+      oldIds.forEach((id) => touched.add(id));
     }
     const fit = existing
       ? await tx.fit.update({ where: { id: existing.id }, data: { title: opts.title, outfitSuggestionId: opts.outfitSuggestionId ?? existing.outfitSuggestionId, items: { create: ids.map((itemId, sortOrder) => ({ itemId, sortOrder })) } } })
       : await tx.fit.create({ data: { personId, date, title: opts.title, outfitSuggestionId: opts.outfitSuggestionId, items: { create: ids.map((itemId, sortOrder) => ({ itemId, sortOrder })) } } });
     await tx.wearLog.createMany({ data: ids.map((itemId) => ({ personId, itemId, wornOn: date, fitId: fit.id })) });
-    for (const id of ids) {
-      const last = await tx.wearLog.findFirst({ where: { itemId: id }, orderBy: { wornOn: "desc" }, select: { wornOn: true } });
-      await tx.item.update({ where: { id }, data: { wearCount: { increment: 1 }, lastWornAt: last && last.wornOn > date ? undefined : now } });
-    }
+    await tx.item.updateMany({ where: { id: { in: ids } }, data: { wearCount: { increment: 1 } } });
+    await relastWorn(tx, [...touched], now, tz);
     return fit.id;
-  });
+  }, { timeout: 15_000 });
 }

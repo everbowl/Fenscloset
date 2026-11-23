@@ -51,7 +51,6 @@ async function save(personId: string, date: string, source: "taps" | "selfie", a
     if (!s || !s.options.some((o) => o.id === a.optionId)) throw new CheckInError("That answer isn't on the list anymore.");
   }
   const existing = await db.checkIn.findUnique({ where: { personId_date: { personId, date } } });
-  if (existing?.selfieKey && existing.selfieKey !== selfieKey) await deleteObject(existing.selfieKey).catch(() => {});
   await db.$transaction(async (tx) => {
     const row = await tx.checkIn.upsert({
       where: { personId_date: { personId, date } },
@@ -61,6 +60,8 @@ async function save(personId: string, date: string, source: "taps" | "selfie", a
     await tx.checkInAnswer.deleteMany({ where: { checkInId: row.id } });
     if (answers.length) await tx.checkInAnswer.createMany({ data: answers.map((a) => ({ checkInId: row.id, scaleId: a.scaleId, optionId: a.optionId })) });
   });
+  // The old selfie goes only once the row no longer points at it (review D 6.2: a failed save used to leave a row pointing at a deleted object).
+  if (existing?.selfieKey && existing.selfieKey !== selfieKey) await deleteObject(existing.selfieKey).catch(() => {});
 }
 
 export async function saveTaps(viewer: Viewer, personId: string, date: string, answers: { scaleId: string; optionId: string }[]): Promise<void> {
@@ -75,7 +76,12 @@ export async function saveSelfie(viewer: Viewer, personId: string, date: string,
   const answers = await readSelfie(image, scales);
   const key = newKey("checkins", personId, image.contentType);
   await putObject(key, image.data, image.contentType);
-  await save(personId, date, "selfie", answers, key);
+  try {
+    await save(personId, date, "selfie", answers, key);
+  } catch (e) {
+    await deleteObject(key).catch(() => {}); // a failed save must not leave a selfie nobody's row points at (review D 6.3)
+    throw e;
+  }
   return (await getCheckIn(viewer, personId, date))!;
 }
 
@@ -90,7 +96,7 @@ async function readSelfie(image: { data: Buffer; contentType: "image/jpeg" | "im
     system: "You look at one selfie and describe the person's current appearance using only the given scales. Pick exactly one option per scale. This is for choosing clothes today; be kind and neutral.",
     prompt: `Scales and options:\n${usable.map((s) => `- ${s.name}: ${s.options.map((o) => o.name).join(" / ")}`).join("\n")}\nAnswer with one option per scale.`,
     image: { data: image.data.toString("base64"), mediaType: image.contentType },
-    schema, effort: "low", maxTokens: 300,
+    schema, effort: "low", maxTokens: 1000, // thinking counts toward max_tokens; 300 cut the answer off (review D 6.1)
   });
   return usable.flatMap((s) => {
     const o = s.options.find((x) => x.name === result[s.name]);

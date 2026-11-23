@@ -9,6 +9,7 @@ import { personalClosetId } from "@/lib/items/service";
 import { newKey, putObject } from "@/lib/storage";
 import { canViewKey } from "@/lib/photos/visibility";
 import { deleteFit, getDay, getFit, listMonth, saveFit, setFitPhoto, setFitViewers, wearHistory } from "@/lib/fits/service";
+import { dayKey, hourIn } from "@/lib/dates";
 
 async function addItem(ownerId: string, name: string, category: string) {
   const cat = await db.category.findFirstOrThrow({ where: { name: category } });
@@ -49,9 +50,19 @@ describe("fits", () => {
     expect((await listMonth(olivia, { kind: "family" }, 2026, 9)).map((d) => d.ownerName)).toEqual(["Jeff"]);
     expect((await getDay(olivia, { kind: "family" }, "2026-10-18"))).toEqual([]);
     expect((await wearHistory(top.id))[0]).toMatchObject({ wornOn: "2026-10-17", title: "Dinner out" });
-    expect((await db.item.findUniqueOrThrow({ where: { id: top.id } })).wearCount).toBe(1);
+    const worn = await db.item.findUniqueOrThrow({ where: { id: top.id } });
+    expect(worn.wearCount).toBe(1);
+    // a fit saved for a past day rests its pieces from that day, at local noon in the household zone (review D 2.3)
+    expect(dayKey(worn.lastWornAt!, "America/Los_Angeles")).toBe("2026-10-17");
+    expect(hourIn(worn.lastWornAt!, "America/Los_Angeles")).toBe(12);
+    // removing a fit falls back to the earlier wear's day, never UTC midnight (review D 2.4/6.4)
+    const earlier = await saveFit(jeff, jeff.id, "2026-10-15", [top.id], "Earlier");
     await deleteFit(jeff, fitId);
     expect(await getFit(jeff, fitId)).toBeNull();
+    const back = await db.item.findUniqueOrThrow({ where: { id: top.id } });
+    expect(back.wearCount).toBe(1);
+    expect(dayKey(back.lastWornAt!, "America/Los_Angeles")).toBe("2026-10-15");
+    await deleteFit(jeff, earlier);
     expect((await db.item.findUniqueOrThrow({ where: { id: top.id } }))).toMatchObject({ wearCount: 0, lastWornAt: null });
   });
 });

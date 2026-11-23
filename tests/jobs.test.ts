@@ -37,6 +37,17 @@ describe("background jobs (the mirror dresses and Today builds its looks off the
     expect(await settled(bad, 10)).toMatchObject({ state: "failed" });
   });
 
+  it("a job can say part of its result is saved (`partial`), and the flag sticks through later steps; a follower says it is waiting", async () => {
+    const job = startJob("k4", "jeff", async (step) => { step("First look ready", { partial: true }); await wait(60); step("Two more looks…"); await wait(60); return "x"; });
+    expect(await settled(job, 10)).toMatchObject({ state: "running", step: "First look ready", partial: true });
+    await wait(80);
+    expect(jobStatus(job.id, "jeff")).toMatchObject({ state: "running", step: "Two more looks…", partial: true }); // still true: the screen may poll late
+    const follower = startJob("k4", "jeff", async () => "y", { after: true });
+    expect(follower.status).toMatchObject({ state: "running", step: "Waiting for the earlier build…" });
+    expect(follower.status).not.toHaveProperty("partial", true); // nothing of the follower's own is saved yet
+    expect(await settled(follower, 2000)).toMatchObject({ state: "done", result: "y" });
+  });
+
   it("quick work answers in the first call; a failure is kept with its reason", async () => {
     const quick = startJob("k2", "jeff", async () => "q");
     expect(await settled(quick, 500)).toMatchObject({ state: "done", result: "q" });

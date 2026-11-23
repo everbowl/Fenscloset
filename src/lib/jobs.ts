@@ -11,17 +11,23 @@
  */
 
 export type JobStatus<T> =
-  | { state: "running"; step: string; startedAt: number }
+  /** `partial`: part of the result is already saved (the first of the day's looks), so a screen can show it while the rest builds. Sticky once set. */
+  | { state: "running"; step: string; startedAt: number; partial?: boolean }
   | { state: "done"; result: T }
   | { state: "failed"; error: Error };
 
 export type Job<T> = { id: string; key: string; ownerId: string; startedAt: number; status: JobStatus<T>; promise: Promise<void> };
+
+/** What a job calls to say where it is; `partial` says part of the result is saved already. */
+export type Step = (s: string, opts?: { partial?: boolean }) => void;
 
 const byId = new Map<string, Job<unknown>>();
 const running = new Map<string, Job<unknown>>();
 /** A finished job stays readable for a while, for a phone that comes back late. */
 const KEEP_MS = 10 * 60 * 1000;
 const FIRST_STEP = "Getting ready…";
+/** A follower's first step: it is in line behind the build it must come after. */
+const WAITING_STEP = "Waiting for the earlier build…";
 
 const randomId = () => `j_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
 
@@ -30,12 +36,12 @@ const randomId = () => `j_${Date.now().toString(36)}${Math.random().toString(36)
  * With `after`, a job already running is not joined but followed: the new job waits for it, then does the work
  * again (a check-in saved while the day's looks were building: the looks must be built with it, not without it).
  */
-export function startJob<T>(key: string, ownerId: string, fn: (step: (s: string) => void) => Promise<T>, { after = false }: { after?: boolean } = {}): Job<T> {
+export function startJob<T>(key: string, ownerId: string, fn: (step: Step) => Promise<T>, { after = false }: { after?: boolean } = {}): Job<T> {
   const live = running.get(key);
   if (live && !after) return live as Job<T>;
   const startedAt = Date.now();
-  const job: Job<T> = { id: randomId(), key, ownerId, startedAt, status: { state: "running", step: FIRST_STEP, startedAt }, promise: Promise.resolve() };
-  const work = () => fn((s) => { if (job.status.state === "running") job.status = { state: "running", step: s, startedAt }; });
+  const job: Job<T> = { id: randomId(), key, ownerId, startedAt, status: { state: "running", step: live ? WAITING_STEP : FIRST_STEP, startedAt }, promise: Promise.resolve() };
+  const work = () => fn((s, opts) => { if (job.status.state === "running") job.status = { state: "running", step: s, startedAt, partial: opts?.partial || job.status.partial || undefined }; });
   job.promise = (live ? live.promise.then(work, work) : work())
     .then(
       (result) => { job.status = { state: "done", result }; },

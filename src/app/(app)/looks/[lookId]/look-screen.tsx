@@ -19,6 +19,7 @@ import { addPiecesAction, deleteLookAction, removePieceAction, saveLookAction } 
 
 type ClosetPiece = { id: string; name: string; thumbKey: string | null; categoryName: string | null };
 type Look = Omit<LookView, "savedAt"> & { savedAt: string | null };
+const LOST = "Lost the connection. Try again.";
 
 /**
  * A look (Jeff, 2 Nov 2026, B1): things to buy and things you own, together. Each store piece keeps its Buy link;
@@ -42,32 +43,44 @@ export function LookScreen({ look, meId, tryOn, mannequin, backPhoto, engine, ad
   const names = look.pieces.map((p) => p.name).join(" · ");
   const room = Math.max(0, MAX_LOOK_PIECES - look.pieces.length);
   const inLook = new Set(look.pieces.flatMap((p) => (p.itemId ? [p.itemId] : [])));
+  /** One tap, one answer: a thrown action is an error with words, never a stuck button (review D 7.1). */
   const run = (key: string, fn: () => Promise<{ ok: boolean; error?: string }>, then?: () => void) => {
     setBusy(key);
-    start(async () => { const r = await fn(); setBusy(null); if (!r.ok) { toast.error(r.error ?? "Something went wrong."); return; } then?.(); router.refresh(); });
+    start(async () => {
+      let r: { ok: boolean; error?: string };
+      try { r = await fn(); } catch { r = { ok: false, error: LOST }; }
+      setBusy(null);
+      if (!r.ok) { toast.error(r.error ?? "Something went wrong."); return; }
+      then?.(); router.refresh();
+    });
   };
+  const categories = ["All", ...Array.from(new Set(closet.map((c) => c.categoryName).filter(Boolean) as string[]))];
 
   return (
     <div data-testid="look" className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-14">
       <div className="lg:col-span-2">
-        <PageHeader eyebrow={<span className="text-graphite" data-testid="look-eyebrow">{mine ? "My look" : `${look.personName}’s look`}{saved ? " · saved under Fits" : " · not saved yet"}</span>} title={(look.name ?? "New look").trim()} />
+        <PageHeader eyebrow={<span data-testid="look-eyebrow">{mine ? "My look" : `${look.personName}’s look`}{saved ? " · saved under Fits" : " · not saved yet"}</span>} title={(look.name ?? "New look").trim()} />
       </div>
 
       <section className="lg:col-start-1" data-testid="look-pieces">
-        {look.pieces.length ? look.pieces.map((p) => (
-          <div key={p.id} className="flex items-center gap-3 border-b border-line py-2" data-testid="look-piece" data-kind={p.kind}>
-            <div className="h-[72px] w-[56px] shrink-0 overflow-hidden bg-bone">
-              {p.thumbKey ? <img src={`/api/photo/${p.thumbKey}`} alt="" className="size-full object-cover" /> : p.imageUrl ? <img src={p.imageUrl} alt="" referrerPolicy="no-referrer" loading="lazy" className="size-full object-cover" /> : null}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[15px]">{p.name}</p>
-              <p className="mono truncate text-graphite">{p.kind === "store" ? [p.priceText, p.storeName, "to buy"].filter(Boolean).join(" · ") : [p.category, "in the closet"].filter(Boolean).join(" · ")}</p>
-            </div>
-            {p.kind === "store" && p.url ? <a href={p.url} target="_blank" rel="noreferrer" className="pill pill-sm shrink-0" aria-label={`Buy ${p.name}`}>Buy ↗</a> : null}
-            {look.canEdit ? <button type="button" onClick={() => run(`rm-${p.id}`, () => removePieceAction(look.id, p.id))} disabled={busy !== null} className="flex size-11 shrink-0 items-center justify-center text-[22px] leading-none text-graphite" aria-label={`Take out ${p.name}`} data-testid="look-remove">×</button> : null}
+        {look.pieces.length ? (
+          <div className="card flex flex-col px-4">
+            {look.pieces.map((p) => (
+              <div key={p.id} className="flex items-center gap-3 border-b border-line py-2.5 last:border-b-0" data-testid="look-piece" data-kind={p.kind}>
+                <div className="stage h-[72px] w-[56px] shrink-0 overflow-hidden rounded-xl">
+                  {p.thumbKey ? <img src={`/api/photo/${p.thumbKey}`} alt="" className="size-full object-contain p-1" /> : p.imageUrl ? <img src={p.imageUrl} alt="" referrerPolicy="no-referrer" loading="lazy" className="size-full object-cover" /> : null}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[16px]">{p.name}</p>
+                  <p className="caption truncate">{p.kind === "store" ? [p.priceText, p.storeName, "to buy"].filter(Boolean).join(" · ") : [p.category, "in the closet"].filter(Boolean).join(" · ")}</p>
+                </div>
+                {p.kind === "store" && p.url ? <a href={p.url} target="_blank" rel="noreferrer" className="pill pill-sm shrink-0" aria-label={`Buy ${p.name}`}>Buy ↗</a> : null}
+                {look.canEdit ? <button type="button" onClick={() => run(`rm-${p.id}`, () => removePieceAction(look.id, p.id))} disabled={busy !== null} className="tap flex size-11 shrink-0 items-center justify-center rounded-full text-[22px] leading-none text-graphite" aria-label={`Take out ${p.name}`} data-testid="look-remove">×</button> : null}
+              </div>
+            ))}
           </div>
-        )) : <p className="note py-6" data-testid="look-empty">Nothing in this look yet. Tap Add to a look on a store find, or add from the closet.</p>}
-        <p className="mono mt-2 text-graphite" data-testid="look-line">
+        ) : <div className="stage flex min-h-[140px] items-center justify-center p-6"><p className="note text-center" data-testid="look-empty">Nothing in this look yet. Tap Add to a look on a store find, or add from the closet.</p></div>}
+        <p className="caption mt-2" data-testid="look-line">
           {look.pieces.length} of {MAX_LOOK_PIECES}{look.toBuy ? ` · ${look.toBuy} to buy${look.total !== null ? ` · about $${look.total}` : ""}` : ""}
         </p>
         {look.pieces.length > 3 ? <p className="note mt-1">The mirror dresses up to three of them: a top, a bottom, shoes. The rest stay on the list.</p> : null}
@@ -75,13 +88,13 @@ export function LookScreen({ look, meId, tryOn, mannequin, backPhoto, engine, ad
 
       <aside className="mt-6 flex flex-col gap-2 lg:col-start-2 lg:mt-0">
         {(onMe || mannequin) && look.pieces.length ? (
-          <Button size="lg" className="w-full" disabled={m.busy} onClick={() => m.begin({ look: { kind: "look", lookId: look.id }, on: onMe ? "me" : "mannequin" })} data-testid={onMe ? "look-see-on-me" : "look-see-on-mannequin"}>
+          <Button size="lg" className="w-full" busy={m.busy} disabled={m.busy} onClick={() => m.begin({ look: { kind: "look", lookId: look.id }, on: onMe ? "me" : "mannequin" })} data-testid={onMe ? "look-see-on-me" : "look-see-on-mannequin"}>
             {m.busy ? "Dressing…" : onMe ? "See it on me" : "See it on a mannequin"}
           </Button>
         ) : null}
         {look.canEdit ? <button type="button" onClick={() => { setPicked([]); setSheet("closet"); }} className="pill h-[50px] w-full" data-testid="look-add-closet">Add from {mine ? "my" : `${look.personName}’s`} closet</button> : null}
         {look.canEdit ? <button type="button" onClick={() => setSheet("name")} className="pill h-[50px] w-full" data-testid={saved ? "look-rename" : "look-save"}>{saved ? "Rename" : "Name and save"}</button> : null}
-        {saved ? <Link href="/fits" className="mono text-graphite underline underline-offset-4">All looks under Fits</Link> : <p className="note">Saved looks live under Fits → Looks.</p>}
+        {saved ? <Link href="/fits" className="caption text-ink underline underline-offset-4">All looks under Fits</Link> : <p className="note">Saved looks live under Fits → Looks.</p>}
         {look.canEdit ? <button type="button" onClick={() => setSheet("remove")} className="pill pill-sm pill-quiet self-start" data-testid="look-delete">{saved ? "Remove look" : "Start over"}</button> : null}
       </aside>
 
@@ -89,29 +102,30 @@ export function LookScreen({ look, meId, tryOn, mannequin, backPhoto, engine, ad
         onSave={(v) => run("save", () => saveLookAction(look.id, v), () => { setSheet(null); toast.ok(saved ? "Renamed" : "Saved under Fits"); })} />
       <Sheet open={sheet === "remove"} onClose={() => setSheet(null)} title={saved ? "Remove this look?" : "Start over?"}>
         <div className="flex flex-col gap-3 py-3">
-          <p className="text-[15px] leading-snug">{saved ? "The look goes. Your clothes and the stores’ pieces stay where they are." : "Everything comes out of the look."}</p>
-          <Button variant="danger" className="w-full" disabled={busy !== null} onClick={() => run("delete", () => deleteLookAction(look.id), () => router.push(saved ? "/fits" : `/shop?for=${look.personId}`))} data-testid="look-delete-confirm">{saved ? "Remove look" : "Start over"}</Button>
+          <p className="note">{saved ? "The look goes. Your clothes and the stores’ pieces stay where they are." : "Everything comes out of the look."}</p>
+          <Button variant="danger" className="w-full" busy={busy === "delete"} disabled={busy !== null} onClick={() => run("delete", () => deleteLookAction(look.id), () => router.push(saved ? "/fits" : `/shop?for=${look.personId}`))} data-testid="look-delete-confirm">{saved ? "Remove look" : "Start over"}</Button>
         </div>
       </Sheet>
       <Sheet open={sheet === "closet"} onClose={() => setSheet(null)} title="Add from the closet"
         footer={<Button className="w-full" busy={busy === "add"} disabled={busy !== null || !picked.length} onClick={() => run("add", () => addPiecesAction(look.id, picked), () => { setSheet(null); toast.ok(`Added ${picked.length}`); })} data-testid="look-add-picked">{busy === "add" ? "Adding…" : picked.length ? `Add ${picked.length}` : room ? `Pick up to ${room}` : "The look is full"}</Button>}>
-        <div className="-mx-5 flex gap-4 overflow-x-auto px-5" role="tablist">
-          {["All", ...Array.from(new Set(closet.map((c) => c.categoryName).filter(Boolean) as string[]))].map((c) => (
-            <button key={c} type="button" role="tab" aria-selected={(pickCat ?? "All") === c} onClick={() => setPickCat(c === "All" ? null : c)} className={cn("mono mono-11 flex min-h-11 shrink-0 items-center", (pickCat ?? "All") === c ? "text-ink" : "text-graphite")}><span className={cn("py-1", (pickCat ?? "All") === c && "border-b-[1.5px] border-ink")}>{c}</span></button>
+        <div className="strip -mx-5 gap-2 px-5" role="tablist" aria-label="Category">
+          {categories.map((c) => (
+            <button key={c} type="button" role="tab" aria-selected={(pickCat ?? "All") === c} onClick={() => setPickCat(c === "All" ? null : c)} className={cn("pill pill-sm shrink-0", (pickCat ?? "All") === c && "pill-on")}>{c}</button>
           ))}
         </div>
-        <div className="grid grid-cols-3 gap-1 pt-2" role="listbox" aria-multiselectable>
+        <div className="grid grid-cols-3 gap-1.5 pt-3" role="listbox" aria-multiselectable>
           {closet.filter((c) => !pickCat || c.categoryName === pickCat).map((c) => {
             const on = picked.includes(c.id), already = inLook.has(c.id);
             return (
-              <button key={c.id} type="button" role="option" aria-selected={on} disabled={already || (!on && picked.length >= room)} onClick={() => setPicked(on ? picked.filter((x) => x !== c.id) : [...picked, c.id])} className={cn("relative h-[112px] overflow-hidden bg-bone", on && "outline outline-2 -outline-offset-2 outline-ink", already && "opacity-50")} data-testid={`look-pick-${c.id}`}>
-                {c.thumbKey ? <img src={`/api/photo/${c.thumbKey}`} alt={c.name} className="size-full object-cover" /> : <span className="mono absolute inset-x-1 bottom-1 truncate text-left text-graphite">{c.name}</span>}
-                {already ? <span className="mono absolute left-1 top-1 bg-paper px-1 py-0.5">In the look</span> : null}
+              <button key={c.id} type="button" role="option" aria-selected={on} disabled={already || (!on && picked.length >= room)} onClick={() => setPicked(on ? picked.filter((x) => x !== c.id) : [...picked, c.id])} className={cn("stage tap relative h-[112px] overflow-hidden", on && "ring-2 ring-inset ring-ink", already && "opacity-50")} data-testid={`look-pick-${c.id}`}>
+                {c.thumbKey ? <img src={`/api/photo/${c.thumbKey}`} alt={c.name} className="size-full object-contain p-1.5" /> : <span className="caption absolute inset-x-1 bottom-1 truncate text-left">{c.name}</span>}
+                {already ? <span className="caption absolute left-1.5 top-1.5 rounded-full bg-paper px-2 py-0.5 text-ink">In the look</span> : null}
+                {on ? <span className="absolute left-1.5 top-1.5 flex size-6 items-center justify-center rounded-full bg-ink text-[12px] text-paper">✓</span> : null}
               </button>
             );
           })}
         </div>
-        {closet.length === 0 ? <div className="flex flex-col items-start gap-3 py-4"><p className="mono text-graphite">Nothing in the closet yet</p><Link href="/add" className="pill">+ Add clothes</Link></div> : null}
+        {closet.length === 0 ? <div className="flex flex-col items-start gap-3 py-4"><p className="note">Nothing in the closet yet</p><Link href="/add" className="pill">+ Add clothes</Link></div> : null}
       </Sheet>
       <MirrorSheet m={m} pieces={names} mine={mine} personId={look.personId} personName={look.personName} tryOnState={tryOn} backPhoto={backPhoto} mannequinAvailable={mannequin} admin={admin} />
     </div>

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
-import { conditionWord, forgetWeatherFailures, geocodeZip, getWeather, summarize, weatherLine } from "@/lib/weather";
-import { dayKey, hourIn, monoDate, addDays, clock } from "@/lib/dates";
+import { asOfLine, conditionWord, forgetWeatherFailures, geocodeZip, getWeather, summarize, weatherLine } from "@/lib/weather";
+import { dayKey, hourIn, monoDate, addDays, clock, isEvening, isValidDayKey, localInstant, wornDateToInstant } from "@/lib/dates";
 
 const sample = {
   timezone: "America/Los_Angeles",
@@ -56,10 +56,11 @@ describe("weather", () => {
     await db.weatherCache.create({ data: { key: "wx:41.00,-73.00", payload: sample, fetchedAt: new Date(Date.now() - 3 * 60 * 60 * 1000) } }); // three hours old: past the hour, inside the day
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("busy", { status: 503, statusText: "Service Unavailable" }));
     const w = await getWeather({ lat: 41, lon: -73 }, new Date("2026-10-18T21:00:00Z"));
-    expect(w.nowF).toBe(68); // the stale forecast, not an error
+    expect(w.nowF).toBe(65); // the stale forecast's number for this hour (not the 68.2 measured when it was fetched), not an error
+    expect(w.stale).toBe(true);
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const again = await getWeather({ lat: 41, lon: -73 }, new Date("2026-10-18T21:00:00Z"));
-    expect(again.nowF).toBe(68); expect(fetchSpy).toHaveBeenCalledTimes(1); // inside the retry-after window: no call, still the stale answer
+    expect(again.nowF).toBe(65); expect(fetchSpy).toHaveBeenCalledTimes(1); // inside the retry-after window: no call, still the stale answer
     fetchSpy.mockRestore(); forgetWeatherFailures();
     const timeout = Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" });
     const slow = vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(timeout).mockResolvedValueOnce(new Response(JSON.stringify(sample), { status: 200 }));
@@ -69,9 +70,33 @@ describe("weather", () => {
     // with an older forecast in hand a timed-out call is not tried again: the old forecast stands in at once (Today waits for this)
     await db.weatherCache.create({ data: { key: "wx:43.00,-73.00", payload: sample, fetchedAt: new Date(Date.now() - 2 * 60 * 60 * 1000) } });
     const once = vi.spyOn(globalThis, "fetch").mockRejectedValue(timeout);
-    expect((await getWeather({ lat: 43, lon: -73 }, new Date("2026-10-18T21:00:00Z"))).nowF).toBe(68);
+    expect((await getWeather({ lat: 43, lon: -73 }, new Date("2026-10-18T21:00:00Z"))).nowF).toBe(65); // the old forecast's number for this hour
     expect(once).toHaveBeenCalledTimes(1);
     once.mockRestore(); forgetWeatherFailures();
+  });
+
+  it("an older forecast standing in is marked stale, reads today's hour rather than the hour it was fetched, and is dropped past six hours", async () => {
+    forgetWeatherFailures();
+    const now = new Date("2026-10-18T23:00:00Z"); // 4 PM Los Angeles; the sample was fetched at 2 PM
+    await db.weatherCache.create({ data: { key: "wx:44.00,-73.00", payload: sample, fetchedAt: new Date(Date.now() - 2 * 60 * 60 * 1000) } });
+    await db.weatherCache.create({ data: { key: "wx:45.00,-73.00", payload: sample, fetchedAt: new Date(Date.now() - 7 * 60 * 60 * 1000) } });
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("busy", { status: 503, statusText: "Service Unavailable" }));
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
+    const w = await getWeather({ lat: 44, lon: -73 }, now);
+    expect(w.stale).toBe(true);
+    expect(w.fetchedAt).toBeTruthy();
+    expect(w.nowF).toBe(65); // the forecast's number for 4 PM, not the 68.2 measured at 2 PM
+    expect(w.tonightF).toBe(61);
+    await expect(getWeather({ lat: 45, lon: -73 }, now)).rejects.toMatchObject({ code: "unavailable" }); // seven hours old: a different day's numbers, so nothing
+    fetchSpy.mockRestore(); quiet.mockRestore(); forgetWeatherFailures();
+    const fresh = summarize(sample, new Date("2026-10-18T21:00:00Z"));
+    expect(fresh.stale).toBe(false);
+    expect(fresh.nowF).toBe(68);
+    // the chip's words: the hour it was fetched, and "yesterday" when that was another day
+    const at = { fetchedAt: "2026-10-18T16:00:00Z", timezone: "America/Los_Angeles" }; // 9 AM Los Angeles
+    expect(asOfLine(at, new Date("2026-10-18T23:00:00Z"))).toBe("as of 9:00 AM");
+    expect(asOfLine(at, new Date("2026-10-19T15:00:00Z"))).toBe("as of 9:00 AM yesterday");
+    expect(asOfLine({ fetchedAt: undefined, timezone: "America/Los_Angeles" })).toBeNull();
   });
 
   it("date helpers follow the household time zone", () => {
@@ -81,5 +106,22 @@ describe("weather", () => {
     expect(monoDate("2026-10-18")).toBe("SUN, OCT 18");
     expect(addDays("2026-10-31", 1)).toBe("2026-11-01");
     expect(clock(new Date("2026-10-19T02:30:00Z"), "America/Los_Angeles")).toBe("7:30 PM");
+  });
+
+  it("a wear on a day is stored as local noon in the household zone, so it reads as that day on either side of midnight", () => {
+    const tz = "America/Los_Angeles";
+    expect(wornDateToInstant("2026-10-18", tz).toISOString()).toBe("2026-10-18T19:00:00.000Z"); // PDT
+    expect(wornDateToInstant("2026-12-18", tz).toISOString()).toBe("2026-12-18T20:00:00.000Z"); // PST
+    for (const key of ["2026-10-18", "2026-03-08", "2026-11-01", "2026-12-31"]) expect(dayKey(wornDateToInstant(key, tz), tz)).toBe(key); // the clock-change days included
+    expect(localInstant("2026-10-18", "Europe/Paris", 0).toISOString()).toBe("2026-10-17T22:00:00.000Z"); // midnight in Paris
+    expect(localInstant("2026-10-18", "UTC", 12).toISOString()).toBe("2026-10-18T12:00:00.000Z");
+    // a rolled-over day key is not a day (review D 5.9)
+    expect(isValidDayKey("2026-13-45")).toBe(false);
+    expect(isValidDayKey("2026-02-30")).toBe(false);
+    expect(isValidDayKey("2026-02-28")).toBe(true);
+    expect(isValidDayKey("2026-2-28")).toBe(false);
+    // one threshold for "Good evening" and "tonight's looks" (review D 5.11)
+    expect(isEvening(16)).toBe(false);
+    expect(isEvening(17)).toBe(true);
   });
 });

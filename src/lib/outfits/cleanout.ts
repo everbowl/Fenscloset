@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
-import { getRuleNumber } from "@/lib/rules";
+import { getRuleNumber, getTimezone } from "@/lib/rules";
+import { dayKey } from "@/lib/dates";
 import { canEditItem, type Viewer } from "@/lib/people/visibility";
 import { OutfitError } from "@/lib/outfits/engine";
 import { countsOf, laundrySummary } from "@/lib/items/copies";
@@ -23,15 +24,19 @@ export function copiesNeeded(wears90: number, cycleDays: number): number {
 }
 
 export async function listStacks(personId: string, now = new Date()): Promise<StackAdvice[]> {
-  const cycleDays = await getRuleNumber("laundryCycleDays", 7);
   const since = new Date(now); since.setDate(since.getDate() - 90);
-  const stacks = await db.item.findMany({
-    where: { ownerId: personId, retiredAt: null, copies: { gt: 1 }, OR: [{ cleanOutSnoozedUntil: null }, { cleanOutSnoozedUntil: { lt: now } }] },
-    select: { id: true, name: true, copies: true, category: { select: { name: true } }, photos: { where: { kind: "thumb" }, take: 1, select: { bucketKey: true } } },
-    orderBy: { copies: "desc" },
-  });
+  const [cycleDays, tz, stacks] = await Promise.all([
+    getRuleNumber("laundryCycleDays", 7),
+    getTimezone(),
+    db.item.findMany({
+      where: { ownerId: personId, retiredAt: null, copies: { gt: 1 }, OR: [{ cleanOutSnoozedUntil: null }, { cleanOutSnoozedUntil: { lt: now } }] },
+      select: { id: true, name: true, copies: true, category: { select: { name: true } }, photos: { where: { kind: "thumb" }, take: 1, select: { bucketKey: true } } },
+      orderBy: { copies: "desc" },
+    }),
+  ]);
   if (!stacks.length) return [];
-  const wears = await db.wearLog.groupBy({ by: ["itemId"], where: { itemId: { in: stacks.map((s) => s.id) }, wornOn: { gte: since.toISOString().slice(0, 10) } }, _count: { _all: true } });
+  // `wornOn` keys are household-zone days, so the edge of the window is one too, not a UTC day (review D 2.12).
+  const wears = await db.wearLog.groupBy({ by: ["itemId"], where: { itemId: { in: stacks.map((s) => s.id) }, wornOn: { gte: dayKey(since, tz) } }, _count: { _all: true } });
   const count = new Map(wears.map((w) => [w.itemId, w._count._all]));
   return stacks
     .map((s) => { const wears90 = count.get(s.id) ?? 0; return { id: s.id, name: s.name ?? "Untitled piece", thumbKey: s.photos[0]?.bucketKey ?? null, categoryName: s.category?.name ?? null, copies: s.copies, wears90, keep: Math.min(s.copies, copiesNeeded(wears90, cycleDays)), cycleDays }; })

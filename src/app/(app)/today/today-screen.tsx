@@ -12,19 +12,21 @@ import { TextSheet } from "@/components/items/row-editor";
 import { cn } from "@/lib/cn";
 import type { BoardView, Piece } from "@/lib/outfits/engine";
 import type { Scale } from "@/lib/checkins/service";
+import type { FitRating } from "@/lib/fits/service";
 import type { TryOnState } from "@/lib/tryon";
 import type { Wardrobe } from "@/lib/tryon/complete";
 import type { Engine } from "@/lib/tryon/engines";
 import { MirrorGlyph, MirrorSheet } from "@/components/mirror/mirror-sheet";
 import { useMirror } from "@/components/mirror/use-mirror";
+import { shrinkPhoto } from "@/lib/import/client-queue";
 import { checkInSelfieAction, checkInTapsAction, looksStatusAction, moreAction, rateAction, regenerateAction, removeAction, setLocationAction, setPlanAction, setZipAction, swapAction, wearAction, type LooksResult } from "./actions";
 import { RatingRow } from "../fits/rating-row";
 import { deleteFitAction } from "../fits/actions";
 import { InlineAdd } from "@/components/lists/inline-add";
-import { monoDate } from "@/lib/dates";
+import { EVENING_HOUR, monoDate } from "@/lib/dates";
 
-/** What the weather cell shows: the forecast, or why there is none (nothing saved yet, or the lookup failed). */
-export type WeatherView = { weather: { condition: string; source: string; nowF: number; tonightF: number; highF: number; lowF: number; rainChance: number } | null; note: "none" | "failed" | null };
+/** What the weather cell shows: the forecast, or why there is none (nothing saved yet, or the lookup failed). `asOf`: an older forecast is standing in, and this is how old. */
+export type WeatherView = { weather: { condition: string; source: string; nowF: number; tonightF: number; highF: number; lowF: number; rainChance: number; asOf: string | null } | null; note: "none" | "failed" | null };
 
 /** One day of the week strip: the last six days and today, with the fit worn that day when there is one. */
 export type WeekDay = { key: string; weekday: string; day: number; today: boolean; thumbKey: string | null; fitId: string | null };
@@ -36,6 +38,8 @@ type Props = {
   weather: WeatherView | Promise<WeatherView>; savedZip: string | null;
   week: WeekDay[];
   plan: { source: string; label: string | null; occasionId: string | null }; calendarConnected: boolean; calendarConfigured: boolean;
+  /** The calendar is connected but Google refused its token: the person has to connect it again (review D 5.2). */
+  calendarBroken: boolean;
   checkIn: { source: "taps" | "selfie"; answers: { scaleId: string; optionId: string }[] } | null; scales: Scale[];
   occasions: { id: string; name: string }[];
   suggestion: { id: string; boards: BoardView[]; wornIndex: number | null } | null;
@@ -68,12 +72,23 @@ function longDate(key: string): string {
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" });
 }
 
+/** What a dropped request says (iOS drops the fetch when the app goes to the background; review D 7.1). */
+const LOST = "Lost the connection. Try again.";
+/** How often the screen asks after a build that is still running: every 2 s, then every 4 s past 30 s (review D 4.6). */
+const POLL_MS = 2000, POLL_SLOW_MS = 4000, POLL_SLOW_AFTER_MS = 30_000;
+/** Past this the screen stops asking and says so (review D 7.4); the server's own timeouts end a build well before. */
+const POLL_GIVE_UP_MS = 5 * 60_000;
+
 /** Today (screen 04, v2): greeting and weather, the week, the look as a flat-lay, one colored button, the mirror, the rest as small cards. */
 export function TodayScreen(p: Props) {
   const router = useRouter();
   const [, start] = useTransition();
   // No looks yet: the screen opens already building (the build starts below), never on an error it has not had.
   const [busy, setBusy] = useState<string | null>(p.needsLooks ? "regen" : null);
+  /** The first board is saved and on the screen; the other two are still on their way (the wait card stays, the screen is live). */
+  const [finishing, setFinishing] = useState(false);
+  /** Where the build is, in the job's own words ("Checking the weather…", "First look ready"). */
+  const [buildStep, setBuildStep] = useState<string | null>(null);
   const setError = (e?: string) => { if (e) toast.error(e); };
   const [sheet, setSheet] = useState<"checkin" | "plan" | "planText" | "swap" | "zip" | null>(null);
   const [index, setIndex] = useState(Math.max(0, p.suggestion?.wornIndex ?? 0));
@@ -83,39 +98,57 @@ export function TodayScreen(p: Props) {
   // The mirror: dressed in the background, polled, shown in the shared sheet (src/components/mirror).
   const m = useMirror(p.personId, p.wardrobe, p.engine);
 
-  function run(label: string, fn: () => Promise<{ ok: boolean; error?: string }>, after?: () => void) {
+  /** One tap, one answer: a thrown action (the phone went to sleep mid-request) is an error with words, never a stuck button (review D 7.1). */
+  function run(label: string, fn: () => Promise<{ ok: boolean; error?: string }>, after?: () => void, onFail?: () => void) {
     setError(undefined); setBusy(label);
     start(async () => {
-      const r = await fn();
+      let r: { ok: boolean; error?: string };
+      try { r = await fn(); } catch { r = { ok: false, error: LOST }; }
       setBusy(null);
-      if (!r.ok) setError(r.error); else after?.();
+      if (!r.ok) { setError(r.error); onFail?.(); } else after?.();
       router.refresh();
     });
   }
 
-  // Looks are built in the background and polled (20 to 40 seconds of Claude); the screen stays usable and a phone
+  // Looks are built in the background and polled (10 to 40 seconds of Claude); the screen stays usable and a phone
   // that gives up on a long request has nothing to give up on.
   const poll = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Each build gets a number; a poll from an older build (a check-in saved while the first looks were building) is dropped.
   const build = useRef(0);
+  // Whether this build's first board has been shown already (the job says so once; the screen refreshes once).
+  const shownPartial = useRef(false);
   useEffect(() => () => { if (poll.current) clearTimeout(poll.current); }, []);
   function newBuild(): number {
     if (poll.current) { clearTimeout(poll.current); poll.current = null; }
+    setFinishing(false); setBuildStep(null); shownPartial.current = false;
+    setBuildStartedAt(Date.now());
     return ++build.current;
   }
-  function looksDone(r: LooksResult, n: number, after?: () => void) {
+  function buildOver(error?: string) {
+    setBusy(null); setFinishing(false); setBuildStep(null);
+    if (error) setError(error);
+  }
+  function looksDone(r: LooksResult, n: number, after?: () => void, since = Date.now()) {
     if (n !== build.current) return; // a newer build took over
-    if (!r.ok) { setBusy(null); setError(r.error); router.refresh(); return; }
+    if (!r.ok) { buildOver(r.error); router.refresh(); return; }
     if (r.pending) {
-      const { jobId } = r.pending;
+      const { jobId, step, partial } = r.pending;
+      setBuildStep(step);
+      if (partial && !shownPartial.current) {
+        // Board 1 is saved (review D §0): show it now and keep the screen live while the other two build.
+        shownPartial.current = true;
+        setBusy(null); setFinishing(true);
+        router.refresh();
+      }
+      if (Date.now() - since > POLL_GIVE_UP_MS) { buildOver("The looks are taking too long. Try again."); router.refresh(); return; }
       poll.current = setTimeout(async () => {
         let next: LooksResult;
-        try { next = await looksStatusAction(jobId); } catch { next = r; } // a dropped poll (phone asleep): ask again
-        looksDone(next, n, after);
-      }, 2000);
+        try { next = await looksStatusAction(jobId, p.personId); } catch { next = r; } // a dropped poll (phone asleep): ask again
+        looksDone(next, n, after, since);
+      }, Date.now() - since > POLL_SLOW_AFTER_MS ? POLL_SLOW_MS : POLL_MS);
       return;
     }
-    setBusy(null); after?.(); router.refresh();
+    buildOver(); after?.(); router.refresh();
   }
   function buildLooks(label: string, fn: () => Promise<LooksResult>, after?: () => void) {
     const n = newBuild();
@@ -141,8 +174,9 @@ export function TodayScreen(p: Props) {
     const n = newBuild();
     setSheet(null); setError(undefined); setBusy("regen");
     start(async () => {
-      const saved = await fn();
-      if (!saved.ok) { if (n === build.current) { setBusy(null); setError(saved.error); } router.refresh(); return; }
+      let saved: { ok: boolean; error?: string };
+      try { saved = await fn(); } catch { saved = { ok: false, error: LOST }; }
+      if (!saved.ok) { if (n === build.current) buildOver(saved.error); router.refresh(); return; }
       router.refresh();
       let r: LooksResult;
       try { r = await regenerateAction(p.personId, true); } catch { r = { ok: false, error: "Couldn’t build the looks. Try again." }; }
@@ -172,8 +206,10 @@ export function TodayScreen(p: Props) {
     if (el && child) el.scrollTo({ left: child.offsetLeft - (el.clientWidth - child.clientWidth) / 2, behavior: "instant" as ScrollBehavior });
     setIndex(i);
   };
-  // After every refresh (new suggestion object) keep the strip on the board the person is looking at.
-  useEffect(() => { if (boards.length) goTo(Math.min(indexRef.current, boards.length - 1)); }, [p.suggestion, boards.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  // When the set of boards changes (a new build, more looks) keep the strip on the board the person is looking at.
+  // Keyed on the suggestion's id and count, not the object: every refresh made a new object and snapped the strip mid-swipe (review D 7.6).
+  const suggestionId = p.suggestion?.id ?? null;
+  useEffect(() => { if (boards.length) goTo(Math.min(indexRef.current, boards.length - 1)); }, [suggestionId, boards.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function askLocation() {
     if (!("geolocation" in navigator)) { setSheet("zip"); return; }
@@ -186,12 +222,13 @@ export function TodayScreen(p: Props) {
   }
 
   // Seconds since the build started, for the wait card; after ~90s say so and offer Try again.
+  const building = busy === "regen" || busy === "more" || finishing;
   const [buildStartedAt, setBuildStartedAt] = useState<number | null>(p.needsLooks ? Date.now() : null);
   const [buildSecs, setBuildSecs] = useState(0);
   useEffect(() => {
-    if (busy !== "regen" && busy !== "more") { setBuildStartedAt(null); setBuildSecs(0); return; }
+    if (!building) { setBuildStartedAt(null); setBuildSecs(0); return; }
     setBuildStartedAt((t) => t ?? Date.now());
-  }, [busy]);
+  }, [building]);
   useEffect(() => {
     if (buildStartedAt === null) return;
     const tick = () => setBuildSecs(Math.max(0, Math.floor((Date.now() - buildStartedAt) / 1000)));
@@ -199,14 +236,19 @@ export function TodayScreen(p: Props) {
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [buildStartedAt]);
-  const slow = buildSecs >= 90;
+  const slow = buildSecs >= 90 && !finishing;
   const whose = p.mine ? "your" : `${p.personName}’s`;
   const worn = Boolean(board?.wornFitId);
   const [flashWorn, setFlashWorn] = useState(false); // "✓ Worn" for a beat before the button turns into the Fits link
-  const building = busy === "regen" || busy === "more";
-  const greeting = p.mine ? `${p.hour < 5 ? "Up late" : p.hour < 12 ? "Good morning" : p.hour < 17 ? "Good afternoon" : "Good evening"}, ${p.personName}` : `${p.personName}’s ${p.evening ? "evening" : "day"}`;
+  /** The boards fade while they are being replaced or changed, not while two more are on their way. */
+  const dimBoards = busy === "regen" || busy === "more" || busy === "swap";
+  const greeting = p.mine ? `${p.hour < 5 ? "Up late" : p.hour < 12 ? "Good morning" : p.hour < EVENING_HOUR ? "Good afternoon" : "Good evening"}, ${p.personName}` : `${p.personName}’s ${p.evening ? "evening" : "day"}`;
   const planLabel = p.plan.label ?? "Everyday";
   const checkInLabel = p.checkIn ? (p.checkIn.source === "selfie" ? "Checked in · selfie" : "Checked in") : "Check in";
+  // "✓ Thanks" stays on the card until the refresh lands and the card goes (review D 7.10).
+  const [rated, setRated] = useState<FitRating | null>(null);
+  /** The wait card's first line. */
+  const waitTitle = busy === "swap" ? "Changing the piece" : finishing ? "Two more looks on the way" : slow ? "Taking longer than usual" : busy === "more" ? "Finding more looks" : `Building ${p.evening ? "tonight’s" : "today’s"} looks`;
 
   return (
     <div data-testid="today" className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-x-14">
@@ -237,12 +279,18 @@ export function TodayScreen(p: Props) {
           <span className="text-[20px] font-semibold">{planLabel}</span>
         )}
       </div>
+      {/* The calendar is connected but Google let go of it: say so where the plan is, with the way to fix it (review D 5.2). */}
+      {p.calendarBroken && p.plan.source !== "pick" ? (
+        p.mine
+          ? <Link href="/profile/settings" className="caption mt-1 flex min-h-9 items-center gap-1 text-ink underline underline-offset-4 lg:col-start-2" data-testid="calendar-reconnect">Calendar needs reconnecting ›</Link>
+          : <p className="caption mt-1 lg:col-start-2" data-testid="calendar-reconnect">{p.personName}’s calendar needs reconnecting.</p>
+      ) : null}
 
       {boards.length ? (
         <>
           <div className="relative mt-3 lg:col-start-1 lg:row-start-1 lg:row-span-3 lg:mt-0">
             <div ref={scroller} tabIndex={0} aria-label="Looks" onKeyDown={(e) => { if (e.key === "ArrowRight" && index < boards.length - 1) goTo(index + 1); if (e.key === "ArrowLeft" && index > 0) goTo(index - 1); }} className="strip -mx-5 snap-x snap-mandatory outline-none focus-visible:outline-2 focus-visible:outline-ink lg:mx-0">
-              {boards.map((b, i) => <Board key={i} index={i} board={b} active={i === index} dim={building} />)}
+              {boards.map((b, i) => <Board key={i} index={i} board={b} active={i === index} dim={dimBoards} />)}
             </div>
           </div>
           {/* Dots say where you are; the arrows are for a keyboard and a desktop. */}
@@ -279,7 +327,8 @@ export function TodayScreen(p: Props) {
               )}
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="outline" disabled={busy !== null || worn} onClick={() => setSheet("swap")} data-testid="swap">Change a piece</Button>
-                <Button variant="outline" busy={busy === "more"} disabled={busy !== null} onClick={() => { const next = boards.length; buildLooks("more", () => moreAction(p.personId), () => setIndex(next)); }} data-testid="more-looks">{busy === "more" ? "Thinking…" : "More looks"}</Button>
+                {/* Not while two more are already on the way: the two builds would write over each other's boards. */}
+                <Button variant="outline" busy={busy === "more"} disabled={busy !== null || finishing} onClick={() => { const next = boards.length; buildLooks("more", () => moreAction(p.personId), () => setIndex(next)); }} data-testid="more-looks">{busy === "more" ? "Thinking…" : "More looks"}</Button>
               </div>
             </div>
           ) : null}
@@ -307,12 +356,12 @@ export function TodayScreen(p: Props) {
         </>
       ) : (
         <>
-          {/* Before the first looks: a look's shape on the stage, breathing while they build. */}
+          {/* Before the first looks: a look's shape on the stage, breathing while they build, with the build's own words under it (review D 7.7). */}
           <div className={cn("stage relative mt-3 aspect-square w-full overflow-hidden lg:col-start-1 lg:row-start-1 lg:row-span-6 lg:mt-0 lg:aspect-[4/5]", building && "animate-pulse")} aria-hidden>
             <span className="absolute left-[24%] top-[6%] h-[44%] w-[52%] rounded-2xl bg-paper/70" />
             <span className="absolute left-[26%] top-[48%] h-[44%] w-[48%] rounded-2xl bg-paper/70" />
             <span className="absolute left-[64%] top-[70%] h-[18%] w-[30%] rounded-2xl bg-paper/70" />
-            {building ? <span className="absolute inset-x-0 bottom-5 text-center text-[15px] font-medium text-graphite">Considering the weather…</span> : null}
+            {building ? <span className="absolute inset-x-0 bottom-5 text-center text-[15px] font-medium text-graphite" data-testid="build-step">{buildStep ?? "Getting ready…"}</span> : null}
           </div>
           <div className="mt-3 flex flex-col gap-2 lg:col-start-2 lg:mt-0">
             {!building ? (
@@ -320,7 +369,7 @@ export function TodayScreen(p: Props) {
                 <p className="section">No looks yet</p>
                 <p className="note">{p.enoughClothes ? (p.canDress ? "Something went wrong building today’s looks." : `${p.personName} hasn’t opened Today yet.`) : p.mine ? "Add clothes with the + button and your first three looks will appear here." : `${p.personName}’s closet needs a few more pieces first.`}</p>
                 {!p.enoughClothes && p.mine ? <Link href="/add" className="pill mt-2 self-start" data-testid="empty-add-clothes">+ Add clothes</Link> : null}
-                {p.enoughClothes && p.canDress ? <Button variant="secondary" className="mt-2 w-full" disabled={busy !== null} onClick={() => buildLooks("regen", () => regenerateAction(p.personId))}>Try again</Button> : null}
+                {p.enoughClothes && p.canDress ? <Button variant="secondary" className="mt-2 w-full" disabled={busy !== null} onClick={() => buildLooks("regen", () => regenerateAction(p.personId, true))}>Try again</Button> : null}
               </>
             ) : null}
           </div>
@@ -330,7 +379,7 @@ export function TodayScreen(p: Props) {
       {p.unrated ? (
         <div className="card mt-4 px-4 py-3 lg:col-start-2" data-testid="yesterday-strip">
           <p className="caption">{monoDate(p.unrated.date)} · {p.unrated.title}</p>
-          <RatingRow compact rating={null} disabled={busy !== null} onRate={(r) => { if (r) run("rate", () => rateAction(p.unrated!.id, r)); }} />
+          <RatingRow compact rating={rated} disabled={busy !== null} onRate={(r) => { if (r) { setRated(r); run("rate", () => rateAction(p.unrated!.id, r), undefined, () => setRated(null)); } }} />
         </div>
       ) : null}
 
@@ -343,26 +392,39 @@ export function TodayScreen(p: Props) {
 
       <Suspense fallback={null}><WeatherCredit weather={p.weather} /></Suspense>
 
-      {/* The wait card: what is happening, how long it usually takes, and that you can leave. */}
-      {building ? (
+      {/* The wait card: what is happening (the job's own step), how long it has been, and that you can leave. */}
+      {building || busy === "swap" ? (
         <div className="wait flex items-center gap-3" role="status" aria-live="polite" data-testid="refreshing">
           <span aria-hidden className="size-2.5 shrink-0 animate-pulse rounded-full bg-paper" />
           <span className="flex min-w-0 flex-1 flex-col">
-            <span className="text-[15px] font-semibold">{slow ? "Taking longer than usual" : busy === "more" ? "Finding more looks" : `Building ${p.evening ? "tonight’s" : "today’s"} looks`}<span className="font-normal opacity-70"> · {buildSecs}s</span></span>
-            <span className="text-[13px] opacity-80">Usually about 30 seconds. You can leave; they’ll be here.</span>
+            <span className="text-[15px] font-semibold">{waitTitle}{building ? <span className="font-normal opacity-70"> · {buildSecs}s</span> : null}</span>
+            <span className="truncate text-[13px] opacity-80" data-testid="wait-step">{busy === "swap" ? "A few seconds." : `${buildStep ?? "Getting ready…"} · You can leave; they’ll be here.`}</span>
           </span>
-          {slow ? <button type="button" onClick={() => buildLooks("regen", () => regenerateAction(p.personId))} className="pill pill-sm shrink-0 bg-paper text-ink" data-testid="build-retry">Try again</button> : null}
+          {/* Try again follows the stuck build instead of joining it, and the clock starts over (review D 3.4/7.2). */}
+          {slow ? <button type="button" onClick={() => buildLooks("regen", () => regenerateAction(p.personId, true))} className="pill pill-sm shrink-0 bg-paper text-ink" data-testid="build-retry">Try again</button> : null}
         </div>
       ) : null}
 
       {/* Check-in: taps on each scale, or a selfie read by Claude. */}
       <CheckInSheet open={sheet === "checkin"} onClose={() => setSheet(null)} scales={p.scales} current={p.checkIn} busy={busy} isAdmin={p.isAdmin} mine={p.mine} personName={p.personName}
         onTaps={(answers) => saveThenRefresh(() => checkInTapsAction(p.personId, answers))}
-        onSelfie={(file) => { const fd = new FormData(); fd.set("selfie", file); saveThenRefresh(() => checkInSelfieAction(p.personId, fd)); }} />
+        onSelfie={(file) => saveThenRefresh(async () => {
+          // Shrunk on the phone first (review D 4.1): a raw selfie is 2 to 4 MB, past the server action's body limit, and the 1280px version reads the same.
+          const blob = await shrinkPhoto(file, 1280);
+          const fd = new FormData(); fd.set("selfie", new File([blob], "selfie.jpg", { type: blob.type || "image/jpeg" }));
+          return checkInSelfieAction(p.personId, fd);
+        })} />
 
       {/* Plan: the occasion list (admins add right here), free text, or back to the calendar. */}
       <Sheet open={sheet === "plan"} onClose={() => setSheet(null)} title="Today’s plan">
-        <p className="note mb-3">{p.plan.source === "calendar" ? `From your calendar: ${p.plan.label}` : p.plan.source === "pick" ? `Picked: ${p.plan.label}` : p.calendarConnected ? "Nothing on your calendar today" : p.calendarConfigured ? <>Pick a plan, or <Link href="/profile/settings" className="text-ink underline">connect your calendar</Link>.</> : "Pick a plan for today."}</p>
+        <p className="note mb-3">
+          {p.plan.source === "calendar" ? `From your calendar: ${p.plan.label}`
+            : p.plan.source === "pick" ? `Picked: ${p.plan.label}`
+            : p.calendarBroken ? <>Calendar needs reconnecting{p.mine ? <>: <Link href="/profile/settings" className="text-ink underline">Settings</Link></> : null}. Pick a plan for today.</>
+            : p.calendarConnected ? "Nothing on your calendar today"
+            : p.calendarConfigured ? <>Pick a plan, or <Link href="/profile/settings" className="text-ink underline">connect your calendar</Link>.</>
+            : "Pick a plan for today."}
+        </p>
         <PlanPicker occasions={p.occasions} selected={p.plan.occasionId} isAdmin={p.isAdmin} busy={busy !== null && busy !== "regen"}
           onPick={(id) => saveThenRefresh(() => setPlanAction(p.personId, { occasionId: id }))}
           onText={() => setSheet("planText")}
@@ -370,7 +432,7 @@ export function TodayScreen(p: Props) {
       </Sheet>
       <TextSheet open={sheet === "planText"} onClose={() => setSheet(null)} title="What’s the plan?" label="Plan" value={p.plan.source === "pick" && !p.plan.occasionId ? p.plan.label ?? "" : ""} placeholder="Dinner with the Smiths" onSave={(v) => saveThenRefresh(() => setPlanAction(p.personId, { text: v }))} />
 
-      {/* Swap: tap the piece to replace. */}
+      {/* Swap: tap the piece to replace. The sheet closes first, so an error's toast is never under its backdrop (review D 7.5). */}
       <Sheet open={sheet === "swap"} onClose={() => setSheet(null)} title="Change a piece">
         <p className="note mb-2">Swap it for another, or take it off the look.</p>
         <div className="flex flex-col">
@@ -378,18 +440,17 @@ export function TodayScreen(p: Props) {
             <div key={x.id} className="flex h-14 items-center gap-3 border-b border-line">
               <span className="stage size-10 shrink-0 overflow-hidden rounded-lg">{x.thumbKey ? <img src={`/api/photo/${x.thumbKey}`} alt="" className="size-full object-contain" /> : null}</span>
               <span className="min-w-0 flex-1"><span className="block truncate text-[16px]">{x.name}</span><span className="caption">{sentence(x.label)}</span></span>
-              <button type="button" disabled={busy !== null} onClick={() => run("swap", () => swapAction(p.personId, index, x.id), () => setSheet(null))} className="pill pill-sm" data-testid={`swap-${x.id}`}>Swap</button>
-              {(board?.pieces.length ?? 0) > 2 ? <button type="button" disabled={busy !== null} onClick={() => run("swap", () => removeAction(p.personId, index, x.id), () => setSheet(null))} className="pill pill-sm pill-quiet" data-testid={`remove-${x.id}`}>Remove</button> : null}
+              <button type="button" disabled={busy !== null} onClick={() => { setSheet(null); run("swap", () => swapAction(p.personId, index, x.id)); }} className="pill pill-sm" data-testid={`swap-${x.id}`}>Swap</button>
+              {(board?.pieces.length ?? 0) > 2 ? <button type="button" disabled={busy !== null} onClick={() => { setSheet(null); run("swap", () => removeAction(p.personId, index, x.id)); }} className="pill pill-sm pill-quiet" data-testid={`remove-${x.id}`}>Remove</button> : null}
             </div>
           ))}
         </div>
-        {busy === "swap" ? <p className="note mt-3">Thinking…</p> : null}
       </Sheet>
 
       {/* See it on: the look on your own body photo (yours alone), or on the shared mannequin (no body in it). */}
       <MirrorSheet m={m} pieces={board?.pieces.map((x) => sentence(x.label)).join(" · ") ?? ""} mine={p.mine} personId={p.personId} personName={p.personName} tryOnState={p.tryOn} backPhoto={p.backPhoto} mannequinAvailable={p.mannequinAvailable} admin={p.isAdmin} />
 
-      <TextSheet open={sheet === "zip"} onClose={() => setSheet(null)} title="Weather for your zip" label="Zip code" kind="zip" value={p.savedZip ?? ""} placeholder="92101" onSave={(v) => run("zip", () => setZipAction(v))} />
+      <TextSheet open={sheet === "zip"} onClose={() => setSheet(null)} title={p.mine ? "Weather for your zip" : `Weather for ${p.personName}’s zip`} label="Zip code" kind="zip" value={p.savedZip ?? ""} placeholder="92101" onSave={(v) => run("zip", () => setZipAction(p.personId, v))} />
     </div>
   );
 }
@@ -404,13 +465,13 @@ function SmallCard({ href, icon, title, sub, testId }: { href: string; icon: Rea
   );
 }
 
-/** The last six days and today: a worn fit shows as its picture, today is the filled dot, each day opens Fits. */
+/** The last six days and today: a worn fit shows as its picture, today is the filled dot, each day opens that day on Fits (Fits takes `?d=`; review D 7.3). */
 function WeekStrip({ days, className }: { days: WeekDay[]; className?: string }) {
   if (!days.length) return null;
   return (
     <div className={cn("grid grid-cols-7 gap-1", className)} data-testid="week-strip" aria-label="This week">
       {days.map((d) => (
-        <Link key={d.key} href={d.fitId ? `/fits/${d.fitId}` : "/fits"} className="flex flex-col items-center gap-1.5" aria-label={`${d.weekday} ${d.day}${d.fitId ? ", worn" : ""}`} aria-current={d.today ? "date" : undefined}>
+        <Link key={d.key} href={`/fits?d=${d.key}`} className="flex flex-col items-center gap-1.5" aria-label={`${d.weekday} ${d.day}${d.fitId ? ", worn" : ""}`} aria-current={d.today ? "date" : undefined}>
           <span className={cn("text-[11px] font-medium", d.today ? "text-ink" : "text-graphite")}>{d.weekday}</span>
           <span className={cn("flex size-8 items-center justify-center overflow-hidden rounded-full text-[13px] font-semibold", d.today ? "bg-ink text-paper" : d.thumbKey ? "bg-bone" : "bg-paper text-graphite ring-1 ring-inset ring-line")}>
             {d.thumbKey && !d.today ? <img src={`/api/photo/${d.thumbKey}`} alt="" className="size-full object-cover" /> : d.day}
@@ -440,7 +501,7 @@ function WeatherIcon({ condition, className }: { condition: string; className?: 
 
 type WeatherAreaProps = { weather: WeatherView | Promise<WeatherView>; canDress: boolean; savedZip: string | null; finding: boolean; onZip: () => void; onLocation: () => void };
 
-/** The weather chip beside the greeting: the number now, the condition and tonight under it. With no forecast, the way to get one. */
+/** The weather chip beside the greeting: the number now, the condition and tonight under it; "as of 9 AM" when an older forecast is standing in. With no forecast, the way to get one. */
 function WeatherArea({ weather, canDress, savedZip, finding, onZip, onLocation }: WeatherAreaProps) {
   const { weather: w, note } = useWeather(weather);
   if (w) {
@@ -451,13 +512,15 @@ function WeatherArea({ weather, canDress, savedZip, finding, onZip, onLocation }
           <span className="text-[22px] font-semibold leading-none">{w.nowF}°</span>
           <span className="caption whitespace-nowrap">{w.condition} · {w.tonightF}° tonight</span>
           <span className="caption whitespace-nowrap">H {w.highF}° · L {w.lowF}°{w.rainChance >= 20 ? ` · Rain ${w.rainChance}%` : ""}</span>
+          {w.asOf ? <span className="caption whitespace-nowrap" data-testid="weather-as-of">Forecast {w.asOf}</span> : null}
         </span>
       </>
     );
     const cls = "flex shrink-0 items-center gap-2 rounded-2xl py-1 pl-1 pr-2 text-left";
+    const label = `Weather ${w.nowF} degrees, ${w.condition}${w.asOf ? `, forecast ${w.asOf}` : ""}`;
     return canDress
-      ? <button type="button" onClick={onZip} className={cn(cls, "tap")} data-testid="weather-block" aria-label={`Weather ${w.nowF} degrees, ${w.condition}. Change zip`}>{inner}</button>
-      : <div className={cls} data-testid="weather-block">{inner}</div>;
+      ? <button type="button" onClick={onZip} className={cn(cls, "tap")} data-testid="weather-block" aria-label={`${label}. Change zip`}>{inner}</button>
+      : <div className={cls} data-testid="weather-block" aria-label={label}>{inner}</div>;
   }
   if (!canDress) return null;
   return (
@@ -562,9 +625,12 @@ function CheckInSheet({ open, onClose, scales, current, busy, isAdmin, mine, per
 }) {
   const [answers, setAnswers] = useState<Record<string, string>>(() => Object.fromEntries((current?.answers ?? []).map((a) => [a.scaleId, a.optionId])));
   useEffect(() => { if (open) setAnswers(Object.fromEntries((current?.answers ?? []).map((a) => [a.scaleId, a.optionId]))); }, [open, current]);
-  const file = useRef<HTMLInputElement>(null);
+  // Two ways in (review D 7.8): the camera (`capture` forces it on iOS), and the photo library.
+  const camera = useRef<HTMLInputElement>(null);
+  const library = useRef<HTMLInputElement>(null);
   // Usable while the day's looks are building (Jeff, 2 Nov 2026: "can't click button"); blocked only while another action runs.
   const blocked = busy !== null && busy !== "regen";
+  const picked = (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (f) onSelfie(f); e.target.value = ""; };
   return (
     <Sheet open={open} onClose={onClose} title="Check-in">
       <p className="mb-4 text-[14px] leading-snug text-graphite">{mine ? "How are you looking today?" : `How is ${personName} looking today?`} Tap, or take a selfie and let the app read it.</p>
@@ -589,8 +655,12 @@ function CheckInSheet({ open, onClose, scales, current, busy, isAdmin, mine, per
       </div>
       <div className="mt-6 flex flex-col gap-2">
         <Button className="w-full" disabled={blocked} onClick={() => onTaps(Object.entries(answers).filter(([, v]) => v).map(([scaleId, optionId]) => ({ scaleId, optionId })))} data-testid="save-check-in">Save check-in</Button>
-        <button type="button" className="pill h-[50px] w-full" disabled={blocked} onClick={() => file.current?.click()}>Take a selfie</button>
-        <input ref={file} type="file" accept="image/*" capture="user" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onSelfie(f); e.target.value = ""; }} />
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" className="pill h-[50px] w-full" disabled={blocked} onClick={() => camera.current?.click()} data-testid="take-selfie">Take a selfie</button>
+          <button type="button" className="pill h-[50px] w-full" disabled={blocked} onClick={() => library.current?.click()} data-testid="choose-selfie">Choose a photo</button>
+        </div>
+        <input ref={camera} type="file" accept="image/*" capture="user" className="hidden" onChange={picked} />
+        <input ref={library} type="file" accept="image/*" className="hidden" onChange={picked} />
         {current?.source === "selfie" ? <p className="mono text-graphite">Read from {mine ? "your" : `${personName}’s`} selfie · only {mine ? "you" : `${personName} and a parent`} can see it</p> : null}
       </div>
     </Sheet>

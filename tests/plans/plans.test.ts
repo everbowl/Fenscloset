@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
 import { seed } from "../../prisma/seed";
-import { getPlan, planLine, setPlan } from "@/lib/plans";
-import { connectUrl, disconnect, finishConnect, getConnection, isGoogleConfigured, listCalendars, personFromState, setCalendarIds } from "@/lib/plans/google";
+import { calendarNeedsReconnect, getPlan, planLine, setPlan } from "@/lib/plans";
+import { connectUrl, disconnect, finishConnect, getConnection, isGoogleConfigured, listCalendars, markCalendarBroken, personFromState, setCalendarIds } from "@/lib/plans/google";
 import { decrypt, encrypt, sign, verify } from "@/lib/crypto";
 
 describe("plans & Google Calendar", () => {
@@ -46,5 +46,21 @@ describe("plans & Google Calendar", () => {
     await disconnect(jeff.id);
     expect(await getConnection(jeff.id)).toBeNull();
     expect(await getPlan(jeff.id, "2026-10-18", tz, noon)).toMatchObject({ source: "none" });
+  });
+
+  it("a connection Google refused is marked as needing a reconnect; connecting again, or disconnecting, clears it (review D 5.2)", async () => {
+    const jeff = await by("Jeff");
+    expect(await calendarNeedsReconnect(jeff.id)).toBe(false);
+    await finishConnect(jeff.id, "code");
+    expect(await calendarNeedsReconnect(jeff.id)).toBe(false);
+    await markCalendarBroken(jeff.id, "Google: Token has been expired or revoked.");
+    expect(await calendarNeedsReconnect(jeff.id)).toBe(true);
+    expect(await getConnection(jeff.id)).not.toBeNull(); // the row stays, so Settings can offer "Connect again" instead of "Connect"
+    await finishConnect(jeff.id, "code");
+    expect(await calendarNeedsReconnect(jeff.id)).toBe(false);
+    await markCalendarBroken(jeff.id, "invalid_grant");
+    await disconnect(jeff.id);
+    expect(await calendarNeedsReconnect(jeff.id)).toBe(false); // no connection: nothing to reconnect
+    expect(await db.weatherCache.count({ where: { key: { startsWith: "gcal" } } })).toBe(0);
   });
 });

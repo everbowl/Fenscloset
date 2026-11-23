@@ -5,6 +5,7 @@ import { hasBackPhoto, mirrorEngines, tryOnState } from "@/lib/tryon";
 import { isMannequinConfigured } from "@/lib/tryon/mannequin";
 import { canDress } from "@/lib/outfits/engine";
 import { listClosetItems } from "@/lib/items/query";
+import { CrumbLabel } from "@/components/crumbs";
 import { LookScreen } from "./look-screen";
 
 export const metadata = { title: "Look" };
@@ -21,7 +22,11 @@ export default async function LookPage({ params }: { params: Promise<{ lookId: s
   ]);
   const backPhoto = tryOn === "ready" && (await hasBackPhoto(look.personId));
   return (
-    <LookScreen look={{ ...look, savedAt: look.savedAt?.toISOString() ?? null }} meId={me.id} tryOn={tryOn} mannequin={dress && isMannequinConfigured()} backPhoto={backPhoto}
-      engine={engines[0] ?? "google"} admin={me.role === "admin"} closet={closet.map((c) => ({ id: c.id, name: c.name, thumbKey: c.thumbKey, categoryName: c.categoryName }))} />
+    <>
+      {/* The breadcrumb row shows the look's own name instead of "Look". */}
+      <CrumbLabel label={(look.name ?? "New look").trim()} />
+      <LookScreen look={{ ...look, savedAt: look.savedAt?.toISOString() ?? null }} meId={me.id} tryOn={tryOn} mannequin={dress && isMannequinConfigured()} backPhoto={backPhoto}
+        engine={engines[0] ?? "google"} admin={me.role === "admin"} closet={closet.map((c) => ({ id: c.id, name: c.name, thumbKey: c.thumbKey, categoryName: c.categoryName }))} />
+    </>
   );
 }

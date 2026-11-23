@@ -1,8 +1,10 @@
 import { cookies } from "next/headers";
 import { requirePerson, isAdmin } from "@/lib/auth/current";
+import { db } from "@/lib/db";
 import { resolveView, VIEW_COOKIE } from "@/lib/people/visibility";
 import { loadTodayBase } from "@/lib/today/context";
 import { loadWeather, type WeatherSlice } from "@/lib/today/weather";
+import { asOfLine } from "@/lib/weather";
 import { canDress, getSuggestion, type Suggestion } from "@/lib/outfits/engine";
 import { loadCandidates } from "@/lib/outfits/catalog";
 import { countCleanOut } from "@/lib/outfits/cleanout";
@@ -13,18 +15,18 @@ import { isMannequinConfigured } from "@/lib/tryon/mannequin";
 import { getScales } from "@/lib/checkins/service";
 import { listEntries } from "@/lib/lists/service";
 import { getConnection, isGoogleConfigured } from "@/lib/plans/google";
-import { addDays, monoDate } from "@/lib/dates";
+import { addDays, isEvening, monoDate } from "@/lib/dates";
 import { listMonth } from "@/lib/fits/service";
-import { planLine } from "@/lib/plans";
+import { calendarNeedsReconnect, planLine } from "@/lib/plans";
 import { newMatchCount } from "@/lib/shop/wants";
 import { TodayScreen, type WeatherView, type WeekDay } from "./today-screen";
 
 export const metadata = { title: "Today" };
 export const dynamic = "force-dynamic";
 
-/** What the screen's weather cell gets: the numbers it shows, or the reason there are none. */
-function asWeatherView({ weather: w, weatherNote }: WeatherSlice): WeatherView {
-  return { weather: w ? { condition: w.condition, source: w.source, nowF: w.nowF, tonightF: w.tonightF, highF: w.highF, lowF: w.lowF, rainChance: w.rainChance } : null, note: weatherNote };
+/** What the screen's weather cell gets: the numbers it shows, or the reason there are none; `asOf` when an older forecast is standing in (review D 5.3). */
+function asWeatherView({ weather: w, weatherNote }: WeatherSlice, now: Date): WeatherView {
+  return { weather: w ? { condition: w.condition, source: w.source, nowF: w.nowF, tonightF: w.tonightF, highF: w.highF, lowF: w.lowF, rainChance: w.rainChance, asOf: w.stale ? asOfLine(w, now) : null } : null, note: weatherNote };
 }
 
 /** The last six days and today for the week strip: the fit worn each day (its first piece's picture, or the fit's own photo). */
@@ -45,26 +47,22 @@ export default async function TodayPage() {
   const me = await requirePerson();
   const view = await resolveView(me, (await cookies()).get(VIEW_COOKIE)?.value);
   const personId = view.kind === "person" ? view.personId : me.id;
-  const ctx = await loadTodayBase(me, personId);
+  // Everything the page needs in two rounds, not eight (review D 9.2): the day first (the rest hangs on its date), then all of it at once.
+  const [ctx, dress, person] = await Promise.all([loadTodayBase(me, personId), canDress(me, personId), personId === me.id ? me : db.person.findUniqueOrThrow({ where: { id: personId } })]);
   // The weather is the one outside call on this screen, so the page never waits for it: the promise is handed to the
   // screen and streams in after the paint (21 Nov 2026: a slow minute for Open-Meteo was a slow minute for the whole
   // screen). With nowhere to ask about, the answer is already in hand and nothing streams.
-  const weather: WeatherView | Promise<WeatherView> = ctx.loc || ctx.savedZip ? loadWeather(ctx).then(asWeatherView) : { weather: null, note: "none" };
-  const [dress, cand, scales, occasions, cleanOut, calendar, week] = await Promise.all([
-    canDress(me, personId), loadCandidates(personId), getScales(), listEntries("occasion"), countCleanOut(personId), getConnection(personId), weekOf(me, personId, ctx.date),
+  const weather: WeatherView | Promise<WeatherView> = ctx.loc || ctx.savedZip ? loadWeather(ctx).then((s) => asWeatherView(s, ctx.now)) : { weather: null, note: "none" };
+  const [cand, scales, occasions, cleanOut, calendar, calendarBroken, week, suggestion, unrated, tryOn, lookingFor, wardrobe, engines] = await Promise.all([
+    loadCandidates(personId), getScales(), listEntries("occasion"), countCleanOut(personId), getConnection(personId), calendarNeedsReconnect(personId), weekOf(me, personId, ctx.date),
+    // The page never builds looks itself (Claude takes 10 to 40 seconds and a phone gives up on a load that long):
+    // it shows what exists, and the screen asks for the day's looks in the background when there are none yet.
+    getSuggestion(personId, ctx.date).catch((e): Suggestion | null => { console.error("looks", e); return null; }),
+    dress ? unratedRecentFit(personId, ctx.date) : null, tryOnState(me, personId), newMatchCount(me, personId), mirrorWardrobe(personId), mirrorEngines(),
   ]);
-  const [unrated, tryOn, lookingFor, wardrobe, engines] = await Promise.all([dress ? unratedRecentFit(personId, ctx.date) : null, tryOnState(me, personId), newMatchCount(me, personId), mirrorWardrobe(personId), mirrorEngines()]);
   const enough = cand.usable.length + cand.restingIds.length >= 2;
-  // The page never builds looks itself (Claude takes 20 to 40 seconds and a phone gives up on a load that long):
-  // it shows what exists, and the screen asks for the day's looks in the background when there are none yet.
-  let suggestion: Suggestion | null = null;
-  try {
-    suggestion = enough ? await getSuggestion(personId, ctx.date) : null;
-  } catch (e) {
-    console.error("looks", e);
-  }
   const needsLooks = enough && dress && !suggestion;
-  const person = personId === me.id ? me : await (await import("@/lib/db")).db.person.findUniqueOrThrow({ where: { id: personId } });
+  const backPhoto = tryOn === "ready" ? await hasBackPhoto(personId) : false;
   const context = planLine(ctx.plan, ctx.tz) ?? "NO PLANS · EVERYDAY";
   return (
     <TodayScreen
@@ -74,7 +72,7 @@ export default async function TodayPage() {
       canDress={dress}
       isAdmin={isAdmin(me)}
       date={ctx.date}
-      evening={ctx.hour >= 16}
+      evening={isEvening(ctx.hour)}
       hour={ctx.hour}
       week={week}
       contextLine={context}
@@ -83,11 +81,12 @@ export default async function TodayPage() {
       savedZip={ctx.savedZip}
       plan={{ source: ctx.plan.source, label: ctx.plan.label, occasionId: ctx.plan.occasionId }}
       calendarConnected={Boolean(calendar)}
+      calendarBroken={calendarBroken}
       calendarConfigured={isGoogleConfigured()}
       checkIn={ctx.checkIn ? { source: ctx.checkIn.source, answers: ctx.checkIn.answers.map((a) => ({ scaleId: a.scaleId, optionId: a.optionId })) } : null}
       scales={scales}
       occasions={occasions.map((o) => ({ id: o.id, name: o.name }))}
-      suggestion={suggestion ? { id: suggestion.id, boards: suggestion.boards, wornIndex: suggestion.wornIndex } : null}
+      suggestion={enough && suggestion ? { id: suggestion.id, boards: suggestion.boards, wornIndex: suggestion.wornIndex } : null}
       needsLooks={needsLooks}
       enoughClothes={enough}
       cleanOutCount={cleanOut}
@@ -95,7 +94,7 @@ export default async function TodayPage() {
       unrated={unrated}
       tryOn={tryOn}
       mannequin={dress && tryOn !== "ready" && isMannequinConfigured()}
-      backPhoto={tryOn === "ready" && (await hasBackPhoto(personId))}
+      backPhoto={backPhoto}
       mannequinAvailable={dress && isMannequinConfigured()}
       wardrobe={wardrobe}
       engine={engines.engines[0] ?? "google"}

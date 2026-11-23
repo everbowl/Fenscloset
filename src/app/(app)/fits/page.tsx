@@ -26,13 +26,14 @@ export default async function FitsPage({ searchParams }: { searchParams: Promise
   // No day asked for: today when it is in this month, else the month's latest fit, else its first day.
   const monthPrefix = `${y}-${String(mo).padStart(2, "0")}`;
   const selected = wanted ?? (today.startsWith(monthPrefix) ? today : [...days].sort((a, b) => (a.date < b.date ? 1 : -1))[0]?.date ?? `${monthPrefix}-01`);
-  const [fits, dress, people, looks] = await Promise.all([
+  // One round for the day, the people, the looks and the owner; the closet (only needed to save a fit) rides along when the day allows it.
+  const [fits, dress, people, looks, owner] = await Promise.all([
     getDay(me, view, selected), canDress(me, personId),
     db.person.findMany({ where: { status: { not: "removed" } }, orderBy: { createdAt: "asc" }, select: { id: true, name: true } }),
     view.kind === "person" ? listLooks(me, personId) : Promise.resolve([]),
+    view.kind === "person" ? db.person.findUniqueOrThrow({ where: { id: view.personId }, select: { name: true } }) : null,
   ]);
   const closet = dress && selected <= today ? await listClosetItems({ kind: "person", personId, name: "" }) : [];
-  const owner = view.kind === "person" ? await db.person.findUniqueOrThrow({ where: { id: view.personId }, select: { name: true } }) : null;
   return (
     <FitsScreen
       year={y} month0={mo - 1} today={today} selected={selected}

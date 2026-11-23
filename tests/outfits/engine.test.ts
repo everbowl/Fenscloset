@@ -4,12 +4,16 @@ import { resetDb } from "../helpers";
 import { seed } from "../../prisma/seed";
 import { personalClosetId } from "@/lib/items/service";
 import { loadCandidates } from "@/lib/outfits/catalog";
-import { generateSuggestion, getOrGenerate, moreLooks, removePiece, swapPiece, wearBoard, type DayContext } from "@/lib/outfits/engine";
+import { FIRST_LOOK_READY, generateSuggestion, getOrGenerate, getSuggestion, moreLooks, removePiece, swapPiece, wearBoard, type DayContext } from "@/lib/outfits/engine";
 import { cleanOutDecision, listCleanOut } from "@/lib/outfits/cleanout";
 import { createTogether, togetherPeople } from "@/lib/outfits/together";
+import { dayKey, hourIn } from "@/lib/dates";
 
 const ctx: DayContext = { weather: { nowF: 68, tonightF: 61, highF: 71, lowF: 58, rainChance: 0, condition: "Clear", timezone: "America/Los_Angeles", source: "mock" }, plan: { source: "none", occasionId: null, label: null }, checkIn: null };
 const DAY = "2026-10-18";
+/** Noon in Los Angeles on DAY: Wear this checks that the looks are today's (review D 2.8). */
+const NOW = new Date("2026-10-18T19:00:00Z");
+const TZ = "America/Los_Angeles";
 
 async function addItem(ownerId: string, name: string, category: string, extra: Partial<{ laundryStatus: "dirty" | "clean" | "cleaners"; neverSuggest: boolean; lastWornAt: Date; createdAt: Date }> = {}) {
   const cat = await db.category.findFirstOrThrow({ where: { name: category } });
@@ -41,18 +45,29 @@ describe("outfit engine", () => {
     for (const b of s.boards) { expect(b.pieces.length).toBeGreaterThanOrEqual(2); expect(b.itemIds).not.toContain(dirty.id); expect(b.itemIds).not.toContain(recent.id); }
     expect((await getOrGenerate(jeff.id, DAY, ctx)).id).toBe(s.id);
 
-    await expect(wearBoard(olivia, jeff.id, s.id, 0, "Today")).rejects.toMatchObject({ status: 403 });
-    const fitId = await wearBoard(jeff, jeff.id, s.id, 0, "Dinner out");
+    await expect(wearBoard(olivia, jeff.id, s.id, 0, "Today", NOW)).rejects.toMatchObject({ status: 403 });
+    // looks from another day cannot be worn as today's (a Today left open past midnight; review D 2.8)
+    await expect(wearBoard(jeff, jeff.id, s.id, 0, "Dinner out", new Date("2026-10-19T19:00:00Z"))).rejects.toThrow(/another day/);
+    const fitId = await wearBoard(jeff, jeff.id, s.id, 0, "Dinner out", NOW);
     const fit = await db.fit.findUniqueOrThrow({ where: { id: fitId }, include: { items: true, wearLogs: true } });
     expect(fit.items.map((i) => i.itemId).sort()).toEqual([...s.boards[0].itemIds].sort());
     expect(fit.wearLogs).toHaveLength(s.boards[0].itemIds.length);
     expect((await db.item.findUniqueOrThrow({ where: { id: tee.id } })).wearCount).toBe(1);
+    expect((await db.item.findUniqueOrThrow({ where: { id: tee.id } })).lastWornAt).toEqual(NOW); // worn today: the moment itself
+    // with no title, the look's plan names the fit, else the time of day
+    expect(fit.title).toBe("Dinner out");
     // wearing again the same day replaces the fit instead of double counting
-    const fitId2 = await wearBoard(jeff, jeff.id, s.id, 1, "Dinner out");
+    const fitId2 = await wearBoard(jeff, jeff.id, s.id, 1, null, NOW);
     expect(fitId2).toBe(fitId);
+    expect((await db.fit.findUniqueOrThrow({ where: { id: fitId } })).title).toBe("Today’s look");
     expect((await db.item.findUniqueOrThrow({ where: { id: tee.id } })).wearCount).toBe(1);
     expect(await db.fit.count({ where: { personId: jeff.id, date: DAY } })).toBe(1);
     expect((await getOrGenerate(jeff.id, DAY, ctx)).wornIndex).toBe(1);
+    // "Wearing this" survives a rebuild (a check-in or plan change makes a new row): the fit is matched by the day, not the row (review D 2.2)
+    const rebuilt = await generateSuggestion(jeff.id, DAY, ctx);
+    expect(rebuilt.id).not.toBe(s.id);
+    expect(rebuilt.wornIndex).toBe(1);
+    expect((await getSuggestion(jeff.id, DAY))!.boards[1].wornFitId).toBe(fitId);
 
     const tee2 = await addItem(jeff.id, "Black tee", "Tops");
     const swapped = await swapPiece(jeff.id, DAY, 2, tee.id, ctx);
@@ -97,6 +112,38 @@ describe("outfit engine", () => {
     expect(s.boards[0].reason).toContain("Repeats a recent piece");
   });
 
+  it("builds one look first and says so (the screen shows board 1 while two more build), then fills the day to three", async () => {
+    const jeff = await by("Jeff");
+    await addItem(jeff.id, "White tee", "Tops"); await addItem(jeff.id, "Dark jeans", "Bottoms"); await addItem(jeff.id, "Sneakers", "Shoes");
+    const steps: [string, boolean][] = [];
+    const s = await generateSuggestion(jeff.id, DAY, ctx, (step, opts) => steps.push([step, Boolean(opts?.partial)]));
+    expect(s.boards).toHaveLength(3);
+    expect(steps.map(([x]) => x)).toEqual(["Reading the closet…", "Drafting the first look…", FIRST_LOOK_READY, "Two more looks…"]);
+    expect(steps.find(([x]) => x === FIRST_LOOK_READY)?.[1]).toBe(true); // the first look is saved when that step is reported
+    expect(steps.filter(([, partial]) => partial)).toHaveLength(1);
+    expect(await db.outfitSuggestion.count({ where: { personId: jeff.id, date: DAY } })).toBe(1); // one row, created then filled in
+  });
+
+  it("a fit saved for a past day rests its pieces from that day (local noon), and undoing falls back to the earlier wear", async () => {
+    const jeff = await by("Jeff");
+    await addItem(jeff.id, "Tee", "Tops"); await addItem(jeff.id, "Jeans", "Bottoms"); await addItem(jeff.id, "Boots", "Shoes");
+    const past = await generateSuggestion(jeff.id, "2026-10-10", ctx);
+    await wearBoard(jeff, jeff.id, past.id, 0, "Back then", new Date("2026-10-10T19:00:00Z"));
+    const later = await generateSuggestion(jeff.id, "2026-10-14", ctx);
+    // saved on the 18th for the 14th: the pieces rest from the 14th, not from today (review D 2.3)
+    const fitId = await wearBoard(jeff, jeff.id, later.id, 0, "Backfilled", new Date("2026-10-14T19:00:00Z"));
+    const tee = await db.item.findFirstOrThrow({ where: { ownerId: jeff.id, name: "Tee" } });
+    expect(dayKey(tee.lastWornAt!, TZ)).toBe("2026-10-14");
+    expect(hourIn(tee.lastWornAt!, TZ)).toBe(12);
+    // undo: the earlier wear's day, as local noon, never UTC midnight (which is the evening before in Los Angeles; review D 2.4)
+    const { deleteFit } = await import("@/lib/fits/service");
+    await deleteFit(jeff, fitId, new Date("2026-10-18T19:00:00Z"));
+    const again = await db.item.findUniqueOrThrow({ where: { id: tee.id } });
+    expect(dayKey(again.lastWornAt!, TZ)).toBe("2026-10-10");
+    expect(hourIn(again.lastWornAt!, TZ)).toBe(12);
+    expect(again.wearCount).toBe(1);
+  });
+
   it("clean-out lists pieces not worn for the rule's months; keep snoozes, donate retires and removes from suggestions", async () => {
     const [jeff, olivia] = await Promise.all([by("Jeff"), by("Olivia")]);
     const old = await addItem(jeff.id, "Old coat", "Outerwear", { createdAt: new Date(Date.now() - 400 * 86400000) });
@@ -119,13 +166,24 @@ describe("outfit engine", () => {
     for (const p of [jeff, brittney, olivia, mya]) { await addItem(p.id, `${p.name} top`, "Tops"); await addItem(p.id, `${p.name} jeans`, "Bottoms"); }
     expect((await togetherPeople(olivia)).map((p) => p.name)).toEqual(["Jeff", "Brittney", "Olivia"]);
     expect((await togetherPeople(jeff)).map((p) => p.name)).toContain("Mya");
-    const t = await createTogether(jeff, { personIds: [jeff.id, brittney.id, olivia.id], mode: "match", date: DAY, ctx });
+    const steps: string[] = [];
+    const t = await createTogether(jeff, { personIds: [jeff.id, brittney.id, olivia.id], mode: "match", date: DAY, ctx, step: (s) => steps.push(s) });
     expect(t.boards).toHaveLength(3);
+    expect(t.missing).toEqual([]);
+    expect(steps).toEqual(["Reading everyone’s closets…", "Matching the looks…", "Saving…"]);
     expect(t.boards.map((b) => b.personName)).toEqual(["Jeff", "Brittney", "Olivia"]);
     for (const b of t.boards) expect(b.pieces.every((p) => p.ownerId === b.personId)).toBe(true);
+    // the creator's own calendar is not everyone's plan: with nothing picked, the plan is nothing (review D 8.4)
+    expect(t.occasionLabel).toBeNull();
+    expect(((await db.outfitSuggestion.findFirstOrThrow({ where: { togetherSessionId: t.id, personId: brittney.id } })).inputs as { plan: { source: string } }).plan.source).toBe("none");
     await expect(createTogether(olivia, { personIds: [olivia.id, mya.id], mode: "match", date: DAY, ctx })).rejects.toMatchObject({ status: 400 });
-    const fitId = await wearBoard(jeff, mya.id, (await createTogether(jeff, { personIds: [jeff.id, mya.id], mode: "coordinate", date: DAY, ctx })).boards[1].suggestionId, 0, "Coordinated");
+    const fitId = await wearBoard(jeff, mya.id, (await createTogether(jeff, { personIds: [jeff.id, mya.id], mode: "coordinate", date: DAY, ctx })).boards[1].suggestionId, 0, "Coordinated", NOW);
     expect(fitId).toBeTruthy();
+    // a person without enough clean pieces is a line with a reason, never silently missing (review D 8.2)
+    const empty = await db.person.create({ data: { name: "Sam Empty", email: "sam@example.com", role: "member" } });
+    const t2 = await createTogether(jeff, { personIds: [jeff.id, empty.id], mode: "coordinate", date: DAY, ctx });
+    expect(t2.boards.map((b) => b.personName)).toEqual(["Jeff"]);
+    expect(t2.missing).toEqual([{ personId: empty.id, personName: "Sam", reason: "Not enough clean pieces for a look." }]);
   });
 });
 

@@ -26,7 +26,15 @@ export type Candidate = {
   copies: number;
 };
 
-export type CandidateSet = { usable: Candidate[]; restingIds: string[]; noRepeatDays: number };
+export type CandidateSet = {
+  usable: Candidate[];
+  restingIds: string[];
+  /** The resting pieces themselves, so a small closet's fallback needs no second load (review D 2.6). */
+  resting: Candidate[];
+  noRepeatDays: number;
+  /** The household zone the resting window was judged in. */
+  tz: string;
+};
 
 type CandidateRow = {
   id: string; name: string | null; ownerId: string; isFavorite: boolean; wearCount: number; lastWornAt: Date | null; copies?: number;
@@ -60,17 +68,20 @@ export const candidateSelect = {
  * only when the usable set is too small, and says so).
  */
 export async function loadCandidates(personId: string, now = new Date(), opts: { noRepeatDays?: number } = {}): Promise<CandidateSet> {
-  const noRepeatDays = opts.noRepeatDays ?? (await getRuleNumber("noRepeatDays", 14));
-  const items = await db.item.findMany({
-    where: {
-      OR: [{ ownerId: personId }, { closets: { some: { closet: { kind: "family" } } } }],
-      laundryStatus: "clean", neverSuggest: false, retiredAt: null,
-    },
-    select: candidateSelect, orderBy: { createdAt: "asc" },
-  });
+  // The rule, the zone and the pieces in one round, not three (review D 2.10).
+  const [noRepeatDays, tz, items] = await Promise.all([
+    opts.noRepeatDays ?? getRuleNumber("noRepeatDays", 14),
+    getTimezone(),
+    db.item.findMany({
+      where: {
+        OR: [{ ownerId: personId }, { closets: { some: { closet: { kind: "family" } } } }],
+        laundryStatus: "clean", neverSuggest: false, retiredAt: null,
+      },
+      select: candidateSelect, orderBy: { createdAt: "asc" },
+    }),
+  ]);
   const cutoff = now.getTime() - noRepeatDays * 24 * 3600 * 1000;
   // Pieces worn earlier today are not "resting": you are wearing them, and Together / More looks may still use them.
-  const tz = await getTimezone();
   const today = dayKey(now, tz);
   const all = items.map(toCandidate);
   // A stack (ten of the same shirt) rests only once as many wears as copies landed inside the window.
@@ -81,7 +92,7 @@ export async function loadCandidates(personId: string, now = new Date(), opts: {
     for (const r of rows) wearsInWindow.set(r.itemId, r._count._all);
   }
   const resting = all.filter((c) => c.lastWornAt && c.lastWornAt.getTime() > cutoff && dayKey(c.lastWornAt, tz) !== today && (c.copies <= 1 || (wearsInWindow.get(c.id) ?? 0) >= c.copies));
-  return { usable: all.filter((c) => !resting.includes(c)), restingIds: resting.map((c) => c.id), noRepeatDays };
+  return { usable: all.filter((c) => !resting.includes(c)), restingIds: resting.map((c) => c.id), resting, noRepeatDays, tz };
 }
 
 /** One compact line per piece for the prompt. `#n` codes keep ids out of the model's output. */
@@ -103,14 +114,19 @@ export function describe(c: Candidate, code: string, now = new Date()): string {
 
 /** The style profile lines the engine may use (loved/avoid colors, style words, fit notes — for the owner's own looks only). */
 export async function styleContext(personId: string): Promise<string> {
-  const p = await db.person.findUniqueOrThrow({ where: { id: personId }, select: { name: true, role: true, lovedColors: { select: { name: true } }, avoidColors: { select: { name: true } }, styleWords: { select: { name: true } }, bodyProfile: { select: { fitNotes: true } } } });
+  // The profile, the inspiration and the taste memory in one round (review D 2.11).
+  const [p, inspiration, taste] = await Promise.all([
+    db.person.findUniqueOrThrow({ where: { id: personId }, select: { name: true, role: true, lovedColors: { select: { name: true } }, avoidColors: { select: { name: true } }, styleWords: { select: { name: true } }, bodyProfile: { select: { fitNotes: true } } } }),
+    inspirationContext(personId),
+    tasteContext(personId),
+  ]);
   const lines = [
     p.lovedColors.length ? `Loves colors: ${p.lovedColors.map((c) => c.name).join(", ")}` : null,
     p.avoidColors.length ? `Avoids colors: ${p.avoidColors.map((c) => c.name).join(", ")}` : null,
     p.styleWords.length ? `Style words: ${p.styleWords.map((w) => w.name).join(", ")}` : null,
     p.bodyProfile?.fitNotes ? `Fit notes: ${p.bodyProfile.fitNotes}` : null,
-    await inspirationContext(personId),
-    await tasteContext(personId),
+    inspiration,
+    taste,
   ].filter(Boolean);
   return lines.join("\n");
 }

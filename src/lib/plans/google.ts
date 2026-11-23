@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { decrypt, encrypt, sign, verify } from "@/lib/crypto";
-import { dayKey } from "@/lib/dates";
+import { dayKey, localInstant } from "@/lib/dates";
 
 /**
  * Google Calendar, read-only: the next event of the local day becomes the plan on Today.
@@ -12,6 +12,35 @@ export type CalendarEvent = { summary: string; start: Date; allDay: boolean };
 
 const SCOPES = ["https://www.googleapis.com/auth/calendar.readonly", "https://www.googleapis.com/auth/userinfo.email"];
 const EVENT_TTL_MS = 10 * 60 * 1000;
+/** A failed calendar read is not tried again for this long: Today loads several times a morning, and Google on a slow day was 10 to 30 s on every one of them (review D 5.1). */
+const FAILURE_MEMO_MS = 10 * 60 * 1000;
+/** How long one Google call may take. Short: the plan is one line on the screen, not the screen. */
+const GOOGLE_TIMEOUT_MS = 6000;
+const failures = new Map<string, { at: number; error: Error }>();
+
+/** Google said the refresh token is gone (the person removed the app, or six months went by unused). */
+export class GoogleAuthError extends Error {
+  constructor(message: string) { super(message); this.name = "GoogleAuthError"; }
+}
+
+/**
+ * A connection whose refresh token Google refused (review D 5.2). Kept as a row in WeatherCache (already the calendar's
+ * cache) so no table changes: Today and Settings read it and say "Calendar needs reconnecting"; connecting again clears it.
+ */
+const brokenKey = (personId: string) => `gcal-broken:${personId}`;
+export async function markCalendarBroken(personId: string, reason: string): Promise<void> {
+  await db.weatherCache.upsert({ where: { key: brokenKey(personId) }, update: { payload: { reason }, fetchedAt: new Date() }, create: { key: brokenKey(personId), payload: { reason } } });
+}
+export async function calendarNeedsReconnect(personId: string): Promise<boolean> {
+  const [conn, broken] = await Promise.all([db.googleCalendarConnection.findUnique({ where: { personId }, select: { personId: true } }), db.weatherCache.findUnique({ where: { key: brokenKey(personId) } })]);
+  return Boolean(conn && broken);
+}
+async function clearCalendarCache(personId: string): Promise<void> {
+  failures.delete(personId);
+  await db.weatherCache.deleteMany({ where: { OR: [{ key: { startsWith: `gcal:${personId}:` } }, { key: brokenKey(personId) }] } });
+}
+/** Tests: forget the failures that are waiting to be retried. */
+export function forgetCalendarFailures(): void { failures.clear(); }
 
 export function isGoogleConfigured(): boolean {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) || process.env.MOCK_GOOGLE === "true";
@@ -49,6 +78,7 @@ async function tokenRequest(params: Record<string, string>): Promise<TokenRespon
     signal: AbortSignal.timeout(10000),
   });
   const json = (await res.json()) as TokenResponse;
+  if (json.error === "invalid_grant") throw new GoogleAuthError(`Google: ${json.error_description ?? json.error}`);
   if (!res.ok || json.error) throw new Error(`Google: ${json.error_description ?? json.error ?? res.status}`);
   return json;
 }
@@ -57,6 +87,7 @@ async function tokenRequest(params: Record<string, string>): Promise<TokenRespon
 export async function finishConnect(personId: string, code: string): Promise<void> {
   if (process.env.MOCK_GOOGLE === "true") {
     await db.googleCalendarConnection.upsert({ where: { personId }, update: { refreshToken: encrypt("mock"), email: "mock@example.com" }, create: { personId, refreshToken: encrypt("mock"), email: "mock@example.com" } });
+    await clearCalendarCache(personId);
     return;
   }
   const tok = await tokenRequest({ code, grant_type: "authorization_code", redirect_uri: redirectUri() });
@@ -67,6 +98,7 @@ export async function finishConnect(personId: string, code: string): Promise<voi
     if (me.ok) email = ((await me.json()) as { email?: string }).email ?? null;
   } catch { /* email is cosmetic */ }
   await db.googleCalendarConnection.upsert({ where: { personId }, update: { refreshToken: encrypt(tok.refresh_token), email }, create: { personId, refreshToken: encrypt(tok.refresh_token), email } });
+  await clearCalendarCache(personId); // a fresh token: the "needs reconnecting" mark and the old day's events go
 }
 
 export async function getConnection(personId: string): Promise<{ email: string | null; connectedAt: Date; calendarIds: string[] } | null> {
@@ -81,8 +113,8 @@ export async function listCalendars(personId: string): Promise<CalendarChoice[]>
   const conn = await db.googleCalendarConnection.findUnique({ where: { personId } });
   if (!conn) return [];
   if (process.env.MOCK_GOOGLE === "true") return [{ id: "primary", name: "mock@example.com", primary: true }, { id: "family@group.calendar.google.com", name: "Family", primary: false }];
-  const token = await accessToken(conn.refreshToken);
-  const res = await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=reader&showHidden=false", { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10000) });
+  const token = await accessToken(personId, conn.refreshToken);
+  const res = await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=reader&showHidden=false", { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS) });
   if (!res.ok) throw new Error(`Google Calendar: ${res.status}`);
   const json = (await res.json()) as { items?: { id: string; summary?: string; summaryOverride?: string; primary?: boolean }[] };
   return (json.items ?? []).map((c) => ({ id: c.primary ? "primary" : c.id, name: c.summaryOverride ?? c.summary ?? c.id, primary: Boolean(c.primary) }));
@@ -105,17 +137,32 @@ export async function disconnect(personId: string): Promise<void> {
     } catch { /* revoke is best-effort; the row goes either way */ }
   }
   await db.googleCalendarConnection.delete({ where: { personId } });
-  await db.weatherCache.deleteMany({ where: { key: { startsWith: `gcal:${personId}:` } } });
+  await clearCalendarCache(personId);
 }
 
-async function accessToken(refreshTokenEnc: string): Promise<string> {
-  const tok = await tokenRequest({ refresh_token: decrypt(refreshTokenEnc), grant_type: "refresh_token" });
-  return tok.access_token;
+/** A fresh access token; a refused refresh token marks the connection as needing a reconnect before the error goes up. */
+async function accessToken(personId: string, refreshTokenEnc: string): Promise<string> {
+  try {
+    const tok = await tokenRequest({ refresh_token: decrypt(refreshTokenEnc), grant_type: "refresh_token" });
+    return tok.access_token;
+  } catch (e) {
+    if (e instanceof GoogleAuthError) await markCalendarBroken(personId, e.message).catch(() => {});
+    throw e;
+  }
 }
 
 type GEvent = { summary?: string; status?: string; start?: { dateTime?: string; date?: string }; attendees?: { self?: boolean; responseStatus?: string }[] };
+type CachedEvent = { summary: string; start: string; allDay: boolean };
 
-/** The next not-declined event between `now` and the end of the local day. Cached 10 min. */
+/** The next timed event still ahead, else the day's all-day one (review D 5.6: "Thanksgiving" used to beat a 7:30 PM dinner). */
+function pickNext(events: CalendarEvent[], now: Date): CalendarEvent | null {
+  return events.find((e) => !e.allDay && e.start >= now) ?? events.find((e) => e.allDay) ?? null;
+}
+
+/**
+ * The next not-declined event between `now` and the end of the local day. Cached 10 min; a failure is remembered for
+ * 10 min too, and a connection Google refused answers nothing at once until it is connected again.
+ */
 export async function nextEventToday(personId: string, tz: string, now = new Date()): Promise<CalendarEvent | null> {
   const conn = await db.googleCalendarConnection.findUnique({ where: { personId } });
   if (!conn) return null;
@@ -125,30 +172,45 @@ export async function nextEventToday(personId: string, tz: string, now = new Dat
     return start > now ? { summary: "Dinner", start, allDay: false } : null;
   }
   const cacheKey = `gcal:${personId}:${day}`;
-  const hit = await db.weatherCache.findUnique({ where: { key: cacheKey } });
+  const [hit, broken] = await Promise.all([db.weatherCache.findUnique({ where: { key: cacheKey } }), db.weatherCache.findUnique({ where: { key: brokenKey(personId) }, select: { key: true } })]);
   if (hit && Date.now() - hit.fetchedAt.getTime() < EVENT_TTL_MS) {
-    const list = hit.payload as { summary: string; start: string; allDay: boolean }[];
-    const next = list.map((e) => ({ ...e, start: new Date(e.start) })).find((e) => e.allDay || e.start >= now);
-    return next ?? null;
+    return pickNext((hit.payload as CachedEvent[]).map((e) => ({ ...e, start: new Date(e.start) })), now);
   }
-  const token = await accessToken(conn.refreshToken);
-  const q = new URLSearchParams({ timeMin: now.toISOString(), timeMax: new Date(now.getTime() + 36 * 3600 * 1000).toISOString(), singleEvents: "true", orderBy: "startTime", maxResults: "10", timeZone: tz });
-  const calendarIds = conn.calendarIds.length ? conn.calendarIds : ["primary"];
-  const items: GEvent[] = [];
-  for (const id of calendarIds) {
-    const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(id)}/events?${q}`, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10000) });
-    if (!res.ok) throw new Error(`Google Calendar: ${res.status}`);
-    items.push(...(((await res.json()) as { items?: GEvent[] }).items ?? []));
+  if (broken) return null; // Settings and Today say "Calendar needs reconnecting"; no point asking Google again
+  const failed = failures.get(personId);
+  if (failed && Date.now() - failed.at < FAILURE_MEMO_MS) throw failed.error;
+  let events: CalendarEvent[];
+  try {
+    const token = await accessToken(personId, conn.refreshToken);
+    const q = new URLSearchParams({ timeMin: now.toISOString(), timeMax: new Date(now.getTime() + 36 * 3600 * 1000).toISOString(), singleEvents: "true", orderBy: "startTime", maxResults: "10", timeZone: tz });
+    const calendarIds = conn.calendarIds.length ? conn.calendarIds : ["primary"];
+    // Every calendar at once, not one after another (review D 5.1).
+    const pages = await Promise.all(calendarIds.map(async (id) => {
+      const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(id)}/events?${q}`, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS) });
+      if (!res.ok) throw new Error(`Google Calendar: ${res.status}`);
+      return ((await res.json()) as { items?: GEvent[] }).items ?? [];
+    }));
+    events = pages.flat()
+      .filter((e) => e.status !== "cancelled" && !(e.attendees ?? []).some((a) => a.self && a.responseStatus === "declined"))
+      .flatMap((e): CalendarEvent[] => {
+        const allDay = Boolean(e.start?.date && !e.start?.dateTime);
+        // An all-day date is a day key, never an instant: it counts when it is today's key, and starts at local midnight (review D 5.5).
+        if (allDay) return e.start!.date === day ? [{ summary: e.summary ?? "Busy", start: localInstant(day, tz, 0), allDay }] : [];
+        if (!e.start?.dateTime) return [];
+        const start = new Date(e.start.dateTime);
+        return dayKey(start, tz) === day ? [{ summary: e.summary ?? "Busy", start, allDay }] : [];
+      })
+      .sort((a, b) => a.start.getTime() - b.start.getTime());
+  } catch (e) {
+    failures.set(personId, { at: Date.now(), error: e as Error });
+    throw e;
   }
-  const events = items
-    .filter((e) => e.status !== "cancelled" && !(e.attendees ?? []).some((a) => a.self && a.responseStatus === "declined"))
-    .map((e) => {
-      const allDay = Boolean(e.start?.date && !e.start?.dateTime);
-      const start = e.start?.dateTime ? new Date(e.start.dateTime) : new Date(`${e.start?.date}T00:00:00`);
-      return { summary: e.summary ?? "Busy", start, allDay };
-    })
-    .filter((e) => dayKey(e.start, tz) === day || (e.allDay && e.start.toISOString().slice(0, 10) === day))
-    .sort((a, b) => a.start.getTime() - b.start.getTime());
-  await db.weatherCache.upsert({ where: { key: cacheKey }, update: { payload: events.map((e) => ({ ...e, start: e.start.toISOString() })), fetchedAt: new Date() }, create: { key: cacheKey, payload: events.map((e) => ({ ...e, start: e.start.toISOString() })) } });
-  return events.find((e) => e.allDay || e.start >= now) ?? null;
+  failures.delete(personId);
+  const payload: CachedEvent[] = events.map((e) => ({ ...e, start: e.start.toISOString() }));
+  await Promise.all([
+    db.weatherCache.upsert({ where: { key: cacheKey }, update: { payload, fetchedAt: new Date() }, create: { key: cacheKey, payload } }),
+    // Yesterday's events are of no use now (review D 5.7): one row per person stays, not one per day forever.
+    db.weatherCache.deleteMany({ where: { key: { startsWith: `gcal:${personId}:` }, NOT: { key: cacheKey } } }),
+  ]);
+  return pickNext(events, now);
 }
