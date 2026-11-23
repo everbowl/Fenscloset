@@ -45,7 +45,9 @@ export async function validateSession(token: string): Promise<SessionWithPerson 
   }
   if (session.person.status === "removed") return null;
   const timeLeft = session.expiresAt.getTime() - Date.now();
-  if (timeLeft < REFRESH_WHEN_LEFT_MS) {
+  // The sliding refresh is a write; every closet thumbnail goes through here, so at most one write an hour (review B D8).
+  const seenRecently = session.lastSeenAt && Date.now() - session.lastSeenAt.getTime() < 60 * 60 * 1000;
+  if (timeLeft < REFRESH_WHEN_LEFT_MS && !seenRecently) {
     const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
     await db.session.update({ where: { id: session.id }, data: { expiresAt, lastSeenAt: new Date() } });
     session.expiresAt = expiresAt;

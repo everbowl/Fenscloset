@@ -7,7 +7,9 @@ const sp = (s: string) => new URLSearchParams(s);
 describe("the header's back control", () => {
   it("goes to the parent of every page that has one, never off the site", () => {
     expect(parentOf("/closet/abc")).toEqual({ href: "/closet", label: "Closet", closet: true });
-    expect(parentOf("/closet/abc/go-with")).toEqual({ href: "/closet/abc", label: "the piece" });
+    expect(parentOf("/closet/abc/go-with")).toEqual({ href: "/closet/abc", label: "Piece" });
+    expect(parentOf("/looks/l1")?.href).toBe("/fits");
+    expect(parentOf("/mirror")?.href).toBe("/today");
     expect(parentOf("/profile/body")?.href).toBe("/profile");
     expect(parentOf("/profile")?.href).toBe("/today");
     expect(parentOf("/today/together")?.href).toBe("/today");

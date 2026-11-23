@@ -11,7 +11,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export const PHOTO_KINDS = ["originals", "cutouts", "thumbs", "labels", "worn", "avatars", "bodies", "checkins", "fits", "shop", "inspo", "tryon", "mannequin", "looks"] as const;
@@ -56,6 +56,8 @@ function s3(): S3Client {
       endpoint: process.env.S3_ENDPOINT,
       forcePathStyle: process.env.S3_PATH_STYLE !== "false",
       credentials: { accessKeyId: process.env.S3_ACCESS_KEY_ID ?? "", secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? "" },
+      // A bucket call that never answers would hold a dressing or an import forever (review C/B): 5 s to connect, 60 s per request.
+      requestHandler: { connectionTimeout: 5_000, requestTimeout: 60_000 },
     });
   }
   return client;
@@ -110,7 +112,28 @@ export async function objectExists(key: string): Promise<boolean> {
   if (storageMode() === "mock") {
     try { await stat(safeMockPath(key)); return true; } catch { return false; }
   }
-  try { await getObject(key); return true; } catch { return false; }
+  try { await s3().send(new HeadObjectCommand({ Bucket: bucket(), Key: key })); return true; } catch { return false; } // HEAD, not a download (review B D3)
+}
+
+/**
+ * The object as a stream for the photo proxy: nothing is buffered in Node on the way to the phone (review B A1/D2).
+ * `length` is known when the store says so; the mock store reads the file.
+ */
+export async function getObjectStream(key: string): Promise<{ stream: ReadableStream<Uint8Array>; contentType: string; length: number | null }> {
+  const parsed = parseKey(key);
+  if (!parsed) throw new NotFoundError(key);
+  if (storageMode() === "mock") {
+    const { body, contentType } = await getObject(key);
+    return { stream: new Blob([new Uint8Array(body)]).stream(), contentType, length: body.length };
+  }
+  try {
+    const res = await s3().send(new GetObjectCommand({ Bucket: bucket(), Key: key }));
+    if (!res.Body) throw new NotFoundError(key);
+    return { stream: res.Body.transformToWebStream() as ReadableStream<Uint8Array>, contentType: res.ContentType || parsed.contentType, length: res.ContentLength ?? null };
+  } catch (e) {
+    if ((e as { name?: string }).name === "NoSuchKey" || (e as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404) throw new NotFoundError(key);
+    throw e;
+  }
 }
 
 export async function deleteObject(key: string): Promise<void> {

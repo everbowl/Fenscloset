@@ -27,7 +27,7 @@ export async function removeBackground(input: Buffer): Promise<Buffer> {
   form.append("type", "product");
   let res: Response;
   try {
-    res = await fetch(ENDPOINT, { method: "POST", headers: { "X-Api-Key": apiKey }, body: form });
+    res = await fetch(ENDPOINT, { method: "POST", headers: { "X-Api-Key": apiKey }, body: form, signal: AbortSignal.timeout(45_000) }); // one hung call must not hold an import slot (review B A2.4)
   } catch (e) {
     throw new RemoveBgError("network", (e as Error).message);
   }
