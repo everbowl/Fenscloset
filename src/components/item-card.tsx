@@ -9,7 +9,8 @@ export type CardPick = { on: boolean; /** the mirror can place this kind of piec
 
 /** Grid card (v2, Alta's closet grid): the cutout on a soft stage, the brand bold and the name light under it, a "New" tag on fresh pieces, "×n" on stacks. */
 export function ItemCard({ item, showOwner, pick }: { item: ItemCardData; showOwner?: boolean; pick?: CardPick }) {
-  const meta = [showOwner ? item.ownerName : null, item.categoryName, item.status !== "New" ? item.status : null].filter(Boolean).join(" · ");
+  const laundry = item.status !== "New" && item.status !== "Clean" ? item.status : null; // "In the wash", "At cleaners": the one status worth a line on the card
+  const meta = [showOwner ? item.ownerName : null, item.categoryName, laundry].filter(Boolean).join(" · ");
   const body = (
     <>
       <div className="stage relative aspect-[4/5] overflow-hidden rounded-xl">
@@ -21,7 +22,7 @@ export function ItemCard({ item, showOwner, pick }: { item: ItemCardData; showOw
       </div>
       <div className="mt-1.5 flex flex-col gap-px">
         <div className="truncate text-[13px] font-semibold">{item.brandName ?? item.name}</div>
-        <div className="caption truncate">{item.brandName ? item.name : meta || " "}</div>
+        <div className="caption truncate">{item.brandName ? [item.name, showOwner ? item.ownerName : null, laundry].filter(Boolean).join(" · ") : meta || " "}</div>
       </div>
     </>
   );

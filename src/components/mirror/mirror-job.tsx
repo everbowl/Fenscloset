@@ -62,11 +62,7 @@ const STORE_KEY = "fc.mirror.job";
 function load(): MirrorJob | null {
   try {
     const raw = sessionStorage.getItem(STORE_KEY);
-    if (!raw) return null;
-    const j = JSON.parse(raw) as MirrorJob;
-    // A dressing that never got a job id cannot be followed after a reload: say so instead of counting forever.
-    if (j.status === "running" && !j.jobId) return { ...j, status: "failed", error: "The mirror lost that dressing when the page reloaded. Try again." };
-    return j;
+    return raw ? (JSON.parse(raw) as MirrorJob) : null;
   } catch { return null; }
 }
 function save(j: MirrorJob | null) {
@@ -82,7 +78,15 @@ export function MirrorJobProvider({ children }: { children: ReactNode }) {
     setJobState((prev) => { const n = typeof next === "function" ? next(prev) : next; save(n); return n; });
   }, []);
 
-  useEffect(() => { const j = load(); if (j) setJobState(j); }, []);
+  const rejoin = useRef<MirrorJob | null>(null);
+  useEffect(() => {
+    const j = load();
+    if (!j) return;
+    setJobState(j);
+    // Reloaded before the server had answered with a job id: ask again. The job helper joins the dressing already running
+    // for the same look (same key), so nothing is dressed twice.
+    if (j.status === "running" && !j.jobId) rejoin.current = j;
+  }, []);
 
   // One answer, whichever call it came from: the picture, a job to keep asking about, or why not.
   const settle = useCallback((r: MirrorResult, mine: number, previous: TryOnView | null) => {
@@ -108,6 +112,14 @@ export function MirrorJobProvider({ children }: { children: ReactNode }) {
     }, POLL_MS);
     return () => { if (timer.current) clearTimeout(timer.current); };
   }, [job, settle, setJob]);
+
+  useEffect(() => {
+    const j = rejoin.current;
+    if (!j) return;
+    rejoin.current = null;
+    void start({ ...j.request, pieces: j.pieces });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, after the restored job is in state
+  }, [job]);
 
   const start = useCallback(async (req: MirrorRequest & { pieces?: string }) => {
     const mine = ++seq.current;

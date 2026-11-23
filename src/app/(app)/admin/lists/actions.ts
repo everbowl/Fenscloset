@@ -70,6 +70,7 @@ export async function reorderEntriesAction(kind: string, orderedIds: string[]): 
   if (!(await currentAdmin())) return ADMINS_ONLY;
   if (!isListKind(kind)) return NO_SUCH_LIST;
   try {
+    console.info(`lists: reorder ${kind} · ${orderedIds.length} rows`);
     await reorderEntries(kind, orderedIds);
     revalidate(kind);
     return { ok: true };

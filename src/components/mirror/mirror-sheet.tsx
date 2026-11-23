@@ -168,7 +168,7 @@ export function MirrorBody({ m, pieces, mine, personId, personName, tryOnState, 
               {views.map(([v, word]) => {
                 const current = v === "mannequin" ? m.on === "mannequin" : m.on === "me" && m.view === v;
                 return (
-                  <button key={v} type="button" disabled={m.busy} aria-pressed={current} onClick={() => { if (!current) m.switchTo(v as "front" | "back" | "mannequin"); }} className={cn("pill pill-sm", current && "pill-solid")} data-testid={`mirror-view-${v}`}>{word}</button>
+                  <button key={v} type="button" disabled={m.busy} aria-pressed={current} onClick={() => { if (!current) m.switchTo(v as "front" | "back" | "mannequin"); }} className={cn("pill pill-sm", current && "pill-solid")} data-testid={`mirror-${v}`}>{word}</button>
                 );
               })}
             </div>

@@ -25,7 +25,7 @@ test("Jeff logs in with 0535 once, is forced to change it, then 0535 is dead", a
   await page.goto("/today");
   await expect(page).toHaveURL(/\/change-password$/);
 
-  await page.getByLabel("New password").fill("0535");
+  await page.getByLabel("New password").fill("0535abcd"); // long enough for the field, still the DEV password inside: the server refuses it
   await page.getByRole("button", { name: "Save new password" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "Pick a real one" })).toBeVisible();
   // With 0535 spent and no real password yet there is no way out but setting one (review A A2).

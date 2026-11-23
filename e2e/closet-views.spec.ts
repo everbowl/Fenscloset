@@ -16,8 +16,8 @@ test.describe("closet views", () => {
     const cards = page.getByTestId("item-card");
     await expect(cards).toHaveCount(5);
     await expect(cards.first()).toContainText("White linen shirt"); // newest first
-    await expect(page.getByTestId("sort-button")).toHaveText("Sort · Newest first");
-    await expect(page.getByTestId("filter-button")).toHaveText("Filter");
+    await expect(page.getByTestId("sort-button")).toHaveText("Newest first");
+    await expect(page.getByTestId("filter-button")).toHaveAttribute("aria-label", "Filter");
 
     // sort: the sheet, the pick, the URL
     await page.getByTestId("sort-button").click();
@@ -26,7 +26,7 @@ test.describe("closet views", () => {
     await page.getByRole("option", { name: "Worn the most" }).click();
     await expect(page).toHaveURL(/sort=most-worn/);
     await expect(cards.first()).toContainText("Dark jeans");
-    await expect(page.getByTestId("sort-button")).toHaveText("Sort · Worn the most");
+    await expect(page.getByTestId("sort-button")).toHaveText("Worn the most");
 
     // filter: a tap applies at once, the grid and the counts follow
     await page.getByTestId("filter-button").click();
@@ -107,6 +107,6 @@ test.describe("closet views", () => {
       await expect(cards.first()).toContainText(first);
     }
     await page.goto("/closet?sort=nonsense");
-    await expect(page.getByTestId("sort-button")).toHaveText("Sort · Newest first");
+    await expect(page.getByTestId("sort-button")).toHaveText("Newest first");
   });
 });
