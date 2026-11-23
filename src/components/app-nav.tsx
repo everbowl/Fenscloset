@@ -18,14 +18,16 @@ const tabs = [
 export function AppNav() {
   const pathname = usePathname();
   return (
-    <nav aria-label="Main" className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-line bg-paper/95 backdrop-blur lg:static lg:border-t-0 lg:border-b lg:bg-paper lg:backdrop-blur-none">
+    // Opaque, no backdrop blur: the blur over a 95% white was invisible and cost a repaint on every scroll frame (WebKit most of all).
+    <nav aria-label="Main" className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-line bg-paper lg:static lg:border-t-0 lg:border-b">
       <div className="mx-auto grid h-[76px] max-w-[480px] grid-cols-5 items-center px-2 lg:flex lg:h-12 lg:max-w-[1040px] lg:items-stretch lg:gap-8 lg:px-10">
         {tabs.map(({ href, label, plus, Icon }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           if (plus) {
+            // The + marks itself current on /add (a ring) and pulses while its navigation is in flight, like the other tabs.
             return (
-              <Link key={href} href={href} aria-label={label} className="flex items-center justify-center justify-self-center lg:order-last lg:ml-auto">
-                <span className="flex size-[52px] items-center justify-center rounded-full bg-ink text-paper shadow-[0_6px_16px_rgba(0,0,0,0.18)] transition-transform active:scale-95 lg:size-9 lg:shadow-none"><Icon className="size-6 lg:size-5" strokeWidth={2.2} /></span>
+              <Link key={href} href={href} aria-label={label} aria-current={active ? "page" : undefined} className="flex items-center justify-center justify-self-center lg:order-last lg:ml-auto">
+                <LinkPending className={cn("flex size-[52px] items-center justify-center rounded-full bg-ink text-paper shadow-[0_6px_16px_rgba(0,0,0,0.18)] transition-transform active:scale-95 lg:size-9 lg:shadow-none", active && "ring-2 ring-ink ring-offset-2 ring-offset-paper")}><Icon className="size-6 lg:size-5" strokeWidth={2.2} /></LinkPending>
                 <span className={cn("ml-2 hidden text-[14px] font-medium lg:inline", active ? "text-ink" : "text-graphite")}>Add clothes</span>
               </Link>
             );

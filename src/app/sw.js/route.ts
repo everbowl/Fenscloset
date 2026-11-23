@@ -1,12 +1,15 @@
-import { SW_SOURCE } from "@/lib/sw-source";
+import { swScript, swVersion } from "@/lib/sw-source";
+
+/** Served fresh on every request (the handler takes no request, so Next would otherwise prerender it and may swap the cache header). */
+export const dynamic = "force-dynamic";
 
 /**
- * The service worker, served with a version per deploy so the cached offline page and assets refresh
- * on every build (a fixed string never did). Railway gives the commit; a dev build uses the start time.
+ * The service worker, versioned per build so the browser installs a new one on every deploy (a fixed string never did).
+ * RAILWAY_GIT_COMMIT_SHA is the commit; NEXT_PUBLIC_BUILD is fixed once at build time by next.config.ts and inlined here.
+ * Both are named in full so the build can inline them.
  */
-const VERSION = (process.env.RAILWAY_GIT_COMMIT_SHA ?? process.env.SOURCE_VERSION ?? String(Date.now())).slice(0, 12);
-const source = SW_SOURCE.replace('const VERSION = "v1";', `const VERSION = "${VERSION}";`);
+const source = swScript(swVersion({ sha: process.env.RAILWAY_GIT_COMMIT_SHA, build: process.env.NEXT_PUBLIC_BUILD }));
 
 export function GET() {
-  return new Response(source, { headers: { "Content-Type": "application/javascript; charset=utf-8", "Cache-Control": "no-cache", "Service-Worker-Allowed": "/" } });
+  return new Response(source, { headers: { "Content-Type": "application/javascript; charset=utf-8", "Cache-Control": "no-cache" } });
 }

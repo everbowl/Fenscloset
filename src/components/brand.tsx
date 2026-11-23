@@ -1,13 +1,16 @@
+import { useId } from "react";
 import { cn } from "@/lib/cn";
 
 /** The door-ajar mark from the brand sheet. */
 export function Mark({ className, color = "currentColor" }: { className?: string; color?: string }) {
+  // One clip path per mark: two marks on a page (the sign-in hero and a sheet) shared one id and clipped each other.
+  const id = `fc-mark-${useId().replace(/\W/g, "")}`;
   return (
     <svg viewBox="0 0 60 96" className={className} aria-hidden="true">
       <defs>
-        <clipPath id="fc-mark"><path d="M0 96V30a30 30 0 0 1 60 0v66z" /></clipPath>
+        <clipPath id={id}><path d="M0 96V30a30 30 0 0 1 60 0v66z" /></clipPath>
       </defs>
-      <g clipPath="url(#fc-mark)" fill={color}>
+      <g clipPath={`url(#${id})`} fill={color}>
         <rect x="0" y="0" width="36" height="96" />
         <rect x="39.5" y="0" width="20.5" height="96" />
       </g>

@@ -5,27 +5,30 @@ import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from "
 import { buttonClass, type Size, type Variant } from "./button-class";
 
 /*
- * Brand buttons (Jeff, 19 Oct 2026, Q11 A + C + D + motion): pills in the household accent (real orange,
- * editable in Admin → Rules) sitting on a stone base; big ones carry a line icon and a second line that says
- * what happens next, and sit on a bone shelf. Press: the pill sinks onto its base and the arrow slides.
- * Done: a quick black "✓ …" flash. The big button rises in a beat after the page. Everything else on the
- * page stays black and white: secondary is a solid black pill (Jeff, 23 Oct 2026: "all buttons should be
- * louder and apparent"; it was a 1px outline), danger an outlined one, and every text action on a screen
- * is a .pill (globals.css) so that anything tappable reads as a button.
+ * Brand buttons (Jeff, 19 Oct 2026, Q11 A + C + D + motion, restyled for v2 on 23 Nov 2026): pills in the household accent
+ * (real orange, editable in Admin → Rules); big ones carry a line icon and a second line that says what happens next. Press:
+ * the pill dips and the arrow slides. Done: a quick black "✓ …" flash. The big button rises in a beat after the page.
+ * Everything else on the page stays black and white: secondary is a solid black pill (Jeff, 23 Oct 2026: "all buttons
+ * should be louder and apparent"; it was a 1px outline), danger an outlined one, and every text action on a screen is a
+ * .pill (globals.css) so that anything tappable reads as a button.
  */
 export { buttonClass };
-/** The bone band a big button sits on (Q11 D "warm paper"). It wraps the button rather than being a pseudo on it: the button animates (a stacking context of its own), and a -z pseudo inside it would paint over the orange. */
-const SHELF = "block relative";
-function Shelf({ children, className }: { children: ReactNode; className?: string }) {
-  return <span className={cn(SHELF, className)}>{children}</span>;
-}
+
+/* Busy keeps the button's own color (disabled gray is for "can't", not "saving"); the dot does the talking. */
+const busyKeep: Record<Variant, string> = {
+  primary: "disabled:bg-accent disabled:text-ink",
+  secondary: "disabled:bg-ink disabled:text-paper",
+  outline: "disabled:bg-bone disabled:text-ink",
+  ghost: "disabled:bg-transparent disabled:text-ink",
+  danger: "disabled:bg-paper disabled:text-danger",
+};
 
 export function Button({
-  className, variant = "primary", size = "md", type = "button", shelf, arrow, icon, sub, flash, busy, disabled, children, ...props
+  className, variant = "primary", size = "md", type = "button", shelf: _shelf, arrow, icon, sub, flash, busy, disabled, children, ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant; size?: Size;
   /** Working on it: the button waits (no second tap) but keeps its color, with a moving dot; disabled gray is for "can't", not "saving". */ busy?: boolean;
-  /** bone band behind the button; default on for large primaries */ shelf?: boolean;
+  /** @deprecated v2 has no bone shelf; accepted and ignored until the four callers that pass shelf={false} drop it. */ shelf?: boolean;
   /** "→" after the label; default on for large primaries without a sub line */ arrow?: boolean;
   /** a line icon at the left (Q11 C) */ icon?: ReactNode;
   /** the second line: what happens next (Q11 C) */ sub?: string;
@@ -40,17 +43,12 @@ export function Button({
     const t = setTimeout(() => setShowFlash(false), 900);
     return () => clearTimeout(t);
   }, [flash]);
-  const withShelf = shelf ?? false; // v2: no bone shelf; the button stands on the page
-  // Width and flex classes belong to the outermost box: on the shelf when there is one, so `flex-1` and `w-full` still work.
-  const parts = (className ?? "").split(/\s+/).filter(Boolean);
-  const layout = parts.filter((c) => /^(flex-1|w-full|grow|shrink-0|self-\w+|mt-\d+|mb-\d+|lg:col-start-\d|lg:w-\w+)$/.test(c));
-  const own = parts.filter((c) => !layout.includes(c));
-  const inner = (
+  return (
     <button type={type} disabled={disabled || busy} aria-busy={busy || undefined}
-      className={cn(buttonClass({ variant, size, className: cn(own.join(" "), withShelf && layout.length ? "w-full" : layout.join(" ")) }), showFlash && "bg-ink text-paper hover:brightness-100", busy && "disabled:opacity-100 disabled:bg-accent disabled:text-ink disabled:shadow-[0_6px_0_0_var(--color-stone)] disabled:translate-y-0 disabled:cursor-progress", busy && variant === "secondary" && "disabled:bg-ink disabled:text-paper")} {...props}>
+      className={cn(buttonClass({ variant, size, className }), showFlash && "bg-ink text-paper hover:brightness-100", busy && cn("disabled:opacity-100 disabled:cursor-progress", busyKeep[variant]))} {...props}>
       {showFlash ? <span data-testid="button-flash">{flash}</span> : (
         <>
-          {busy ? <span aria-hidden className="size-2 shrink-0 animate-pulse rounded-full bg-current" /> : icon ? <span aria-hidden className="shrink-0">{icon}</span> : null}
+          {busy ? <span aria-hidden className="size-2 shrink-0 animate-pulse rounded-full bg-current motion-reduce:animate-none" /> : icon ? <span aria-hidden className="shrink-0">{icon}</span> : null}
           {sub ? (
             <span className="flex min-w-0 flex-col items-start gap-0 text-left">
               <span className="text-[16px] font-semibold leading-tight">{children}</span>
@@ -62,7 +60,6 @@ export function Button({
       )}
     </button>
   );
-  return withShelf ? <Shelf className={layout.join(" ")}>{inner}</Shelf> : inner;
 }
 
 /** Line icons for the big buttons: the same stroke as the rest of the app. */

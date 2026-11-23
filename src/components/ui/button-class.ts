@@ -4,8 +4,6 @@ export type Variant = "primary" | "secondary" | "outline" | "ghost" | "danger";
 export type Size = "md" | "lg" | "sm";
 
 /** No "use client" here on purpose: server pages (All done, Shop) render Links that must look like the big button. */
-/** Kept for the two places that still import it; v2 buttons carry no shadow base. */
-export const LIFT = "";
 const variants: Record<Variant, string> = {
   // The one colored button on a screen. Black on the household's orange (Jeff, 31 Oct 2026, B1).
   primary: "bg-accent text-ink hover:brightness-95 active:brightness-90 active:scale-[0.99] disabled:bg-neutral-300 disabled:text-paper",
@@ -16,7 +14,8 @@ const variants: Record<Variant, string> = {
   danger: "bg-paper text-danger ring-1 ring-inset ring-line hover:bg-bone active:bg-[#e2e1dc]",
 };
 const sizes: Record<Size, string> = {
-  sm: "h-10 px-4 text-[14px]",
+  // Small stays 40px to the eye and 50px to the finger: the hit area reaches 5px past each edge, as .pill-sm does.
+  sm: "relative h-10 px-4 text-[14px] after:absolute after:-inset-[5px]",
   md: "h-12 px-5 text-[15px]",
   lg: "min-h-[54px] px-6 text-[16px]",
 };

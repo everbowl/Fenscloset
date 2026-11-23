@@ -11,22 +11,15 @@
   --line: #e9e8e4;      /* hairlines and card edges */
   --danger: #b91c1c;
   --accent: #FF5A00;    /* the one colored button per screen; the household changes it under Admin → Rules */
-  --stone: #d9d7d1;     /* kept for the few places that still name it */
 }
 
 @theme inline {
-  --color-background: var(--paper);
-  --color-foreground: var(--black);
   --color-ink: var(--black);
   --color-paper: var(--paper);
   --color-bone: var(--bone);
   --color-graphite: var(--graphite);
-  --color-muted: var(--graphite);
-  --color-surface: var(--paper);
-  --color-border: var(--line);
   --color-line: var(--line);
   --color-accent: var(--accent);
-  --color-stone: var(--stone);
   --color-accent-foreground: var(--black); /* black on orange (Jeff, 31 Oct 2026, B1) */
   --color-danger: var(--danger);
   --font-sans: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
@@ -58,8 +51,6 @@ img { -webkit-user-drag: none; }
   line-height: 1.35;
 }
 .mono-11 { font-size: 14px; }
-.mono-12 { font-size: 14px; }
-.mono-13 { font-size: 15px; }
 
 /* A sentence of help: a shade lighter, never smaller than 15px. */
 .note {

@@ -12,8 +12,19 @@ export function useUndoable(ms = 5000) {
   const [pending, setPending] = useState<{ text: string } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const job = useRef<{ commit: () => void; revert?: () => void } | null>(null);
-  const flush = useRef(() => { if (timer.current) { clearTimeout(timer.current); timer.current = null; } const j = job.current; job.current = null; j?.commit(); });
-  useEffect(() => { const f = flush.current; return () => f(); }, []); // leaving the screen commits
+  const flush = useRef(() => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+    const j = job.current; job.current = null;
+    if (j) { setPending(null); j.commit(); }
+  });
+  // Leaving the screen commits; so does the app going to the background or being killed inside the five seconds (pagehide),
+  // or the thing would be back on the next open.
+  useEffect(() => {
+    const f = () => flush.current();
+    const hidden = () => { if (document.visibilityState === "hidden") f(); };
+    window.addEventListener("pagehide", f); document.addEventListener("visibilitychange", hidden);
+    return () => { window.removeEventListener("pagehide", f); document.removeEventListener("visibilitychange", hidden); f(); };
+  }, []);
   function start(text: string, commit: () => void, revert?: () => void) {
     flush.current();
     job.current = { commit, revert }; setPending({ text });

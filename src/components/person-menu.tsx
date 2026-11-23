@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import { ChevronDown } from "lucide-react";
 import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 
 export type ViewOption = { key: string; label: string };
@@ -19,7 +20,10 @@ export function PersonMenu({ views, current, isAdmin, logout, setView }: {
 }) {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
+  /** The choice just tapped: the check mark moves at once, before the server answers. */
+  const [chosen, setChosen] = useState<string | null>(null);
   const router = useRouter();
+  const shown = pending && chosen ? chosen : current;
   const label = views.find((v) => v.key === current)?.label ?? views[0]?.label ?? "";
   const Row = ({ href, label }: { href: string; label: string }) => (
     <Link href={href} onClick={() => setOpen(false)} className="tap flex h-12 items-center justify-between rounded-xl px-1 text-[16px]">
@@ -27,8 +31,14 @@ export function PersonMenu({ views, current, isAdmin, logout, setView }: {
     </Link>
   );
   function choose(key: string) {
-    start(async () => { await setView(key); setOpen(false); router.refresh(); });
+    setChosen(key);
+    start(async () => {
+      try { await setView(key); } catch { setChosen(null); toast.error("Couldn’t switch. Try again."); return; }
+      setOpen(false); router.refresh();
+    });
   }
+  /** Signing out empties the worker's photo cache first: on a shared phone the next person must not see this one's photos. */
+  function forgetPhotos() { navigator.serviceWorker?.controller?.postMessage({ type: "logout" }); }
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} aria-label={`${label} menu`} className="flex h-11 items-center gap-2 rounded-full pl-1 pr-2 text-[15px] font-semibold active:bg-bone">
@@ -36,11 +46,12 @@ export function PersonMenu({ views, current, isAdmin, logout, setView }: {
         {label} <ChevronDown className="size-3.5 text-graphite" strokeWidth={2.5} />
       </button>
       <Sheet open={open} onClose={() => setOpen(false)} title="Viewing">
-        <div className="flex flex-col" role="listbox" aria-label="Closet to view">
+        {/* A group of toggles, not a listbox: VoiceOver reads a <button role="option"> as a button anyway, and aria-pressed is true to what it is. */}
+        <div className="flex flex-col" role="group" aria-label="Closet to view">
           {views.map((v) => (
-            <button key={v.key} type="button" role="option" aria-selected={v.key === current} disabled={pending} onClick={() => choose(v.key)} className="tap flex h-12 items-center justify-between rounded-xl px-1 text-[16px]">
+            <button key={v.key} type="button" aria-pressed={v.key === shown} disabled={pending} onClick={() => choose(v.key)} className={cn("tap flex h-12 items-center justify-between rounded-xl px-1 text-[16px]", pending && v.key !== shown && "opacity-60")}>
               <span>{v.label}{v.key === "family" ? " closet" : ""}</span>
-              <span className={cn("mono", v.key === current ? "text-ink" : "text-transparent")}>{v.key === current ? "✓" : "·"}</span>
+              <span className={cn("mono", v.key === shown ? "text-ink" : "text-transparent")}>{v.key === shown ? "✓" : "·"}</span>
             </button>
           ))}
         </div>
@@ -58,7 +69,7 @@ export function PersonMenu({ views, current, isAdmin, logout, setView }: {
             </>
           ) : null}
         </div>
-        <form action={logout} className="pt-6">
+        <form action={logout} onSubmit={forgetPhotos} className="pt-6">
           <Button type="submit" variant="secondary" className="w-full">Log out</Button>
         </form>
       </Sheet>
