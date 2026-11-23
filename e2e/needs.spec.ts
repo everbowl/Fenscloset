@@ -12,7 +12,7 @@ test.describe("what's needed on the closet page", () => {
     await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
     await page.goto("/closet");
     const strip = page.getByTestId("needs");
-    await expect(strip).toContainText("What’s needed");
+    await expect(strip).toContainText(/things? to finish/);
     await expect(page.getByTestId("needs-count")).toHaveText("2");
     await expect(page.getByTestId("need-body-front")).toContainText("A front photo, so the mirror can dress you");
     const size = page.locator("[data-testid^=need-size-]");

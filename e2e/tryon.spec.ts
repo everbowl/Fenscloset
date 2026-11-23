@@ -34,9 +34,9 @@ test("try-on: on by default, needs a body photo, then a picture of the look on y
   await expect(page.getByTestId("try-on-sheet")).toContainText("Only you can see this picture");
   await expect(page.getByTestId("try-on-sheet").locator("img").first()).toHaveAttribute("src", /\/api\/photo\/tryon\//);
   await expect(page.getByTestId("mirror-back")).toHaveCount(0); // no back photo yet
-  // how it shows: untucked by default (the look has a top and a bottom); a chip re-styles the same picture
+  // how it shows: the chips are there (the look has a top and a bottom) but a plain dressing has no styling pass (23 Nov 2026); a chip re-styles the same picture
   await expect(page.getByTestId("mirror-styling")).toBeVisible();
-  await expect(page.getByTestId("styling-summary")).toContainText("Untucked");
+  await expect(page.getByTestId("styling-summary")).toHaveCount(0);
   const firstSrc = await page.getByTestId("try-on-sheet").locator("img").first().getAttribute("src");
   await page.getByTestId("style-group-tuck").getByRole("button", { name: "Tucked", exact: true }).click();
   await expect(page.getByTestId("styling-summary")).toContainText("Tucked", { timeout: 20_000 });

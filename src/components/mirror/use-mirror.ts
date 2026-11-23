@@ -43,8 +43,9 @@ export function useMirror(personId: string, wardrobe: Wardrobe = EMPTY_WARDROBE,
   const progress = busy && mine ? { step: mine.step, startedAt: mine.startedAt } : null;
   const error = mine?.error ?? undefined;
 
-  const setOpen = useCallback((v: boolean) => { setOpenState(v); jobs.sheetOpen(v); }, [jobs]);
-  useEffect(() => () => { jobs.sheetOpen(false); }, [jobs]);
+  const { sheetOpen } = jobs; // stable; depending on the whole context object re-ran the cleanup on every poll and hid the bar
+  const setOpen = useCallback((v: boolean) => { setOpenState(v); sheetOpen(v); }, [sheetOpen]);
+  useEffect(() => () => { sheetOpen(false); }, [sheetOpen]);
   const setError = useCallback((e: string | undefined) => jobs.setError(e), [jobs]);
 
   /** Dress a look. The sheet opens at once and shows progress until the picture arrives; leaving the screen is fine. */

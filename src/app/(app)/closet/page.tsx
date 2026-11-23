@@ -67,8 +67,7 @@ export default async function ClosetPage({ searchParams }: { searchParams: Promi
     <div>
       <Suspense><ClosetSearch basePath="/closet" /><RememberCloset /></Suspense>
       {added > 0 ? <AddedToast count={added} /> : null}
-      <PageHeader title={view.kind === "family" ? "Family" : mine ? "Closet" : view.name} accent={view.kind === "family" ? "closet" : mine ? undefined : "closet"}
-        aside={narrowed ? `${shown} of ${total} ${total === 1 ? "piece" : "pieces"}` : `${total} ${total === 1 ? "piece" : "pieces"}`} />
+      <PageHeader title={view.kind === "family" ? "Family" : mine ? "Closet" : view.name} accent={view.kind === "family" ? "closet" : mine ? undefined : "closet"} />
       <FilterTabs categories={categories} active={categoryId} basePath="/closet" keep={keep} canEdit={isAdmin(person)} />
       <ClosetPickProvider>
       <ClosetTools basePath="/closet" filters={filters} sort={sort} facets={facets} toggles={toggles} shown={shown} total={total} cat={categoryId} q={q} mirror={canMirror && items.length > 0} cleanOut={cleanOut} />

@@ -40,11 +40,11 @@ test.describe("closet", () => {
     // put it in the Family closet, then switch the header to FAMILY and see it there
     await page.getByTestId("item-card").filter({ hasText: "Dark jeans" }).click();
     await page.getByTestId("row-closets").click();
-    await page.getByRole("dialog").getByRole("option", { name: /Family/ }).click();
+    await page.getByRole("dialog").getByRole("button", { name: /Family/ }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Done" }).click();
     await expect(page.getByTestId("row-closets")).toContainText("Family");
     await page.getByRole("button", { name: /Jeff menu/ }).click();
-    await page.getByRole("option", { name: "Family closet" }).click();
+    await page.getByRole("button", { name: "Family closet" }).click();
     await expect(page.getByRole("button", { name: /Family menu/ })).toBeVisible(); // the cookie lands before we navigate
     await page.goto("/closet");
     await expect(page.getByRole("heading", { name: /Family closet/ })).toBeVisible();
@@ -53,7 +53,7 @@ test.describe("closet", () => {
 
     // browse Olivia's closet (Q13 A), then come back
     await page.getByRole("button", { name: /Family menu/ }).click();
-    await page.getByRole("option", { name: "Olivia" }).click();
+    await page.getByRole("button", { name: "Olivia" }).click();
     await expect(page.getByRole("button", { name: /Olivia menu/ })).toBeVisible();
     await page.goto("/closet");
     await expect(page.getByRole("heading", { name: /Olivia/ })).toBeVisible();

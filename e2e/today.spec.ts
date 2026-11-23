@@ -84,7 +84,7 @@ test("morning flow: Jeff gets three looks, checks in, sets the plan, swaps, wear
 
   // share with Brittney
   await page.getByTestId("share").click();
-  await page.getByRole("dialog").getByRole("option", { name: "Brittney" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Brittney" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Done" }).click();
   await expect(page.getByTestId("visibility")).toContainText("Visible to Jeff, Brittney only");
 
@@ -119,7 +119,7 @@ test("Brittney sees Jeff's shared fit in the family calendar and gets her own lo
   await expect(page.getByTestId("wearing-this")).toBeVisible();
 
   await page.getByRole("button", { name: /Brittney menu/ }).click();
-  await page.getByRole("option", { name: "Family" }).click();
+  await page.getByRole("button", { name: "Family" }).click();
   await expect(page.getByRole("button", { name: /Family menu/ })).toBeVisible();
   await page.goto("/fits");
   await expect(page.getByTestId("fit-panel")).toHaveCount(2); // Jeff's (shared) + hers

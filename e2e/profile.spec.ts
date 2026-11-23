@@ -30,7 +30,7 @@ test("Jeff fills his body profile and settings; parents edit Mya's; Olivia is in
 
   // parent views and edits Mya's body profile
   await page.getByRole("button", { name: /Jeff menu/ }).click();
-  await page.getByRole("option", { name: "Mya" }).click();
+  await page.getByRole("button", { name: "Mya" }).click();
   await expect(page.getByRole("button", { name: /Mya menu/ })).toBeVisible();
   await page.goto("/profile/body");
   await expect(page.getByText("Visible to Mya, Jeff, Brittney only")).toBeVisible();
@@ -39,7 +39,7 @@ test("Jeff fills his body profile and settings; parents edit Mya's; Olivia is in
   await page.getByTestId("measure-sheet").getByRole("option", { name: `5'4"` }).click();
   await expect(page.getByTestId("measure-height")).toContainText(`5'4"`);
   await page.getByRole("button", { name: /Mya menu/ }).click();
-  await page.getByRole("option", { name: "Jeff" }).click();
+  await page.getByRole("button", { name: "Jeff" }).click();
   await expect(page.getByRole("button", { name: /Jeff menu/ })).toBeVisible();
 
   // invite Olivia (seeded, no password yet) end-to-end
@@ -65,7 +65,7 @@ test("Jeff fills his body profile and settings; parents edit Mya's; Olivia is in
 
   // Mya's body data is invisible to Olivia
   await olivia.getByRole("button", { name: /Olivia menu/ }).click();
-  await olivia.getByRole("option", { name: "Mya" }).click();
+  await olivia.getByRole("button", { name: "Mya" }).click();
   await expect(olivia.getByRole("button", { name: /Mya menu/ })).toBeVisible();
   await olivia.goto("/profile");
   await expect(olivia.getByTestId("row-body")).toContainText("Private");
@@ -75,14 +75,14 @@ test("Jeff fills his body profile and settings; parents edit Mya's; Olivia is in
 
   // Jeff's too, until he grants it
   await olivia.getByRole("button", { name: /Mya menu/ }).click();
-  await olivia.getByRole("option", { name: "Jeff" }).click();
+  await olivia.getByRole("button", { name: "Jeff" }).click();
   await expect(olivia.getByRole("button", { name: /Jeff menu/ })).toBeVisible();
   await olivia.goto("/profile");
   await expect(olivia.getByTestId("row-body")).toContainText("Private");
 
   await page.goto("/profile/settings");
   await page.getByTestId("row-body-viewers").click();
-  await page.getByRole("dialog").getByRole("option", { name: "Olivia" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Olivia" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Done" }).click();
   await expect(page.getByTestId("row-body-viewers")).toContainText("Olivia");
 
@@ -117,7 +117,7 @@ test("my brands & sizes: add Lululemon with a size per item type and a link, the
   await page.goto("/profile/brands");
   await expect(page.getByTestId("my-brands")).toContainText("None yet");
   await page.getByTestId("add-my-brand").click();
-  await page.getByRole("dialog").getByRole("option", { name: /^Lululemon/ }).click();
+  await page.getByRole("dialog").getByRole("button", { name: /^Lululemon/ }).click();
   await expect(page.getByTestId("my-size-tops")).toContainText("Likely L");
   await page.getByTestId("my-size-tops").click();
   await page.getByTestId("size-sheet").getByRole("option", { name: /^L/ }).click();

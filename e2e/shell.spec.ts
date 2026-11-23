@@ -53,15 +53,15 @@ test.describe("the shell, signed in", () => {
   test("a toast shows, can be tapped away, and otherwise leaves on its own", async ({ page }) => {
     await loginAs(page, DEV_ADMIN_EMAIL, JEFF_PASSWORD);
     await page.goto("/admin/people");
-    await page.getByRole("link", { name: /Olivia/ }).click();
-    await page.getByLabel("Email").first().fill("olivia@example.com");
-    await page.getByLabel("Email").first().blur(); // details save when the field is left
+    await page.getByRole("link", { name: /Mya/ }).click();
+    // a parent toggle on a minor's page answers with a toast (the Details fields say "✓ Saved" inline instead, review A I1)
+    const brittney = page.getByRole("checkbox", { name: /Brittney/ });
+    await brittney.uncheck();
     const toast = page.getByTestId("toast-ok");
-    await expect(toast).toContainText("Details saved");
+    await expect(toast).toContainText("Parents updated");
     await toast.click();
     await expect(toast).toHaveCount(0);
-    await page.getByLabel("Email").first().fill("olivia2@example.com");
-    await page.getByLabel("Email").first().blur();
+    await brittney.check();
     await expect(toast).toBeVisible();
     await expect(toast).toHaveCount(0, { timeout: 6000 }); // 4 s for a plain success
   });

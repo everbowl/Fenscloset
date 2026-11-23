@@ -59,7 +59,7 @@ test.describe("add clothes", () => {
     await page.getByTestId("row-brand").click();
     await page.getByRole("dialog").getByText("Pick a brand").click();
     await page.getByTestId("brand-search").fill("nik");
-    await page.getByRole("dialog").getByRole("option", { name: /^Nike/ }).click(); // seeded brand; a catalog brand not yet in the list shows as brand-national-<name>
+    await page.getByRole("dialog").getByRole("button", { name: /^Nike/ }).click(); // seeded brand; a catalog brand not yet in the list shows as brand-national-<name>
     await expect(page.getByTestId("row-brand")).toContainText("Nike");
     await page.getByTestId("match-style").click();
     await page.getByTestId("match-0").click();
@@ -97,8 +97,8 @@ test.describe("add clothes", () => {
 
     // change the category through the row editor (values come from the lists)
     await page.getByTestId("row-category").click();
-    await page.getByRole("dialog").getByRole("option", { name: "Bottoms" }).click();
-    await page.getByRole("dialog").getByRole("option", { name: "Jeans" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Bottoms" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Jeans" }).click();
     await expect(page.getByTestId("row-category")).toContainText("Bottoms · Jeans");
     await page.getByTestId("confirm-next").click();
     await expect(page.getByTestId("confirm-counter")).toHaveText("003 / 003");

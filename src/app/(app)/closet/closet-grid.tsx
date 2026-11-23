@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { addPickedToLookAction } from "@/app/(app)/looks/actions";
 import { MirrorSheet } from "@/components/mirror/mirror-sheet";
+import { cn } from "@/lib/cn";
 import { useMirror } from "@/components/mirror/use-mirror";
 import { mirrorCanPlace } from "@/lib/tryon/features";
 import type { ItemCardData } from "@/lib/items/query";
@@ -55,7 +56,7 @@ export function ClosetGrid({ items, showOwner, mirror, lead }: { items: ItemCard
           <button type="button" onClick={stop} className="pill pill-sm" data-testid="pick-cancel">Cancel</button>
         </div>
       ) : null}
-      <div className="mt-3 grid grid-cols-3 gap-x-2 gap-y-4 lg:grid-cols-5 lg:gap-x-4 lg:gap-y-6">
+      <div className={cn("mt-3 grid grid-cols-3 gap-x-2 gap-y-4 lg:grid-cols-5 lg:gap-x-4 lg:gap-y-6", picking && "pb-[176px]")}>{/* room for the fixed pick bar, so the last rows can scroll above it */}
         {lead}
         {items.map((it) => (
           <ItemCard key={it.id} item={it} showOwner={showOwner}
