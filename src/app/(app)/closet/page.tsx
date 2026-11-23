@@ -21,7 +21,7 @@ import { likelySizes, sizeOptionsByCategory } from "@/lib/profiles/sizes";
 import { NeedsStrip } from "./needs-strip";
 import { LookTray } from "@/components/looks/look-tray";
 import { pendingAdds } from "@/lib/import/pending";
-import { TaggingCards } from "./tagging-cards";
+import { AddedToast, TaggingCards } from "./tagging-cards";
 
 export const metadata = { title: "Closet" };
 export const dynamic = "force-dynamic";
@@ -31,18 +31,23 @@ export default async function ClosetPage({ searchParams }: { searchParams: Promi
   const sp = await searchParams;
   const cat = typeof sp.cat === "string" ? sp.cat : undefined;
   const q = typeof sp.q === "string" ? sp.q : undefined;
+  const added = typeof sp.added === "string" ? Number(sp.added) || 0 : 0;
   const { filters, sort } = parseClosetParams(sp);
-  const view = await resolveView(person, (await cookies()).get(VIEW_COOKIE)?.value);
-  const categories = await listEntries("category", { includeArchived: true });
+  // The independent loads run side by side (review B C1): this page used to be eight round trips in a row.
+  const [view, categories] = await Promise.all([resolveView(person, (await cookies()).get(VIEW_COOKIE)?.value), listEntries("category", { includeArchived: true })]);
   const categoryId = cat && categories.some((c) => c.id === cat) ? cat : undefined;
-  const { items, shown, total, facets, toggles } = await loadClosetView(view, { categoryId, q, filters, sort });
   const mine = view.kind === "person" && view.personId === person.id;
-  // The mirror's pick mode: from your own closet or the Family closet, the pieces go on you (or the mannequin).
-  const mirror = mine || view.kind === "family" ? await mirrorConfig(person) : null;
+  const [{ items, shown, total, facets, toggles }, mirror, cleanOut, needs, pending] = await Promise.all([
+    loadClosetView(view, { categoryId, q, filters, sort }),
+    // The mirror's pick mode: from your own closet or the Family closet, the pieces go on you (or the mannequin).
+    mine || view.kind === "family" ? mirrorConfig(person) : null,
+    mine ? countCleanOut(person.id) : 0,
+    // What's needed (D1): the owner's own closet only; the rows' sheets get their lists only when a row needs them.
+    mine ? listNeeds(person, person.id) : [],
+    // Just added and not a card yet (Tagging, failed, waiting to confirm, needs a category): in every view of the owner's own closet (review B A2.3), narrowed by category only where the category is known.
+    mine ? pendingAdds(person.id, { categoryId }) : null,
+  ]);
   const canMirror = Boolean(mirror && (mirror.tryOn === "ready" || mirror.mannequinAvailable));
-  const cleanOut = mine ? await countCleanOut(person.id) : 0;
-  // What's needed (D1): the owner's own closet only; the rows' sheets get their lists only when a row needs them.
-  const needs = mine ? await listNeeds(person, person.id) : [];
   const [sections, sizeOptions, likely, visibleTo] = await Promise.all([
     needs.some((n) => n.kind === "section") ? listEntries("shopSection") : [],
     needs.some((n) => n.kind === "size") ? sizeOptionsByCategory() : [],
@@ -51,23 +56,25 @@ export default async function ClosetPage({ searchParams }: { searchParams: Promi
   ]);
   const filtered = activeFilterCount(filters) > 0;
   const narrowed = Boolean(categoryId || q || filtered);
-  // Just added and not a card yet (Tagging, failed, waiting to confirm): the owner's own, in the whole-closet view.
-  const pending = mine && !narrowed ? await pendingAdds(person.id) : null;
   const lead = pending && (pending.cards.length || pending.toConfirm) ? <TaggingCards pending={pending} /> : null;
+  // A piece shown as a "Needs a category" card is not shown a second time as a plain tile.
+  const pendingItemIds = new Set((pending?.cards ?? []).map((c) => c.itemId).filter((id): id is string => Boolean(id)));
+  const tiles = pendingItemIds.size ? items.filter((it) => !pendingItemIds.has(it.id)) : items;
   // Everything but the category rides along when a tab changes: the search, the sort, the filters.
-  const keep = Object.fromEntries(Object.entries(sp).filter(([k, v]) => k !== "cat" && typeof v === "string")) as Record<string, string>;
+  const keep = Object.fromEntries(Object.entries(sp).filter(([k, v]) => k !== "cat" && k !== "added" && typeof v === "string")) as Record<string, string>;
 
   return (
     <div>
       <Suspense><ClosetSearch basePath="/closet" /><RememberCloset /></Suspense>
+      {added > 0 ? <AddedToast count={added} /> : null}
       <PageHeader title={view.kind === "family" ? "Family" : mine ? "Closet" : view.name} accent={view.kind === "family" ? "closet" : mine ? undefined : "closet"}
         aside={narrowed ? `${shown} of ${total} ${total === 1 ? "piece" : "pieces"}` : `${total} ${total === 1 ? "piece" : "pieces"}`} />
       <FilterTabs categories={categories} active={categoryId} basePath="/closet" keep={keep} canEdit={isAdmin(person)} />
       <ClosetPickProvider>
       <ClosetTools basePath="/closet" filters={filters} sort={sort} facets={facets} toggles={toggles} shown={shown} total={total} cat={categoryId} q={q} mirror={canMirror && items.length > 0} cleanOut={cleanOut} />
       {needs.length ? <NeedsStrip personId={person.id} needs={needs} sections={sections} isAdmin={isAdmin(person)} sizeOptions={sizeOptions} likely={likely} visibleTo={visibleTo} /> : null}
-      {items.length || lead ? (
-        <ClosetGrid items={items} showOwner={view.kind === "family"} mirror={mirror} lead={lead} />
+      {tiles.length || lead ? (
+        <div id="just-added"><ClosetGrid items={tiles} showOwner={view.kind === "family"} mirror={mirror} lead={lead} /></div>
       ) : (
         <div className="mt-3">
           <div className="grid grid-cols-3 gap-x-2 gap-y-4">

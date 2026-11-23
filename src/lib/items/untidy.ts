@@ -21,9 +21,13 @@ import type { EntryAiResult } from "@/lib/import/process";
 export const UNTIDY_SET = "untidy-v1";
 const UNTIDY_SINCE = new Date("2026-10-18T19:57:29Z");
 
-export type UntidyReport = { recut: number; skipped: number; failed: number; done: boolean; /** Why the last piece was left (remove.bg's word for it). */ lastError?: string };
-/** While pieces are left (remove.bg out of credits, say), the server tries again this often; Admin → Rules has a button for right now. */
+export type UntidyReport = { recut: number; skipped: number; failed: number; done: boolean; /** Why the last piece was left (remove.bg's word for it). */ lastError?: string; /** The last failure is one more tries will not fix (no key, no credits): the hourly loop stops and waits for Admin → Rules. */ waitForAdmin?: boolean };
+/** While pieces are left, the server tries again this often; Admin → Rules has a button for right now. */
 const UNTIDY_RETRY_MS = 60 * 60_000;
+/** A piece that fails this many times is marked `recut:failed:<code>` and left alone (review B C8): no more remove.bg calls for it every hour, forever. */
+const MAX_TRIES = 3;
+/** remove.bg answers that mean "stop asking": the key or the credits, not this piece. The loop waits for the admin instead of retrying hourly. */
+const WAIT_FOR_ADMIN = new Set(["no_key", "insufficient_credits", "auth_failed", "invalid_api_key"]);
 
 type Quarter = 0 | 90 | 180 | 270;
 
@@ -39,7 +43,7 @@ export async function untidyAll(opts: { log?: (line: string) => void } = {}): Pr
   for (const entry of entries) {
     const ai = (entry.aiResult as Partial<EntryAiResult> | null) ?? {};
     const warnings = ai.warnings ?? [];
-    if (warnings.some((w) => w.startsWith("recut"))) continue;
+    if (warnings.some((w) => w.startsWith("recut") && w !== "recut:try")) continue;
     const mark = (w: string) => db.importEntry.update({ where: { id: entry.id }, data: { aiResult: JSON.parse(JSON.stringify({ ...ai, warnings: [...warnings, w] })) } });
     const photo = (await db.itemPhoto.findFirst({ where: { bucketKey: entry.cutoutKey!, kind: "cutout" } })) ?? (await onlyPhoto(entry.itemId!, "cutout"));
     if (!photo) { await mark("recut:none"); report.skipped++; continue; }
@@ -52,7 +56,18 @@ export async function untidyAll(opts: { log?: (line: string) => void } = {}): Pr
     try { cut = await removeBackground(await normalizeOriginal(original)); } catch (e) {
       if (!(e instanceof RemoveBgError)) throw e;
       report.lastError = `remove.bg ${e.code}: ${e.message}`;
-      log(`untidy: ${entry.id} left for later, ${report.lastError}`); report.failed++; continue;
+      if (WAIT_FOR_ADMIN.has(e.code)) {
+        // Not this piece's fault: every piece would fail the same way. Stop here and wait for the admin.
+        report.waitForAdmin = true;
+        // Everything not re-cut or skipped so far (this piece included) is left for later.
+        report.failed = entries.filter((x) => !((x.aiResult as Partial<EntryAiResult> | null)?.warnings ?? []).some((w) => w.startsWith("recut") && w !== "recut:try")).length - report.recut - report.skipped;
+        log(`untidy: ${report.lastError}; waiting for Admin → Rules`);
+        break;
+      }
+      const tries = warnings.filter((w) => w === "recut:try").length + 1;
+      if (tries >= MAX_TRIES) { await mark(`recut:failed:${e.code}`); log(`untidy: ${entry.id} given up after ${tries} tries, ${report.lastError}`); report.skipped++; continue; }
+      await mark("recut:try");
+      log(`untidy: ${entry.id} left for later (try ${tries} of ${MAX_TRIES}), ${report.lastError}`); report.failed++; continue;
     }
     let fitted = await fitCutout(cut);
     let old: Buffer | null = null;
@@ -85,7 +100,7 @@ export async function untidyAll(opts: { log?: (line: string) => void } = {}): Pr
 export async function untidyPending(): Promise<number> {
   if (await db.seedSet.findUnique({ where: { name: UNTIDY_SET } })) return 0;
   const entries = await db.importEntry.findMany({ where: { status: "done", itemId: { not: null }, cutoutKey: { not: null }, createdAt: { gte: UNTIDY_SINCE } }, select: { aiResult: true } });
-  return entries.filter((e) => !((e.aiResult as Partial<EntryAiResult> | null)?.warnings ?? []).some((w) => w.startsWith("recut"))).length;
+  return entries.filter((e) => !((e.aiResult as Partial<EntryAiResult> | null)?.warnings ?? []).some((w) => w.startsWith("recut") && w !== "recut:try")).length;
 }
 
 /** The item's one photo of that kind, when there is exactly one (an entry's keys can be stale after a refit). */
@@ -125,7 +140,8 @@ export async function untidyOnStart(delayMs = 5000, retryMs = UNTIDY_RETRY_MS): 
   try {
     const r = await untidyAll({ log: (line) => console.log(line) });
     if (r.recut || r.skipped || r.failed) console.log(`untidy: ${r.recut} re-cut, ${r.skipped} skipped, ${r.failed} left for later${r.done ? "; done" : ""}`);
-    if (!r.done) {
+    if (!r.done && r.waitForAdmin) console.log("untidy: remove.bg cannot be used right now; the rest waits for Admin → Rules");
+    else if (!r.done) {
       console.log(`untidy: the rest again in ${Math.round(retryMs / 60_000)} min, or now from Admin → Rules`);
       void untidyOnStart(retryMs, retryMs);
     }

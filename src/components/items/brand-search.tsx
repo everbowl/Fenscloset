@@ -41,6 +41,9 @@ export function BrandSearch({ open, onClose, brands, selectedId, selectedIds, mu
       if (!brands.some((x) => x.id === b.id)) onAdded(b);
       if (!multi) onClose();
       onPick(b);
+    }).catch(() => {
+      // A dropped connection or a stale deploy used to leave "Adding…" on forever (review F A4).
+      setBusy(false); setError("Couldn’t add it. Try again.");
     });
   }
 

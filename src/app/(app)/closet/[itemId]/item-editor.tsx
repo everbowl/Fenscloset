@@ -13,7 +13,7 @@ import { BrandSearch } from "@/components/items/brand-search";
 import { MatchSheet } from "@/components/items/match-sheet";
 import { matchItemAction } from "@/lib/brands/actions";
 import type { Product } from "@/lib/shop/products";
-import { shrinkPhoto } from "@/lib/import/client-queue";
+import { putSigned, shrinkPhoto, signUploadFor } from "@/lib/import/client-queue";
 import type { ItemLists } from "@/lib/items/query";
 import type { ItemDetailEdits } from "@/lib/items/service";
 import type { LaundryStatus, PhotoKind } from "@/generated/prisma/client";
@@ -126,9 +126,12 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
     setError(undefined);
     start(async () => { const r = await setCopiesAction(it.id, n); if (!r.ok) setError(r.error); else setIt((x) => ({ ...x, ...r.value, status: statusWordOf(r.value.laundryStatus, x.wearCount) })); router.refresh(); });
   }
+  // Rotate and Split one off take a few seconds each: their pills say so (review B C5, C6) instead of only graying out.
+  const [turning, setTurning] = useState(false);
+  const [splitting, setSplitting] = useState(false);
   function splitOne() {
-    setError(undefined);
-    start(async () => { const r = await splitOneOffAction(it.id); if (!r.ok) setError(r.error); else router.push(`/closet/${r.value}`); });
+    setError(undefined); setSplitting(true);
+    start(async () => { const r = await splitOneOffAction(it.id); if (!r.ok) { setSplitting(false); setError(r.error); } else router.push(`/closet/${r.value}`); });
   }
   function setLaundry(st: LaundryStatus) {
     setIt((x) => ({ ...x, laundryStatus: st, status: statusWordOf(st, x.wearCount) }));
@@ -141,11 +144,8 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
     try {
       const blob = await shrinkPhoto(file);
       const kindKey = photoKind === "label" ? "labels" : photoKind === "worn" ? "worn" : "originals";
-      const signRes = await fetch("/api/uploads/sign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contentType: blob.type || "image/jpeg", kind: kindKey }) });
-      const signed = (await signRes.json()) as { key: string; url: string; headers: Record<string, string>; error?: string };
-      if (!signRes.ok) throw new Error(signed.error || "Upload failed.");
-      const put = await fetch(signed.url, { method: "PUT", headers: signed.headers, body: blob });
-      if (!put.ok) throw new Error("Upload failed.");
+      const signed = await signUploadFor(blob.type || "image/jpeg", kindKey);
+      await putSigned(signed.url, signed.headers, blob); // a minute per try, one more try, then a plain error (review B B15)
       const r = await addItemPhotoAction(it.id, photoKind, signed.key);
       if (!r.ok) throw new Error(r.error);
       setJustAdded(true);
@@ -164,7 +164,7 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
       <div className="relative -mx-5 h-[380px] bg-bone lg:mx-0 lg:h-[560px] lg:self-start lg:[grid-row:1/span_80]">
         {photo ? <img src={`/api/photo/${photo.key}`} alt={it.name} className="size-full object-contain" data-testid="item-hero" /> : null}
         {canEdit && photo ? (<>
-          <button type="button" disabled={pending} onClick={() => start(async () => { const r = await rotateItemPhotoAction(it.id, photo.id); if (!r.ok) setError(r.error); else setIt((x) => ({ ...x, photos: x.photos.map((p) => (p.id === r.value.photoId ? { ...p, key: r.value.key } : p)) })); })} className="pill pill-sm absolute bottom-2 right-2" data-testid="rotate-photo" title="Turn the photo a quarter turn">Rotate ↻</button>
+          <button type="button" disabled={pending || turning} onClick={() => { setTurning(true); start(async () => { const r = await rotateItemPhotoAction(it.id, photo.id); setTurning(false); if (!r.ok) setError(r.error); else setIt((x) => ({ ...x, photos: x.photos.map((p) => (p.id === r.value.photoId ? { ...p, key: r.value.key } : p)) })); }); }} className="pill pill-sm absolute bottom-2 right-2" data-testid="rotate-photo" title="Turn the photo a quarter turn">{turning ? "Turning…" : "Rotate ↻"}</button>
           {canEdit && photo.kind !== "worn" && photo.kind !== "label" ? <button type="button" disabled={pending} aria-pressed={photo.forMirror} onClick={() => start(async () => { const r = await mirrorPhotoAction(it.id, photo.id); if (!r.ok) setError(r.error); else setIt((x) => ({ ...x, photos: x.photos.map((p) => ({ ...p, forMirror: p.id === r.value.photoId })) })); })} className={`pill pill-sm absolute bottom-2 left-2 ${photo.forMirror ? "pill-solid" : ""}`} data-testid="mirror-photo" title="The mirror dresses you with this photo">{photo.forMirror ? "Mirror ✓" : "Use in mirror"}</button> : null}
         </>) : null}
         {photo?.kind === "retail" ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">Store photo</span> : photo?.kind === "worn" || photo?.kind === "back" ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">{KIND_WORD[photo.kind]}</span> : it.storePhoto && photo?.isPrimary ? <span className="mono mono-11 absolute right-2 top-2 bg-paper px-2.5 py-1.5">Store photo</span> : null}
@@ -253,7 +253,7 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
           <div className="flex min-h-[42px] items-center justify-between gap-3 border-b border-line" data-testid="copies-row">
             <span className="mono w-[120px] shrink-0 text-graphite">Copies</span>
             <div className="flex flex-1 items-center justify-end gap-2">
-              {canEdit && it.copies > 1 ? <button type="button" disabled={pending} onClick={splitOne} className="pill pill-sm pill-quiet" data-testid="split-one">Split one off</button> : null}
+              {canEdit && it.copies > 1 ? <button type="button" disabled={pending || splitting} onClick={splitOne} className="pill pill-sm pill-quiet" data-testid="split-one">{splitting ? "Splitting…" : "Split one off"}</button> : null}
               {canEdit ? (
                 <div className="flex items-center">
                   <button type="button" aria-label="One fewer copy" disabled={pending || it.copies <= 1} onClick={() => setCopies(it.copies - 1)} className="mono size-9 text-[17px] disabled:text-graphite">−</button>

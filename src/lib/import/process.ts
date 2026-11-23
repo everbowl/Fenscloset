@@ -3,13 +3,13 @@ import { deleteObject, getObject, newKey, NotFoundError, putObject } from "@/lib
 import { removeBackground, RemoveBgError } from "@/lib/images/remove-bg";
 import { fitCutout, makeThumb, normalizeOriginal, toAiImage } from "@/lib/images/thumb";
 import { phash } from "@/lib/images/phash";
-import { loadTagLists, rotationFor, tagItem, type TagResult } from "@/lib/ai/tag-item";
+import { loadTagLists, rotationFor, tagItem, type TagLists, type TagResult } from "@/lib/ai/tag-item";
 import { rotateImage } from "@/lib/images/rotate";
 import { readLabel } from "@/lib/ai/read-label";
 import { AiError } from "@/lib/ai/claude";
 import type { ImportEntry } from "@/generated/prisma/client";
 import type { StoreMeta } from "@/lib/store/add";
-import { confirmedDuplicate } from "@/lib/items/duplicates";
+import { confirmedDuplicate, loadDuplicateCandidates } from "@/lib/items/duplicates";
 import type { DuplicateHint } from "@/lib/items/duplicates";
 
 /** What lands in ImportEntry.aiResult. */
@@ -18,17 +18,28 @@ export type EntryAiResult = { tags: TagResult; warnings: string[]; label?: { bra
 
 export type ProcessOutcome = { status: ImportEntry["status"]; error?: string };
 
+/** Entry states a worker may pick up. `processing` is included for a retry after a restart or a watchdog drop. */
+const CLAIMABLE: ImportEntry["status"][] = ["queued", "uploaded", "failed", "processing"];
+
 /**
- * Runs one photo through: normalize → remove background → thumbnail → hash → Claude tags.
- * A background-removal failure is a warning (the original stays usable); a tagging failure marks
- * the entry `failed` with a retryable error. Re-running on a `failed` entry starts over.
+ * Runs one photo through: normalize → remove background and Claude tags (side by side) → thumbnail → hash → duplicate check.
+ * A background-removal failure is a warning (the original stays usable); a tagging failure marks the entry `failed`
+ * with a retryable error. Re-running on a `failed` entry starts over.
+ *
+ * The entry is claimed first (one worker at a time, review B B5) and every final write is guarded on it still being
+ * ours (status "processing"): a watchdog drop, a split, or a retry from another tab cannot be overwritten by a late answer.
  */
 export async function processEntry(entryId: string): Promise<ProcessOutcome> {
   const entry = await db.importEntry.findUnique({ where: { id: entryId }, include: { batch: true } });
   if (!entry) return { status: "failed", error: "Entry not found" };
-  if (!["queued", "uploaded", "failed", "processing"].includes(entry.status)) return { status: entry.status };
-  await db.importEntry.update({ where: { id: entryId }, data: { status: "processing", error: null } });
+  if (!CLAIMABLE.includes(entry.status)) return { status: entry.status };
+  const claimed = await db.importEntry.updateMany({ where: { id: entryId, status: { in: CLAIMABLE } }, data: { status: "processing", error: null } });
+  if (claimed.count === 0) return { status: entry.status };
   const ownerId = entry.batch.personId;
+  const meta = (entry.storeMeta as StoreMeta | null) ?? null;
+  /** A late write loses: the row must still be ours, as claimed this very time (a retry's own claim moves updatedAt). */
+  const stamp = await db.importEntry.findUnique({ where: { id: entryId }, select: { updatedAt: true } });
+  const ours = { id: entryId, status: "processing" as const, updatedAt: stamp?.updatedAt };
 
   let original: Buffer;
   try {
@@ -36,32 +47,41 @@ export async function processEntry(entryId: string): Promise<ProcessOutcome> {
   } catch (e) {
     const msg = e instanceof NotFoundError ? "The photo never finished uploading." : (e as Error).message;
     console.error(`import: entry ${entryId} failed before processing: ${msg}`);
-    await db.importEntry.update({ where: { id: entryId }, data: { status: "failed", error: msg } });
+    await db.importEntry.updateMany({ where: ours, data: { status: "failed", error: msg } });
     return { status: "failed", error: msg };
   }
 
+  const made: string[] = []; // objects written this run, dropped again if the row is no longer ours
   try {
     const normalized = await normalizeOriginal(original);
     const warnings: string[] = [];
+    // The owner's pieces for the "one you own" check load while the slow calls run (review B B3).
+    const candidates = loadDuplicateCandidates(ownerId).catch(() => []);
+    const lists = await loadTagLists();
 
     let cutout: Buffer | null = null;
-    let cutoutKey: string | null = entry.cutoutKey;
-    try {
-      cutout = await fitCutout(await removeBackground(normalized));
-      cutoutKey = newKey("cutouts", ownerId, "image/png");
-      await putObject(cutoutKey, cutout, "image/png");
-    } catch (e) {
-      if (e instanceof RemoveBgError) {
-        warnings.push(`bg_failed:${e.code}`);
-        cutoutKey = null;
-      } else throw e;
+    let cutoutKey: string | null = null;
+    let tags: TagResult;
+    if (meta?.noPhoto) {
+      // No picture from the store: nothing for remove.bg or Claude to look at. The store's facts carry the piece.
+      warnings.push("no_store_photo");
+      tags = applyStoreMeta(emptyTags(null, null, null), meta, lists);
+    } else {
+      // Tags come from the straightened original, so Claude and remove.bg run at the same time (review B B3).
+      const [cut, tagged] = await Promise.all([
+        removeBackground(normalized).then(fitCutout).catch((e: unknown) => { if (e instanceof RemoveBgError) return e; throw e; }),
+        toAiImage(normalized).then((image) => tagItem({ image, lists })),
+      ]);
+      if (cut instanceof RemoveBgError) warnings.push(`bg_failed:${cut.code}`);
+      else {
+        cutout = cut;
+        cutoutKey = newKey("cutouts", ownerId, "image/png");
+        await putObject(cutoutKey, cutout, "image/png"); made.push(cutoutKey);
+      }
+      tags = meta ? applyStoreMeta(tagged, meta, lists) : tagged;
     }
 
     let source = cutout ?? normalized;
-
-    const lists = await loadTagLists();
-    let tags = await tagItem({ image: await toAiImage(source), lists });
-    if (entry.storeMeta) tags = applyStoreMeta(tags, entry.storeMeta as StoreMeta, lists);
 
     // Auto-upright: a phone held sideways leaves the piece lying on its side; Claude says which turn fixes it.
     const deg = rotationFor(tags.raw.orientation);
@@ -69,49 +89,65 @@ export async function processEntry(entryId: string): Promise<ProcessOutcome> {
       const type = cutout ? "image/png" : "image/jpeg";
       source = await rotateImage(source, deg, type);
       const fixedKey = newKey("cutouts", ownerId, type);
-      await putObject(fixedKey, source, type);
+      await putObject(fixedKey, source, type); made.push(fixedKey);
       if (cutoutKey) await deleteObject(cutoutKey).catch(() => undefined);
       cutoutKey = fixedKey;
       warnings.push(`auto_rotated:${deg}`);
     }
 
-    const thumb = await makeThumb(source);
     const thumbKey = newKey("thumbs", ownerId, "image/jpeg");
-    await putObject(thumbKey, thumb, "image/jpeg");
-    const hash = await phash(source);
-    const duplicate = await confirmedDuplicate(ownerId, { phash: hash, categoryId: tags.categoryId, colorIds: tags.colorIds, brandId: tags.brandId }, source);
+    const [, hash] = await Promise.all([makeThumb(source).then((thumb) => putObject(thumbKey, thumb, "image/jpeg")), phash(source)]);
+    made.push(thumbKey);
+    const duplicate = meta?.noPhoto ? null : await confirmedDuplicate(ownerId, { phash: hash, categoryId: tags.categoryId, colorIds: tags.colorIds, brandId: tags.brandId }, source, await candidates);
 
     const aiResult: EntryAiResult = { tags, warnings, duplicate };
-
-    await db.importEntry.update({
-      where: { id: entryId },
+    const written = await db.importEntry.updateMany({
+      where: ours,
       data: { status: "needs_confirm", cutoutKey, thumbKey, phash: hash, aiResult: JSON.parse(JSON.stringify(aiResult)), error: null },
     });
+    if (written.count === 0) {
+      // Someone else owns the row now (the watchdog failed it, or a retry restarted it): keep their files, drop ours.
+      await Promise.all(made.map((k) => deleteObject(k).catch(() => undefined)));
+      console.warn(`import: entry ${entryId} finished after it was taken over; result dropped`);
+      return { status: (await db.importEntry.findUnique({ where: { id: entryId }, select: { status: true } }))?.status ?? "failed" };
+    }
+    // A retry leaves the previous run's cutout and thumb behind otherwise (review B B4).
+    for (const old of [entry.cutoutKey, entry.thumbKey]) if (old && old !== cutoutKey && old !== thumbKey) await deleteObject(old).catch(() => undefined);
+
     // C1 (Jeff, 3 Nov 2026): a piece with store facts (a link or a receipt, not a photo the person took) goes straight
-    // into the closet, no card; it is fixable on the piece page. Only a missing category still asks.
-    const meta = entry.storeMeta as { matched?: boolean } | null;
-    if (meta && !meta.matched && tags.categoryId) {
+    // into the closet, no card; it is fixable on the piece page. A category the AI could not place is no reason to
+    // hold it back (review B A2.2): it lands with no category and the closet shows "Needs a category" on it.
+    if (meta && !meta.matched) {
       try {
         const { createItemFromEntry } = await import("@/lib/items/service");
-        await createItemFromEntry(ownerId, entryId);
-        console.log(`import: entry ${entryId} landed in the closet (${(entry.storeMeta as StoreMeta).name})`);
+        await createItemFromEntry(ownerId, entryId, {}, { allowNoCategory: true });
+        console.log(`import: entry ${entryId} landed in the closet (${meta.name}${tags.categoryId ? "" : ", no category yet"})`);
         return { status: "done" };
-      } catch (e) { console.error("auto-add from store", e); }
+      } catch (e) {
+        // The piece keeps its card; the reason shows on the Tagging card and the confirm card (review B B6).
+        const why = `Could not add it on its own: ${(e as Error).message}`;
+        console.error(`auto-add from store: entry ${entryId}: ${why}`);
+        await db.importEntry.updateMany({ where: { id: entryId, status: "needs_confirm" }, data: { error: why } });
+        return { status: "needs_confirm", error: why };
+      }
     }
-    if (entry.storeMeta) console.log(`import: entry ${entryId} from a store waits for a confirm (${tags.categoryId ? "duplicate check" : "no category"})`);
     return { status: "needs_confirm" };
   } catch (e) {
     const msg = e instanceof AiError
       ? (e.code === "no_key" ? "Tagging is not set up yet (missing ANTHROPIC_API_KEY)." : `Tagging failed: ${e.message}`)
       : `Processing failed: ${(e as Error).message}`;
     console.error(`import: entry ${entryId} failed: ${msg}`);
-    await db.importEntry.update({ where: { id: entryId }, data: { status: "failed", error: msg } });
+    const marked = await db.importEntry.updateMany({ where: ours, data: { status: "failed", error: msg } });
+    if (marked.count === 0) await Promise.all(made.map((k) => deleteObject(k).catch(() => undefined)));
     return { status: "failed", error: msg };
   }
 }
 
-/** A piece from a store link or receipt: the store's name, brand, size and color win over the guess. */
-function applyStoreMeta(tags: TagResult, meta: StoreMeta, lists: { brands: { id: string; name: string }[]; colors: { id: string; name: string }[] }): TagResult {
+/**
+ * A piece from a store link or receipt: the store's name, brand, size, color and (when the page or the receipt knew
+ * it) category win over the guess. An unknown category stays null; the piece is added anyway and asks for one later.
+ */
+export function applyStoreMeta(tags: TagResult, meta: StoreMeta, lists: Pick<TagLists, "brands" | "colors" | "categories">): TagResult {
   const next = { ...tags };
   if (meta.name) next.name = meta.name.slice(0, 80);
   if (meta.brandText) {
@@ -123,6 +159,13 @@ function applyStoreMeta(tags: TagResult, meta: StoreMeta, lists: { brands: { id:
     const words = meta.color.toLowerCase();
     const hits = lists.colors.filter((c) => words.includes(c.name.toLowerCase())).map((c) => c.id);
     if (hits.length) next.colorIds = hits;
+  }
+  if (meta.category) {
+    const cat = lists.categories.find((c) => c.name.toLowerCase() === meta.category!.trim().toLowerCase());
+    if (cat && cat.id !== tags.categoryId) {
+      next.categoryId = cat.id;
+      next.subcategoryId = cat.subcategories.some((s) => s.id === tags.subcategoryId) ? tags.subcategoryId : null;
+    }
   }
   return next;
 }

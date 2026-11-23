@@ -7,8 +7,9 @@ import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
 import { seed } from "../../prisma/seed";
 import { newKey, putObject } from "@/lib/storage";
-import { abandonBatch, finishBatchIfDone, getOrCreateOpenBatch, openBatch, registerEntry } from "@/lib/import/service";
+import { abandonBatch, finishBatchIfDone, getOrCreateOpenBatch, openBatch, registerEntry, requeueUnfinished } from "@/lib/import/service";
 import { drainQueue } from "@/lib/import/queue";
+import { objectExists } from "@/lib/storage";
 
 describe("import batches", () => {
   let jeffId: string; let oliviaId: string;
@@ -72,5 +73,55 @@ describe("import batches", () => {
     await openBatch(jeffId); // sees an uploaded entry nobody is working on
     await drainQueue();
     expect((await db.importEntry.findUniqueOrThrow({ where: { id: e.id } })).status).toBe("needs_confirm");
+  });
+
+  it("a registered photo gets a small picture right away; the summary carries rows and the working list (review B B13, Add flow v2)", async () => {
+    const b = await getOrCreateOpenBatch(jeffId, 1);
+    const k = await uploaded(jeffId);
+    const e = await registerEntry(jeffId, b.id, k, 0);
+    const fresh = await db.importEntry.findUniqueOrThrow({ where: { id: e.id } });
+    expect(fresh.thumbKey).toMatch(/^thumbs\//);
+    expect(await objectExists(fresh.thumbKey!)).toBe(true);
+    await drainQueue();
+    const s = (await openBatch(jeffId))!;
+    expect(s.rows.map((r) => [r.id, r.status])).toEqual([[e.id, "needs_confirm"]]);
+    expect(s.rows[0].photoKey).toMatch(/^thumbs\//); // the tagging run's thumb replaced the early one
+    expect(await objectExists(fresh.thumbKey!)).toBe(false);
+    expect(s.working).toEqual([]);
+  });
+
+  it("a batch nothing ever landed in closes once it has sat empty a while; picks taken back never drop the count under what arrived (review B B9)", async () => {
+    const b = await getOrCreateOpenBatch(jeffId, 20);
+    expect((await openBatch(jeffId))!.total).toBe(20); // fresh: still waiting for its uploads
+    await db.importBatch.update({ where: { id: b.id }, data: { updatedAt: new Date(Date.now() - 10 * 60_000) } });
+    expect(await openBatch(jeffId)).toBeNull();
+    expect((await db.importBatch.findUniqueOrThrow({ where: { id: b.id } })).status).toBe("done");
+    // taking failed picks back
+    const c = await getOrCreateOpenBatch(jeffId, 5);
+    const k = await uploaded(jeffId);
+    await registerEntry(jeffId, c.id, k, 0);
+    expect((await getOrCreateOpenBatch(jeffId, -4)).total).toBe(1);
+    expect((await getOrCreateOpenBatch(jeffId, -4)).total).toBe(1); // never under the one that arrived
+  });
+
+  it("openBatch answers for the batch asked for, not whichever open batch is newest (review B B10)", async () => {
+    const older = await db.importBatch.create({ data: { personId: jeffId, total: 1 } });
+    const k = await uploaded(jeffId);
+    const e = await db.importEntry.create({ data: { batchId: older.id, order: 0, originalKey: k, status: "needs_confirm" } });
+    const newer = await db.importBatch.create({ data: { personId: jeffId, total: 0 } });
+    expect((await openBatch(jeffId, older.id))!.nextConfirmId).toBe(e.id);
+    expect((await openBatch(jeffId, newer.id))!.id).toBe(newer.id);
+    expect((await openBatch(jeffId))!.id).toBe(older.id); // with no batch named, the one with work in it
+    expect(await openBatch(oliviaId, older.id)).toBeNull(); // not hers
+  });
+
+  it("on server start every photo left mid-way goes back on the queue at once (review B A2.5)", async () => {
+    const b = await getOrCreateOpenBatch(jeffId, 2);
+    const k1 = await uploaded(jeffId); const k2 = await uploaded(jeffId);
+    const a = await db.importEntry.create({ data: { batchId: b.id, order: 0, originalKey: k1, status: "processing" } });
+    const c = await db.importEntry.create({ data: { batchId: b.id, order: 1, originalKey: k2, status: "uploaded" } });
+    expect(await requeueUnfinished()).toBe(2);
+    await drainQueue();
+    expect((await db.importEntry.findMany({ where: { id: { in: [a.id, c.id] } } })).map((e) => e.status)).toEqual(["needs_confirm", "needs_confirm"]);
   });
 });

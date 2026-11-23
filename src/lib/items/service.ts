@@ -62,19 +62,37 @@ export async function saveEntryEdits(personId: string, entryId: string, edits: I
   return tags;
 }
 
+/**
+ * The person's one personal closet. Two pieces landing at the same moment (a store add of two colors, review B A2.1)
+ * both miss the lookup and both create one; there is no unique key to lean on, so the later one steps back: after
+ * creating, the earliest closet wins and any newer one of ours is removed again.
+ */
 export async function personalClosetId(personId: string): Promise<string> {
-  const closet = await db.closet.findFirst({ where: { ownerId: personId, kind: "personal" } })
-    ?? await db.closet.create({ data: { ownerId: personId, kind: "personal", name: "My closet" } });
-  return closet.id;
+  const found = await db.closet.findFirst({ where: { ownerId: personId, kind: "personal" }, orderBy: { createdAt: "asc" } });
+  if (found) return found.id;
+  const mine = await db.closet.create({ data: { ownerId: personId, kind: "personal", name: "My closet" } });
+  const all = await db.closet.findMany({ where: { ownerId: personId, kind: "personal" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { id: true } });
+  const first = all[0]?.id ?? mine.id;
+  if (first !== mine.id) await db.closet.deleteMany({ where: { id: mine.id, items: { none: {} } } }).catch(() => undefined);
+  return first;
 }
 
-/** The one-tap confirm: entry → Item with photos, tags and the owner's personal closet. */
-export async function createItemFromEntry(personId: string, entryId: string, edits: ItemEdits = {}): Promise<Item> {
+/** "Add all" on the review page is offered only when every remaining card is sure: a category, a color and the tagger's own confidence (review B, Add flow v2). */
+export const SURE_CONFIDENCE = 0.75;
+export function isSure(tags: Pick<TagResult, "categoryId" | "colorIds" | "confidence">): boolean {
+  return Boolean(tags.categoryId) && tags.colorIds.length > 0 && tags.confidence >= SURE_CONFIDENCE;
+}
+
+/**
+ * The one-tap confirm: entry → Item with photos, tags and the owner's personal closet.
+ * `allowNoCategory` is for the store auto-add (review B A2.2): the piece lands with no category and the closet asks for one.
+ */
+export async function createItemFromEntry(personId: string, entryId: string, edits: ItemEdits = {}, opts: { allowNoCategory?: boolean } = {}): Promise<Item> {
   const entry = await ownedEntry(personId, entryId);
   if (entry.status !== "needs_confirm") throw new ItemError(entry.status === "done" ? "Already added." : "This photo is still being tagged.", 409);
   const ai = (entry.aiResult as EntryAiResult | null) ?? { tags: emptyTags(), warnings: [] };
   const tags = applyEdits(ai.tags, edits);
-  if (!tags.categoryId) throw new ItemError("Pick a category first.");
+  if (!tags.categoryId && !opts.allowNoCategory) throw new ItemError("Pick a category first.");
   const closetId = await personalClosetId(personId);
   const connect = (ids: string[]) => ({ connect: ids.map((id) => ({ id })) });
   const meta = (entry.storeMeta as StoreMeta | null) ?? null;
@@ -312,16 +330,15 @@ export async function splitOneOff(viewer: { id: string; role: string }, itemId: 
   if (it.copies <= 1) throw new ItemError("This is already a single piece.");
   const full = await db.item.findUniqueOrThrow({ where: { id: itemId }, include: { colors: true, patterns: true, fabrics: true, seasons: true, formalities: true, occasions: true, tags: true, photos: true, closets: true } });
   const ids = (xs: { id: string }[]) => ({ connect: xs.map((x) => ({ id: x.id })) });
-  // A photo key belongs to one piece: the new card gets its own copies of the pictures.
-  const photos: { kind: PhotoKind; bucketKey: string; isPrimary: boolean; forMirror: boolean; wholeGarment: boolean | null }[] = [];
-  for (const ph of full.photos) {
+  // A photo key belongs to one piece: the new card gets its own copies of the pictures, copied side by side (review B C5).
+  const photos = (await Promise.all(full.photos.map(async (ph) => {
     const parsed = parseKey(ph.bucketKey);
-    if (!parsed) continue;
+    if (!parsed) return null;
     const { body, contentType } = await getObject(ph.bucketKey);
     const key = newKey(parsed.kind, full.ownerId, contentType);
     await putObject(key, body, contentType);
-    photos.push({ kind: ph.kind, bucketKey: key, isPrimary: ph.isPrimary, forMirror: ph.forMirror, wholeGarment: ph.wholeGarment });
-  }
+    return { kind: ph.kind as PhotoKind, bucketKey: key, isPrimary: ph.isPrimary, forMirror: ph.forMirror, wholeGarment: ph.wholeGarment };
+  }))).filter((p): p is NonNullable<typeof p> => p !== null);
   return db.$transaction(async (tx) => {
     const made = await tx.item.create({
       data: {
@@ -429,11 +446,14 @@ export async function rotateItemPhoto(viewer: { id: string; role: string }, phot
   return { photoId, key };
 }
 
-/** Deletes the item and its photos from the bucket. */
+/** Deletes the item and its photos from the bucket, and the import entries that pointed at those photos (review B C7). */
 export async function deleteItem(viewer: { id: string; role: string }, itemId: string): Promise<void> {
   await ownedItem(viewer, itemId);
   const photos = await db.itemPhoto.findMany({ where: { itemId }, select: { bucketKey: true } });
-  await db.item.delete({ where: { id: itemId } });
+  await db.$transaction([
+    db.importEntry.deleteMany({ where: { itemId, status: "done" } }),
+    db.item.delete({ where: { id: itemId } }),
+  ]);
   await Promise.all(photos.map((p) => deleteObject(p.bucketKey).catch(() => {})));
 }
 

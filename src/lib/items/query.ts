@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { copiesWord, countsOf } from "@/lib/items/copies";
 import { db } from "@/lib/db";
 import type { ClosetView } from "@/lib/people/visibility";
@@ -64,7 +65,8 @@ export async function countClosetItems(view: ClosetView): Promise<number> {
   return db.item.count({ where: { retiredAt: null, ...(view.kind === "family" ? { closets: { some: { closet: { kind: "family" } } } } : { ownerId: view.personId }) } });
 }
 
-export async function getItemDetail(itemId: string) {
+/** One load per request (review B C2): the page and its generateMetadata both ask for the same piece. */
+export const getItemDetail = cache(async function getItemDetail(itemId: string) {
   return db.item.findUnique({
     where: { id: itemId },
     include: {
@@ -76,7 +78,7 @@ export async function getItemDetail(itemId: string) {
       shares: { include: { person: { select: { id: true, name: true } } } },
     },
   });
-}
+});
 
 import { loadTagLists, type Named, type TagLists } from "@/lib/ai/tag-item";
 

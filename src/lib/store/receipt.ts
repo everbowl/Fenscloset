@@ -8,7 +8,7 @@ import { lookupProduct, type StoreProduct } from "@/lib/store/add";
  * only the item facts and prices are kept, never order numbers, addresses or card digits.
  */
 
-type ReceiptLine = { name: string; color: string | null; size: string | null; quantity: number; priceText: string | null; url: string | null };
+type ReceiptLine = { name: string; color: string | null; size: string | null; quantity: number; priceText: string | null; url: string | null; /** One of the family's categories when the line makes it plain (review B A2.2), else null: the piece then lands without one and asks. */ category: string | null };
 export type Receipt = { storeName: string | null; orderDate: string | null; lines: ReceiptLine[] };
 export type MatchedLine = ReceiptLine & { picks: Product[] };
 
@@ -25,9 +25,10 @@ const SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["name", "color", "size", "quantity", "priceText", "url"],
+        required: ["name", "color", "size", "quantity", "priceText", "url", "category"],
         properties: {
           name: { type: "string", description: "The product name as printed, without color and size." },
+          category: { type: ["string", "null"], description: "Which of the allowed categories the line is, when its name makes it plain (a tee is Tops, jeans are Bottoms); null when unsure." },
           url: { type: ["string", "null"], description: "The product's own web link if one is printed or visible for this line, else null." },
           color: { type: ["string", "null"] },
           size: { type: ["string", "null"] },
@@ -39,21 +40,26 @@ const SCHEMA = {
   },
 };
 
-export async function readReceipt(image: { data: string; mediaType: "image/jpeg" | "image/png" | "image/webp" }): Promise<Receipt> {
+/** `categories` are the family's category names (editable list): the reader may name one per line, never anything else. */
+export async function readReceipt(image: { data: string; mediaType: "image/jpeg" | "image/png" | "image/webp" }, categories: string[] = []): Promise<Receipt> {
+  const known = (name: string | null | undefined) => (name && categories.find((c) => c.toLowerCase() === name.trim().toLowerCase())) || null;
   if (isMockAi()) {
     return { storeName: "Mock Store", orderDate: "2026-10-12", lines: [
-      { name: "Linen Blazer", color: "Oatmeal", size: "M", quantity: 1, priceText: "$128.00", url: "https://mock.example/products/linen-blazer" },
-      { name: "Crew Tee", color: "Black", size: "M", quantity: 2, priceText: "$38.00", url: null },
+      { name: "Linen Blazer", color: "Oatmeal", size: "M", quantity: 1, priceText: "$128.00", url: "https://mock.example/products/linen-blazer", category: known("Outerwear") },
+      { name: "Crew Tee", color: "Black", size: "M", quantity: 2, priceText: "$38.00", url: null, category: known("Tops") },
     ] };
   }
+  const schema = categories.length
+    ? { ...SCHEMA, properties: { ...SCHEMA.properties, lines: { ...SCHEMA.properties.lines, items: { ...SCHEMA.properties.lines.items, properties: { ...SCHEMA.properties.lines.items.properties, category: { type: ["string", "null"], enum: [...categories, null], description: SCHEMA.properties.lines.items.properties.category.description } } } } } }
+    : SCHEMA;
   const r = await structured<Receipt>({
     system: "You read shopping receipts and order confirmation emails. Answer with JSON only. Copy product names as printed. Never include order numbers, addresses, phone numbers or payment details.",
     prompt: "Read this receipt.",
     image,
-    schema: SCHEMA,
+    schema,
     effort: "low",
   });
-  return { storeName: r.storeName?.trim() || null, orderDate: r.orderDate && /^\d{4}-\d{2}-\d{2}$/.test(r.orderDate) ? r.orderDate : null, lines: (r.lines ?? []).slice(0, 25).map((l) => ({ ...l, url: l.url && /^https?:\/\//i.test(l.url) ? l.url : null, quantity: Math.min(10, Math.max(1, Math.floor(l.quantity || 1))) })) };
+  return { storeName: r.storeName?.trim() || null, orderDate: r.orderDate && /^\d{4}-\d{2}-\d{2}$/.test(r.orderDate) ? r.orderDate : null, lines: (r.lines ?? []).slice(0, 25).map((l) => ({ ...l, url: l.url && /^https?:\/\//i.test(l.url) ? l.url : null, quantity: Math.min(10, Math.max(1, Math.floor(l.quantity || 1))), category: known(l.category) })) };
 }
 
 /** The photo the store shows for this color, when its page lists one. */

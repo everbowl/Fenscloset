@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { Banner } from "@/components/ui/banner";
 import { AddToLook } from "@/components/looks/add-to-look";
+import { StoreImg } from "@/components/items/store-img";
 import { cn } from "@/lib/cn";
 import type { GoWithView } from "@/lib/shop/go-with";
 import { goWithAction, goWithStatusAction, type GoWithResult } from "./actions";
@@ -106,7 +107,7 @@ export function GoWithScreen({ itemId, name, thumbKey, fresh, initial }: { itemI
                 {view.products.map((p) => (
                   <div key={p.url} className="w-[150px] shrink-0 snap-start" data-testid="go-with-product">
                     <a href={p.url} target="_blank" rel="noreferrer" className="block h-[190px] overflow-hidden bg-bone" aria-label={p.title}>
-                      {p.imageUrl ? <img src={p.imageUrl} alt="" referrerPolicy="no-referrer" loading="lazy" className="size-full object-cover" /> : null}
+                      <StoreImg src={p.imageUrl} className="h-full" note="preview" />
                     </a>
                     <p className="mt-2 line-clamp-2 text-[13px] font-medium leading-snug">{p.title}</p>
                     <p className="mono mt-1 text-graphite">{[p.priceText, p.storeName].filter(Boolean).join(" · ")}</p>

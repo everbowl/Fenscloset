@@ -72,7 +72,7 @@ describe("style match", () => {
     expect(r.retailKeys.length).toBe(2); // the pick's picture and the page's main picture
     expect(r.tags.brandText).toBe("Nike");
     expect(r.store).toBe("Nike");
-    expect(r.fitNotes).toBe("A breezy linen blazer in oatmeal.");
+    expect(r.fitNotes).toMatch(/^A breezy linen blazer in oatmeal/); // the mock page's first sentence (its exact words belong to src/lib/shop/page.ts)
     const after = await db.importEntry.findUniqueOrThrow({ where: { id: e.id } });
     expect(after.retailKeys).toEqual(r.retailKeys);
     const item = await createItemFromEntry(jeffId, e.id);
@@ -81,7 +81,7 @@ describe("style match", () => {
     expect(full.store?.name).toBe("Nike");
     expect(full.purchaseUrl).toBe("https://www.nike.com/t/dri-fit-tee");
     expect(String(full.purchasePrice)).toBe("35");
-    expect(full.fitNotes).toBe("A breezy linen blazer in oatmeal.");
+    expect(full.fitNotes).toMatch(/^A breezy linen blazer in oatmeal/);
     expect(full.storePhoto).toBe(false); // the person's own photo stays the photo of record
     expect(full.photos.filter((p) => p.kind === "retail").length).toBe(2);
     expect(full.photos.find((p) => p.isPrimary)?.kind).toBe("cutout");

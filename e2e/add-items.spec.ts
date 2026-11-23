@@ -102,7 +102,7 @@ test.describe("add clothes", () => {
     await expect(page.getByTestId("row-category")).toContainText("Bottoms · Jeans");
     await page.getByTestId("confirm-next").click();
     await expect(page.getByTestId("confirm-counter")).toHaveText("003 / 003");
-    await page.getByRole("button", { name: "Skip" }).click();
+    await page.getByRole("button", { name: "Not this one" }).click(); // the v2 card's quiet skip (review B, Add flow v2)
 
     await expect(page.getByRole("heading", { name: /All done/ })).toBeVisible();
     await expect(page.getByText(/2 added to your closet/)).toBeVisible();

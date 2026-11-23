@@ -72,7 +72,8 @@ async function cropBox(photo: Buffer, box: PieceBox): Promise<Buffer> {
 export async function splitEntry(personId: string, entryId: string): Promise<{ entryIds: string[]; pieces: number }> {
   const entry = await db.importEntry.findUnique({ where: { id: entryId }, include: { batch: true } });
   if (!entry || entry.batch.personId !== personId) throw new ImportError("That photo is not in your pile.", 404);
-  if (entry.status !== "needs_confirm" && entry.status !== "uploaded") throw new ImportError(entry.status === "done" ? "That one is already in the closet." : "That photo is still being tagged.", 409);
+  // Only a tagged photo splits (review B B11): one still in the worker would come back as a card beside its pieces.
+  if (entry.status !== "needs_confirm") throw new ImportError(entry.status === "done" ? "That one is already in the closet." : entry.status === "skipped" ? "That one was already split or skipped." : "That photo is still being tagged. Give it a moment.", 409);
   const photo = await normalizeOriginal((await getObject(entry.originalKey)).body);
   const boxes = await findPieces(await toAiImage(photo));
   if (boxes.length < 2) throw new ImportError("Only one piece was found in that photo. Keep it as one card, or take the pieces one at a time.");
@@ -84,18 +85,23 @@ export async function splitEntry(personId: string, entryId: string): Promise<{ e
     if (g) g.count += 1; else groups.set(key, { box: b, count: 1 });
   }
   const last = await db.importEntry.aggregate({ where: { batchId: entry.batchId }, _max: { order: true } });
-  let order = (last._max.order ?? -1) + 1;
-  const entryIds: string[] = [];
-  for (const g of groups.values()) {
+  const first = (last._max.order ?? -1) + 1;
+  // Every crop is cut, uploaded and recorded side by side (review B B12); the order follows the photo, left to right.
+  const made = await Promise.all([...groups.values()].map(async (g, i) => {
     const key = newKey("originals", personId, "image/jpeg");
-    await putObject(key, await cropBox(photo, g.box), "image/jpeg");
-    const made = await db.importEntry.create({ data: { batchId: entry.batchId, order: order++, originalKey: key, status: "uploaded", quantity: g.count } });
-    entryIds.push(made.id);
+    const crop = await cropBox(photo, g.box);
+    const thumbKey = newKey("thumbs", personId, "image/jpeg");
+    await Promise.all([putObject(key, crop, "image/jpeg"), sharp(crop).resize(400, 400, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer().then((t) => putObject(thumbKey, t, "image/jpeg")).catch(() => undefined)]);
+    return db.importEntry.create({ data: { batchId: entry.batchId, order: first + i, originalKey: key, thumbKey, status: "uploaded", quantity: g.count } });
+  }));
+  const entryIds = made.map((m) => m.id);
+  // The original steps aside only while it is still the card it was (a confirm from another tab meanwhile wins).
+  const stepped = await db.importEntry.updateMany({ where: { id: entryId, status: "needs_confirm" }, data: { status: "skipped", aiResult: JSON.parse(JSON.stringify({ ...((entry.aiResult as object | null) ?? {}), splitInto: entryIds })) } });
+  if (stepped.count === 0) {
+    await db.importEntry.deleteMany({ where: { id: { in: entryIds } } });
+    throw new ImportError("That photo was just confirmed or skipped somewhere else.", 409);
   }
-  await db.$transaction([
-    db.importBatch.update({ where: { id: entry.batchId }, data: { total: { increment: entryIds.length }, status: "open" } }),
-    db.importEntry.update({ where: { id: entryId }, data: { status: "skipped", aiResult: JSON.parse(JSON.stringify({ ...((entry.aiResult as object | null) ?? {}), splitInto: entryIds })) } }),
-  ]);
+  await db.importBatch.update({ where: { id: entry.batchId }, data: { total: { increment: entryIds.length }, status: "open" } });
   for (const id of entryIds) enqueueProcessing(id);
   return { entryIds, pieces: boxes.length };
 }

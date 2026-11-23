@@ -1,6 +1,5 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
@@ -11,6 +10,7 @@ import { Field } from "@/components/ui/field";
 import { Input, Textarea } from "@/components/ui/input";
 import { cn } from "@/lib/cn";
 import { shrinkPhoto } from "@/lib/import/client-queue";
+import { StoreImg } from "@/components/items/store-img";
 import type { StoreProduct } from "@/lib/store/add";
 import type { MatchedLine, Receipt } from "@/lib/store/receipt";
 import type { Product } from "@/lib/shop/products";
@@ -26,7 +26,7 @@ export function StoreScreen({ canSearch, initialTab = "link" }: { canSearch: boo
       <PageHeader title="Add from" accent="a store" aside={<Link href="/add" className="pill pill-sm">Photos instead</Link>} />
       <div className="mt-2 flex gap-1.5" role="tablist">
         {(["link", "receipt"] as const).map((t) => (
-          <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`mono mono-11 h-9 px-4 ${tab === t ? "bg-ink text-paper" : "border border-ink"}`} data-testid={`tab-${t}`}>{t === "link" ? "Product link" : "Receipts"}</button>
+          <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className="pill pill-sm" aria-pressed={tab === t} data-testid={`tab-${t}`}>{t === "link" ? "Product link" : "Receipts"}</button>
         ))}
       </div>
       {tab === "link" ? <LinkTab canSearch={canSearch} /> : <ReceiptTab />}
@@ -36,10 +36,10 @@ export function StoreScreen({ canSearch, initialTab = "link" }: { canSearch: boo
 
 function Stepper({ value, onChange, min = 1, what = "", testId = "quantity" }: { value: number; onChange: (n: number) => void; min?: number; what?: string; testId?: string }) {
   return (
-    <div className="flex h-9 shrink-0 items-center border-b border-ink">
-      <button type="button" aria-label={`One fewer${what ? ` ${what}` : ""}`} onClick={() => onChange(Math.max(min, value - 1))} className="mono size-9 text-[17px]">−</button>
-      <span className={cn("mono w-9 text-center text-[17px]", value === 0 && "text-graphite")} data-testid={testId}>{value}</span>
-      <button type="button" aria-label={`One more${what ? ` ${what}` : ""}`} onClick={() => onChange(Math.min(10, value + 1))} className="mono size-9 text-[17px]">+</button>
+    <div className="flex h-9 shrink-0 items-center rounded-full bg-bone">
+      <button type="button" aria-label={`One fewer${what ? ` ${what}` : ""}`} onClick={() => onChange(Math.max(min, value - 1))} className="size-9 text-[17px]">−</button>
+      <span className={cn("w-7 text-center text-[16px] font-medium", value === 0 && "text-graphite")} data-testid={testId}>{value}</span>
+      <button type="button" aria-label={`One more${what ? ` ${what}` : ""}`} onClick={() => onChange(Math.min(10, value + 1))} className="size-9 text-[17px]">+</button>
     </div>
   );
 }
@@ -47,9 +47,9 @@ function Stepper({ value, onChange, min = 1, what = "", testId = "quantity" }: {
 function Pills({ options, value, onPick, testPrefix }: { options: string[]; value: string; onPick: (v: string) => void; testPrefix: string }) {
   if (!options.length) return null;
   return (
-    <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] lg:mx-0 lg:px-0">
+    <div className="strip -mx-5 gap-1.5 px-5 pb-1 lg:mx-0 lg:px-0">
       {options.map((o) => (
-        <button key={o} type="button" onClick={() => onPick(o)} aria-pressed={o === value} className={`mono mono-11 h-8 shrink-0 px-3 ${o === value ? "bg-ink text-paper" : "border border-ink"}`} data-testid={`${testPrefix}-${o}`}>{o}</button>
+        <button key={o} type="button" onClick={() => onPick(o)} aria-pressed={o === value} className="pill pill-sm shrink-0" data-testid={`${testPrefix}-${o}`}>{o}</button>
       ))}
     </div>
   );
@@ -57,14 +57,31 @@ function Pills({ options, value, onPick, testPrefix }: { options: string[]; valu
 
 function PhotoPicks({ picks, chosen, onPick }: { picks: Product[]; chosen: string | null; onPick: (url: string) => void }) {
   return (
-    <div className="-mx-5 flex snap-x gap-2.5 overflow-x-auto px-5 pb-2 lg:mx-0 lg:px-0" data-testid="photo-picks">
+    <div className="strip -mx-5 snap-x gap-2.5 px-5 pb-2 lg:mx-0 lg:px-0" data-testid="photo-picks">
       {picks.map((p) => (
         <button key={p.url} type="button" onClick={() => onPick(p.imageUrl!)} aria-pressed={p.imageUrl === chosen} className={`w-[110px] shrink-0 snap-start text-left ${p.imageUrl === chosen ? "outline outline-2 outline-ink" : ""}`} data-testid="photo-pick">
-          <div className="h-[140px] overflow-hidden bg-bone"><img src={p.imageUrl!} alt="" referrerPolicy="no-referrer" loading="lazy" className="size-full object-cover" /></div>
+          <StoreImg src={p.imageUrl} className="h-[140px] rounded-xl" />
           <p className="mt-1 line-clamp-2 text-[12px] leading-snug">{p.title}</p>
-          <p className="mono mt-0.5 text-graphite">{[p.query === "exact" ? "Exact item" : null, p.priceText, p.storeName].filter(Boolean).join(" · ")}</p>
+          <p className="caption mt-0.5">{[p.query === "exact" ? "Exact item" : null, p.priceText, p.storeName].filter(Boolean).join(" · ")}</p>
         </button>
       ))}
+    </div>
+  );
+}
+
+/** What was just sent on its way (review B E10): the pieces are uploaded and tagging, not yet in the closet; the closet's Tagging cards show them land, and say so if one needs a look. */
+function AddedStrip({ count, noPhoto, skipped, onMore, testId = "added-strip" }: { count: number; noPhoto: number; skipped?: number; onMore?: () => void; testId?: string }) {
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl bg-bone px-4 py-3 sm:flex-row sm:items-center sm:justify-between" data-testid={testId}>
+      <span className="flex flex-col">
+        <span className="text-[16px] font-semibold">{count} on {count === 1 ? "its" : "their"} way · tagging now{skipped ? ` · ${skipped} skipped` : ""}</span>
+        <span className="note">A few seconds each; the same color and size become one card. If one needs a look, the closet will say so.</span>
+        {noPhoto > 0 ? <span className="note mt-1" data-testid="added-no-photo">{noPhoto === 1 ? "One has no photo yet" : `${noPhoto} have no photo yet`}: the store wouldn’t give one. Add your own from the piece.</span> : null}
+      </span>
+      <div className="flex shrink-0 gap-2">
+        {onMore ? <button type="button" onClick={onMore} className="pill" data-testid="add-another-color">More of this</button> : null}
+        <Link href="/closet" className="pill pill-solid" data-testid="check-it">See closet →</Link>
+      </div>
     </div>
   );
 }
@@ -84,7 +101,7 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
   const [newColor, setNewColor] = useState("");
   const [words, setWords] = useState("");
   const [error, setError] = useState<string>();
-  const [added, setAdded] = useState<number>(0);
+  const [added, setAdded] = useState<{ count: number; noPhoto: number } | null>(null);
   const [pending, start] = useTransition();
   const [busy, setBusy] = useState<"lookup" | "words" | "photos" | "add" | null>(null);
 
@@ -93,7 +110,7 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
   const patch = (i: number, changes: Partial<Row>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...changes } : r)));
 
   function lookup() {
-    setError(undefined); setProduct(null); setAdded(0); setBusy("lookup");
+    setError(undefined); setProduct(null); setAdded(null); setBusy("lookup");
     start(async () => {
       const r = await lookupProductAction(url);
       setBusy(null);
@@ -153,16 +170,16 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
     setError(undefined); setBusy("add");
     start(async () => {
       const r = await addStoreRowsAction({
-        product: { url: product.url, name: product.name, brandText: product.brandText, storeName: product.storeName, priceText: product.priceText },
+        product: { url: product.url, name: product.name, brandText: product.brandText, storeName: product.storeName, priceText: product.priceText, category: product.category ?? null },
         rows: chosen.map((x) => ({ color: x.color, size: x.size ?? (sizeAll || null), quantity: x.quantity, imageUrl: x.imageUrl ?? product.imageUrl })),
       });
       setBusy(null);
       if (!r.ok) { setError(r.error); return; }
-      setAdded(r.value.count);
+      setAdded({ count: r.value.count, noPhoto: r.value.noPhoto });
       router.refresh();
     });
   }
-  function again() { setAdded(0); setRows((rs) => rs.map((r) => ({ ...r, quantity: 0, sizing: false }))); setWords(""); }
+  function again() { setAdded(null); setRows((rs) => rs.map((r) => ({ ...r, quantity: 0, sizing: false }))); setWords(""); }
 
   return (
     <div className="mt-5 flex flex-col gap-5">
@@ -171,45 +188,45 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
           <Input id="store-url" type="url" inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} enterKeyHint="go" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://shop.lululemon.com/…" data-testid="store-url" />
         </Field>
         {product ? <button type="submit" className="pill self-start" disabled={pending || !url.trim()} data-testid="lookup">{busy === "lookup" ? "Looking it up…" : "Look up another"}</button>
-          : <Button type="submit" size="lg" disabled={pending || !url.trim()} data-testid="lookup">{busy === "lookup" ? "Looking it up…" : "Look it up"}</Button>}
+          : <Button type="submit" size="lg" busy={busy === "lookup"} disabled={pending || !url.trim()} data-testid="lookup">{busy === "lookup" ? "Looking it up…" : "Look it up"}</Button>}
       </form>
       {error ? <Banner tone="danger" title={error} /> : null}
 
       {product ? (
         <div className="flex flex-col gap-6" data-testid="product-card">
           <div className="flex gap-4">
-            <div className="h-[170px] w-[128px] shrink-0 bg-bone">{product.imageUrl ? <img src={product.imageUrl} alt="" referrerPolicy="no-referrer" className="size-full object-contain" data-testid="product-image" /> : null}</div>
+            <StoreImg src={product.imageUrl} className="h-[170px] w-[128px] shrink-0 rounded-2xl" imgClassName="object-contain" testId="product-image" />
             <div className="min-w-0">
-              <h2 className="serif text-[26px] leading-tight" data-testid="product-name">{product.name}</h2>
-              <p className="mono mt-1 text-graphite">{[product.brandText, product.storeName, product.priceText].filter(Boolean).join(" · ")}</p>
-              {product.source === "search" ? <p className="mono mt-2 normal-case text-graphite" data-testid="via-search">{product.storeName} blocked the link, so this came from a product search. Check the photo is your piece; if not, tap “find a photo” on a color.</p> : null}
+              <h2 className="section leading-tight" data-testid="product-name">{product.name}</h2>
+              <p className="caption mt-1">{[product.brandText, product.storeName, product.priceText, product.category].filter(Boolean).join(" · ")}</p>
+              {product.source === "search" ? <p className="note mt-2" data-testid="via-search">{product.storeName} blocked the link, so this came from a product search. Check the photo is your piece; if not, tap “find a photo” on a color.</p> : null}
             </div>
           </div>
 
           <section>
-            <p className="mono mb-2 border-b border-ink pb-2 text-graphite">Size for all{sizeAll ? <span className="ml-2 text-ink" data-testid="chosen-size">· {sizeAll}</span> : null}</p>
+            <p className="caption mb-2">Size for all{sizeAll ? <span className="ml-2 font-medium text-ink" data-testid="chosen-size">· {sizeAll}</span> : null}</p>
             <div className="flex flex-col gap-2">
               <Pills options={product.sizes} value={sizeAll} onPick={(v) => { setSizeAll(v); setSizeTyped(""); }} testPrefix="size" />
               <form onSubmit={(e) => { e.preventDefault(); if (sizeTyped.trim()) { setSizeAll(sizeTyped.trim()); setSizeTyped(""); } }} className="flex gap-2">
                 <Input id="store-size" value={sizeTyped} onChange={(e) => setSizeTyped(e.target.value)} placeholder={product.sizes.length ? "Or type a size" : "M · 32 · 8"} aria-label="Size for all" data-testid="store-size" />
                 <Button type="submit" variant="outline" disabled={!sizeTyped.trim()} data-testid="size-next">Set</Button>
               </form>
-              <p className="mono text-graphite">One size differs? Tap “change” on that color.</p>
+              <p className="caption">One size differs? Tap “change” on that color.</p>
             </div>
           </section>
 
           <section>
-            <p className="mono mb-1 border-b border-ink pb-2 text-graphite">How many of each color?</p>
+            <p className="caption mb-1">How many of each color?</p>
             <div className="flex flex-col" data-testid="color-rows">
               {rows.map((r, i) => {
                 const size = r.size ?? sizeAll;
                 return (
                   <div key={rowKey(r)} className="border-b border-line py-2.5" data-testid={`row-${rowKey(r)}`}>
                     <div className="flex items-center gap-3">
-                      <div className="h-[56px] w-[42px] shrink-0 overflow-hidden bg-bone">{(r.imageUrl ?? product.imageUrl) ? <img src={r.imageUrl ?? product.imageUrl!} alt="" referrerPolicy="no-referrer" loading="lazy" className="size-full object-cover" data-testid={`row-image-${rowKey(r)}`} /> : null}</div>
+                      <StoreImg src={r.imageUrl ?? product.imageUrl} className="h-[56px] w-[42px] shrink-0 rounded-lg" testId={`row-image-${rowKey(r)}`} />
                       <div className="min-w-0 flex-1">
                         <p className={cn("text-[15px] leading-snug", r.quantity > 0 && "font-medium")}>{r.color ?? "No color given"}</p>
-                        <p className="mono mt-0.5 flex flex-wrap gap-x-3 text-graphite">
+                        <p className="caption mt-0.5 flex flex-wrap gap-x-3">
                           <span>{size ? `Size ${size}` : "No size"}{r.size && r.size !== sizeAll ? " · its own" : ""}</span>
                           <button type="button" onClick={() => patch(i, { sizing: !r.sizing })} className="underline underline-offset-4" data-testid={`row-size-change-${rowKey(r)}`}>{r.sizing ? "done" : "change"}</button>
                           {canSearch && r.color && !r.imageUrl && !r.picks ? <button type="button" onClick={() => findPhotos(i)} disabled={pending} className="underline underline-offset-4" data-testid={`find-photos-${rowKey(r)}`}>{busy === "photos" ? "searching…" : "find a photo"}</button> : null}
@@ -241,13 +258,8 @@ function LinkTab({ canSearch }: { canSearch: boolean }) {
             <button type="button" onClick={readWords} disabled={pending || !words.trim()} className="pill self-start" data-testid="read-words">{busy === "words" ? "Reading…" : "Read it"}</button>
           </section>
 
-          {added === 0 ? <Button size="lg" onClick={add} disabled={pending || !total} sub={total ? `${chosen.length} ${chosen.length === 1 ? "color" : "colors"}${sizeAll ? ` · size ${sizeAll}` : ""}` : "Tap + on a color first"} data-testid="add-to-closet">{busy === "add" ? "Adding…" : `Add ${total || ""} to closet`.replace("  ", " ")}</Button> : null}
-          {added > 0 ? (
-            <div className="flex items-center justify-between border-y border-ink py-2.5" data-testid="added-strip">
-              <span className="flex flex-col"><span className="mono tracking-[0.1em]">{added} added to the closet</span><span className="note">Tagging takes a few seconds each. The same color and size become one card. Watch them land in the closet.</span></span>
-              <div className="flex gap-4"><button type="button" onClick={again} className="pill" data-testid="add-another-color">More of this</button><Link href="/closet" className="pill pill-solid" data-testid="check-it">See closet →</Link></div>
-            </div>
-          ) : null}
+          {!added ? <Button size="lg" onClick={add} busy={busy === "add"} disabled={pending || !total} sub={total ? `${chosen.length} ${chosen.length === 1 ? "color" : "colors"}${sizeAll ? ` · size ${sizeAll}` : ""}` : "Tap + on a color first"} data-testid="add-to-closet">{busy === "add" ? "Adding…" : `Add ${total || ""} to closet`.replace("  ", " ")}</Button> : null}
+          {added ? <AddedStrip count={added.count} noPhoto={added.noPhoto} onMore={again} /> : null}
         </div>
       ) : null}
     </div>
@@ -283,19 +295,17 @@ function ReceiptTab() {
   const [openPicks, setOpenPicks] = useState<string | null>(null);
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState<"add" | null>(null);
-  const [done, setDone] = useState<{ count: number; skipped: number; batchId: string | null } | null>(null);
+  const [done, setDone] = useState<{ count: number; skipped: number; noPhoto: number; batchId: string | null } | null>(null);
   const [pending, start] = useTransition();
   const patchGroup = (id: number, changes: Partial<Group>) => setGroups((gs) => gs.map((g) => (g.id === id ? { ...g, ...changes } : g)));
 
+  /** The receipt goes straight into the read (review B E6): shrunk on the phone, sent inside the action, never stored. */
   async function readOne(file: File, id: number) {
     try {
-      const blob = await shrinkPhoto(file);
-      const signRes = await fetch("/api/uploads/sign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contentType: blob.type || "image/jpeg", kind: "labels" }) });
-      const signed = (await signRes.json()) as { key: string; url: string; headers: Record<string, string>; error?: string };
-      if (!signRes.ok) throw new Error(signed.error || "Upload failed.");
-      const put = await fetch(signed.url, { method: "PUT", headers: signed.headers, body: blob });
-      if (!put.ok) throw new Error("Upload failed.");
-      const r = await readReceiptAction(signed.key);
+      const blob = await shrinkPhoto(file, 1200, 0.82);
+      const form = new FormData();
+      form.set("receipt", blob, "receipt.jpg");
+      const r = await readReceiptAction(form);
       if (!r.ok) throw new Error(r.error);
       patchGroup(id, { receipt: r.value.receipt, lines: r.value.lines.map((l) => ({ ...l, pick: l.picks[0] ?? null })), reading: false, error: r.value.lines.length ? undefined : "No clothing lines were found on this one." });
     } catch (err) { patchGroup(id, { reading: false, error: (err as Error).message }); }
@@ -317,10 +327,10 @@ function ReceiptTab() {
     if (!ready.length) return;
     setError(undefined); setBusy("add");
     start(async () => {
-      const r = await addReceiptsAction(ready.map((g) => ({ storeName: g.receipt!.storeName ?? "", purchaseDate: g.receipt!.orderDate, lines: g.lines.map((l) => ({ name: l.name, color: l.color, size: l.size, quantity: l.quantity, priceText: l.priceText, pick: l.pick })) })));
+      const r = await addReceiptsAction(ready.map((g) => ({ storeName: g.receipt!.storeName ?? "", purchaseDate: g.receipt!.orderDate, lines: g.lines.map((l) => ({ name: l.name, color: l.color, size: l.size, quantity: l.quantity, priceText: l.priceText, category: l.category, pick: l.pick })) })));
       setBusy(null);
       if (!r.ok) { setError(r.error); return; }
-      setDone({ count: r.value.count, skipped: r.value.skipped, batchId: r.value.batchId });
+      setDone({ count: r.value.count, skipped: r.value.skipped, noPhoto: r.value.noPhoto, batchId: r.value.batchId });
       router.refresh();
     });
   }
@@ -328,29 +338,29 @@ function ReceiptTab() {
   return (
     <div className="mt-5 flex flex-col gap-5">
       <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onFiles} data-testid="receipt-file" />
-      <p className="note">Screenshots of order emails or photos of paper receipts, as many as you like. Each is read once and deleted; only the pieces and prices are kept.</p>
+      <p className="note">Screenshots of order emails or photos of paper receipts, as many as you like. Each is read once and never stored; only the pieces and prices are kept.</p>
       <Button size="lg" onClick={() => fileRef.current?.click()} disabled={busy === "add"} sub={groups.length ? "Add more receipts" : "Pick several at once"} data-testid="pick-receipt">Upload receipts</Button>
-      {reading ? <p className="mono text-ink" role="status" data-testid="receipt-progress">Reading {groups.length - reading + 1} of {groups.length} receipts…</p> : null}
+      {reading ? <p className="text-[15px] font-medium" role="status" data-testid="receipt-progress">Reading {groups.length - reading + 1} of {groups.length} receipts…</p> : null}
       {error ? <Banner tone="danger" title={error} /> : null}
 
       {groups.length ? (
         <div className="flex flex-col gap-6" data-testid="receipt-groups">
           {groups.map((g) => (
             <div key={g.id} className="flex flex-col" data-testid="receipt-group">
-              <div className="flex items-end justify-between border-b border-ink pb-2">
-                <p className="mono text-graphite">{g.reading ? `Reading ${g.fileName}…` : g.receipt ? [g.receipt.storeName ?? "Store", g.receipt.orderDate, g.lines.length ? `${g.lines.length} ${g.lines.length === 1 ? "line" : "lines"}` : null].filter(Boolean).join(" · ") : g.fileName}</p>
+              <div className="flex items-end justify-between border-b border-line pb-2">
+                <p className="caption">{g.reading ? `Reading ${g.fileName}…` : g.receipt ? [g.receipt.storeName ?? "Store", g.receipt.orderDate, g.lines.length ? `${g.lines.length} ${g.lines.length === 1 ? "line" : "lines"}` : null].filter(Boolean).join(" · ") : g.fileName}</p>
                 {!g.reading ? <button type="button" onClick={() => setGroups((gs) => gs.filter((x) => x.id !== g.id))} className="pill pill-sm pill-quiet" data-testid="remove-receipt">Remove</button> : null}
               </div>
-              {g.error ? <p className="mono mt-2 text-danger" data-testid="receipt-error">{g.error}</p> : null}
+              {g.error ? <p className="note mt-2" role="alert" data-testid="receipt-error">{g.error}</p> : null}
               {g.lines.map((l, i) => (
                 <div key={i} className="border-b border-line py-3" data-testid="receipt-line">
                   <div className="flex gap-3">
-                    <div className="h-[72px] w-[56px] shrink-0 overflow-hidden bg-bone">{l.pick?.imageUrl ? <img src={l.pick.imageUrl} alt="" referrerPolicy="no-referrer" className="size-full object-cover" /> : null}</div>
+                    <StoreImg src={l.pick?.imageUrl} className="h-[72px] w-[56px] shrink-0 rounded-lg" />
                     <div className="min-w-0 flex-1">
                       <p className="text-[15px] font-medium leading-snug">{l.name}</p>
-                      <p className="mono mt-1 text-graphite">{[l.color, l.size, l.quantity > 1 ? `×${l.quantity}` : null, l.priceText, l.pick?.query === "exact" ? "Exact item at the store" : l.pick ? "Closest match" : null].filter(Boolean).join(" · ")}</p>
+                      <p className="caption mt-1">{[l.color, l.size, l.quantity > 1 ? `×${l.quantity}` : null, l.priceText, l.category, l.pick?.query === "exact" ? "Exact item at the store" : l.pick ? "Closest match" : null].filter(Boolean).join(" · ")}</p>
                       <div className="mt-1.5 flex gap-4">
-                        {l.picks.length ? <button type="button" onClick={() => setOpenPicks(openPicks === `${g.id}:${i}` ? null : `${g.id}:${i}`)} className="pill pill-sm" data-testid="pick-another">{l.pick ? "Pick another" : "Pick a photo"}</button> : <span className="mono text-graphite">No photo found · take one later</span>}
+                        {l.picks.length ? <button type="button" onClick={() => setOpenPicks(openPicks === `${g.id}:${i}` ? null : `${g.id}:${i}`)} className="pill pill-sm" data-testid="pick-another">{l.pick ? "Pick another" : "Pick a photo"}</button> : <span className="caption">No photo found · take one later</span>}
                         {l.pick ? <button type="button" onClick={() => updateLine(g.id, i, { pick: null })} className="pill pill-sm pill-quiet">Skip this one</button> : null}
                       </div>
                     </div>
@@ -361,12 +371,9 @@ function ReceiptTab() {
             </div>
           ))}
           {done ? (
-            <div className="flex items-center justify-between border-y border-ink py-2.5" data-testid="added-strip">
-              <span className="flex flex-col"><span className="mono tracking-[0.1em]">{done.count} added to the closet{done.skipped ? ` · ${done.skipped} skipped` : ""}</span><span className="note">Tagging takes a few seconds each. Watch them land in the closet.</span></span>
-              <Link href="/closet" className="pill pill-solid" data-testid="check-it">See closet →</Link>
-            </div>
+            <AddedStrip count={done.count} noPhoto={done.noPhoto} skipped={done.skipped} />
           ) : (
-            <Button size="lg" onClick={add} disabled={pending || !total || reading > 0} sub={reading ? "Still reading" : groups.length > 1 ? `From ${groups.filter((g) => g.receipt).length} receipts` : undefined} data-testid="add-receipt">{busy === "add" ? "Adding…" : `Add ${total} piece${total === 1 ? "" : "s"}`}</Button>
+            <Button size="lg" onClick={add} busy={busy === "add"} disabled={pending || !total || reading > 0} sub={reading ? "Still reading" : groups.length > 1 ? `From ${groups.filter((g) => g.receipt).length} receipts` : undefined} data-testid="add-receipt">{busy === "add" ? "Adding…" : `Add ${total} piece${total === 1 ? "" : "s"}`}</Button>
           )}
         </div>
       ) : null}

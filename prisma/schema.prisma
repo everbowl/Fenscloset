@@ -533,6 +533,8 @@ model ImportEntry {
   item        Item?       @relation(fields: [itemId], references: [id], onDelete: SetNull)
 
   @@index([batchId, status])
+  /// Every registered photo looks itself up by key (review B B8): a scan of the table otherwise.
+  @@index([originalKey])
 }
 
 // ---------- Profiles & privacy (Phase 2) ----------
@@ -1014,6 +1016,8 @@ model Want {
   /** Matches found since the person last opened this want. */
   newCount       Int       @default(0)
   lastSearchedAt DateTime?
+  /** Why the last search brought nothing back (the stores or the judge did not answer); null after a search that worked. */
+  lastError      String?
   seenAt         DateTime?
   foundAt        DateTime?
   createdAt      DateTime  @default(now())
@@ -1036,6 +1040,8 @@ model BrandFeed {
   /** Product & { firstSeenAt }, newest first. */
   products      Json      @default("[]")
   lastFetchedAt DateTime?
+  /** Why the last refresh brought nothing back (the stores did not answer); null after a refresh that worked. */
+  lastError     String?
   seenAt        DateTime?
   updatedAt     DateTime  @updatedAt
   person        Person    @relation(fields: [personId], references: [id], onDelete: Cascade)

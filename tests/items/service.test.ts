@@ -9,7 +9,7 @@ import { seed } from "../../prisma/seed";
 import { getObject, newKey, objectExists, putObject } from "@/lib/storage";
 import { getOrCreateOpenBatch, openBatch, registerEntry } from "@/lib/import/service";
 import { drainQueue } from "@/lib/import/queue";
-import { createItemFromEntry, mergeIntoItem, mirrorFromItem, rotateItemPhoto, saveEntryEdits, skipEntry } from "@/lib/items/service";
+import { createItemFromEntry, deleteItem, isSure, mergeIntoItem, mirrorFromItem, rotateItemPhoto, saveEntryEdits, skipEntry } from "@/lib/items/service";
 import { findLikelyDuplicate } from "@/lib/items/duplicates";
 import { loadTagLists } from "@/lib/ai/tag-item";
 import type { EntryAiResult } from "@/lib/import/process";
@@ -132,5 +132,27 @@ describe("confirm → item", () => {
     expect(tags.seasonIds.length).toBeGreaterThan(0);
     const mya = await db.person.findFirstOrThrow({ where: { name: "Mya" } });
     await expect(mirrorFromItem(mya.id, again.id, owned.id)).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("a piece may land with no category only when the caller allows it (the store auto-add); Add all needs a sure card", async () => {
+    const e = await readyEntry();
+    await expect(createItemFromEntry(jeffId, e.id, { categoryId: null })).rejects.toThrow(/Pick a category/);
+    const item = await createItemFromEntry(jeffId, e.id, { categoryId: null }, { allowNoCategory: true });
+    expect(item.categoryId).toBeNull();
+    const tags = (e.aiResult as EntryAiResult).tags;
+    expect(isSure(tags)).toBe(true); // the mock tagger: Tops, Black, 0.9
+    expect(isSure({ ...tags, categoryId: null })).toBe(false);
+    expect(isSure({ ...tags, colorIds: [] })).toBe(false);
+    expect(isSure({ ...tags, confidence: 0.5 })).toBe(false);
+  });
+
+  it("deleting a piece takes its photos and its import entries with it (review B C7)", async () => {
+    const e = await readyEntry();
+    const item = await createItemFromEntry(jeffId, e.id);
+    const keys = (await db.itemPhoto.findMany({ where: { itemId: item.id } })).map((p) => p.bucketKey);
+    await deleteItem({ id: jeffId, role: "admin" }, item.id);
+    expect(await db.item.findUnique({ where: { id: item.id } })).toBeNull();
+    expect(await db.importEntry.findUnique({ where: { id: e.id } })).toBeNull();
+    for (const k of keys) expect(await objectExists(k)).toBe(false);
   });
 });

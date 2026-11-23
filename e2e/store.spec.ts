@@ -30,7 +30,7 @@ test.describe("add from a store", () => {
     await page.getByRole("button", { name: "One fewer Black" }).click(); // back to 2 pieces in all
     await expect(page.getByTestId("add-to-closet")).toContainText("Add 2 to closet");
     await page.getByTestId("add-to-closet").click();
-    await expect(page.getByTestId("added-strip")).toContainText("2 added to the closet"); // C1: no confirm card for store pieces
+    await expect(page.getByTestId("added-strip")).toContainText("2 on their way"); // review B E10: uploaded and tagging, not yet in the closet (C1: no confirm card for store pieces)
 
     // receipts: two in one pick, read side by side, one Add for both
     await page.getByTestId("tab-receipt").click();
@@ -46,7 +46,7 @@ test.describe("add from a store", () => {
     await expect(page.getByTestId("receipt-progress")).toBeHidden();
     await expect(page.getByTestId("add-receipt")).toContainText("Add 6 pieces");
     await page.getByTestId("add-receipt").click();
-    await expect(page.getByTestId("added-strip")).toContainText("6 added to the closet");
+    await expect(page.getByTestId("added-strip")).toContainText("6 on their way");
 
     // the pieces land in the closet on their own once tagged (C1); two of the same color and size are one card with ×2 (F)
     // 2 link rows (Oatmeal 1, Black 1) + 2 receipts × 2 lines; the page is server-rendered, so reload until the tagging is through
