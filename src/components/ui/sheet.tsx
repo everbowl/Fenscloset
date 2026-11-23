@@ -42,9 +42,13 @@ export function Sheet({ open, onClose, title, children, footer }: { open: boolea
     if (!open || !el || !vv) return;
     let field = false;
     const apply = () => {
-      if (!field) { el.style.maxHeight = ""; el.style.marginBottom = ""; return; }
+      // Only while a keyboard is really up (the visual viewport is well short of the window): with none, leaving the styles alone
+      // keeps the sheet's height steady, so a button does not move under a finger between the press and the release (23 Nov 2026:
+      // the Create invite tap landed on the form's padding after the Email field lost focus and the sheet snapped back).
+      const keyboard = Math.round(window.innerHeight - vv.height - vv.offsetTop);
+      if (!field || keyboard < 80) { el.style.maxHeight = ""; el.style.marginBottom = ""; return; }
       el.style.maxHeight = `${Math.round(vv.height)}px`;
-      el.style.marginBottom = `${Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop))}px`;
+      el.style.marginBottom = `${Math.max(0, keyboard)}px`;
     };
     const check = () => { const a = document.activeElement; field = Boolean(a && el.contains(a) && FIELD.test(a.tagName)); apply(); };
     let t: ReturnType<typeof setTimeout> | undefined;

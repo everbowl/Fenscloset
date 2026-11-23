@@ -35,6 +35,8 @@ export type MirrorJob = {
   seen: boolean;
   /** The request, kept so "Try again" can repeat it exactly. */
   request: MirrorRequest;
+  /** The request itself did not come back (a dropped connection, or the page left while it was in flight): the next page asks again. */
+  cut?: boolean;
 };
 
 type Ctx = {
@@ -58,6 +60,8 @@ const MirrorJobContext = createContext<Ctx | null>(null);
 const POLL_MS = 2000;
 const DEADLINE_MS = 5 * 60_000;
 const STORE_KEY = "fc.mirror.job";
+/** The words when the request itself did not come back (a dropped connection; or the page left while it was in flight). */
+const LOST = "The mirror didn’t come back. Try again.";
 
 function load(): MirrorJob | null {
   try {
@@ -75,24 +79,33 @@ export function MirrorJobProvider({ children }: { children: ReactNode }) {
   const seq = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const setJob = useCallback((next: MirrorJob | null | ((j: MirrorJob | null) => MirrorJob | null)) => {
-    setJobState((prev) => { const n = typeof next === "function" ? next(prev) : next; save(n); return n; });
+    // Only a real change is written: a child's effect (markSeen on /mirror) ran before the provider had read storage and used to
+    // write null over the stored job.
+    setJobState((prev) => { const n = typeof next === "function" ? next(prev) : next; if (n !== prev) save(n); return n; });
   }, []);
 
   const rejoin = useRef<MirrorJob | null>(null);
+  const leaving = useRef(false);
+  useEffect(() => {
+    const onHide = () => { leaving.current = true; };
+    window.addEventListener("pagehide", onHide);
+    return () => window.removeEventListener("pagehide", onHide);
+  }, []);
   useEffect(() => {
     const j = load();
     if (!j) return;
+    // Reloaded before the server had answered with a job id, or the leaving page's request was cut: ask again. The job
+    // helper joins the dressing already running for the same look (same key), so nothing is dressed twice.
+    const cut = j.status === "failed" && j.cut && Date.now() - j.startedAt < 90_000;
+    if ((j.status === "running" && !j.jobId) || cut) { const again = { ...j, status: "running" as const, error: null, cut: undefined }; rejoin.current = again; setJobState(again); return; }
     setJobState(j);
-    // Reloaded before the server had answered with a job id: ask again. The job helper joins the dressing already running
-    // for the same look (same key), so nothing is dressed twice.
-    if (j.status === "running" && !j.jobId) rejoin.current = j;
   }, []);
 
   // One answer, whichever call it came from: the picture, a job to keep asking about, or why not.
   const settle = useCallback((r: MirrorResult, mine: number, previous: TryOnView | null) => {
     if (mine !== seq.current) return;
     if (!r.ok) { setJob((j) => (j ? { ...j, status: "failed", error: r.error, tryOn: previous, seen: false } : j)); return; }
-    if ("tryOn" in r) { setJob((j) => (j ? { ...j, status: "done", tryOn: r.tryOn, error: null, jobId: null, seen: false } : j)); return; }
+    if ("tryOn" in r) { setJob((j) => (j ? { ...j, status: "done", tryOn: r.tryOn, error: null, jobId: null, seen: false, cut: undefined } : j)); return; }
     setJob((j) => (j ? { ...j, jobId: r.pending.jobId, step: r.pending.step } : j));
   }, [setJob]);
 
@@ -132,7 +145,7 @@ export function MirrorJobProvider({ children }: { children: ReactNode }) {
       return { personId: req.personId, look: req.look, on, view, pieces: req.pieces ?? (j && j.personId === req.personId ? j.pieces : ""), startedAt: Date.now(), step: "Getting ready…", status: "running", jobId: null, tryOn: previous, error: null, seen: true, request };
     });
     let r: MirrorResult;
-    try { r = await dressAction(request); } catch { r = { ok: false, error: "The mirror didn’t come back. Try again." }; }
+    try { r = await dressAction(request); } catch { if (leaving.current) return; setJob((j) => (j ? { ...j, cut: true } : j)); r = { ok: false, error: LOST }; } // a cut request is marked: the next page asks again
     settle(r, mine, previous);
   }, [setJob, settle]);
 
@@ -140,7 +153,7 @@ export function MirrorJobProvider({ children }: { children: ReactNode }) {
     const mine = ++seq.current;
     setJob((j) => (j ? { ...j, status: "running", step: "Keeping it…", startedAt: Date.now(), jobId: null, error: null } : j));
     let r: MirrorResult;
-    try { r = await keepTryOnAction({ personId, tryOnId }); } catch { r = { ok: false, error: "The mirror didn’t come back. Try again." }; }
+    try { r = await keepTryOnAction({ personId, tryOnId }); } catch { if (leaving.current) return; r = { ok: false, error: LOST }; }
     if (mine !== seq.current) return;
     setJob((j) => (j ? (r.ok && "tryOn" in r ? { ...j, status: "done", tryOn: r.tryOn, error: null } : { ...j, status: r.ok ? "done" : "failed", error: r.ok ? null : r.error }) : j));
   }, [setJob]);

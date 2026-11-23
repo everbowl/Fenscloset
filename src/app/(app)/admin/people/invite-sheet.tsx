@@ -42,8 +42,7 @@ export function InviteSheet({ admins, smsReady, existing, trigger }: {
       if (sendEmail && email) channels.push("email");
       if (sendSms && phone) channels.push("sms");
       const res = await invitePersonAction({ personId: existing?.id, name, email, phone, role, guardianIds: role === "minor" ? guardianIds : [], channels });
-      setResult(res);
-      if (res.ok) router.refresh();
+      setResult(res); // the page refreshes on Done: a refresh here remounted the sheet and the link vanished with it
     });
   }
 
@@ -54,7 +53,7 @@ export function InviteSheet({ admins, smsReady, existing, trigger }: {
       </span>
       <Sheet open={open} onClose={() => setOpen(false)} title={existing ? `Invite ${existing.name}` : "Add a person"}>
         {result?.ok ? (
-          <InviteLink result={result} name={name} email={email} phone={phone} onDone={() => setOpen(false)} />
+          <InviteLink result={result} name={name} email={email} phone={phone} onDone={() => { setOpen(false); router.refresh(); }} />
         ) : (
           <form onSubmit={submit} className="flex flex-col gap-4">
             {result && !result.ok ? <p className="text-[15px] leading-snug" role="alert">— {result.error}</p> : null}
