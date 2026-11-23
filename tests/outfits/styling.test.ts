@@ -21,22 +21,35 @@ describe("mirror styling (pure)", () => {
     expect([...featuresOf({ features: ["nonsense"], category: "Shoes" })]).toEqual([]);
   });
 
-  it("defaults to the first entry of each list; only groups the look has the features for; blank prompts give no instruction", () => {
+  it("defaults fill the chips but ask for nothing: a plain dressing is the try-on alone, with no styling key", () => {
     const tee = resolveStyling(lists, {}, undefined, ["top", "bottom"]);
     expect(tee.groups.map((g) => g.name)).toEqual(["Tuck"]);
+    expect(tee.groups[0].explicit).toBe(false);
     expect(tee.options).toEqual({ "g-tuck": "o-untucked" });
     expect(tee.poseId).toBe("p-stand");
-    expect(tee.instructions).toEqual(["the top worn untucked"]);
-    expect(tee.summary).toBe("Untucked"); // the pose has nothing to say, so it is not in the caption
-    expect(tee.key).toBe("pose=p-stand;g-tuck=o-untucked");
+    expect(tee.poseExplicit).toBe(false);
+    expect(tee.instructions).toEqual([]);
+    expect(tee.summary).toBe("");
+    expect(tee.key).toBeNull();
     const shirt = resolveStyling(lists, {}, undefined, ["top", "bottom", "button_front", "long_sleeve"]);
     expect(shirt.groups.map((g) => g.name)).toEqual(["Tuck", "Buttons", "Sleeves"]);
-    expect(shirt.instructions).toEqual(["the top worn untucked", "the top button undone"]); // Sleeves "Down" is blank
-    expect(shirt.summary).toBe("Untucked · Top one open · Down");
+    expect(shirt.instructions).toEqual([]);
     const dress = resolveStyling(lists, {}, undefined, ["top"]);
     expect(dress.groups).toEqual([]);
-    expect(dress.instructions).toEqual([]);
-    expect(dress.key).toBe("pose=p-stand");
+    expect(dress.key).toBeNull();
+  });
+
+  it("a tap on a chip, even the default one, turns the styling pass on for that look; blank prompts still give no instruction", () => {
+    const tapped = resolveStyling(lists, {}, { options: { "g-tuck": "o-untucked" } }, ["top", "bottom", "long_sleeve"]);
+    expect(tapped.groups.find((g) => g.id === "g-tuck")?.explicit).toBe(true);
+    expect(tapped.groups.find((g) => g.id === "g-sleeves")?.explicit).toBe(false);
+    expect(tapped.instructions).toEqual(["the top worn untucked"]);
+    expect(tapped.summary).toBe("Untucked");
+    expect(tapped.key).toBe("pose=;g-tuck=o-untucked");
+    const down = resolveStyling(lists, {}, { options: { "g-sleeves": "o-down" } }, ["top", "long_sleeve"]);
+    expect(down.instructions).toEqual([]); // "Down" has a blank prompt
+    expect(down.summary).toBe("Down");
+    expect(down.key).toBe("pose=;g-sleeves=o-down");
   });
 
   it("a pick wins over what is remembered, which wins over the default; unknown ids fall back", () => {
@@ -57,7 +70,7 @@ describe("mirror styling (pure)", () => {
     const a = resolveStyling(lists, { options: { "g-sleeves": "o-rolled", "g-buttons": "o-all" } }, undefined, ["button_front", "long_sleeve"]);
     const b = resolveStyling({ ...lists, groups: [...lists.groups].reverse() }, { options: { "g-buttons": "o-all", "g-sleeves": "o-rolled" } }, undefined, ["long_sleeve", "button_front"]);
     expect(a.key).toBe(b.key);
-    expect(a.key).toBe("pose=p-stand;g-buttons=o-all;g-sleeves=o-rolled");
+    expect(a.key).toBe("pose=;g-buttons=o-all;g-sleeves=o-rolled");
   });
 
   it("the artist's brief lists only the changes and tells it to keep the person and the clothes", () => {

@@ -150,14 +150,15 @@ describe("virtual try-on", () => {
     await tryOnLook(jeff, jeff.id, [tee.id, jeans.id], "closet", undefined, "front", undefined, [], false, { step: (s) => steps.push(s) });
     expect(steps[0]).toBe("Dressing you · Tee, Jeans");
     expect(steps).toContain("Checking the picture…");
-    expect(steps.some((s) => s.startsWith("Styling · ") && s.includes("Untucked"))).toBe(true);
-    expect(steps.at(-1)).toBe("Checking the styled picture…");
+    // a plain dressing: no styling pass (the person as photographed; one engine call), so the check is the last step
+    expect(steps.some((s) => s.startsWith("Styling · "))).toBe(false);
+    expect(steps.at(-1)).toBe("Checking the picture…");
     const again: string[] = [];
     await tryOnLook(jeff, jeff.id, [tee.id, jeans.id], "closet", undefined, "front", undefined, [], false, { step: (s) => again.push(s) });
     expect(again).toEqual([]);
   });
 
-  it("styling: untucked by default on a top + bottom look, one raw picture plus one styled per set of choices; a pick is remembered", async () => {
+  it("styling: a plain dressing is the try-on alone; a tapped chip adds one styled picture per set of choices, and the pick is remembered", async () => {
     const jeff = await by("Jeff");
     await setTryOnEnabled(jeff, jeff.id, true);
     const bodyKey = newKey("bodies", jeff.id, "image/jpeg"); await putObject(bodyKey, await jpeg(), "image/jpeg");
@@ -171,30 +172,32 @@ describe("virtual try-on", () => {
 
     const first = await tryOnLook(jeff, jeff.id, [shirt.id, jeans.id], "today");
     expect(first.cached).toBe(false);
-    expect(first.styling?.groups.map((g) => g.name)).toEqual(["Tuck", "Buttons", "Sleeves", "Collar", "Hem"]);
-    expect(first.styling?.summary).toBe("Untucked · Top one open · Down · Down · As is");
+    expect(first.styling?.groups.map((g) => g.name)).toEqual(["Tuck", "Buttons", "Sleeves", "Collar", "Hem"]); // the chips show, with the defaults
+    expect(first.styling?.groups.every((g) => !g.explicit)).toBe(true);
+    expect(first.styling?.summary).toBe(""); // nothing was chosen: the try-on as it came, no image-model pass
     expect(first.styling?.poses[0]?.name).toBe("Standing, as photographed");
     const rows = await db.tryOn.findMany({ where: { personId: jeff.id }, orderBy: { createdAt: "asc" } });
-    expect(rows.map((r) => r.styling === null)).toEqual([true, false]); // the raw try-on, then the styled picture
-    expect(first.key).toBe(rows[1].bucketKey);
-    expect(rows[1].styling).toMatch(/^pose=.+;.+=.+/);
-    // same look again: the styled picture comes straight back
+    expect(rows.map((r) => r.styling)).toEqual([null]); // the raw try-on alone
+    expect(first.key).toBe(rows[0].bucketKey);
+    // same look again: the picture comes straight back
     const again = await tryOnLook(jeff, jeff.id, [jeans.id, shirt.id], "today");
     expect(again).toMatchObject({ id: first.id, cached: true });
-    expect(await db.tryOn.count({ where: { personId: jeff.id } })).toBe(2);
-    // a chip: tucked + top two open → one more styled picture, no second dressing
+    expect(await db.tryOn.count({ where: { personId: jeff.id } })).toBe(1);
+    // a chip: tucked → one styled picture over the same dressing, no second dressing
     const tuck = first.styling!.groups.find((g) => g.name === "Tuck")!;
     const tucked = await tryOnLook(jeff, jeff.id, [shirt.id, jeans.id], "today", undefined, "front", { options: { [tuck.id]: tuck.options.find((o) => o.name === "Tucked")!.id } });
     expect(tucked.cached).toBe(false);
-    expect(tucked.styling?.summary).toBe("Tucked · Top one open · Down · Down · As is");
-    expect(await db.tryOn.count({ where: { personId: jeff.id } })).toBe(3);
+    expect(tucked.styling?.summary).toBe("Tucked");
+    expect(tucked.styling?.groups.find((g) => g.name === "Tuck")?.explicit).toBe(true);
+    expect((await db.tryOn.findUniqueOrThrow({ where: { id: tucked.id } })).styling).toMatch(/^pose=;.+=.+/);
+    expect(await db.tryOn.count({ where: { personId: jeff.id } })).toBe(2);
     expect(await db.tryOn.count({ where: { personId: jeff.id, styling: null } })).toBe(1);
     // remembered: the next look opens tucked; a pose rides along too
     const remembered = await tryOnLook(jeff, jeff.id, [shirt.id, jeans.id], "today");
     expect(remembered).toMatchObject({ id: tucked.id, cached: true });
     const pockets = first.styling!.poses.find((p) => p.name === "Hands in pockets")!;
     const posed = await tryOnLook(jeff, jeff.id, [shirt.id, jeans.id], "today", undefined, "front", { poseId: pockets.id });
-    expect(posed.styling?.summary).toBe("Tucked · Top one open · Down · Down · As is · Hands in pockets");
+    expect(posed.styling?.summary).toBe("Tucked · Hands in pockets");
     expect(posed.styling?.poseId).toBe(pockets.id);
     expect((await db.person.findUniqueOrThrow({ where: { id: jeff.id } })).mirrorPrefs).toMatchObject({ poseId: pockets.id });
     // a dress alone: no tuck, nothing to change → just the raw try-on, and the history lists only the styled pictures of the shirt look
@@ -203,7 +206,7 @@ describe("virtual try-on", () => {
     expect(alone.styling?.summary).toBe("");
     expect((await db.tryOn.findUniqueOrThrow({ where: { id: alone.id } })).styling).toBeNull();
     const history = await listTryOns(jeff.id);
-    expect(history.map((h) => h.id)).toEqual([alone.id, posed.id, tucked.id, first.id]);
+    expect(history.map((h) => h.id)).toEqual([alone.id, posed.id, tucked.id]); // the shirt look's raw picture hides behind its styled ones
   });
 
 

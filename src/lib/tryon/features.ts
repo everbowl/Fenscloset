@@ -36,8 +36,10 @@ export type Styling = {
   instructions: string[];
   /** Labels for the caption, e.g. "Untucked · Top one open · Hands in pockets". */
   summary: string;
-  /** The groups that apply to this look, in list order, with the chosen option id. */
-  groups: { id: string; name: string; chosen: string; options: { id: string; name: string }[] }[];
+  /** The groups that apply to this look, in list order, with the chosen option id; `explicit` when the person chose it (a tap now or remembered), not the list's default. */
+  groups: { id: string; name: string; chosen: string; explicit: boolean; options: { id: string; name: string }[] }[];
+  /** The pose was the person's choice, not the list's first entry. */
+  poseExplicit: boolean;
 };
 
 /** The kinds of pieces the try-on model can place on a body, in the order they go on (outer layer last). Hats, bags and jewelry can't be placed. */
@@ -80,6 +82,11 @@ export function featuresOf(piece: { features?: string[] | null; category?: strin
 /**
  * Pure: the styling for one look from the lists, the person's remembered choices, this call's picks and
  * the look's features. Picks win over remembered choices, which win over the first entry of each list.
+ *
+ * Only a choice the person made (now, or remembered) becomes an instruction. The list's default fills the
+ * chip row but asks the image model for nothing, so a plain dressing is the try-on alone: one engine call,
+ * the person as photographed (23 Nov 2026: the styling pass redrew people they did not recognize and added
+ * 10–20 s to every look). The first tap on a chip, even on the default, turns the pass on for that look.
  */
 export function resolveStyling(lists: StylingLists, remembered: StylingChoice, pick: StylingChoice | undefined, features: Iterable<string>): Styling {
   const have = new Set(features);
@@ -88,19 +95,30 @@ export function resolveStyling(lists: StylingLists, remembered: StylingChoice, p
   const chosenGroups: Styling["groups"] = [];
   const instructions: string[] = [];
   const labels: string[] = [];
+  const explicitOptions: Record<string, string> = {};
   for (const g of groups) {
     const want = pick?.options?.[g.id] ?? remembered.options?.[g.id];
-    const opt = g.options.find((o) => o.id === want) ?? g.options[0];
+    const chosen = g.options.find((o) => o.id === want);
+    const opt = chosen ?? g.options[0];
     options[g.id] = opt.id;
-    chosenGroups.push({ id: g.id, name: g.name, chosen: opt.id, options: g.options.map((o) => ({ id: o.id, name: o.name })) });
-    if (opt.prompt.trim()) instructions.push(opt.prompt.trim());
-    labels.push(opt.name);
+    const explicit = Boolean(chosen);
+    chosenGroups.push({ id: g.id, name: g.name, chosen: opt.id, explicit, options: g.options.map((o) => ({ id: o.id, name: o.name })) });
+    if (explicit) {
+      explicitOptions[g.id] = opt.id;
+      if (opt.prompt.trim()) instructions.push(opt.prompt.trim());
+      labels.push(opt.name);
+    }
   }
   const wantPose = pick?.poseId !== undefined ? pick.poseId : remembered.poseId;
-  const pose = lists.poses.find((p) => p.id === wantPose) ?? lists.poses[0] ?? null;
-  if (pose?.prompt.trim()) { instructions.push(pose.prompt.trim()); labels.push(pose.name); }
-  const key = groups.length || pose ? [`pose=${pose?.id ?? ""}`, ...Object.entries(options).sort(([a], [b]) => a.localeCompare(b)).map(([g, o]) => `${g}=${o}`)].join(";") : null;
-  return { poseId: pose?.id ?? null, options, key, instructions, summary: labels.join(" · "), groups: chosenGroups };
+  const chosenPose = lists.poses.find((p) => p.id === wantPose) ?? null;
+  const pose = chosenPose ?? lists.poses[0] ?? null;
+  const poseExplicit = Boolean(chosenPose);
+  if (poseExplicit && pose?.prompt.trim()) { instructions.push(pose.prompt.trim()); labels.push(pose.name); }
+  // The cache key names only what the person chose: a plain dressing has no key and is the raw picture.
+  const key = poseExplicit || Object.keys(explicitOptions).length
+    ? [`pose=${poseExplicit ? pose?.id ?? "" : ""}`, ...Object.entries(explicitOptions).sort(([a], [b]) => a.localeCompare(b)).map(([g, o]) => `${g}=${o}`)].join(";")
+    : null;
+  return { poseId: pose?.id ?? null, options, key, instructions, summary: labels.join(" · "), groups: chosenGroups, poseExplicit };
 }
 
 /** The artist's brief for the styling pass over a dressed person. Only the listed changes; the person and the clothes stay. */

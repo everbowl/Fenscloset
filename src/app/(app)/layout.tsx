@@ -8,6 +8,7 @@ import { AppHeader } from "@/components/app-header";
 import { PersonMenu } from "@/components/person-menu";
 import { HeaderBack } from "@/components/header-back";
 import { Crumbs } from "@/components/crumbs";
+import { MirrorJobProvider, MirrorStrip } from "@/components/mirror/mirror-job";
 import { accentColor } from "@/lib/rules";
 import { HeaderActionSlot } from "@/components/header-action";
 import { DevModeBanner } from "@/components/dev-mode-banner";
@@ -30,7 +31,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <AppHeader left={<div className="flex items-center"><Suspense><HeaderBack /></Suspense><PersonMenu views={views} current={current} isAdmin={isAdmin(person)} logout={logoutAction} setView={setViewAction} /></div>} right={<HeaderActionSlot />} />
       {/* Desktop (Q17): the tab row sits under the header; on phones it is the pinned bottom bar. */}
       <AppNav />
-      <main className="mx-auto w-full max-w-[480px] px-5 pb-[calc(76px+env(safe-area-inset-bottom)+24px)] pt-5 lg:max-w-[1040px] lg:px-10 lg:pb-16 lg:pt-8"><Suspense><Crumbs /></Suspense>{children}</main>
+      <MirrorJobProvider>
+        {/* A look being dressed keeps going on any page; this bar says where it stands (Jeff, 23 Nov 2026). */}
+        <MirrorStrip />
+        <main className="mx-auto w-full max-w-[480px] px-5 pb-[calc(76px+env(safe-area-inset-bottom)+24px)] pt-5 lg:max-w-[1040px] lg:px-10 lg:pb-16 lg:pt-8"><Suspense><Crumbs /></Suspense>{children}</main>
+      </MirrorJobProvider>
       <ToastHost />
     </div>
   );

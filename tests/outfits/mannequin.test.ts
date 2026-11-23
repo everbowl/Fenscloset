@@ -57,11 +57,12 @@ describe("see it on a mannequin", () => {
     const top = await db.item.create({ data: { ownerId: mya.id, name: "Tee", categoryId: (await cat("Tops")).id, photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
     const skirt = await db.item.create({ data: { ownerId: mya.id, name: "Skirt", categoryId: (await cat("Bottoms")).id, photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
     const first = await mannequinLook(mya, mya.id, [top.id, skirt.id], "today");
-    expect(first.styling?.summary).toBe("Untucked · As is");
+    expect(first.styling?.summary).toBe(""); // nothing chosen: the look as the model dresses it
+    expect(first.styling?.groups.map((g) => g.name)).toEqual(["Tuck", "Hem"]);
     const tuck = first.styling!.groups.find((g) => g.name === "Tuck")!;
     const tucked = await mannequinLook(mya, mya.id, [top.id, skirt.id], "today", undefined, undefined, { options: { [tuck.id]: tuck.options[1].id } });
     expect(tucked.id).not.toBe(first.id);
-    expect(tucked.styling?.summary).toBe("Tucked · As is");
+    expect(tucked.styling?.summary).toBe("Tucked");
     expect(await mannequinLook(mya, mya.id, [top.id, skirt.id], "today")).toMatchObject({ id: tucked.id, cached: true });
     expect(await db.tryOn.count({ where: { personId: mya.id } })).toBe(2);
   });

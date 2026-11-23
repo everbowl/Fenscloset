@@ -33,7 +33,7 @@ export type BodyViewSide = "front" | "back";
 /** A garment that is not a closet piece: the Shop's candidate, or a store find in a look (src/lib/looks). Its id keys the cached picture. */
 export type ExtraGarment = { id: string; name: string; category: string | null; buf: Buffer };
 /** The styling chips for the mirror: the pose row and each group that applies to the look, with what is chosen. */
-export type StylingView = { summary: string; poseId: string | null; poses: { id: string; name: string }[]; groups: Styling["groups"] };
+export type StylingView = { summary: string; poseId: string | null; poseExplicit: boolean; poses: { id: string; name: string }[]; groups: Styling["groups"] };
 export type TryOnView = {
   id: string; key: string; itemIds: string[]; createdAt: string; cached: boolean;
   /** Which body photo was dressed. */ view?: BodyViewSide;
@@ -41,6 +41,7 @@ export type TryOnView = {
   /** How the look is styled (pose, tuck, buttons…) and what else could be picked. */ styling?: StylingView;
   /** The styling pass did not come back: this is the plain try-on. */ stylingFailed?: boolean;
   /** The render check was not satisfied even after a second dressing: what it saw wrong, shown under the picture. */ note?: string | null;
+  /** The try-on left a piece wrong and the image model redrew the person: said on the picture, never passed off as the try-on (23 Nov 2026: "it's not me"). */ redrawn?: boolean;
   /** Who dressed it. */ engine?: Engine;
   /** Compare (Admin → Rules): the other engines' pictures of the same look, shown beside this one. */ alts?: TryOnView[];
   /** An engine without its key, or one that could not finish in a comparison: said under the picture. */ engineNote?: string;
@@ -55,7 +56,7 @@ export async function stylingFor(personId: string, itemIds: string[], pick: Styl
 }
 
 export function stylingView(lists: StylingLists, styling: Styling): StylingView {
-  return { summary: styling.summary, poseId: styling.poseId, poses: lists.poses.map((p) => ({ id: p.id, name: p.name })), groups: styling.groups };
+  return { summary: styling.summary, poseId: styling.poseId, poseExplicit: styling.poseExplicit, poses: lists.poses.map((p) => ({ id: p.id, name: p.name })), groups: styling.groups };
 }
 
 /** Dev/test stand-in for the styling pass: the same picture, a touch brighter, so a styled result is its own file. */
@@ -92,7 +93,9 @@ export const extraKeys = (extras: ExtraGarment[], source: string) => extras.map(
 /** Top, dress, bottom, shoes, outer layer: the order the engines dress in. A garment without a category goes first. */
 const byMirrorOrder = <T extends { category: string | null }>(gs: T[]): T[] => [...gs].sort((a, b) => ORDER.indexOf(a.category ?? "") - ORDER.indexOf(b.category ?? ""));
 /** Progress reports while a look is dressed ("Dressing you · Oxford", "Checking the picture…"), shown in the mirror while it runs. */
-export type DressingHooks = { step?: (step: string) => void };
+export type DressingHooks = { step?: (step: string) => void; /** Garments already fetched by the caller (Compare fetches once for every engine). */ garments?: { id: string; name: string; category: string | null; buf: Buffer }[] };
+/** The note a redrawn picture carries; the view's `redrawn` flag is read off it. */
+const REDRAWN = "Redrawn by the image model";
 
 export function isTryOnConfigured(): boolean {
   return process.env.MOCK_TRYON === "true" || isGoogleTryOnConfigured() || isFashnConfigured();
@@ -221,7 +224,7 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
   const where = { personId, bodyPhotoKey: photo.bucketKey, itemIds: { equals: cacheIds }, engine: by };
   if (fresh) await db.tryOn.deleteMany({ where }); // "Dress again": the look is dressed from scratch, raw and styled
   const pack = (row: { id: string; bucketKey: string; itemIds: string[]; createdAt: Date; note?: string | null }, cached: boolean, stylingFailed = false): TryOnView =>
-    ({ id: row.id, key: row.bucketKey, itemIds: row.itemIds, createdAt: row.createdAt.toISOString(), cached, view, engine: by, styling: stylingView(lists, styling), note: row.note ?? null, ...(stylingFailed ? { stylingFailed } : {}) });
+    ({ id: row.id, key: row.bucketKey, itemIds: row.itemIds, createdAt: row.createdAt.toISOString(), cached, view, engine: by, styling: stylingView(lists, styling), note: row.note ?? null, ...(row.note?.startsWith(REDRAWN) ? { redrawn: true } : {}), ...(stylingFailed ? { stylingFailed } : {}) });
 
   // The styled picture for these exact choices, if it was made before.
   if (styling.instructions.length) {
@@ -232,12 +235,14 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
   let raw = await db.tryOn.findFirst({ where: { ...where, styling: null }, orderBy: { createdAt: "desc" } });
   let rawCached = Boolean(raw);
   let person: Buffer;
+  // The pieces that went into the picture, kept for the styled picture's check (fetched once, not twice).
+  let dressed: { id: string; name: string; category: string | null; buf: Buffer }[] | null = null;
   if (raw) person = (await getObject(raw.bucketKey)).body;
   else {
-    const garments = byMirrorOrder([...extras, ...(await garmentImages(ids, view === "back"))]).slice(0, MAX_GARMENTS);
+    const garments = byMirrorOrder([...extras, ...(hooks.garments ?? (await garmentImages(ids, view === "back")))]).slice(0, MAX_GARMENTS);
     if (!garments.length) throw new TryOnError("None of these pieces has a photo the try-on can use.");
     const skipped = garments.filter(leftOut);
-    const dressed = garments.filter((g) => !leftOut(g));
+    dressed = garments.filter((g) => !leftOut(g));
     if (!dressed.length) throw new TryOnError(`${ENGINE_WORD[by]} doesn’t place shoes yet. Pick a top, bottom or dress too.`);
     const body = await sharp((await getObject(photo.bucketKey)).body).rotate().resize(1024, 1024, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
     person = body;
@@ -280,7 +285,8 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
         const again = process.env.MOCK_TRYON === "true" ? await mockStyle(person) : await sharp(await googleImage([{ data: body, mimeType: "image/jpeg" }, ...(await Promise.all(dressed.map(async (g) => ({ data: await sharp(g.buf).flatten({ background: "#ffffff" }).resize(1024, 1024, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer(), mimeType: "image/jpeg" as const }))))], dressPrompt(dressed.map((g) => g.name)), fetch, { relaxed: true })).jpeg({ quality: 90 }).toBuffer();
         step("Checking again…");
         const second = await renderVerdict(again, dressed);
-        if (second.ok) person = again;
+        // The redraw is shown only when it passes, and then it says so on the picture: the person was redrawn, not dressed.
+        if (second.ok) { person = again; note = `${REDRAWN}: the try-on got a piece wrong (${verdict.problem}).`; }
         else { note = `The mirror isn’t sure about this one: ${second.problem ?? verdict.problem}`; console.log(`tryon: second render check: ${second.problem}`); }
       } catch (e) { console.error("tryon: second dressing failed", e); note = `The mirror isn’t sure about this one: ${verdict.problem}`; }
     }
@@ -305,7 +311,7 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
   // The styling pass is an edit by the image model and can re-draw a piece (a crew neck came back as a polo): the styled
   // picture gets the same check as the dressed one, and when a piece changed, the verified picture is shown instead.
   step("Checking the styled picture…");
-  const styledGarments = (await garmentImages(ids, view === "back")).filter((g) => !leftOut(g));
+  const styledGarments = dressed ?? (await garmentImages(ids, view === "back")).filter((g) => !leftOut(g)); // a cached raw picture: fetch once here
   const styledVerdict = await renderVerdict(styledBuf, styledGarments);
   if (!styledVerdict.ok) { console.log(`tryon: styled picture failed the check (${styledVerdict.problem}); showing the plain try-on`); return pack(raw, rawCached, true); }
   const key = newKey("tryon", personId, "image/jpeg");
@@ -355,6 +361,7 @@ async function keptEngine(personId: string, itemIds: string[], view: BodyViewSid
  * (G1) is shown alone until "Dress again".
  */
 export async function dressOnMe(viewer: Viewer, personId: string, itemIds: string[], source: string, view: BodyViewSide = "front", pick?: StylingChoice, fresh = false, hooks: DressingHooks = {}, extras: ExtraGarment[] = [], extraFeatures: string[] = []): Promise<TryOnView> {
+  await assertReady(viewer, personId); // before any engine or lookup runs: a minor or someone else's body never gets further
   const { engines, note } = await mirrorEngines();
   if (!engines.length) throw new TryOnError("Try-on isn’t set up on the site yet.");
   const keyIds = [...new Set(itemIds), ...extraKeys(extras, source)]; // the kept engine (Compare) is remembered per look, store finds included
@@ -366,9 +373,11 @@ export async function dressOnMe(viewer: Viewer, personId: string, itemIds: strin
     if (kept && engines.includes(kept)) return { ...withNote(await tryOnLook(viewer, personId, itemIds, source, extras, view, pick, extraFeatures, false, hooks, kept)), kept: true };
   }
   if (pick) await stylingFor(personId, [...new Set(itemIds)], pick); // remembered once, before either engine reads it
+  hooks.step?.("Getting the pieces…");
+  const garments = await garmentImages([...new Set(itemIds)], view === "back"); // once, for every engine
   const steps: Partial<Record<Engine, string>> = {};
   const report = () => hooks.step?.(engines.map((e) => `${ENGINE_WORD[e]} · ${steps[e] ?? "starting…"}`).join("   "));
-  const results = await Promise.allSettled(engines.map((e) => tryOnLook(viewer, personId, itemIds, source, extras, view, undefined, extraFeatures, fresh, { step: (s) => { steps[e] = s; report(); } }, e)));
+  const results = await Promise.allSettled(engines.map((e) => tryOnLook(viewer, personId, itemIds, source, extras, view, undefined, extraFeatures, fresh, { step: (s) => { steps[e] = s; report(); }, garments }, e)));
   const ok = results.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
   const failed = results.flatMap((r, i) => (r.status === "rejected" ? [`${ENGINE_WORD[engines[i]]}: ${(r.reason as Error).message}`] : []));
   if (!ok.length) throw results[0].status === "rejected" ? results[0].reason : new TryOnError("The mirror didn’t come back.");
@@ -379,6 +388,12 @@ export async function dressOnMe(viewer: Viewer, personId: string, itemIds: strin
 /** What an engine said about a body photo it could not make out (the Closet's What's-needed asks for a retake); null once a dressing on it works. */
 export async function noteBodyPhotoProblem(photoId: string, problem: string | null): Promise<void> {
   await db.bodyPhoto.update({ where: { id: photoId }, data: { problem } }).catch(() => {}); // the photo may have been removed meanwhile
+}
+
+/** Is the person's current front photo locked "only me"? A retake from the mirror keeps the same lock. */
+export async function frontPhotoOnlyMe(personId: string): Promise<boolean> {
+  const p = (await db.bodyPhoto.findFirst({ where: { personId, view: "front" }, orderBy: { takenAt: "desc" }, select: { onlyMe: true } })) ?? (await db.bodyPhoto.findFirst({ where: { personId }, orderBy: { takenAt: "desc" }, select: { onlyMe: true } }));
+  return Boolean(p?.onlyMe);
 }
 
 export async function hasBackPhoto(personId: string): Promise<boolean> {

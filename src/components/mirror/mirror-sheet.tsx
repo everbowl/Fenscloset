@@ -31,7 +31,7 @@ function completeSub(m: Mirror): string {
 /** "Google, FASHN and Kling" for the line under a comparison. */
 const engineList = (v: TryOnView) => [v, ...(v.alts ?? [])].map((p) => ENGINE_WORD[p.engine ?? "google"]).join(", ").replace(/, ([^,]*)$/, " and $1");
 
-export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState, backPhoto, mannequinAvailable , admin = false }: { /** Engine names and notes show for admins only. */ admin?: boolean;
+type MirrorProps = {
   m: Mirror;
   /** The pieces in the look, for the line under the picture ("White tee · Dark jeans"). */
   pieces: string;
@@ -41,8 +41,30 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
   personName: string;
   tryOnState: TryOnState;
   backPhoto: boolean;
+  /** The current front photo is locked "only me": a retake keeps that lock. */
+  bodyOnlyMe?: boolean;
   mannequinAvailable: boolean;
-}) {
+  /** Engine names and notes show for admins only. */
+  admin?: boolean;
+};
+
+/** The mirror in its sheet, over the screen that started the dressing. The same body fills the full-screen /mirror page. */
+export function MirrorSheet(props: MirrorProps) {
+  const { m } = props;
+  return (
+    <Sheet open={m.open} onClose={() => m.setOpen(false)} title={m.pending ? "Complete the look" : "In the mirror"}
+      footer={m.pending ? <Button size="lg" className="w-full" sub={completeSub(m)} onClick={m.confirm} data-testid="complete-go">{m.pending.on === "me" ? "See it on me" : "See it on a mannequin"}</Button> : undefined}>
+      <MirrorBody {...props} />
+    </Sheet>
+  );
+}
+
+/**
+ * What the mirror shows: the picture (or progress), the pieces, the view row, the body photo row, the styling chips and
+ * what goes with it. `inline` is the full-screen page: the picture is taller and the complete-the-look button sits at the
+ * bottom of the body instead of a sheet footer.
+ */
+export function MirrorBody({ m, pieces, mine, personId, personName, tryOnState, backPhoto, bodyOnlyMe = false, mannequinAvailable, admin = false, inline = false }: MirrorProps & { inline?: boolean }) {
   const router = useRouter();
   const t = m.tryOn;
   const [secs, setSecs] = useState(0);
@@ -53,6 +75,9 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
     const id = setInterval(() => setSecs(Math.max(0, Math.floor((Date.now() - startedAt) / 1000))), 1000);
     return () => clearInterval(id);
   }, [startedAt]);
+  // The screen knows the pieces' names: the bar under the header shows them while the person is elsewhere.
+  const describe = m.describe;
+  useEffect(() => { if (pieces) describe(pieces); }, [describe, pieces]);
 
   // The body photo, taken again (or added) without leaving the mirror; the look is then dressed on it.
   const fileRef = useRef<HTMLInputElement>(null);
@@ -66,13 +91,13 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
       const signRes = await fetch("/api/uploads/sign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contentType: blob.type || "image/jpeg", kind: "bodies", ownerId: personId }) });
       const signed = (await signRes.json()) as { key: string; url: string; headers: Record<string, string>; error?: string };
       if (!signRes.ok) throw new Error(signed.error || "Upload failed.");
-      const put = await fetch(signed.url, { method: "PUT", headers: signed.headers, body: blob });
+      const put = await fetch(signed.url, { method: "PUT", headers: signed.headers, body: blob, signal: AbortSignal.timeout(60_000) });
       if (!put.ok) throw new Error("Upload failed.");
       const view = m.on === "me" ? m.view : "front";
-      const r = await addBodyPhotoAction(personId, signed.key, false, view);
+      const r = await addBodyPhotoAction(personId, signed.key, bodyOnlyMe, view); // the new photo keeps the old one's privacy lock
       if (!r.ok) throw new Error(r.error);
       router.refresh();
-      void m.dress({ look: m.look, on: "me", view });
+      void m.dress({ look: m.look, on: "me", view, pieces });
     } catch (err) { m.setError((err as Error).message); } finally { setSaving(false); }
   }
 
@@ -84,43 +109,51 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
   // The pieces in the picture, by name when the wardrobe knows them (a swap under the picture changes them); else the screen's line.
   const known = t ? m.piecesOf(t.itemIds) : [];
   const line = t && known.length && known.length === t.itemIds.length ? known.map((k) => k.name).join(" · ") : pieces;
+  const frame = inline ? "relative w-full overflow-hidden rounded-2xl bg-bone aspect-[3/4] max-h-[72dvh]" : "relative h-[460px] overflow-hidden rounded-2xl bg-bone";
+  const all = t ? [t, ...(t.alts ?? [])] : [];
 
   return (
-    <Sheet open={m.open} onClose={() => m.setOpen(false)} title={m.pending ? "Complete the look" : "In the mirror"}
-      footer={m.pending ? <Button size="lg" shelf={false} className="w-full" sub={completeSub(m)} onClick={m.confirm} data-testid="complete-go">{m.pending.on === "me" ? "See it on me" : "See it on a mannequin"}</Button> : undefined}>
+    <div className="flex flex-col gap-3" data-testid={inline ? "mirror-screen" : undefined}>
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPhoto} data-testid="mirror-body-photo" />
       {m.error ? (
-        <div className="mb-3 flex flex-col gap-2">
+        <div className="flex flex-col gap-2">
           <Banner tone="danger" title={m.error} />
-          {!m.busy && m.look ? <button type="button" onClick={() => void m.dress({ look: m.look!, on: m.on, view: m.view })} className="pill self-start" data-testid="mirror-retry">Try again</button> : null}
+          {!m.busy && m.look ? <button type="button" onClick={() => void m.dress({ look: m.look!, on: m.on, view: m.view, pieces })} className="pill self-start" data-testid="mirror-retry">Try again</button> : null}
         </div>
       ) : null}
-      {m.pending ? <CompletePanel m={m} /> : t || m.busy ? (
+      {m.pending ? (
+        <>
+          <CompletePanel m={m} />
+          {inline ? <Button size="lg" className="w-full" sub={completeSub(m)} onClick={m.confirm} data-testid="complete-go">{m.pending.on === "me" ? "See it on me" : "See it on a mannequin"}</Button> : null}
+        </>
+      ) : t || m.busy ? (
         <div className="flex flex-col gap-3" {...(t ? { "data-testid": "try-on-sheet" } : {})}>
-          <div className="relative h-[460px] overflow-hidden bg-bone">
+          <div className={frame}>
             {t?.alts?.length ? (
-              <div className={`grid h-full gap-1 ${t.alts.length >= 2 ? "grid-cols-3" : "grid-cols-2"}`} data-testid="mirror-compare">
-                {[t, ...t.alts].map((p) => (
-                  <figure key={p.id} className="flex h-full flex-col">
-                    <figcaption className="mono px-2 pt-2 tracking-[0.18em]">{admin ? ENGINE_WORD[p.engine ?? "google"] : `Option ${[t, ...(t.alts ?? [])].indexOf(p) + 1}`}</figcaption>
-                    <img src={`/api/photo/${p.key}`} alt={admin ? `You wearing this look, by ${ENGINE_WORD[p.engine ?? "google"]}` : "You wearing this look"} className={`min-h-0 flex-1 object-contain ${m.busy ? "opacity-40" : ""}`} />
+              // Compare: every engine's picture side by side; three or more scroll sideways so each stays big enough to judge.
+              <div className={all.length >= 3 ? "strip h-full snap-x snap-mandatory gap-2" : "grid h-full grid-cols-2 gap-1"} data-testid="mirror-compare">
+                {all.map((p, i) => (
+                  <figure key={p.key} className={cn("flex h-full flex-col", all.length >= 3 && "w-[72%] shrink-0 snap-center")}>
+                    <figcaption className="caption px-2 pt-2">{admin ? ENGINE_WORD[p.engine ?? "google"] : `Option ${i + 1}`}</figcaption>
+                    <img src={`/api/photo/${p.key}`} alt={admin ? `You wearing this look, by ${ENGINE_WORD[p.engine ?? "google"]}` : "You wearing this look"} className={cn("min-h-0 flex-1 object-contain", m.busy && "opacity-40")} />
                     {/* G1: anyone keeps the column they like; the mirror shows it alone from then on. */}
                     {mine ? <button type="button" disabled={m.busy} onClick={() => void m.keep(p.id)} className="pill pill-sm mx-2 mb-2 mt-1.5" data-testid="mirror-keep">Keep this one</button> : null}
                   </figure>
                 ))}
               </div>
-            ) : t ? <img src={`/api/photo/${t.key}`} alt={t.mannequin ? "This look on a mannequin" : "You wearing this look"} className={`size-full object-contain ${m.busy ? "opacity-40" : ""}`} /> : <div className="mx-auto h-full w-[200px] py-10"><MirrorGlyph /></div>}
+            ) : t ? <img key={t.key} src={`/api/photo/${t.key}`} alt={t.mannequin ? "This look on a mannequin" : "You wearing this look"} className={cn("size-full object-contain", m.busy && "opacity-40")} /> : <div className="mx-auto h-full w-[200px] py-10 opacity-60"><MirrorGlyph /></div>}
+            {t?.redrawn && !m.busy ? <span className="absolute left-2 top-2 rounded-full bg-paper/95 px-2.5 py-1 text-[12px] font-medium text-ink" data-testid="mirror-redrawn">Redrawn by the image model</span> : null}
             {m.busy && m.progress ? (
               <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-paper/95 px-3 py-2.5" data-testid="mirror-progress" aria-live="polite">
-                <span className="mono tracking-[0.18em]">{m.progress.step}</span>
+                <span className="mono truncate">{m.progress.step}</span>
                 <span className="mono shrink-0 text-graphite" aria-hidden>{secs}s</span>
               </div>
             ) : null}
           </div>
-          {m.busy ? <p className="note">Usually 20 to 60 seconds. You can leave this screen; the picture is kept and waits for you.</p> : null}
+          {m.busy ? <p className="note">Usually about a minute. You can keep using the app: the bar under the header says when it’s ready.</p> : null}
           <p className="mono text-graphite" data-testid="mirror-pieces">{line}</p>
           {t?.styling?.summary ? <p className="mono text-ink" data-testid="styling-summary">{t.styling.summary}{t.stylingFailed ? " · didn’t take this time, showing the plain try-on" : ""}</p> : null}
-          {t ? <p className="mono text-ink">{t.mannequin ? `On a mannequin · No body photo used${mine ? "" : ` · ${personName}’s look`}` : t.alts?.length ? `On you${t.view === "back" ? " · from behind" : ""} · ${admin ? `${engineList(t)} side by side · pick the winner under Admin → Rules` : "side by side"} · Only you can see these pictures` : `On you${t.view === "back" ? " · from behind" : ""}${t.kept ? " · your pick" : ""}${admin && t.engine && t.engine !== "google" ? ` · dressed by ${ENGINE_WORD[t.engine]}` : ""} · Only you can see this picture`}{t.cached ? " · saved from before" : ""}</p> : null}
+          {t ? <p className="mono text-ink">{t.mannequin ? `On a mannequin · No body photo used${mine ? "" : ` · ${personName}’s look`}` : t.alts?.length ? `On you${t.view === "back" ? " · from behind" : ""} · ${admin ? `${engineList(t)} side by side` : `${all.length} options`}` : `On you${t.view === "back" ? " · from behind" : ""}${admin && t.engine ? ` · ${ENGINE_WORD[t.engine]}` : ""}${t.kept ? " · the one you kept" : ""}`}</p> : null}
           {t?.note ? <p className="mono text-graphite" data-testid="mirror-note">{t.alts?.length && admin ? `${ENGINE_WORD[t.engine ?? "google"]} · ` : ""}{t.note}</p> : null}
           {t?.alts?.filter((a) => a.note).map((a) => <p key={a.id} className="mono text-graphite" data-testid="mirror-alt-note">{admin ? `${ENGINE_WORD[a.engine ?? "fashn"]} · ` : ""}{a.note}</p>)}
           {t?.engineNote && admin ? <p className="mono text-graphite" data-testid="mirror-engine-note">{t.engineNote}</p> : null}
@@ -135,7 +168,7 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
               {views.map(([v, word]) => {
                 const current = v === "mannequin" ? m.on === "mannequin" : m.on === "me" && m.view === v;
                 return (
-                  <button key={v} type="button" disabled={m.busy} aria-pressed={current} onClick={() => { if (!current) m.switchTo(v as "front" | "back" | "mannequin"); }} className={`pill pill-sm ${current ? "pill-solid" : ""}`} data-testid={`mirror-${v}`}>{word}</button>
+                  <button key={v} type="button" disabled={m.busy} aria-pressed={current} onClick={() => { if (!current) m.switchTo(v as "front" | "back" | "mannequin"); }} className={cn("pill pill-sm", current && "pill-solid")} data-testid={`mirror-view-${v}`}>{word}</button>
                 );
               })}
             </div>
@@ -147,17 +180,18 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
               <button type="button" disabled={m.busy || saving} onClick={() => fileRef.current?.click()} className="pill pill-sm shrink-0" data-testid="retake-body-photo">{saving ? "Saving…" : tryOnState === "ready" ? "Retake" : "Add photo"}</button>
             </div>
           ) : null}
-          {/* How it shows: pose, tuck, buttons… one tap re-styles the same dressed picture (no second dressing). Lists live under Admin → Lists. */}
+          {/* How it shows: pose, tuck, buttons… a tap re-styles the dressed picture with a second pass by the image model; a plain dressing has none. Lists live under Admin → Lists. */}
           {t?.styling && (t.styling.poses.length > 1 || t.styling.groups.length) ? (
             <div className="flex flex-col gap-3 border-t border-line pt-3" data-testid="mirror-styling">
-              {[...(t.styling.poses.length > 1 ? [{ id: "pose", name: "Pose", chosen: t.styling.poseId ?? "", options: t.styling.poses }] : []), ...t.styling.groups].map((g) => (
+              <p className="caption">Restyle: tap how it should show. Each tap is a second pass by the image model, so the picture may change a little.</p>
+              {[...(t.styling.poses.length > 1 ? [{ id: "pose", name: "Pose", chosen: t.styling.poseId ?? "", explicit: t.styling.poseExplicit, options: t.styling.poses }] : []), ...t.styling.groups].map((g) => (
                 <div key={g.id} className="flex flex-col gap-1.5" data-testid={`style-group-${g.id === "pose" ? "pose" : g.name.toLowerCase().replace(/\s+/g, "-")}`}>
                   <span className="mono text-graphite">{g.name}</span>
                   <div className="flex flex-wrap gap-1.5">
                     {g.options.map((o) => {
-                      const current = o.id === g.chosen;
+                      const current = o.id === g.chosen && g.explicit;
                       return (
-                        <button key={o.id} type="button" disabled={m.busy} aria-pressed={current} onClick={() => { if (!current) m.restyle(g.id === "pose" ? { poseId: o.id } : { options: { [g.id]: o.id } }); }} className={`mono mono-11 h-9 px-3 ${current ? "bg-ink text-paper" : "border border-ink"}`} data-testid={`style-${o.id}`}>{o.name}</button>
+                        <button key={o.id} type="button" disabled={m.busy} aria-pressed={current} onClick={() => { if (!current) m.restyle(g.id === "pose" ? { poseId: o.id } : { options: { [g.id]: o.id } }); }} className={cn("pill pill-sm", current && "pill-solid")} data-testid="style-option">{o.name}</button>
                       );
                     })}
                   </div>
@@ -166,9 +200,10 @@ export function MirrorSheet({ m, pieces, mine, personId, personName, tryOnState,
             </div>
           ) : null}
           {t && !m.busy ? <GoWithRows m={m} /> : null}
+          {!inline && (t || m.busy) ? <Link href="/mirror" onClick={() => m.setOpen(false)} className="pill pill-quiet self-start" data-testid="mirror-full-screen">Open the full mirror</Link> : null}
         </div>
       ) : null}
-    </Sheet>
+    </div>
   );
 }
 
