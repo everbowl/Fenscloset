@@ -75,5 +75,8 @@ export function ruleKind(rule: { key: string; value?: string }): RuleKind {
   if (RULE_ONOFF_KEYS.includes(rule.key)) return "onoff";
   if (RULE_COLOR_KEYS.includes(rule.key)) return "color";
   if (RULE_TEXT_KEYS.includes(rule.key)) return "text";
+  // A rule the app does not know (the seed makes none like it): only then does its stored value say what it is. A known
+  // number rule saved as 0 or 1 stays a number (review E D1).
+  if (!(rule.key in RULE_COPY) && rule.value !== undefined && [...ON_WORDS, ...OFF_WORDS].includes(rule.value.trim().toLowerCase())) return "onoff";
   return "number";
 }
