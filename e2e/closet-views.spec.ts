@@ -48,7 +48,7 @@ test.describe("closet views", () => {
     await expect(page.getByText("1 of 5 pieces")).toBeVisible();
     await expect(cards).toHaveCount(1);
     await expect(cards.first()).toContainText("Black crew tee");
-    await expect(page.getByTestId("filter-button")).toHaveText("Filter · 2");
+    await expect(page.getByTestId("filter-button")).toHaveAttribute("aria-label", "Filter, 2 on");
     await expect(page.getByTestId("filter-chip")).toHaveText(["Black ×", "Favorites ×"]);
     await expect(page).toHaveURL(/color=/);
     await expect(page).toHaveURL(/fav=1/);

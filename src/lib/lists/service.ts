@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { Prisma } from "@/generated/prisma/client";
 import { LIST_DEFS, type ListKind } from "@/lib/lists/registry";
 
 export type ListEntry = {
@@ -206,11 +207,13 @@ export async function deleteEntry(kind: ListKind, id: string): Promise<void> {
 
 /** Persists a new order, all at once or not at all (review E E2: the updates used to run outside the transaction). Ids not mentioned keep their relative order after the mentioned ones. */
 export async function reorderEntries(kind: ListKind, orderedIds: string[]): Promise<void> {
-  const delegate = LIST_DEFS[kind].delegate;
-  await db.$transaction(async (tx) => {
-    const d = (tx as unknown as Record<string, Delegate>)[delegate];
-    for (const [i, id] of orderedIds.entries()) await d.update({ where: { id }, data: { sortOrder: i } });
-  });
+  if (!orderedIds.length) return;
+  // One statement for the whole list (review E E2, and 23 Nov: 152 row-by-row updates inside one transaction took seconds, and a
+  // page that reloaded meanwhile cut the request and rolled every one of them back). The table is the model's name; no list
+  // model is @@map'd.
+  const table = LIST_DEFS[kind].delegate.replace(/^./, (c) => c.toUpperCase());
+  const positions = orderedIds.map((_, i) => i);
+  await db.$executeRaw`UPDATE ${Prisma.raw(`"${table}"`)} AS t SET "sortOrder" = v.ord FROM UNNEST(${orderedIds}::text[], ${positions}::int[]) AS v(id, ord) WHERE t.id = v.id`;
 }
 
 /** Counts per kind for the admin overview, in one round (review E E3). */

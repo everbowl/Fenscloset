@@ -29,8 +29,8 @@ test("a dressing started on Today keeps going on the closet; the bar lands on th
   await expect(strip).toContainText(/Dressing the mannequin/);
   await page.goto("/closet");
   await expect(page.getByTestId("mirror-strip")).toBeVisible(); // still there on another page
-  await expect(page.getByTestId("mirror-strip")).toHaveAttribute("data-status", "done", { timeout: 30_000 });
-  await expect(page.getByTestId("mirror-strip")).toContainText("Your look is ready");
+  await expect(page.getByTestId("mirror-strip")).toContainText("Your look is ready", { timeout: 30_000 }); // on a failure the bar's words say why
+  await expect(page.getByTestId("mirror-strip")).toHaveAttribute("data-status", "done");
   await page.getByTestId("mirror-strip-see").click();
   await page.waitForURL(/\/mirror$/);
   await expect(page.getByTestId("mirror-screen")).toBeVisible();

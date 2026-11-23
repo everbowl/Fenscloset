@@ -49,6 +49,9 @@ test("Jeff fills his body profile and settings; parents edit Mya's; Olivia is in
   const sheet = page.getByRole("dialog");
   await sheet.getByRole("textbox", { name: "Email" }).fill("olivia@example.com");
   await sheet.getByRole("button", { name: "Create invite" }).click();
+  const refusal = sheet.getByRole("alert");
+  await expect(page.getByTestId("invite-url").or(refusal)).toBeVisible({ timeout: 20_000 });
+  if (await refusal.count()) throw new Error(`invite refused: ${await refusal.textContent()}`);
   const url = (await page.getByTestId("invite-url").textContent())!.trim();
 
   const ctx = await browser.newContext();

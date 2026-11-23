@@ -188,7 +188,7 @@ export function MirrorStrip() {
   if (job.status !== "running" && job.seen) return null;
   const pieces = job.pieces ? ` · ${job.pieces}` : "";
   return (
-    <div className="sticky top-14 z-20 bg-paper" data-testid="mirror-strip" data-status={job.status}>
+    <div className="sticky top-14 z-20 bg-paper" data-testid="mirror-strip" data-status={job.status} data-error={job.error ?? undefined}>
       <div className="mx-auto max-w-[480px] px-5 pt-2 lg:max-w-[1040px] lg:px-10">
         <div className="flex min-h-11 items-center gap-3 rounded-2xl bg-ink px-4 py-2 text-paper" role="status" aria-live="polite">
           {job.status === "running" ? (

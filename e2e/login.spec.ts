@@ -35,7 +35,7 @@ test("Jeff logs in with 0535 once, is forced to change it, then 0535 is dead", a
   await expect(page.getByTestId("password-strength")).toContainText("Strong enough");
   await page.getByRole("button", { name: "Save new password" }).click();
   await expect(page).toHaveURL(/\/today$/);
-  await expect(page.getByRole("heading", { name: /look/ })).toBeVisible();
+  await expect(page.getByTestId("greeting")).toBeVisible(); // Today greets by name on v2
   await expect(page.getByRole("status").filter({ hasText: /dev mode/i })).toHaveCount(0); // DEV strip gone
 
   await page.goto("/profile");
