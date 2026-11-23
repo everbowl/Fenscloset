@@ -33,6 +33,8 @@ const nextConfig: NextConfig = {
   // argon2 and pg are native/node-only; keep them out of the bundler.
   serverExternalPackages: ["argon2", "pg", "@prisma/adapter-pg", "sharp"],
   poweredByHeader: false,
+  // A check-in selfie goes through a server action; the phone shrinks it first, and a browser that cannot still fits (review D 4.1).
+  experimental: { serverActions: { bodySizeLimit: "6mb" } },
   env: { NEXT_PUBLIC_BUILD: buildId() },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];

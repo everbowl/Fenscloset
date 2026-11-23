@@ -7,6 +7,7 @@ import { Banner } from "@/components/ui/banner";
 import { PickSheet, Row, TextSheet } from "@/components/items/row-editor";
 import type { Named, PrivacyView } from "@/lib/profiles/service";
 import { ENGINE_WORD } from "@/lib/tryon/engines";
+import { PhoneSignInCode } from "@/components/auth/phone-code";
 import { disconnectCalendarAction, listCalendarsAction, setBodyViewersAction, setCalendarIdsAction, setSavedZipAction, setShoppersAction, setShopSectionAction, setTryOnEnabledAction } from "../actions";
 
 /** Settings (screen 14, undrawn): saved zip, who sees my body profile, who shops for me, password, calendar (Phase 3). */
@@ -93,6 +94,8 @@ export function SettingsEditor({ privacy, people, calendar }: { privacy: Privacy
       ) : null}
       <Group title="Account">
         <Link href="/change-password" className="tap flex h-12 items-center justify-between border-b border-line text-[15px]">Change password<span className="mono text-graphite">→</span></Link>
+        {/* A six-digit code signs this same person in on another phone, no typed password (brief §4; admins). */}
+        {privacy.isAdmin ? <PhoneSignInCode /> : null}
         <div className="flex min-h-12 items-center justify-between gap-3 border-b border-line py-2 text-[15px]" data-testid="row-calendar">
           <span className="min-w-0"><span className="block">Google Calendar</span>{calendar.connected ? <span className="caption block truncate">{calendar.email ?? "Connected"}</span> : null}</span>
           {calendar.connected

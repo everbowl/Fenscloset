@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/ui/page-header";
+import { requireAdmin } from "@/lib/auth/current";
 import { getRules } from "@/lib/rules";
 import { RULE_GROUPS } from "@/lib/rules-kind";
 import { RuleForm } from "./rule-form";
@@ -25,6 +26,7 @@ function GroupSection({ g }: { g: Group }) {
 
 /** Rules, grouped the way a parent thinks about them, each saving on its own the moment it changes. The technical ones fold under Advanced (R1). */
 export default async function RulesPage() {
+  await requireAdmin(); // first, before any rule is read (review A S3)
   const [rules, pending] = await Promise.all([getRules(), untidyPending()]);
   const byKey = new Map(rules.map((r) => [r.key, r]));
   const placed = new Set(RULE_GROUPS.flatMap((g) => g.keys));

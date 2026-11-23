@@ -49,7 +49,7 @@ export function InlineAdd({ kind, parentId, onCreated, label, variant = "ghost",
     return open ? (
       <form onSubmit={submit} className="flex w-full flex-col gap-3 border-t border-line pt-3" data-testid={`inline-add-form-${kind}`}>
         <Field label={`New ${def.singular}`} htmlFor="inline-add-name" error={error}>
-          <Input id="inline-add-name" value={name} onChange={(e) => setName(e.target.value)} autoFocus required maxLength={60} />
+          <Input id="inline-add-name" value={name} onChange={(e) => setName(e.target.value)} required maxLength={60} />
         </Field>
         <EntryExtraFields fields={def.extraFields} values={extra} onChange={(p) => setExtra((x) => ({ ...x, ...p }))} />
         <div className="flex gap-2">
@@ -69,7 +69,7 @@ export function InlineAdd({ kind, parentId, onCreated, label, variant = "ghost",
       <Sheet open={open} onClose={() => setOpen(false)} title={`New ${def.singular}`}>
         <form onSubmit={submit} className="space-y-4">
           <Field label="Name" htmlFor="inline-add-name" error={error}>
-            <Input id="inline-add-name" value={name} onChange={(e) => setName(e.target.value)} autoFocus required maxLength={60} />
+            <Input id="inline-add-name" value={name} onChange={(e) => setName(e.target.value)} required maxLength={60} />
           </Field>
           <EntryExtraFields fields={def.extraFields} values={extra} onChange={(p) => setExtra((x) => ({ ...x, ...p }))} />
           <Button type="submit" className="w-full" disabled={pending}>{pending ? "Adding…" : `Add ${def.singular}`}</Button>

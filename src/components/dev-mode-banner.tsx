@@ -11,7 +11,7 @@ export async function DevModeBanner() {
   }
   if (!active) return null;
   return (
-    <div role="alert" className="mono flex h-[30px] items-center justify-center bg-ink text-paper">
+    <div role="status" className="mono flex h-[30px] items-center justify-center bg-ink text-paper">
       Dev mode · one-time admin password active
     </div>
   );
