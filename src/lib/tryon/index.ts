@@ -141,6 +141,9 @@ async function assertReady(viewer: Viewer, personId: string) {
 
 /** Dev/test stand-in: the body photo with each garment pasted on, so the UI and privacy can be tested without Google. */
 export async function mockTryOn(person: Buffer, garments: Buffer[]): Promise<Buffer> {
+  // MOCK_TRYON_SLOW_MS: the stand-in takes its time, so the suites can watch a dressing run in the background (the bar under the header).
+  const slow = Number(process.env.MOCK_TRYON_SLOW_MS ?? 0);
+  if (slow > 0) await new Promise((r) => setTimeout(r, slow));
   const base = sharp(person).rotate().resize(600, 800, { fit: "cover" });
   const meta = { w: 600, h: 800 };
   const composites = await Promise.all(garments.map(async (g, i) => ({ input: await sharp(g).flatten({ background: "#ffffff" }).resize(Math.round(meta.w * 0.4), Math.round(meta.h * 0.3), { fit: "inside" }).png().toBuffer(), left: Math.round(meta.w * 0.3), top: Math.round(meta.h * (0.15 + i * 0.28)) })));
