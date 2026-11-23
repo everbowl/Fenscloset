@@ -60,7 +60,9 @@ export async function searchWantAction(wantId: string): Promise<WantResult> {
 export async function wantStatusAction(wantId: string, jobId: string): Promise<WantResult> {
   const me = await requirePerson();
   const status = jobStatus<string>(jobId, me.id);
-  if (!status) return { ok: false, error: "That search is gone. Try again." };
+  // Lost to a restart: the want row is the record (it says when it was last checked and why it failed), so count it done
+  // and let the screen re-read it instead of showing "gone" (review E C4/H2).
+  if (!status) return { ok: true, id: wantId };
   return answer(wantId, status, jobId);
 }
 

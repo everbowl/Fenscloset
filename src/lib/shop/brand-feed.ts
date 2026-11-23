@@ -3,7 +3,7 @@ import { startJob, type Job } from "@/lib/jobs";
 import { canShopFor, type Viewer } from "@/lib/people/visibility";
 import { getRuleNumber } from "@/lib/rules";
 import { ShopError } from "@/lib/shop/engine";
-import { searchProducts, type Product } from "@/lib/shop/products";
+import { searchProductsDetailed, type Product } from "@/lib/shop/products";
 import { withSection } from "@/lib/shop/section";
 import { mergeMatches, type Match, type StoredMatch } from "@/lib/shop/wants";
 
@@ -17,6 +17,10 @@ import { mergeMatches, type Match, type StoredMatch } from "@/lib/shop/wants";
 
 export type BrandFeedView = {
   personId: string; brands: string[]; products: Match[]; newCount: number; lastFetchedAt: Date | null;
+  /** How many favorite brands there are in all; the feed searches `brands` (at most six a day, taking turns). */
+  totalBrands: number;
+  /** Why the last refresh brought nothing back (the stores did not answer); null after one that worked. */
+  lastError: string | null;
   /** Never fetched, older than the schedule, or the brand list changed: the Shop refreshes it in the background. */
   stale: boolean;
 };
@@ -29,9 +33,17 @@ const MAX_BRANDS = 6;
 const FRESH_HOURS = 1;
 const DEFAULT_SWEEP_HOURS = 24;
 
+/** With more favorites than a day's searches, the window moves one brand a day so every brand gets its turn (review E F5). */
+export function brandWindow(all: string[], day = Math.floor(Date.now() / 86_400_000)): string[] {
+  if (all.length <= MAX_BRANDS) return all;
+  const start = ((day % all.length) + all.length) % all.length;
+  return Array.from({ length: MAX_BRANDS }, (_, i) => all[(start + i) % all.length]);
+}
+
 async function favorites(personId: string) {
   const p = await db.person.findUniqueOrThrow({ where: { id: personId }, select: { favoriteBrands: { where: { isArchived: false }, orderBy: { name: "asc" }, select: { name: true } }, favoriteStores: { where: { isArchived: false }, select: { name: true } }, shopSection: { select: { name: true, isArchived: true } } } });
-  return { brands: p.favoriteBrands.map((b) => b.name).slice(0, MAX_BRANDS), stores: p.favoriteStores.map((s) => s.name), section: p.shopSection && !p.shopSection.isArchived ? p.shopSection.name : null };
+  const all = p.favoriteBrands.map((b) => b.name);
+  return { brands: brandWindow(all), totalBrands: all.length, stores: p.favoriteStores.map((s) => s.name), section: p.shopSection && !p.shopSection.isArchived ? p.shopSection.name : null };
 }
 
 /** Each brand's results take turns so the row is not all one brand. */
@@ -43,22 +55,27 @@ export function interleave(lists: Product[][]): Product[] {
 }
 
 /** Search the stores for each favorite brand and fold what is new into the feed. `maxAgeHours`: how old a cached store answer may be. */
+export const STORES_DID_NOT_ANSWER = "The stores didn't answer. Tap Refresh to try again.";
+
 export async function refreshBrandFeed(personId: string, opts: { maxAgeHours?: number } = {}): Promise<{ added: number; brands: string[] }> {
   const { brands, stores, section } = await favorites(personId);
   const prefs = { favoriteStores: stores, favoriteBrands: brands, section };
-  const lists = await Promise.all(brands.map((b) => searchProducts(withSection([`${b} new arrivals`], section), prefs, fetch, { maxAgeHours: opts.maxAgeHours, limit: PER_BRAND })));
-  const found = interleave(lists);
+  const outcomes = await Promise.all(brands.map((b) => searchProductsDetailed(withSection([`${b} new arrivals`], section), prefs, fetch, { maxAgeHours: opts.maxAgeHours, limit: PER_BRAND })));
+  const found = interleave(outcomes.map((o) => o.products));
   const now = new Date();
+  // Every search failed and nothing came back: say so on the row instead of "nothing new" (review E B5); the old products stay.
+  const lastError = brands.length && outcomes.every((o) => o.failed.length && !o.products.length) ? STORES_DID_NOT_ANSWER : null;
   const row = await db.brandFeed.findUnique({ where: { personId } });
   const { matches, added } = mergeMatches((row?.products as StoredMatch[] | null) ?? [], found, null, now);
   const products = matches.slice(0, MAX_FEED) as object[];
-  await db.brandFeed.upsert({ where: { personId }, update: { brands, products, lastFetchedAt: now }, create: { personId, brands, products, lastFetchedAt: now } });
+  await db.brandFeed.upsert({ where: { personId }, update: { brands, products, lastFetchedAt: now, lastError }, create: { personId, brands, products, lastFetchedAt: now, lastError } });
+  if (lastError) throw new ShopError(lastError, 502);
   return { added, brands };
 }
 
-/** The refresh as a background job, one per person at a time; the result is the person's id. */
+/** The refresh as a background job, one per viewer and person at a time (a job is readable by its owner only, review E C4); the result is the person's id. */
 function startBrandFeedRefresh(viewer: Viewer, personId: string): Job<string> {
-  return startJob<string>(["brandfeed", personId].join("|"), viewer.id, async (step) => { step("Checking your brands…"); await refreshBrandFeed(personId, { maxAgeHours: FRESH_HOURS }); return personId; });
+  return startJob<string>(["brandfeed", viewer.id, personId].join("|"), viewer.id, async (step) => { step("Checking your brands…"); await refreshBrandFeed(personId, { maxAgeHours: FRESH_HOURS }); return personId; });
 }
 
 /** Start a refresh for someone the viewer may shop for. */
@@ -74,12 +91,12 @@ function sameBrands(a: string[], b: string[]): boolean {
 /** The feed as stored, with which products are new since the Shop was last opened and whether it needs a refresh. Null for anyone who may not shop for the person. */
 export async function getBrandFeed(viewer: Viewer, personId: string): Promise<BrandFeedView | null> {
   if (!(await canShopFor(viewer, personId))) return null;
-  const [{ brands }, row, hours] = await Promise.all([favorites(personId), db.brandFeed.findUnique({ where: { personId } }), getRuleNumber("wantSweepHours", DEFAULT_SWEEP_HOURS)]);
+  const [{ brands, totalBrands }, row, hours] = await Promise.all([favorites(personId), db.brandFeed.findUnique({ where: { personId } }), getRuleNumber("wantSweepHours", DEFAULT_SWEEP_HOURS)]);
   const since = row?.seenAt?.getTime() ?? 0;
   const products = ((row?.products as StoredMatch[] | null) ?? []).map((m) => ({ ...m, isNew: new Date(m.firstSeenAt).getTime() > since }));
   const age = row?.lastFetchedAt ? Date.now() - row.lastFetchedAt.getTime() : Infinity;
   const stale = brands.length > 0 && (!row?.lastFetchedAt || !sameBrands(row.brands, brands) || (hours > 0 && age > hours * 3600 * 1000));
-  return { personId, brands, products, newCount: products.filter((m) => m.isNew).length, lastFetchedAt: row?.lastFetchedAt ?? null, stale };
+  return { personId, brands, totalBrands, products, newCount: products.filter((m) => m.isNew).length, lastFetchedAt: row?.lastFetchedAt ?? null, lastError: row?.lastError ?? null, stale };
 }
 
 /** The feed as the Shop opens it: what is new is worked out first, then it is marked seen. */

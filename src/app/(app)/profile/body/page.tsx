@@ -12,9 +12,12 @@ export default async function BodyProfilePage() {
   const body = await getBodyProfile(viewer, owner.id);
   if (!body) {
     return (
-      <div>
-        <PageHeader title="Body" accent="profile" />
-        <p className="mono text-graphite">{owner.first}&apos;s body profile is private</p>
+      <div className="lg:max-w-[640px]">
+        <PageHeader title={owner.first} accent="body" />
+        <div className="card p-4">
+          <p className="text-[17px] font-semibold">{owner.first}&apos;s body profile is private</p>
+          <p className="note mt-1">{owner.role === "minor" ? `Only ${owner.first} and their parents see it.` : `Only ${owner.first} sees it, plus the people ${owner.first} chose in Settings.`}</p>
+        </div>
       </div>
     );
   }

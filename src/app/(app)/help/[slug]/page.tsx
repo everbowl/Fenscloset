@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isAdmin, requirePerson } from "@/lib/auth/current";
 import { PageHeader } from "@/components/ui/page-header";
+import { CrumbLabel } from "@/components/crumbs";
 import { findTopic, HELP_TOPICS } from "../content";
 import { CueTile } from "../cues";
 import { stepsFor } from "../steps";
@@ -24,21 +25,22 @@ export default async function HelpTopicPage({ params }: { params: Promise<{ slug
   const next = visible[i + 1];
   return (
     <div className="lg:max-w-[640px]" data-testid="help-topic">
+      <CrumbLabel label={`${topic.title} ${topic.accent}`} />
       <PageHeader title={topic.title} accent={topic.accent} action={<Link href={topic.link.href} className="pill pill-sm whitespace-nowrap">{topic.link.label}</Link>} />
-      <ol className="border-t border-ink">
+      <ol className="flex flex-col gap-2.5">
         {steps.map((step, n) => (
-          <li key={n} className="flex items-center gap-4 border-b border-line py-4">
+          <li key={n} className="card flex items-center gap-4 p-3">
             <CueTile cue={step.cue} className="h-[72px] w-[120px] shrink-0" />
             <div className="min-w-0">
-              <span className="mono text-graphite">{String(n + 1).padStart(2, "0")}</span>
-              <p className="mt-1 text-[15px] leading-snug">{step.text}</p>
+              <span className="caption">Step {n + 1}</span>
+              <p className="mt-0.5 text-[15px] leading-snug">{step.text}</p>
             </div>
           </li>
         ))}
       </ol>
-      <div className="mt-6 flex items-center justify-between">
-        <Link href="/help" className="pill pill-sm pill-quiet">All topics</Link>
-        {next ? <Link href={`/help/${next.slug}`} className="pill pill-sm">Next: {next.title} {next.accent} →</Link> : null}
+      <div className="mt-6 flex items-center justify-between gap-3">
+        <Link href="/help" className="pill pill-quiet">All topics</Link>
+        {next ? <Link href={`/help/${next.slug}`} className="pill pill-solid min-w-0"><span className="truncate">Next: {next.title} {next.accent} →</span></Link> : null}
       </div>
     </div>
   );

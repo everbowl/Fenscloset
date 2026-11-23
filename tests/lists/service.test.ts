@@ -75,6 +75,30 @@ describe("editable lists", () => {
     await deleteEntry("tag", tag.id);
   });
 
+  it("blocks deleting a brand, store, color or section that people's own data uses (review E E1)", async () => {
+    const jeff = await db.person.findUniqueOrThrow({ where: { email: "jeff@everbowl.com" } });
+    const lulu = await createEntry("brand", { name: "Zed Brand" });
+    const tops = (await listEntries("category")).find((c) => c.name === "Tops")!;
+    await db.bodySizeByBrand.create({ data: { personId: jeff.id, brandId: lulu.id, categoryId: tops.id, size: "L" } });
+    await expect(deleteEntry("brand", lulu.id)).rejects.toMatchObject({ name: "InUseError", count: 1, message: /sizes people recorded/ });
+    await db.bodySizeByBrand.deleteMany({ where: { brandId: lulu.id } });
+    await db.person.update({ where: { id: jeff.id }, data: { favoriteBrands: { connect: [{ id: lulu.id }] } } });
+    await expect(deleteEntry("brand", lulu.id)).rejects.toMatchObject({ name: "InUseError", message: /favorites/ });
+    await db.person.update({ where: { id: jeff.id }, data: { favoriteBrands: { set: [] } } });
+    await deleteEntry("brand", lulu.id);
+    const store = await createEntry("store", { name: "Zed Store", url: "zedstore.com" });
+    expect(store.url).toBe("https://zedstore.com/");
+    await expect(createEntry("store", { name: "Bad Store", url: "not a site" })).rejects.toBeInstanceOf(ValidationError);
+    await db.person.update({ where: { id: jeff.id }, data: { favoriteStores: { connect: [{ id: store.id }] } } });
+    await expect(deleteEntry("store", store.id)).rejects.toBeInstanceOf(InUseError);
+    const teal = await createEntry("color", { name: "Zed Teal", hex: "#008080" });
+    await db.person.update({ where: { id: jeff.id }, data: { avoidColors: { connect: [{ id: teal.id }] } } });
+    await expect(deleteEntry("color", teal.id)).rejects.toMatchObject({ name: "InUseError", message: /style profiles/ });
+    const section = (await listEntries("shopSection"))[0];
+    await db.person.update({ where: { id: jeff.id }, data: { shopSectionId: section.id } });
+    await expect(deleteEntry("shopSection", section.id)).rejects.toMatchObject({ name: "InUseError", message: /people/ });
+  });
+
   it("protects personal and Family closets from delete/archive", async () => {
     const family = (await listEntries("closet")).find((c) => c.closetKind === "family")!;
     await expect(deleteEntry("closet", family.id)).rejects.toBeInstanceOf(ProtectedEntryError);

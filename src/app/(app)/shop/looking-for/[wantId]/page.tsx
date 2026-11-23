@@ -3,6 +3,7 @@ import { requirePerson } from "@/lib/auth/current";
 import { openWant } from "@/lib/shop/wants";
 import { WantScreen } from "./want-screen";
 import { LookTray } from "@/components/looks/look-tray";
+import { CrumbLabel } from "@/components/crumbs";
 
 export const metadata = { title: "Looking for" };
 export const dynamic = "force-dynamic";
@@ -15,6 +16,7 @@ export default async function WantPage({ params }: { params: Promise<{ wantId: s
   if (!want) notFound();
   return (
     <>
+      <CrumbLabel label={want.text} />
       <WantScreen meId={me.id} want={want} />
       <LookTray personId={want.forPersonId} />
     </>

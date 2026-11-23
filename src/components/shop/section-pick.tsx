@@ -30,12 +30,12 @@ export function SectionPick({ personId, forName, mine, section, sections, isAdmi
         {isAdmin ? <button type="button" onClick={() => setOpen(true)} className="pill pill-sm pill-quiet">Another…</button> : null}
       </div>
     );
-    const note = error ? <p className="mono mt-2 text-danger" role="alert">{error}</p> : null;
+    const note = error ? <p className="caption mt-2 text-danger" role="alert">{error}</p> : null;
     if (bare) return <>{pills}{note}{sheet}</>;
     return (
-      <div className={cn("border-y border-ink py-3", className)} data-testid="shop-section-ask">
-        <p className="mono text-ink">Which section {mine ? "do you" : `does ${forName}`} shop in?</p>
-        <p className="note mt-1">Every store search carries it, so the other section stays out.</p>
+      <div className={cn("card px-4 py-3", className)} data-testid="shop-section-ask">
+        <p className="text-[17px] font-semibold">Which section {mine ? "do you" : `does ${forName}`} shop in?</p>
+        <p className="note mt-0.5">Every store search carries it, so the other section stays out.</p>
         {pills}
         {note}
         {sheet}
@@ -45,7 +45,7 @@ export function SectionPick({ personId, forName, mine, section, sections, isAdmi
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={cn("pill pill-sm pill-quiet", className)} aria-haspopup="dialog" data-testid="shop-section">{section.name} <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden><path d="m6 9 6 6 6-6" /></svg></button>
-      {error ? <p className="mono text-danger" role="alert">{error}</p> : null}
+      {error ? <p className="caption text-danger" role="alert">{error}</p> : null}
       {sheet}
     </>
   );

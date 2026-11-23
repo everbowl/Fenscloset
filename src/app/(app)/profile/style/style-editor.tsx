@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Banner } from "@/components/ui/banner";
 import { PickSheet, Row } from "@/components/items/row-editor";
+import { ReadRow } from "@/components/profile/read-row";
 import type { Named, StyleProfileView } from "@/lib/profiles/service";
 import { setNeverSuggestAction, updateStyleAction } from "../actions";
 
@@ -19,28 +20,37 @@ export function StyleEditor({ ownerId, style, colors, words, canEdit, canEditLis
   function save(patch: { lovedColorIds?: string[]; avoidColorIds?: string[]; styleWordIds?: string[] }) {
     start(async () => { const r = await updateStyleAction(ownerId, patch); if (!r.ok) setError(r.error); router.refresh(); });
   }
-  const open = (k: typeof sheet) => canEdit && setSheet(k);
+  // A viewer with read access gets plain rows, never a tap that does nothing (review E G2).
+  const row = (k: NonNullable<typeof sheet>, label: string, value: string, muted: boolean, testId?: string, trailing?: React.ReactNode) => canEdit
+    ? <Row label={label} value={value} muted={muted} onClick={() => setSheet(k)} testId={testId} trailing={trailing} />
+    : <ReadRow label={label} value={value} muted={muted} testId={testId} trailing={trailing} />;
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {error ? <Banner tone="danger" title={error} /> : null}
       <section>
-        <p className="mono border-b border-ink pb-2 text-graphite">Colors</p>
-        <Row label="Loved" value={names(colors, style.lovedColorIds) || "Pick colors"} muted={!style.lovedColorIds.length} onClick={() => open("loved")} testId="row-loved" trailing={<Swatches colors={colors} ids={style.lovedColorIds} />} />
-        <Row label="Avoid" value={names(colors, style.avoidColorIds) || "None"} muted={!style.avoidColorIds.length} onClick={() => open("avoid")} trailing={<Swatches colors={colors} ids={style.avoidColorIds} />} />
+        <h2 className="section">Colors</h2>
+        <div className="card mt-3 px-4">
+          {row("loved", "Loved", names(colors, style.lovedColorIds) || (canEdit ? "Pick colors" : "None yet"), !style.lovedColorIds.length, "row-loved", <Swatches colors={colors} ids={style.lovedColorIds} />)}
+          {row("avoid", "Avoid", names(colors, style.avoidColorIds) || "None", !style.avoidColorIds.length, undefined, <Swatches colors={colors} ids={style.avoidColorIds} />)}
+        </div>
       </section>
       <section>
-        <p className="mono border-b border-ink pb-2 text-graphite">Style</p>
-        <Row label="Words" value={names(wordList, style.styleWordIds) || "Pick words"} muted={!style.styleWordIds.length} onClick={() => open("words")} />
+        <h2 className="section">Style</h2>
+        <div className="card mt-3 px-4">
+          {row("words", "Words", names(wordList, style.styleWordIds) || (canEdit ? "Pick words" : "None yet"), !style.styleWordIds.length)}
+        </div>
       </section>
       <section>
-        <p className="mono border-b border-ink pb-2 text-graphite">Never suggest</p>
-        {style.neverSuggest.length === 0 ? <p className="note py-3">Nothing excluded. Turn off “Suggest it” on a piece in <Link href="/closet" className="text-ink underline underline-offset-4">the closet</Link></p> : null}
-        {style.neverSuggest.map((it) => (
-          <div key={it.id} className="flex h-[42px] items-center justify-between border-b border-line">
-            <Link href={`/closet/${it.id}`} className="truncate text-[14px]">{it.name ?? "Untitled piece"}</Link>
-            {canEdit ? <button type="button" className="pill pill-sm ml-3 shrink-0" onClick={() => start(async () => { await setNeverSuggestAction(ownerId, it.id, false); router.refresh(); })}>Suggest again</button> : null}
-          </div>
-        ))}
+        <h2 className="section">Never suggest</h2>
+        <div className="card mt-3 divide-y divide-line overflow-hidden p-0">
+          {style.neverSuggest.length === 0 ? <p className="note px-4 py-3">Nothing excluded. Turn off “Suggest it” on a piece in <Link href="/closet" className="text-ink underline underline-offset-4">the closet</Link></p> : null}
+          {style.neverSuggest.map((it) => (
+            <div key={it.id} className="flex h-12 items-center justify-between gap-3 px-4">
+              <Link href={`/closet/${it.id}`} className="truncate text-[15px]">{it.name ?? "Untitled piece"}</Link>
+              {canEdit ? <button type="button" className="pill pill-sm shrink-0" onClick={() => start(async () => { await setNeverSuggestAction(ownerId, it.id, false); router.refresh(); })}>Suggest again</button> : null}
+            </div>
+          ))}
+        </div>
       </section>
       <PickSheet open={sheet === "loved"} onClose={() => setSheet(null)} title="Loved colors" kind="color" options={colors.filter((c) => !style.avoidColorIds.includes(c.id))} selected={style.lovedColorIds} multi canAdd={false} onChange={(ids) => save({ lovedColorIds: ids })} />
       <PickSheet open={sheet === "avoid"} onClose={() => setSheet(null)} title="Colors to avoid" kind="color" options={colors.filter((c) => !style.lovedColorIds.includes(c.id))} selected={style.avoidColorIds} multi canAdd={false} onChange={(ids) => save({ avoidColorIds: ids })} />

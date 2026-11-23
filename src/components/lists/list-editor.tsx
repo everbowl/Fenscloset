@@ -225,7 +225,7 @@ function EditForm({ entry, kind, onSave, pending }: { entry: ListEntry; kind: Li
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSave({ name, ...extra }); }} className="space-y-4">
       <div className="space-y-1.5">
-        <label htmlFor="edit-name" className="mono tracking-[0.14em] text-graphite">Name</label>
+        <label htmlFor="edit-name" className="mono text-graphite">Name</label>
         <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} autoFocus required maxLength={60} />
       </div>
       <EntryExtraFields fields={def.extraFields} values={extra} onChange={(p) => setExtra((x) => ({ ...x, ...p }))} />

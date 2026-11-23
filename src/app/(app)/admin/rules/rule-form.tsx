@@ -21,7 +21,8 @@ export function RuleForm({ rule, compact }: { rule: RuleRow; /** label left, inp
   const [error, setError] = useState<string>();
   const [pending, start] = useTransition();
   const fade = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (fade.current) clearTimeout(fade.current); }, []);
+  const colorWait = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (fade.current) clearTimeout(fade.current); if (colorWait.current) clearTimeout(colorWait.current); }, []);
   const [tzOther, setTzOther] = useState(!TIMEZONE_CHOICES.some((c) => c.value === rule.value));
 
   function save(v: string) {
@@ -35,6 +36,13 @@ export function RuleForm({ rule, compact }: { rule: RuleRow; /** label left, inp
       fade.current = setTimeout(() => setState("idle"), 2000);
     });
   }
+  // The native color picker on iOS often closes without a blur, so "any color" saves as it changes, a beat after the last move (review E D2).
+  function pickColor(v: string) {
+    const hex = v.toUpperCase();
+    setValue(hex);
+    if (colorWait.current) clearTimeout(colorWait.current);
+    colorWait.current = setTimeout(() => save(hex), 300);
+  }
   const status = (
     <span className={cn("mono shrink-0 transition-opacity", state === "saved" ? "text-ink opacity-100" : "opacity-0")} aria-live="polite" data-testid={`rule-saved-${rule.key}`}>{pending ? "Saving…" : "✓ Saved"}</span>
   );
@@ -45,8 +53,8 @@ export function RuleForm({ rule, compact }: { rule: RuleRow; /** label left, inp
 
   if (compact) {
     return (
-      <div className="flex min-h-12 items-center gap-3 border-b border-line py-1.5" data-testid={`rule-${rule.key}`}>
-        <label htmlFor={id} className="min-w-0 flex-1 text-[15px]">{copy.label}{copy.description ? <span className="mono ml-2 text-graphite">{copy.description}</span> : null}</label>
+      <div className="flex min-h-12 items-center gap-3 border-b border-line py-1.5 last:border-b-0" data-testid={`rule-${rule.key}`}>
+        <label htmlFor={id} className="min-w-0 flex-1 text-[15px]">{copy.label}{copy.description ? <span className="caption ml-2">{copy.description}</span> : null}</label>
         <span className="flex items-center gap-2">{numberInput}<span className="mono w-10 text-graphite">{copy.unit ?? ""}</span></span>
         {status}
         {error ? <p className="mono text-ink" role="alert">— {error}</p> : null}
@@ -55,12 +63,12 @@ export function RuleForm({ rule, compact }: { rule: RuleRow; /** label left, inp
   }
 
   return (
-    <div className="space-y-2" data-testid={`rule-${rule.key}`}>
+    <div className="card space-y-2 p-4" data-testid={`rule-${rule.key}`}>
       <div className="flex items-center justify-between gap-3">
-        <label htmlFor={id} className="block text-[15px] font-medium">{copy.label}</label>
+        <label htmlFor={id} className="block text-[17px] font-semibold">{copy.label}</label>
         {status}
       </div>
-      {copy.description ? <p id={`${id}-help`} className="text-[13px] leading-snug text-graphite">{copy.description}</p> : null}
+      {copy.description ? <p id={`${id}-help`} className="note">{copy.description}</p> : null}
       {kind === "choice" ? (
         <Select id={id} value={value} onChange={(e) => { setValue(e.target.value); save(e.target.value); }} className="max-w-[360px]">
           {RULE_CHOICES[rule.key].map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
@@ -74,16 +82,16 @@ export function RuleForm({ rule, compact }: { rule: RuleRow; /** label left, inp
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Preset colors">
             {ACCENT_PRESETS.map((p) => (
               <button key={p.value} type="button" role="radio" aria-checked={value.toUpperCase() === p.value} aria-label={p.label} title={p.label} onClick={() => { setValue(p.value); save(p.value); }}
-                className={cn("size-9 rounded-full border-2", value.toUpperCase() === p.value ? "border-ink ring-2 ring-ink ring-offset-2" : "border-line")} style={{ background: p.value }} data-testid={`accent-${p.label.toLowerCase()}`} />
+                className={cn("size-11 rounded-full border-2", value.toUpperCase() === p.value ? "border-ink ring-2 ring-ink ring-offset-2" : "border-line")} style={{ background: p.value }} data-testid={`accent-${p.label.toLowerCase()}`} />
             ))}
-            <label className="relative flex size-9 cursor-pointer items-center justify-center rounded-full border-2 border-dashed border-ink" title="Any color">
-              <input id={id} type="color" value={/^#[0-9A-Fa-f]{6}$/.test(value) ? value : "#FF5A00"} onChange={(e) => setValue(e.target.value.toUpperCase())} onBlur={() => save(value)} className="absolute inset-0 size-full cursor-pointer opacity-0" aria-label="Pick any color" />
-              <span className="mono text-[11px]" aria-hidden>+</span>
+            <label className="relative flex size-11 cursor-pointer items-center justify-center rounded-full border-2 border-dashed border-ink" title="Any color">
+              <input id={id} type="color" value={/^#[0-9A-Fa-f]{6}$/.test(value) ? value : "#FF5A00"} onChange={(e) => pickColor(e.target.value)} className="absolute inset-0 size-full cursor-pointer opacity-0" aria-label="Pick any color" />
+              <span className="mono text-[13px]" aria-hidden>+</span>
             </label>
           </div>
           <div className="flex items-center gap-3">
-            <span className="pill pill-solid pointer-events-none h-10 px-6" style={{ background: value, borderColor: value, color: "var(--black)", boxShadow: "0 5px 0 0 var(--color-stone)" }} aria-hidden>Wear this</span>
-            <span className="mono text-graphite">{value.toUpperCase()}</span>
+            <span className="pill pill-solid pointer-events-none h-10 px-6" style={{ background: value, color: "var(--black)" }} aria-hidden>Wear this</span>
+            <span className="caption">{value.toUpperCase()}</span>
           </div>
         </div>
       ) : kind === "text" ? (

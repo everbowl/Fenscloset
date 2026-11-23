@@ -4,8 +4,8 @@ import { sectionWord, withSection } from "./section";
 import { startJob, type Job } from "@/lib/jobs";
 import { canShopFor, type Viewer } from "@/lib/people/visibility";
 import { getRuleNumber } from "@/lib/rules";
-import { ShopError, type LookupHooks } from "@/lib/shop/engine";
-import { priceDollars, searchProducts, type Product } from "@/lib/shop/products";
+import { asShopError, ShopError, type LookupHooks } from "@/lib/shop/engine";
+import { priceDollars, searchProductsDetailed, type Product } from "@/lib/shop/products";
 
 /**
  * "Looking for" (Jeff, 23 Oct 2026, Shop v2 item 2: "state what I'm looking for so the shopping tool lets me know").
@@ -21,7 +21,10 @@ export type Match = Product & { firstSeenAt: string; /** Found since the person 
 export type WantView = {
   id: string; forPersonId: string; forName: string; askedById: string;
   text: string; category: string | null; maxPrice: number | null; queries: string[];
-  matches: Match[]; newCount: number; lastSearchedAt: Date | null; seenAt: Date | null; foundAt: Date | null; createdAt: Date;
+  matches: Match[]; newCount: number; lastSearchedAt: Date | null;
+  /** Why the last search brought nothing back; null after one that worked. */
+  lastError: string | null;
+  seenAt: Date | null; foundAt: Date | null; createdAt: Date;
 };
 
 /** Matches kept per want, newest first. */
@@ -33,21 +36,27 @@ const DEFAULT_SWEEP_HOURS = 24;
 export type StoredMatch = Product & { firstSeenAt: string };
 type Parsed = { queries: string[]; category: string | null; maxPrice: number | null };
 
-async function access(viewer: Viewer, row: { askedById: string; forPersonId: string }): Promise<boolean> {
-  return row.askedById === viewer.id || canShopFor(viewer, row.forPersonId);
+/** The list is the person's: whoever may shop for them may touch it. (An asker who lost that right loses the lines too, review E A6.) */
+async function access(viewer: Viewer, row: { forPersonId: string }): Promise<boolean> {
+  return canShopFor(viewer, row.forPersonId);
 }
 
-/** "under $200", "less than 150", "$80 max", "up to $60" → the whole dollars, else null. */
+/** A dollar amount as typed: "200", "1,200", "1200". */
+const AMOUNT = String.raw`(\d{1,3}(?:,\d{3})+|\d{1,5})`;
+const CAP_BEFORE = new RegExp(String.raw`\b(?:under|below|less than|up to|max(?:imum)?|no more than|at most|<)\s*\$?\s*${AMOUNT}\b`, "i");
+const CAP_AFTER = new RegExp(String.raw`\$\s?${AMOUNT}\s*(?:max|or less|and under|tops|cap)\b`, "i");
+
+/** "under $200", "less than 150", "$80 max", "up to $1,200" → the whole dollars, else null. */
 export function priceCapOf(text: string): number | null {
-  const m = text.match(/\b(?:under|below|less than|up to|max(?:imum)?|no more than|at most|<)\s*\$?\s*(\d{1,5})\b/i) ?? text.match(/\$\s?(\d{1,5})\s*(?:max|or less|and under|tops|cap)\b/i);
-  return m ? Number(m[1]) : null;
+  const m = text.match(CAP_BEFORE) ?? text.match(CAP_AFTER);
+  return m ? Number(m[1].replace(/,/g, "")) : null; // "1,200" read as 1 once (review E F4)
 }
 
 /** What the person typed without the price words, as a plain search. */
 function plainQuery(text: string): string {
   return text
-    .replace(/\b(?:under|below|less than|up to|max(?:imum)?|no more than|at most|<)\s*\$?\s*\d{1,5}\b/gi, "")
-    .replace(/\$\s?\d{1,5}\s*(?:max|or less|and under|tops|cap)\b/gi, "")
+    .replace(new RegExp(CAP_BEFORE.source, "gi"), "")
+    .replace(new RegExp(CAP_AFTER.source, "gi"), "")
     .replace(/\s+/g, " ").replace(/[,;:]+$/, "").trim().toLowerCase();
 }
 
@@ -91,33 +100,58 @@ async function prefsFor(personId: string) {
   return { name: person.name.split(" ")[0], favoriteStores: person.favoriteStores.map((s) => s.name), favoriteBrands: person.favoriteBrands.map((b) => b.name), section: person.shopSection && !person.shopSection.isArchived ? person.shopSection.name : null };
 }
 
+/** What a failed search says on the row. */
+export const STORES_DID_NOT_ANSWER = "The stores didn't answer. Tap Search now to try again.";
+
 /**
  * Search the stores for one want: the first time Claude writes the searches; every time, what is new goes in front and
  * is counted. `maxAgeHours` is how old a cached store answer may be (the sweep and Search now ask for fresh).
+ *
+ * The merge runs with the row locked, so a Search now and the sweep on the same line never lose each other's matches
+ * (review E C2). A search that fails still writes `lastSearchedAt` and the reason, so the line never reads
+ * "Searching the stores…" forever (C3); the error is rethrown for the job and the sweep's log.
  */
 export async function searchWant(wantId: string, hooks: LookupHooks & { maxAgeHours?: number } = {}): Promise<{ added: number }> {
   const step = (s: string) => hooks.step?.(s);
   const row = await db.want.findUnique({ where: { id: wantId } });
   if (!row) throw new ShopError("That one is gone from the list.", 404);
-  const prefs = await prefsFor(row.forPersonId);
-  let { queries, category, maxPrice } = row;
-  if (!queries.length) {
-    step("Reading what you want…");
-    const parsed = await parseWant(row.text, prefs.name, prefs.favoriteBrands, prefs.section);
-    queries = parsed.queries; category = parsed.category; maxPrice = parsed.maxPrice;
-  }
-  queries = withSection(queries, prefs.section); // the section's word on every search, older lines included
-  step("Searching the stores…");
-  const found = await searchProducts(queries, prefs, fetch, { maxAgeHours: hooks.maxAgeHours, limit: MAX_MATCHES });
   const now = new Date();
-  const { matches, added } = mergeMatches((row.matches as StoredMatch[] | null) ?? [], found, maxPrice, now);
-  await db.want.update({ where: { id: wantId }, data: { queries, category, maxPrice, matches: matches as object[], newCount: row.newCount + added, lastSearchedAt: now } });
-  return { added };
+  try {
+    const prefs = await prefsFor(row.forPersonId);
+    let { queries, category, maxPrice } = row;
+    if (!queries.length) {
+      step("Reading what you want…");
+      const parsed = await parseWant(row.text, prefs.name, prefs.favoriteBrands, prefs.section);
+      queries = parsed.queries; category = parsed.category; maxPrice = parsed.maxPrice;
+    }
+    queries = withSection(queries, prefs.section); // the section's word on every search, older lines included
+    step("Searching the stores…");
+    const { products: found, failed } = await searchProductsDetailed(queries, prefs, fetch, { maxAgeHours: hooks.maxAgeHours, limit: MAX_MATCHES });
+    if (failed.length && !found.length) throw new ShopError(STORES_DID_NOT_ANSWER, 502);
+    const added = await db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Want" WHERE "id" = ${wantId} FOR UPDATE`;
+      const fresh = await tx.want.findUnique({ where: { id: wantId }, select: { matches: true } });
+      if (!fresh) throw new ShopError("That one is gone from the list.", 404);
+      const merged = mergeMatches((fresh.matches as StoredMatch[] | null) ?? [], found, maxPrice, now);
+      await tx.want.update({ where: { id: wantId }, data: { queries, category, maxPrice, matches: merged.matches as object[], newCount: { increment: merged.added }, lastSearchedAt: now, lastError: null } });
+      return merged.added;
+    });
+    return { added };
+  } catch (e) {
+    const known = asShopError(e); // the judge or the stores; anything else is a bug and keeps its stack
+    if (!known) console.error("looking for: search failed", e);
+    await db.want.updateMany({ where: { id: wantId }, data: { lastSearchedAt: now, lastError: known?.message ?? STORES_DID_NOT_ANSWER } }).catch(() => {});
+    throw known ?? e;
+  }
 }
 
-/** The search as a background job (src/lib/jobs.ts), one per want at a time; its result is the want's id. */
+/**
+ * The search as a background job (src/lib/jobs.ts); its result is the want's id. The key carries the viewer: a job is
+ * readable by its owner only, so a parent's search and the kid's Search now on the same line are two jobs (the second
+ * mostly reads the first's cached store answers) rather than one that says "gone" to the other person (review E C4).
+ */
 function startWantSearch(viewer: Viewer, wantId: string, fresh: boolean): Job<string> {
-  return startJob<string>(["want", wantId].join("|"), viewer.id, async (step) => { await searchWant(wantId, { step, maxAgeHours: fresh ? FRESH_HOURS : undefined }); return wantId; });
+  return startJob<string>(["want", viewer.id, wantId].join("|"), viewer.id, async (step) => { await searchWant(wantId, { step, maxAgeHours: fresh ? FRESH_HOURS : undefined }); return wantId; });
 }
 
 /** Add a line to someone's list and start searching for it. The row exists at once; the job fills it in. */
@@ -137,26 +171,26 @@ export async function editWant(viewer: Viewer, wantId: string, text: string): Pr
   if (clean.length > 160) throw new ShopError("Keep it under 160 characters.", 400);
   const row = await db.want.findUnique({ where: { id: wantId } });
   if (!row || !(await access(viewer, row))) throw new ShopError("That one is gone from the list.", 404);
-  await db.want.update({ where: { id: wantId }, data: { text: clean, queries: [], category: null, maxPrice: null, matches: [], newCount: 0, seenAt: null, lastSearchedAt: null } });
+  await db.want.update({ where: { id: wantId }, data: { text: clean, queries: [], category: null, maxPrice: null, matches: [], newCount: 0, seenAt: null, lastSearchedAt: null, lastError: null } });
   return startWantSearch(viewer, wantId, true);
 }
 
 /** Search now, by hand. */
 export async function searchWantNow(viewer: Viewer, wantId: string): Promise<Job<string>> {
-  const row = await db.want.findUnique({ where: { id: wantId }, select: { askedById: true, forPersonId: true } });
+  const row = await db.want.findUnique({ where: { id: wantId }, select: { forPersonId: true } });
   if (!row || !(await access(viewer, row))) throw new ShopError("That one is gone from the list.", 404);
   return startWantSearch(viewer, wantId, true);
 }
 
 /** "Found it" retires the line (kept under Found); `found: false` puts it back on the list. */
 export async function setWantFound(viewer: Viewer, wantId: string, found: boolean): Promise<void> {
-  const row = await db.want.findUnique({ where: { id: wantId }, select: { askedById: true, forPersonId: true } });
+  const row = await db.want.findUnique({ where: { id: wantId }, select: { forPersonId: true } });
   if (!row || !(await access(viewer, row))) throw new ShopError("That one is gone from the list.", 404);
   await db.want.update({ where: { id: wantId }, data: { foundAt: found ? new Date() : null, newCount: 0 } });
 }
 
 export async function deleteWant(viewer: Viewer, wantId: string): Promise<void> {
-  const row = await db.want.findUnique({ where: { id: wantId }, select: { askedById: true, forPersonId: true } });
+  const row = await db.want.findUnique({ where: { id: wantId }, select: { forPersonId: true } });
   if (!row || !(await access(viewer, row))) throw new ShopError("That one is gone from the list.", 404);
   await db.want.delete({ where: { id: wantId } });
 }
@@ -169,7 +203,7 @@ function toView(row: Row): WantView {
   return {
     id: row.id, forPersonId: row.forPersonId, forName: row.forPerson.name.split(" ")[0], askedById: row.askedById,
     text: row.text, category: row.category, maxPrice: row.maxPrice, queries: row.queries,
-    matches, newCount: row.newCount, lastSearchedAt: row.lastSearchedAt, seenAt: row.seenAt, foundAt: row.foundAt, createdAt: row.createdAt,
+    matches, newCount: row.newCount, lastSearchedAt: row.lastSearchedAt, lastError: row.lastError, seenAt: row.seenAt, foundAt: row.foundAt, createdAt: row.createdAt,
   };
 }
 
@@ -224,15 +258,44 @@ export async function sweepWants(now = new Date(), log: (line: string) => void =
   return out;
 }
 
-/** Started once when the server starts (src/instrumentation.ts): the Looking-for sweep and the brand feeds soon after start, then every `everyMs`. */
+/** The sweep's lease, kept in the cache table: the process that takes it runs; a second one (a replica, a dev box on the same database) skips until it lapses (review E C5). */
+const SWEEP_LEASE_KEY = "sweep:lease";
+
+/** Take the lease for `ttlMs` unless another process holds a live one. It is not given back early: one sweep per lease, whoever runs it. */
+export async function acquireSweepLease(now = new Date(), ttlMs = 25 * 60_000): Promise<boolean> {
+  const stale = new Date(now.getTime() - ttlMs);
+  const renewed = await db.weatherCache.updateMany({ where: { key: SWEEP_LEASE_KEY, fetchedAt: { lt: stale } }, data: { fetchedAt: now, payload: { pid: process.pid } } });
+  if (renewed.count) return true;
+  if (await db.weatherCache.findUnique({ where: { key: SWEEP_LEASE_KEY }, select: { key: true } })) return false;
+  try { await db.weatherCache.create({ data: { key: SWEEP_LEASE_KEY, fetchedAt: now, payload: { pid: process.pid } } }); return true; }
+  catch { return false; } // another process made it first
+}
+
+/** Tests: forget the lease. */
+export async function releaseSweepLease(): Promise<void> {
+  await db.weatherCache.deleteMany({ where: { key: SWEEP_LEASE_KEY } }).catch(() => {});
+}
+
+/**
+ * Started once when the server starts (src/instrumentation.ts): the Looking-for sweep and the brand feeds soon after start,
+ * then `everyMs` after each run finishes. A run reschedules itself only when it is done, so a slow sweep never overlaps the
+ * next (review E C1), and only the process holding the lease runs (C5).
+ */
 export async function wantsOnStart(delayMs = 20_000, everyMs = 30 * 60_000): Promise<void> {
   const unref = (t: ReturnType<typeof setTimeout>) => (t as { unref?: () => void }).unref?.();
   await new Promise<void>((resolve) => unref(setTimeout(resolve, delayMs)));
   const { sweepBrandFeeds } = await import("@/lib/shop/brand-feed");
+  let sweeping = false;
   const run = async () => {
-    try { await sweepWants(); } catch (e) { console.error("looking for: sweep failed", e); }
-    try { await sweepBrandFeeds(); } catch (e) { console.error("brand feed: sweep failed", e); }
+    if (sweeping) return;
+    sweeping = true;
+    try {
+      if (await acquireSweepLease()) {
+        try { await sweepWants(); } catch (e) { console.error("looking for: sweep failed", e); }
+        try { await sweepBrandFeeds(); } catch (e) { console.error("brand feed: sweep failed", e); }
+      }
+    } catch (e) { console.error("sweep: lease failed", e); }
+    finally { sweeping = false; unref(setTimeout(run, everyMs)); }
   };
   await run();
-  unref(setInterval(run, everyMs));
 }

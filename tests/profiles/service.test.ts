@@ -8,7 +8,8 @@ import { seed } from "../../prisma/seed";
 import { newKey, putObject } from "@/lib/storage";
 import { canViewKey } from "@/lib/photos/visibility";
 import { bodyPhotosAllowed, canSeeBodyData, canShopFor } from "@/lib/people/visibility";
-import { addBodyPhoto, getBodyProfile, setBodyPhotoPrivacy, getPrivacy, getStyleProfile, setBodyViewers, setMeasurement, setMinorBodyImageApproval, setShoppers, updateFavorites, updateStyle, upsertSize } from "@/lib/profiles/service";
+import { addBodyPhoto, getBodyProfile, setBodyPhotoPrivacy, getPrivacy, getStyleProfile, setBodyViewers, setMeasurement, setMinorBodyImageApproval, setShoppers, updateFavorites, updateStyle } from "@/lib/profiles/service";
+import { setMyBrand } from "@/lib/profiles/brands";
 import { listEntries } from "@/lib/lists/service";
 
 describe("profiles & privacy", () => {
@@ -99,8 +100,8 @@ describe("profiles & privacy", () => {
     const jeff = await by("Jeff");
     const nike = (await listEntries("brand")).find((b) => b.name === "Nike")!;
     const tops = (await listEntries("category")).find((c) => c.name === "Tops")!;
-    await upsertSize(jeff, jeff.id, { brandId: nike.id, categoryId: tops.id, size: "L" });
-    await upsertSize(jeff, jeff.id, { brandId: nike.id, categoryId: tops.id, size: "XL" }); // same brand+category updates
+    await setMyBrand(jeff, jeff.id, { brandId: nike.id, sizes: [{ categoryId: tops.id, size: "L" }] });
+    await setMyBrand(jeff, jeff.id, { brandId: nike.id, sizes: [{ categoryId: tops.id, size: "XL" }] }); // same brand+category updates
     const body = (await getBodyProfile(jeff, jeff.id))!;
     expect(body.sizes).toHaveLength(1);
     expect(body.sizes[0]).toMatchObject({ brandName: "Nike", categoryName: "Tops", size: "XL" });

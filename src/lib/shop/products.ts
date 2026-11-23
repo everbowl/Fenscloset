@@ -1,12 +1,14 @@
 import { createHash } from "node:crypto";
 import { inOtherSection } from "./section";
 import { db } from "@/lib/db";
+import { catalogBrand } from "@/lib/brands/catalog";
 
 /**
  * Real products with pictures and prices from many retailers, via Google Shopping through Serper
  * (https://serper.dev). The key lives only in Railway as SERPER_API_KEY. Without a key the Shop
  * falls back to plain store search links. Queries never carry body measurements: only the words
- * Claude wrote for the piece (category, color, fit, material) plus favorite brands.
+ * Claude wrote for the piece (category, color, fit, material) plus favorite brands. The prompts ask for that, and
+ * `scrubQuery` makes sure of it before anything leaves the server (review E A4).
  */
 
 export type Product = {
@@ -29,6 +31,26 @@ export function isProductSearchConfigured(): boolean {
 }
 
 type RawShopping = { title?: string; source?: string; link?: string; price?: string | number; imageUrl?: string; position?: number };
+
+// What a size looks like in a search: "size 10" / "size medium", waist×length, a number with a body unit (and the
+// measurement word after it), a measurement named with its number, a US/EU shoe size, and a letter size standing on its
+// own (never the s of men's, never the small of small-batch).
+const SIZE_PATTERNS: RegExp[] = [
+  /\bsizes?\s*:?\s*(?:us|eu|uk)?\s*(?:\d{1,2}(?:\.\d)?|xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl|x-?small|small|medium|large|x-?large)\b/gi,
+  /\b\d{2}\s?[x×]\s?\d{2}\b/gi,
+  /\b\d+(?:\.\d+)?\s?(?:in|inch|inches|cm|mm|lb|lbs|kg|")(?![a-z])(?:\s+(?:waist|inseam|chest|bust|hips?|neck|sleeve|tall|long))?/gi,
+  /\b(?:waist|inseam|chest|bust|hips?|neck|sleeve|height|weight)\s*:?\s*\d+(?:\.\d+)?\b/gi,
+  /\b\d+(?:\.\d+)?\s*(?:waist|inseam|chest|bust)\b/gi,
+  /\b(?:us|eu|uk)\s?\d{1,2}(?:\.5)?\b/gi,
+  /(?<![\w'\u2019-])(?:xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl)(?![\w'\u2019-])/gi,
+];
+
+/** A search with every size and measurement taken out, tidied; "" when nothing is left. */
+export function scrubQuery(query: string): string {
+  let q = query;
+  for (const re of SIZE_PATTERNS) q = q.replace(re, " ");
+  return q.replace(/\s*[,;/]+\s*(?=[,;/]|$)/g, " ").replace(/\s+/g, " ").replace(/^[\s,;/-]+|[\s,;/-]+$/g, "").trim();
+}
 
 /** Deterministic products for tests and local dev. */
 function mockProducts(query: string): RawShopping[] {
@@ -73,11 +95,25 @@ export function normalizeProduct(raw: RawShopping, query: string): Product | nul
   return { title, priceText: price, storeName, url, imageUrl, query };
 }
 
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const hostOf = (url: string) => { try { return new URL(url).hostname.toLowerCase().replace(/^www\./, ""); } catch { return ""; } };
+
+/** A product is from one of the favorite stores: the store's name as a whole word, or the link on the store's own domain (review E F6: "On" matched everything). */
+export function isFavoriteStore(p: Product, favoriteStores: string[]): boolean {
+  const host = hostOf(p.url);
+  return favoriteStores.some((s) => {
+    const name = s.trim();
+    if (!name) return false;
+    if (new RegExp(`(?<![\\w])${escapeRe(name.toLowerCase())}(?![\\w])`, "i").test(p.storeName)) return true;
+    const domain = catalogBrand(name)?.domain.toLowerCase().replace(/^www\./, "");
+    return Boolean(domain && host && (host === domain || host.endsWith(`.${domain}`)));
+  });
+}
+
 /** Favorite stores first, then favorite brands in the title, then Google's own order. Ties keep query order. */
 export function rankProducts(products: Product[], prefs: ProductPrefs): Product[] {
-  const stores = prefs.favoriteStores.map((s) => s.toLowerCase());
-  const brands = prefs.favoriteBrands.map((b) => b.toLowerCase());
-  const score = (p: Product) => (stores.some((s) => p.storeName.toLowerCase().includes(s) || p.url.toLowerCase().includes(s.replace(/\s+/g, ""))) ? 2 : 0) + (brands.some((b) => p.title.toLowerCase().includes(b)) ? 1 : 0);
+  const brands = prefs.favoriteBrands.map((b) => b.toLowerCase().trim()).filter(Boolean);
+  const score = (p: Product) => (isFavoriteStore(p, prefs.favoriteStores) ? 2 : 0) + (brands.some((b) => new RegExp(`(?<![\\w])${escapeRe(b)}(?![\\w])`, "i").test(p.title)) ? 1 : 0);
   return products.map((p, i) => ({ p, i, s: score(p) })).sort((a, b) => b.s - a.s || a.i - b.i).map((x) => x.p);
 }
 
@@ -88,16 +124,21 @@ export type SearchOptions = {
   limit?: number;
 };
 
+/** What a search brought back, and which searches the stores did not answer (a 429, a 500, a timeout). */
+export type SearchOutcome = { products: Product[]; failed: string[] };
+
 /**
  * Run each query, interleave the results so every query (and so several retailers) gets a turn,
- * drop duplicates, rank by the person's preferences, and cap the row.
+ * drop duplicates, rank by the person's preferences, and cap the row. Every query is scrubbed of sizes and
+ * measurements first. `failed` names the searches the stores did not answer, so a screen can say so (review E B5).
  */
-export async function searchProducts(queries: string[], prefs: ProductPrefs, fetchImpl: typeof fetch = fetch, opts: SearchOptions = {}): Promise<Product[]> {
-  const qs = [...new Set(queries.map((q) => q.replace(/\s+/g, " ").trim()).filter(Boolean))].slice(0, 3);
-  if (!qs.length || !isProductSearchConfigured()) return [];
+export async function searchProductsDetailed(queries: string[], prefs: ProductPrefs, fetchImpl: typeof fetch = fetch, opts: SearchOptions = {}): Promise<SearchOutcome> {
+  const qs = [...new Set(queries.map((q) => scrubQuery(q)).filter(Boolean))].slice(0, 3);
+  if (!qs.length || !isProductSearchConfigured()) return { products: [], failed: [] };
+  const failed: string[] = [];
   const lists = await Promise.all(qs.map(async (q) => {
     try { return (await fetchQuery(q, fetchImpl, opts.maxAgeHours)).map((r) => normalizeProduct(r, q)).filter((p): p is Product => Boolean(p)); }
-    catch (e) { console.error("product search failed", q, e); return []; }
+    catch (e) { console.error("product search failed", q, e); failed.push(q); return []; }
   }));
   const merged: Product[] = [];
   const seen = new Set<string>();
@@ -107,7 +148,12 @@ export async function searchProducts(queries: string[], prefs: ProductPrefs, fet
       if (p && !seen.has(p.url)) { seen.add(p.url); merged.push(p); }
     }
   }
-  return rankProducts(merged.filter((p) => !inOtherSection(p.title, prefs.section)), prefs).slice(0, opts.limit ?? MAX_PRODUCTS);
+  return { products: rankProducts(merged.filter((p) => !inOtherSection(p.title, prefs.section)), prefs).slice(0, opts.limit ?? MAX_PRODUCTS), failed };
+}
+
+/** The products alone; most callers only need the row. */
+export async function searchProducts(queries: string[], prefs: ProductPrefs, fetchImpl: typeof fetch = fetch, opts: SearchOptions = {}): Promise<Product[]> {
+  return (await searchProductsDetailed(queries, prefs, fetchImpl, opts)).products;
 }
 
 /** The dollars in a price label ("$128.00", "128 USD"), or null when there is no number. */

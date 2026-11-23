@@ -44,32 +44,32 @@ export function InspirationBoard({ ownerId, looks, canEdit, isMinor }: { ownerId
 
   return (
     <section data-testid="inspiration">
-      <div className="flex items-end justify-between border-b border-ink pb-2">
-        <p className="mono text-graphite">Inspiration · looks to dress like</p>
-        <p className="mono text-graphite">{looks.length ? `${looks.length} saved` : ""}</p>
+      <div className="flex items-end justify-between gap-3">
+        <h2 className="section">Inspiration</h2>
+        <p className="caption">{looks.length ? `${looks.length} saved` : ""}</p>
       </div>
       {error ? <Banner tone="danger" title={error} className="mt-3" /> : null}
-      <p className="mt-3 text-[14px] leading-snug text-graphite">Screenshots of outfits you like: Instagram, Pinterest, a magazine. The looks it builds for you follow these. Seen by {isMinor ? "you and your parents" : "you"} only.</p>
-      <div className="mt-3 grid grid-cols-3 gap-[6px]">
+      <p className="note mt-1">Screenshots of outfits you like: Instagram, Pinterest, a magazine. The looks it builds for you follow these. Seen by {isMinor ? "you and your parents" : "you"} only.</p>
+      <div className="mt-3 grid grid-cols-3 gap-2">
         {canEdit ? (
-          <button type="button" disabled={busy !== null} onClick={() => file.current?.click()} className="flex h-[150px] flex-col items-center justify-center gap-2 border border-ink bg-paper" data-testid="add-inspiration">
+          <button type="button" disabled={busy !== null} onClick={() => file.current?.click()} className="flex h-[150px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-ink bg-paper" data-testid="add-inspiration">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><path d="M12 4v16M4 12h16" /></svg>
             <span className="mono">{busy === "upload" ? "Reading…" : "Add a look"}</span>
           </button>
         ) : null}
         {looks.map((l) => (
-          <button key={l.id} type="button" onClick={() => setOpen(l)} className="h-[150px] overflow-hidden bg-bone" aria-label={l.notes.summary} data-testid="inspiration-tile">
+          <button key={l.id} type="button" onClick={() => setOpen(l)} className="stage h-[150px] overflow-hidden" aria-label={l.notes.summary} data-testid="inspiration-tile">
             <img src={`/api/photo/${l.key}`} alt="" className="size-full object-cover" />
           </button>
         ))}
       </div>
-      {!looks.length && !canEdit ? <p className="mono mt-3 text-graphite">Nothing saved yet</p> : null}
+      {!looks.length && !canEdit ? <p className="note mt-3">Nothing saved yet</p> : null}
       <input ref={file} type="file" accept="image/*" className="hidden" onChange={onFile} data-testid="inspiration-file" />
 
       <Sheet open={open !== null} onClose={() => setOpen(null)} title="What it read">
         {open ? (
           <div className="flex flex-col gap-3" data-testid="inspiration-sheet">
-            <div className="h-[220px] overflow-hidden bg-bone"><img src={`/api/photo/${open.key}`} alt="" className="size-full object-cover" /></div>
+            <div className="stage h-[220px] overflow-hidden"><img src={`/api/photo/${open.key}`} alt="" className="size-full object-cover" /></div>
             <p className="text-[16px] leading-snug">{open.notes.summary}</p>
             <Row k="Words" v={open.notes.words.join(", ")} />
             <Row k="Shapes" v={open.notes.silhouettes.join("; ")} />

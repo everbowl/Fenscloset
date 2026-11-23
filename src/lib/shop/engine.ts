@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { db } from "@/lib/db";
 import { startJob, type Job } from "@/lib/jobs";
-import { isMockAi, structured } from "@/lib/ai/claude";
+import { AiError, isMockAi, structured } from "@/lib/ai/claude";
 import { loadTagLists, type TagLists } from "@/lib/ai/tag-item";
 import { newKey, putObject, deleteObject } from "@/lib/storage";
 import { normalizeOriginal, toAiImage } from "@/lib/images/thumb";
@@ -9,9 +9,10 @@ import { canSeeBodyData, canShopFor, type Viewer } from "@/lib/people/visibility
 import { loadCandidates, styleContext, type Candidate } from "@/lib/outfits/catalog";
 import { composeLooks, type Board, type Piece } from "@/lib/outfits/engine";
 import { fetchImage, PageError, readProductPage } from "@/lib/shop/page";
-import { searchProducts, type Product } from "@/lib/shop/products";
-import { sectionOf, sectionWord, withSection } from "@/lib/shop/section";
-import type { ShopSource } from "@/generated/prisma/client";
+import { searchProductsDetailed, type Product } from "@/lib/shop/products";
+import { sectionWord, withSection } from "@/lib/shop/section";
+import { UnsafeUrlError } from "@/lib/net/safe-fetch";
+import type { Prisma, ShopSource } from "@/generated/prisma/client";
 
 /**
  * "Should I buy this?" (screen 15). The shopper may be the person themselves, a parent of a minor, or someone granted
@@ -23,6 +24,27 @@ export class ShopError extends Error {
     super(message);
     this.name = "ShopError";
   }
+}
+
+/**
+ * A ShopError for what the judge or the stores did (a timeout, a refusal, a link that is not a store), with words a
+ * person can act on; null for anything else, so a bug keeps its stack and is logged as one (review E B4).
+ */
+export function asShopError(e: unknown): ShopError | null {
+  if (e instanceof ShopError) return e;
+  if (e instanceof AiError) {
+    if (/timed? ?out|timeout|aborted/i.test(e.message)) return new ShopError("The judge took too long. Try again.", 504);
+    if (e.code === "no_key") return new ShopError("The judge isn't set up on the site yet.", 503);
+    if (e.code === "refusal") return new ShopError("The judge wouldn't read that one. Try a clearer picture.", 422);
+    return new ShopError("The judge couldn't read that one. Try again.", 502);
+  }
+  if (e instanceof UnsafeUrlError) return new ShopError(e.message, 400);
+  return null;
+}
+
+/** The style profile without its fit-notes line: body data a shop-for grantee may not see (review E A3). */
+export function stripFitNotes(style: string): string {
+  return style.split("\n").filter((line) => !/^fit notes:/i.test(line.trim())).join("\n");
 }
 
 type CandidateRead = { name: string; categoryId: string | null; categoryName: string | null; colorIds: string[]; colorNames: string[]; fabricName: string | null; formalityName: string | null; brandText: string | null; sizeText: string | null };
@@ -37,7 +59,17 @@ export type LookupView = {
   read: CandidateRead; verdict: Verdict; similar: SimilarItem[]; pairings: (Board & { pieces: Piece[] })[]; recommendations: Recommendation[];
   /** Real products (picture, price, store) for the missing category or a better alternative; empty when nothing is needed or search is not set up. */
   products: Product[];
+  /** The stores were asked and did not answer, so `products` is empty for that reason (review E B5). */
+  storesFailed: boolean;
 };
+
+/** The person's stores, brands and section, read once per lookup and handed down (review E F8). */
+type ShopPrefs = { favoriteStores: { name: string; url: string | null }[]; favoriteBrands: string[]; section: string | null };
+
+async function loadPrefs(forPersonId: string): Promise<ShopPrefs> {
+  const p = await db.person.findUniqueOrThrow({ where: { id: forPersonId }, select: { favoriteStores: { where: { isArchived: false }, select: { name: true, url: true } }, favoriteBrands: { where: { isArchived: false }, select: { name: true } }, shopSection: { select: { name: true, isArchived: true } } } });
+  return { favoriteStores: p.favoriteStores, favoriteBrands: p.favoriteBrands.map((b) => b.name), section: p.shopSection && !p.shopSection.isArchived ? p.shopSection.name : null };
+}
 
 const CANDIDATE_ID = "candidate";
 
@@ -80,8 +112,8 @@ async function similarOwned(forPersonId: string, read: CandidateRead): Promise<S
   return items.map((it) => ({ id: it.id, name: it.name ?? "Untitled piece", thumbKey: it.photos[0]?.bucketKey ?? null }));
 }
 
-async function bodyContext(viewer: Viewer, forPersonId: string, brandText: string | null): Promise<{ text: string; used: boolean }> {
-  if (!(await canSeeBodyData(viewer, forPersonId))) return { text: "", used: false };
+async function bodyContext(seeBody: boolean, forPersonId: string, brandText: string | null): Promise<{ text: string; used: boolean }> {
+  if (!seeBody) return { text: "", used: false };
   const [sizes, measurements, profile] = await Promise.all([
     db.bodySizeByBrand.findMany({ where: { personId: forPersonId }, include: { brand: true } }),
     db.bodyMeasurement.findMany({ where: { personId: forPersonId }, include: { kind: true } }),
@@ -123,12 +155,11 @@ shoppingQueries: when missingCategory is set, 1–3 shopping searches for pieces
   return { ...out, shoppingQueries: (out.shoppingQueries ?? []).slice(0, 3), usedBodyData: body.used };
 }
 
-/** Plan B5b: real products for the verdict's shopping queries, favorite stores and brands first. */
-async function findProducts(forPersonId: string, verdict: Verdict): Promise<Product[]> {
-  if (!verdict.shoppingQueries.length) return [];
-  const person = await db.person.findUniqueOrThrow({ where: { id: forPersonId }, select: { favoriteStores: { where: { isArchived: false }, select: { name: true } }, favoriteBrands: { where: { isArchived: false }, select: { name: true } }, shopSection: { select: { name: true, isArchived: true } } } });
-  const section = person.shopSection && !person.shopSection.isArchived ? person.shopSection.name : null;
-  return searchProducts(withSection(verdict.shoppingQueries, section), { favoriteStores: person.favoriteStores.map((s) => s.name), favoriteBrands: person.favoriteBrands.map((b) => b.name), section });
+/** Plan B5b: real products for the verdict's shopping queries, favorite stores and brands first; `failed` when the stores did not answer. */
+async function findProducts(prefs: ShopPrefs, verdict: Verdict): Promise<{ products: Product[]; failed: boolean }> {
+  if (!verdict.shoppingQueries.length) return { products: [], failed: false };
+  const out = await searchProductsDetailed(withSection(verdict.shoppingQueries, prefs.section), { favoriteStores: prefs.favoriteStores.map((s) => s.name), favoriteBrands: prefs.favoriteBrands, section: prefs.section });
+  return { products: out.products, failed: out.failed.length > 0 && out.products.length === 0 };
 }
 
 /** Plan B4: three looks with the candidate pinned as hero. */
@@ -144,14 +175,21 @@ async function pairings(forPersonId: string, read: CandidateRead, imageKey: stri
   });
 }
 
+/** A search for `q` on the store's own site, as a Google link: every store's search page is different (review E E4). */
+export function storeSearchUrl(store: { name: string; url: string | null }, q: string): string {
+  let host: string | null = null;
+  try { host = store.url ? new URL(store.url).hostname.replace(/^www\./, "") : null; } catch { host = null; }
+  const words = host ? `site:${host} ${q}` : store.name === "Google" ? q : `${store.name} ${q}`;
+  return `https://www.google.com/search?q=${encodeURIComponent(words)}`;
+}
+
 /** Plan B5: up to 3 search links on the person's favorite stores (fallback: any store with a URL). */
-async function recommend(forPersonId: string, read: CandidateRead, verdict: Verdict): Promise<Recommendation[]> {
+async function recommend(prefs: ShopPrefs, read: CandidateRead, verdict: Verdict): Promise<Recommendation[]> {
   if (verdict.call !== "PASS" && !verdict.missingCategory) return [];
-  const person = await db.person.findUniqueOrThrow({ where: { id: forPersonId }, select: { favoriteStores: { where: { isArchived: false } }, favoriteBrands: { where: { isArchived: false }, take: 3 } } });
-  const fallback = await db.store.findMany({ where: { isArchived: false }, orderBy: [{ url: { sort: "desc", nulls: "last" } }, { sortOrder: "asc" }], take: 3 });
-  const stores: { name: string; url: string | null }[] = person.favoriteStores.length ? person.favoriteStores : fallback.length ? fallback : [{ name: "Google", url: null }];
+  const fallback = prefs.favoriteStores.length ? [] : await db.store.findMany({ where: { isArchived: false }, orderBy: [{ url: { sort: "desc", nulls: "last" } }, { sortOrder: "asc" }], take: 3, select: { name: true, url: true } });
+  const stores: { name: string; url: string | null }[] = prefs.favoriteStores.length ? prefs.favoriteStores : fallback.length ? fallback : [{ name: "Google", url: null }];
   const want = verdict.missingCategory ?? read.categoryName ?? "clothes";
-  const brandWords = person.favoriteBrands.map((b) => b.name);
+  const brandWords = prefs.favoriteBrands.slice(0, 3);
   const queries = verdict.missingCategory
     ? [`${want} to wear with ${read.name}`, ...brandWords.slice(0, 2).map((b) => `${b} ${want}`)]
     : [`${read.colorNames[0] ?? ""} ${read.categoryName ?? want} alternative`.trim(), ...brandWords.slice(0, 2).map((b) => `${b} ${read.categoryName ?? want}`)];
@@ -160,9 +198,7 @@ async function recommend(forPersonId: string, read: CandidateRead, verdict: Verd
     const store = stores[i % stores.length];
     const q = (queries[i] ?? queries[0]).trim();
     if (!q) break;
-    const base = store.url?.replace(/\/$/, "");
-    const url = base ? `${base}/search?q=${encodeURIComponent(q)}` : `https://www.google.com/search?q=${encodeURIComponent(store.name === "Google" ? q : `${store.name} ${q}`)}`;
-    out.push({ label: q.replace(/\s+/g, " ").replace(/^\w/, (c) => c.toUpperCase()), storeName: store.name, url });
+    out.push({ label: q.replace(/\s+/g, " ").replace(/^\w/, (c) => c.toUpperCase()), storeName: store.name, url: storeSearchUrl(store, q) });
   }
   return out;
 }
@@ -184,39 +220,48 @@ async function slowStep(): Promise<void> {
 export async function lookup(viewer: Viewer, forPersonId: string, input: LookupInput, hooks: LookupHooks = {}): Promise<LookupView> {
   const step = async (s: string) => { hooks.step?.(s); await slowStep(); };
   await assertCanShop(viewer, forPersonId);
-  let title: string | null = null, description: string | null = null, priceText: string | null = null, brandText: string | null = null, inputUrl: string | null = null;
-  let image: { data: Buffer; contentType: string } | null = null;
-  if (input.source === "link") {
-    await step("Reading the store page…");
-    const page = await readProductPage(input.url).catch((e) => { if (e instanceof PageError) throw new ShopError(e.message); throw e; });
-    ({ title, description, priceText, brandText } = page); inputUrl = page.url;
-    if (page.imageUrl) image = await fetchImage(page.imageUrl);
-  } else {
-    image = { data: input.data, contentType: input.contentType };
-  }
   let imageKey: string | null = null;
-  let ai: { data: string; mediaType: "image/jpeg" } | undefined;
-  if (image) {
-    const normalized = await normalizeOriginal(image.data);
-    imageKey = newKey("shop", viewer.id, "image/jpeg");
-    await putObject(imageKey, normalized, "image/jpeg");
-    ai = await toAiImage(normalized);
+  try {
+    let title: string | null = null, description: string | null = null, priceText: string | null = null, brandText: string | null = null, inputUrl: string | null = null;
+    let image: { data: Buffer; contentType: string } | null = null;
+    if (input.source === "link") {
+      await step("Reading the store page…");
+      const page = await readProductPage(input.url).catch((e) => { if (e instanceof PageError) throw new ShopError(e.message); throw e; });
+      ({ title, description, priceText, brandText } = page); inputUrl = page.url;
+      if (page.imageUrl) image = await fetchImage(page.imageUrl);
+    } else {
+      image = { data: input.data, contentType: input.contentType };
+    }
+    let ai: { data: string; mediaType: "image/jpeg" } | undefined;
+    if (image) {
+      // A corrupt store picture used to surface as a raw sharp error (review E F7).
+      let normalized: Buffer;
+      try { normalized = await normalizeOriginal(image.data); } catch { throw new ShopError("That picture couldn't be read. Paste a screenshot instead."); }
+      imageKey = newKey("shop", viewer.id, "image/jpeg");
+      await putObject(imageKey, normalized, "image/jpeg");
+      ai = await toAiImage(normalized);
+    }
+    await step("Looking at the piece…");
+    const lists = await loadTagLists();
+    const read = await readCandidate(lists, { image: ai, title, description, brandText });
+    await step("Judging it…");
+    const seeBody = await canSeeBodyData(viewer, forPersonId);
+    const [rawStyle, body, closet, similar, prefs] = await Promise.all([styleContext(forPersonId), bodyContext(seeBody, forPersonId, read.brandText), loadCandidates(forPersonId, new Date(), { noRepeatDays: 0 }), similarOwned(forPersonId, read), loadPrefs(forPersonId)]);
+    const style = seeBody ? rawStyle : stripFitNotes(rawStyle); // fit notes are body data: not for a shopper who may not see it (A3)
+    const verdict = await decide(read, style, body, closet.usable, similar, priceText, prefs.section);
+    await step("Finding what to wear with it…");
+    const [boards, recommendations, found] = await Promise.all([pairings(forPersonId, read, imageKey, closet.usable, style), recommend(prefs, read, verdict), findProducts(prefs, verdict)]);
+    const row = await db.shoppingLookup.create({
+      data: {
+        shopperId: viewer.id, forPersonId, source: input.source, inputUrl, imageKey, title: read.name, priceText, brandText: read.brandText,
+        verdict: { ...verdict, read, storesFailed: found.failed } as object, similarItemIds: similar.map((s) => s.id), pairings: boards.map((b) => ({ itemIds: b.itemIds, reason: b.reason })) as object[], recommendations: recommendations as object[], products: found.products as object[],
+      },
+    });
+    return (await getLookup(viewer, row.id))!;
+  } catch (e) {
+    if (imageKey) await deleteObject(imageKey).catch(() => {}); // nothing points at the picture when the lookup did not land (F7)
+    throw asShopError(e) ?? e;
   }
-  await step("Looking at the piece…");
-  const lists = await loadTagLists();
-  const read = await readCandidate(lists, { image: ai, title, description, brandText });
-  await step("Judging it…");
-  const [style, body, closet, similar] = await Promise.all([styleContext(forPersonId), bodyContext(viewer, forPersonId, read.brandText), loadCandidates(forPersonId, new Date(), { noRepeatDays: 0 }), similarOwned(forPersonId, read)]);
-  const verdict = await decide(read, style, body, closet.usable, similar, priceText, (await sectionOf(forPersonId))?.name ?? null);
-  await step("Finding what to wear with it…");
-  const [boards, recommendations, products] = await Promise.all([pairings(forPersonId, read, imageKey, closet.usable, style), recommend(forPersonId, read, verdict), findProducts(forPersonId, verdict)]);
-  const row = await db.shoppingLookup.create({
-    data: {
-      shopperId: viewer.id, forPersonId, source: input.source, inputUrl, imageKey, title: read.name, priceText, brandText: read.brandText,
-      verdict: { ...verdict, read } as object, similarItemIds: similar.map((s) => s.id), pairings: boards.map((b) => ({ itemIds: b.itemIds, reason: b.reason })) as object[], recommendations: recommendations as object[], products: products as object[],
-    },
-  });
-  return (await getLookup(viewer, row.id))!;
 }
 
 /**
@@ -232,37 +277,64 @@ export function startLookup(viewer: Viewer, forPersonId: string, input: LookupIn
   return startJob<string>(key, viewer.id, async (step) => (await lookup(viewer, forPersonId, input, { step })).id);
 }
 
-export async function getLookup(viewer: Viewer, id: string): Promise<LookupView | null> {
-  const row = await db.shoppingLookup.findUnique({ where: { id }, include: { forPerson: { select: { name: true } } } });
-  if (!row) return null;
-  if (row.shopperId !== viewer.id && !(await canShopFor(viewer, row.forPersonId))) return null;
-  const v = row.verdict as Verdict & { read: CandidateRead };
+type LookupRow = Prisma.ShoppingLookupGetPayload<{ include: { forPerson: { select: { name: true } } } }>;
+type ItemRow = { id: string; name: string | null; ownerId: string; category: { name: string } | null; subcategory: { name: string } | null; photos: { bucketKey: string }[] };
+const itemSelect = { id: true, name: true, ownerId: true, category: { select: { name: true } }, subcategory: { select: { name: true } }, photos: { where: { kind: "thumb" as const }, take: 1, select: { bucketKey: true } } };
+
+/**
+ * Rows into views in one pass: one items query for every pairing and similar piece across the rows, one body-data check
+ * per person (review E F1: Recent used to be 20 rows × 3 queries). A viewer who may not see the person's body data gets
+ * the verdict without its size note (A2).
+ */
+async function viewsOf(viewer: Viewer, rows: LookupRow[]): Promise<LookupView[]> {
+  if (!rows.length) return [];
+  const ids = new Set<string>();
+  for (const row of rows) {
+    for (const b of row.pairings as Board[]) for (const id of b.itemIds) if (id !== CANDIDATE_ID) ids.add(id);
+    for (const id of row.similarItemIds) ids.add(id);
+  }
+  const people = [...new Set(rows.map((r) => r.forPersonId))];
+  const [items, seeBody] = await Promise.all([
+    ids.size ? db.item.findMany({ where: { id: { in: [...ids] } }, select: itemSelect }) : Promise.resolve([] as ItemRow[]),
+    Promise.all(people.map(async (id) => [id, await canSeeBodyData(viewer, id)] as const)).then((xs) => new Map(xs)),
+  ]);
+  const byId = new Map(items.map((it) => [it.id, it]));
+  return rows.map((row) => toView(row, byId, seeBody.get(row.forPersonId) ?? false));
+}
+
+function toView(row: LookupRow, items: Map<string, ItemRow>, seeBody: boolean): LookupView {
+  const v = row.verdict as Verdict & { read: CandidateRead; storesFailed?: boolean };
   const boards = row.pairings as Board[];
-  const ids = [...new Set(boards.flatMap((b) => b.itemIds).filter((x) => x !== CANDIDATE_ID))];
-  const items = await db.item.findMany({ where: { id: { in: [...ids, ...row.similarItemIds] } }, select: { id: true, name: true, ownerId: true, category: { select: { name: true } }, subcategory: { select: { name: true } }, photos: { where: { kind: "thumb" }, take: 1, select: { bucketKey: true } } } });
   const piece = (id: string): Piece | null => {
     if (id === CANDIDATE_ID) return { id, name: row.title ?? "New piece", label: (v.read.categoryName ?? "new").toUpperCase(), thumbKey: row.imageKey, ownerId: row.forPersonId };
-    const it = items.find((x) => x.id === id);
+    const it = items.get(id);
     return it ? { id: it.id, name: it.name ?? "Untitled piece", label: (it.subcategory?.name ?? it.category?.name ?? "piece").toUpperCase(), thumbKey: it.photos[0]?.bucketKey ?? null, ownerId: it.ownerId } : null;
   };
-  const { read, ...rest } = v;
-  const verdict: Verdict = { ...rest, shoppingQueries: rest.shoppingQueries ?? [] };
+  const { read, storesFailed, ...rest } = v;
+  const verdict: Verdict = { ...rest, shoppingQueries: rest.shoppingQueries ?? [], ...(seeBody ? {} : { sizeNote: null, usedBodyData: false }) };
   return {
     id: row.id, source: row.source, createdAt: row.createdAt, shopperId: row.shopperId, forPersonId: row.forPersonId, forName: row.forPerson.name.split(" ")[0],
     inputUrl: row.inputUrl, imageKey: row.imageKey, title: row.title, priceText: row.priceText, brandText: row.brandText,
     read, verdict,
-    similar: row.similarItemIds.map((id) => items.find((x) => x.id === id)).filter(Boolean).map((it) => ({ id: it!.id, name: it!.name ?? "Untitled piece", thumbKey: it!.photos[0]?.bucketKey ?? null })),
+    similar: row.similarItemIds.map((id) => items.get(id)).filter((it): it is ItemRow => Boolean(it)).map((it) => ({ id: it.id, name: it.name ?? "Untitled piece", thumbKey: it.photos[0]?.bucketKey ?? null })),
     pairings: boards.map((b) => ({ ...b, pieces: b.itemIds.map(piece).filter((p): p is Piece => Boolean(p)) })),
     recommendations: row.recommendations as Recommendation[],
     products: (row.products as Product[] | null) ?? [],
+    storesFailed: Boolean(storesFailed),
   };
 }
 
+export async function getLookup(viewer: Viewer, id: string): Promise<LookupView | null> {
+  const row = await db.shoppingLookup.findUnique({ where: { id }, include: { forPerson: { select: { name: true } } } });
+  if (!row) return null;
+  if (row.shopperId !== viewer.id && !(await canShopFor(viewer, row.forPersonId))) return null;
+  return (await viewsOf(viewer, [row]))[0] ?? null;
+}
+
+/** The last 20 lookups the viewer made for the person (or the person's own): one query for the rows, one for their pieces. */
 export async function listRecent(viewer: Viewer, forPersonId: string): Promise<LookupView[]> {
-  const rows = await db.shoppingLookup.findMany({ where: { forPersonId, OR: [{ shopperId: viewer.id }, { forPersonId: viewer.id }] }, orderBy: { createdAt: "desc" }, take: 20, select: { id: true } });
-  const out: LookupView[] = [];
-  for (const r of rows) { const v = await getLookup(viewer, r.id); if (v) out.push(v); }
-  return out;
+  const rows = await db.shoppingLookup.findMany({ where: { forPersonId, OR: [{ shopperId: viewer.id }, { forPersonId: viewer.id }] }, orderBy: { createdAt: "desc" }, take: 20, include: { forPerson: { select: { name: true } } } });
+  return viewsOf(viewer, rows);
 }
 
 export async function deleteLookup(viewer: Viewer, id: string): Promise<void> {

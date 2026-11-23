@@ -14,9 +14,9 @@ type Group = { title: string; blurb?: string; compact?: boolean; advanced?: bool
 function GroupSection({ g }: { g: Group }) {
   return (
     <section className="mb-8" data-testid={`rules-${g.title.toLowerCase().replace(/\s+/g, "-")}`}>
-      <h2 className="mono border-b border-ink pb-2 text-graphite">{g.title}</h2>
-      {g.blurb ? <p className="mt-2 text-[13px] leading-snug text-graphite">{g.blurb}</p> : null}
-      <div className={g.compact ? "mt-1 flex flex-col" : "mt-4 flex flex-col gap-6"}>
+      <h2 className="section">{g.title}</h2>
+      {g.blurb ? <p className="note mt-1">{g.blurb}</p> : null}
+      <div className={g.compact ? "card mt-3 flex flex-col px-4" : "mt-3 flex flex-col gap-3"}>
         {g.rules.map((r) => <RuleForm key={r.key} rule={r} compact={Boolean(g.compact)} />)}
       </div>
     </section>
@@ -35,18 +35,20 @@ export default async function RulesPage() {
   return (
     <div className="lg:max-w-[640px]">
       <PageHeader title="Rules" />
-      <p className="-mt-2 mb-6 text-[14px] leading-snug text-graphite">What the looks, the clean-out nudges, the Shop and the buttons follow. Each one saves on its own as you change it.</p>
+      <p className="note -mt-2 mb-6">What the looks, the clean-out nudges, the Shop and the buttons follow. Each one saves on its own as you change it.</p>
       {plain.map((g) => <GroupSection key={g.title} g={g} />)}
       <section className="mb-8">
-        <h2 className="mono border-b border-ink pb-2 text-graphite">Photo upkeep{pending ? ` · ${pending} ${pending === 1 ? "piece" : "pieces"} waiting` : ""}</h2>
-        <UntidyPhotos pending={pending} />
-        <RefitPhotos />
+        <h2 className="section">Photo upkeep{pending ? ` · ${pending} ${pending === 1 ? "piece" : "pieces"} waiting` : ""}</h2>
+        <div className="card mt-3 px-4 pb-4">
+          <UntidyPhotos pending={pending} />
+          <RefitPhotos />
+        </div>
       </section>
       {advanced.length ? (
         <details className="group mb-8" data-testid="rules-advanced">
-          <summary className="tap flex min-h-12 cursor-pointer list-none items-center justify-between border-y border-ink py-2 [&::-webkit-details-marker]:hidden">
-            <span className="flex flex-col gap-0.5"><span className="mono text-[13px] uppercase tracking-[0.18em]">Advanced</span><span className="text-[14px] text-graphite">{advanced.map((g) => g.title).join(" · ")} · rarely needed</span></span>
-            <span className="mono shrink-0 text-graphite group-open:hidden">Show</span><span className="mono hidden shrink-0 text-graphite group-open:inline">Hide</span>
+          <summary className="card tap flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2 [&::-webkit-details-marker]:hidden">
+            <span className="flex flex-col gap-0.5"><span className="text-[17px] font-semibold">Advanced</span><span className="caption">{advanced.map((g) => g.title).join(" · ")} · rarely needed</span></span>
+            <span className="pill pill-sm pill-quiet shrink-0 group-open:hidden">Show</span><span className="pill pill-sm pill-quiet hidden shrink-0 group-open:inline-flex">Hide</span>
           </summary>
           <div className="pt-6">{advanced.map((g) => <GroupSection key={g.title} g={g} />)}</div>
         </details>

@@ -1,10 +1,10 @@
 import { db } from "@/lib/db";
 import { isMockAi, structured } from "@/lib/ai/claude";
 import { startJob, type Job } from "@/lib/jobs";
-import { canShopFor, type Viewer } from "@/lib/people/visibility";
+import { canSeeBodyData, canShopFor, type Viewer } from "@/lib/people/visibility";
 import { candidateSelect, loadCandidates, styleContext, toCandidate, type Candidate } from "@/lib/outfits/catalog";
 import { composeLooks, type Board, type Piece } from "@/lib/outfits/engine";
-import { ShopError, type LookupHooks } from "@/lib/shop/engine";
+import { asShopError, ShopError, stripFitNotes, type LookupHooks } from "@/lib/shop/engine";
 import { searchProducts, type Product } from "@/lib/shop/products";
 import { sectionWord, withSection } from "@/lib/shop/section";
 
@@ -74,11 +74,13 @@ export async function goWith(viewer: Viewer, itemId: string, hooks: LookupHooks 
   const step = (s: string) => hooks.step?.(s);
   const piece = await anchor(viewer, itemId);
   step("Looking at the closet…");
-  const [closet, style, person] = await Promise.all([
+  const [closet, rawStyle, person, seeBody] = await Promise.all([
     loadCandidates(piece.ownerId, new Date(), { noRepeatDays: 0 }),
     styleContext(piece.ownerId),
     db.person.findUniqueOrThrow({ where: { id: piece.ownerId }, select: { favoriteStores: { where: { isArchived: false }, select: { name: true } }, favoriteBrands: { where: { isArchived: false }, select: { name: true } }, shopSection: { select: { name: true, isArchived: true } } } }),
+    canSeeBodyData(viewer, piece.ownerId),
   ]);
+  const style = seeBody ? rawStyle : stripFitNotes(rawStyle); // fit notes are body data: not for a shopper who may not see it (review E A3)
   const others = closet.usable.filter((c) => c.id !== piece.id);
   const brands = person.favoriteBrands.map((b) => b.name);
   const section = person.shopSection && !person.shopSection.isArchived ? person.shopSection.name : null;
@@ -123,5 +125,7 @@ export async function latestGoWith(viewer: Viewer, itemId: string): Promise<GoWi
 
 /** The same as a background job (src/lib/jobs.ts); the result is the row's id. Asked twice at once, one job runs. */
 export function startGoWith(viewer: Viewer, itemId: string): Job<string> {
-  return startJob<string>(["gowith", viewer.id, itemId].join("|"), viewer.id, async (step) => (await goWith(viewer, itemId, { step })).id);
+  return startJob<string>(["gowith", viewer.id, itemId].join("|"), viewer.id, async (step) => {
+    try { return (await goWith(viewer, itemId, { step })).id; } catch (e) { throw asShopError(e) ?? e; } // a judge timeout reads as one (B4)
+  });
 }

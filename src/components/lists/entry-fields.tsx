@@ -23,12 +23,13 @@ export function EntryExtraFields({ fields, values, onChange }: {
         f.type === "color" ? (
           <Field key={f.name} label={f.label} htmlFor={`field-${f.name}`}>
             <div className="flex items-center gap-3">
+              {/* 44 px to the finger (review F C8) */}
               <input
                 id={`field-${f.name}`}
                 type="color"
                 value={values.hex ?? "#888888"}
                 onChange={(e) => onChange({ hex: e.target.value })}
-                className="size-9 cursor-pointer border border-line bg-paper p-0.5"
+                className="size-11 shrink-0 cursor-pointer rounded-full border border-line bg-paper p-1"
               />
               <Input value={values.hex ?? ""} onChange={(e) => onChange({ hex: e.target.value })} placeholder="#RRGGBB" className="font-mono" />
             </div>
@@ -46,7 +47,8 @@ export function EntryExtraFields({ fields, values, onChange }: {
         ) : f.type === "text" ? (
           <Field key={f.name} label={f.label} htmlFor={`field-${f.name}`}>
             {f.long ? (
-              <textarea id={`field-${f.name}`} value={(values as Record<string, string | null | undefined>)[f.name] ?? ""} onChange={(e) => onChange({ [f.name]: e.target.value })} placeholder={f.placeholder} maxLength={f.maxLength ?? 300} rows={3} className="w-full border border-ink bg-paper px-3 py-2 text-[14px] leading-snug outline-none placeholder:text-graphite/70" />
+              // 17 px text: under 16, iOS Safari zooms the page on focus and does not zoom back (review F C7).
+              <textarea id={`field-${f.name}`} value={(values as Record<string, string | null | undefined>)[f.name] ?? ""} onChange={(e) => onChange({ [f.name]: e.target.value })} placeholder={f.placeholder} maxLength={f.maxLength ?? 300} rows={3} className="w-full rounded-xl border border-line bg-paper px-3 py-2 text-[17px] leading-snug outline-none placeholder:text-graphite/70 focus:border-ink" />
             ) : (
               <Input id={`field-${f.name}`} value={(values as Record<string, string | null | undefined>)[f.name] ?? ""} onChange={(e) => onChange({ [f.name]: e.target.value })} placeholder={f.placeholder} maxLength={f.maxLength ?? 12} />
             )}

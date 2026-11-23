@@ -37,10 +37,10 @@ describe("my brands & sizes by item type", () => {
     const [jeff, olivia, mya] = await Promise.all([by("Jeff"), by("Olivia"), by("Mya")]);
     const [lulu, nike] = await db.brand.findMany({ where: { isArchived: false }, orderBy: { sortOrder: "asc" }, take: 2 });
     const [tops, bottoms, shoes] = await Promise.all([cat("Tops"), cat("Bottoms"), cat("Shoes")]);
-    expect(await listMyBrands(jeff.id)).toEqual([]);
+    expect(await listMyBrands(jeff, jeff.id)).toEqual([]);
     await setMyBrand(jeff, jeff.id, { brandId: lulu.id, url: "shop.lululemon.com", sizes: [{ categoryId: tops.id, size: " L " }, { categoryId: bottoms.id, size: "32" }] });
     await setMyBrand(jeff, jeff.id, { brandId: nike.id, sizes: [{ categoryId: shoes.id, size: "11" }] });
-    const mine = await listMyBrands(jeff.id);
+    const mine = await listMyBrands(jeff, jeff.id);
     const l = mine.find((b) => b.brandId === lulu.id)!;
     expect(l).toMatchObject({ url: "https://shop.lululemon.com/" });
     expect(l.sizes.map((s) => [s.categoryName, s.size])).toEqual([["Tops", "L"], ["Bottoms", "32"]]);
@@ -50,18 +50,27 @@ describe("my brands & sizes by item type", () => {
     expect(sizeFor(mine.find((b) => b.brandId === nike.id)!, tops.id)).toBe("11"); // one size only: offered anyway
     // clear one type; the link stays unless cleared on purpose
     await setMyBrand(jeff, jeff.id, { brandId: lulu.id, url: null, sizes: [{ categoryId: bottoms.id, size: "" }] });
-    expect((await listMyBrands(jeff.id)).find((b) => b.brandId === lulu.id)).toMatchObject({ url: "https://shop.lululemon.com/", sizes: [{ categoryName: "Tops", size: "L" }] });
+    expect((await listMyBrands(jeff, jeff.id)).find((b) => b.brandId === lulu.id)).toMatchObject({ url: "https://shop.lululemon.com/", sizes: [{ categoryName: "Tops", size: "L" }] });
     await setMyBrand(jeff, jeff.id, { brandId: lulu.id, url: "" });
-    expect((await listMyBrands(jeff.id)).find((b) => b.brandId === lulu.id)).toMatchObject({ url: null });
+    expect((await listMyBrands(jeff, jeff.id)).find((b) => b.brandId === lulu.id)).toMatchObject({ url: null });
     await expect(setMyBrand(jeff, jeff.id, { brandId: lulu.id, url: "not a link" })).rejects.toThrow(/link/);
     await removeMyBrand(jeff, jeff.id, lulu.id);
-    expect((await listMyBrands(jeff.id)).map((b) => b.brandId)).toEqual([nike.id]);
+    expect((await listMyBrands(jeff, jeff.id)).map((b) => b.brandId)).toEqual([nike.id]);
     expect(await db.bodySizeByBrand.count({ where: { personId: jeff.id, brandId: lulu.id } })).toBe(0);
-    // minors: parent yes, sibling no
+    // minors: parent yes, sibling no; a sibling sees the brand but never the size (review E A1)
     await setMyBrand(jeff, mya.id, { brandId: nike.id, sizes: [{ categoryId: tops.id, size: "Youth M" }] });
-    expect((await listMyBrands(mya.id))[0].sizes[0]).toMatchObject({ categoryName: "Tops", size: "Youth M" });
+    expect((await listMyBrands(mya, mya.id))[0].sizes[0]).toMatchObject({ categoryName: "Tops", size: "Youth M" });
+    expect((await listMyBrands(jeff, mya.id))[0].sizes[0]).toMatchObject({ size: "Youth M" });
+    expect(await listMyBrands(olivia, mya.id)).toEqual([expect.objectContaining({ brandId: nike.id, sizes: [] })]);
+    expect((await listMyBrands(olivia, jeff.id)).every((b) => b.sizes.length === 0)).toBe(true);
     await expect(setMyBrand(olivia, mya.id, { brandId: lulu.id })).rejects.toMatchObject({ status: 403 });
     await expect(removeMyBrand(olivia, mya.id, nike.id)).rejects.toMatchObject({ status: 403 });
+    // a stale item type from an old sheet is refused; a member fills a blank brand link but does not change one that is set (G6)
+    await expect(setMyBrand(jeff, jeff.id, { brandId: nike.id, sizes: [{ categoryId: "gone", size: "M" }] })).rejects.toThrow(/item type/);
+    await setMyBrand(olivia, olivia.id, { brandId: lulu.id, url: "lululemon.com" }); // blank before: anyone may fill it
+    await expect(setMyBrand(olivia, olivia.id, { brandId: lulu.id, url: "shop.lululemon.com" })).rejects.toMatchObject({ status: 403 });
+    await setMyBrand(olivia, olivia.id, { brandId: lulu.id, url: null, sizes: [{ categoryId: tops.id, size: "S" }] }); // null leaves the link alone
+    expect((await listMyBrands(olivia, olivia.id)).find((b) => b.brandId === lulu.id)).toMatchObject({ url: "https://lululemon.com/", sizes: [{ size: "S" }] });
   });
 
   it("a piece confirmed with one of my brands carries the brand link as its store link", async () => {

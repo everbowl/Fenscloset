@@ -53,18 +53,21 @@ async function assertCanEdit(viewer: Viewer, ownerId: string) {
 
 export async function getBodyProfile(viewer: Viewer, ownerId: string): Promise<BodyProfileView | null> {
   if (!(await canSeeBodyData(viewer, ownerId))) return null;
-  const [profile, kinds, values, sizes, photos, allowed] = await Promise.all([
+  // One round for everything (review E G7): the categories come with each size, the role and the guardian link ride along.
+  const [profile, kinds, values, sizes, photos, allowed, owner, link] = await Promise.all([
     db.bodyProfile.findUnique({ where: { personId: ownerId } }),
     db.measurementKind.findMany({ where: { isArchived: false }, orderBy: { sortOrder: "asc" } }),
     db.bodyMeasurement.findMany({ where: { personId: ownerId } }),
     db.bodySizeByBrand.findMany({ where: { personId: ownerId }, include: { brand: true }, orderBy: { updatedAt: "desc" } }),
     db.bodyPhoto.findMany({ where: { personId: ownerId }, orderBy: { takenAt: "desc" } }),
     bodyPhotosAllowed(ownerId),
+    db.person.findUnique({ where: { id: ownerId }, select: { role: true } }),
+    viewer.id === ownerId ? Promise.resolve(null) : db.guardianLink.findUnique({ where: { minorId_parentId: { minorId: ownerId, parentId: viewer.id } } }),
   ]);
-  const categories = await db.category.findMany({ where: { id: { in: sizes.map((s) => s.categoryId).filter((x): x is string => Boolean(x)) } }, select: { id: true, name: true } });
+  const categoryIds = sizes.map((s) => s.categoryId).filter((x): x is string => Boolean(x));
+  const categories = categoryIds.length ? await db.category.findMany({ where: { id: { in: categoryIds } }, select: { id: true, name: true } }) : [];
   // A minor's locked photos stay visible to their parents; an adult's locked photos are theirs alone.
-  const ownerRole = (await db.person.findUnique({ where: { id: ownerId }, select: { role: true } }))?.role;
-  const isParentView = ownerRole === "minor" && viewer.id !== ownerId && Boolean(await db.guardianLink.findUnique({ where: { minorId_parentId: { minorId: ownerId, parentId: viewer.id } } }));
+  const isParentView = owner?.role === "minor" && viewer.id !== ownerId && Boolean(link);
   return {
     fitNotes: profile?.fitNotes ?? null,
     measurements: kinds.map((k) => ({ kindId: k.id, name: k.name, unit: k.unit, value: values.find((v) => v.kindId === k.id)?.value ?? null })),
@@ -88,25 +91,7 @@ export async function setFitNotes(viewer: Viewer, ownerId: string, notes: string
   await db.bodyProfile.upsert({ where: { personId: ownerId }, update: { fitNotes }, create: { personId: ownerId, fitNotes } });
 }
 
-export async function upsertSize(viewer: Viewer, ownerId: string, input: { id?: string; brandId: string; categoryId: string | null; size: string }): Promise<void> {
-  await assertCanEdit(viewer, ownerId);
-  const size = input.size.trim().slice(0, 20);
-  if (!size) throw new ProfileError("Enter the size.");
-  if (input.id) {
-    const row = await db.bodySizeByBrand.findUnique({ where: { id: input.id } });
-    if (!row || row.personId !== ownerId) throw new ProfileError("Not yours.", 403);
-    await db.bodySizeByBrand.update({ where: { id: input.id }, data: { brandId: input.brandId, categoryId: input.categoryId, size } });
-    return;
-  }
-  const existing = await db.bodySizeByBrand.findFirst({ where: { personId: ownerId, brandId: input.brandId, categoryId: input.categoryId } });
-  if (existing) await db.bodySizeByBrand.update({ where: { id: existing.id }, data: { size } });
-  else await db.bodySizeByBrand.create({ data: { personId: ownerId, brandId: input.brandId, categoryId: input.categoryId, size } });
-}
-
-export async function removeSize(viewer: Viewer, ownerId: string, id: string): Promise<void> {
-  await assertCanEdit(viewer, ownerId);
-  await db.bodySizeByBrand.deleteMany({ where: { id, personId: ownerId } });
-}
+// Sizes by brand are written in one place, setMyBrand (src/lib/profiles/brands.ts); the Body page only reads them (review E G4).
 
 /** Body photos keep their history: the newest of each view is what the mirror uses; older ones stay (and can be removed) so the shape can be followed over time. */
 export async function addBodyPhoto(viewer: Viewer, ownerId: string, key: string, opts: { onlyMe?: boolean; view?: BodyView } = {}): Promise<void> {

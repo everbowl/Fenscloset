@@ -8,7 +8,7 @@ import { resetDb } from "../helpers";
 import { seed } from "../../prisma/seed";
 import { personalClosetId } from "@/lib/items/service";
 import { parseProductPage, normalizeUrl, MOCK_PAGE } from "@/lib/shop/page";
-import { deleteLookup, getLookup, listRecent, lookup, startLookup } from "@/lib/shop/engine";
+import { deleteLookup, getLookup, listRecent, lookup, startLookup, storeSearchUrl, stripFitNotes } from "@/lib/shop/engine";
 import { canViewKey } from "@/lib/photos/visibility";
 import { forgetJobs, jobStatus, settled } from "@/lib/jobs";
 
@@ -27,7 +27,15 @@ describe("shop", () => {
 
   it("parses a store page (OG / price / brand) and rejects non-store links", () => {
     const p = parseProductPage("https://mock.example/p/1", MOCK_PAGE);
-    expect(p).toMatchObject({ title: "Linen Blazer", priceText: "$128.00", brandText: "Everlane", imageUrl: "https://mock.example/blazer.jpg" });
+    expect(p).toMatchObject({ title: "Linen Blazer", priceText: "$128.00", brandText: "Everlane", imageUrl: "https://mock.example/blazer.jpg", description: "A breezy linen blazer in oatmeal, the season's lightest." });
+    // review E F2: an apostrophe inside a double-quoted content used to cut the title to "Women"
+    const w = parseProductPage("https://mock.example/p/2", `<html><head><meta property="og:title" content="Women's Ribbed Tank | J.Crew"><meta property="og:description" content='Men "slim" fit'><meta property="product:brand" content="J.Crew"></head></html>`);
+    expect(w.title).toBe("Women's Ribbed Tank | J.Crew");
+    expect(w.description).toBe(`Men "slim" fit`); // single quotes hold double quotes
+    // a store search is a Google site: link, since every store's own search page differs (E4)
+    expect(storeSearchUrl({ name: "Nordstrom", url: "https://www.nordstrom.com/" }, "navy blazer")).toBe("https://www.google.com/search?q=site%3Anordstrom.com%20navy%20blazer");
+    expect(storeSearchUrl({ name: "Google", url: null }, "navy blazer")).toBe("https://www.google.com/search?q=navy%20blazer");
+    expect(stripFitNotes("Loves colors: navy\nFit notes: short torso\nStyle words: minimal")).toBe("Loves colors: navy\nStyle words: minimal");
     expect(() => normalizeUrl("not a link")).toThrow();
     expect(() => normalizeUrl("http://localhost:3000/x")).toThrow();
     expect(normalizeUrl("everlane.com/products/blazer").toString()).toBe("https://everlane.com/products/blazer");
@@ -81,6 +89,14 @@ describe("shop", () => {
     await db.shopForGrant.create({ data: { ownerId: jeff.id, shopperId: brittney.id } });
     const byB = await lookup(brittney, jeff.id, { source: "screenshot", data: img, contentType: "image/jpeg" });
     expect(byB.verdict.usedBodyData).toBe(false);
+    // review E A2: Jeff's own lookup used his body data; Brittney (shop-for only) reads it without the size note
+    const own = await lookup(jeff, jeff.id, { source: "screenshot", data: img, contentType: "image/jpeg" });
+    expect(own.verdict.usedBodyData).toBe(true);
+    expect(own.verdict.sizeNote).toMatch(/size/);
+    const seenByB = (await getLookup(brittney, own.id))!;
+    expect(seenByB.verdict).toMatchObject({ sizeNote: null, usedBodyData: false });
+    expect((await listRecent(brittney, jeff.id)).every((v) => v.verdict.sizeNote === null)).toBe(true);
+    await deleteLookup(jeff, own.id);
     // recent + delete
     expect((await listRecent(jeff, jeff.id)).length).toBe(3);
     await expect(deleteLookup(olivia, v.id)).rejects.toMatchObject({ status: 403 });

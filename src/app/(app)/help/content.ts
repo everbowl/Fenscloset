@@ -62,7 +62,7 @@ export const HELP_TOPICS: HelpTopic[] = [
   ] },
   { slug: "profile", title: "Your", accent: "profile", blurb: "Sizes, style, stores, and who sees what.", link: { href: "/profile", label: "Open Profile" }, cover: { kind: "switcher", label: "Jeff" }, steps: [
     { text: "Tap your name at the top left, then PROFILE.", cue: { kind: "switcher", label: "Jeff" } },
-    { text: "BODY: your sizes and measurements. Only you can see them, plus parents for kids, plus anyone you choose in Settings.", cue: { kind: "row", label: "Body", value: "Private" } },
+    { text: "BODY: your sizes and measurements. Only you can see them, plus parents for kids, plus anyone you choose in Settings. They never go into a store search.", cue: { kind: "row", label: "Body", value: "Private" } },
     { text: "Body photos: when you add one, pick ONLY ME to keep it to yourself. The app can still use it to dress you.", cue: { kind: "tabs", active: "Only me", others: ["Parents", "Family"] } },
     { text: "STYLE: colors you love, colors you avoid, words that describe you. The looks follow this.", cue: { kind: "row", label: "Style", value: "Loves navy" } },
     { text: "BRANDS & STORES: your favorites. Shopping picks lean on these.", cue: { kind: "row", label: "Stores", value: "Vuori" } },

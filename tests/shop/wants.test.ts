@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
 import { seed } from "../../prisma/seed";
 import { forgetJobs, settled } from "@/lib/jobs";
-import { addWant, deleteWant, editWant, getWant, listWants, mergeMatches, newMatchCount, openWant, priceCapOf, searchWant, searchWantNow, setWantFound, sweepWants } from "@/lib/shop/wants";
+import { acquireSweepLease, addWant, deleteWant, editWant, getWant, listWants, mergeMatches, newMatchCount, openWant, priceCapOf, releaseSweepLease, searchWant, searchWantNow, setWantFound, STORES_DID_NOT_ANSWER, sweepWants } from "@/lib/shop/wants";
 import type { Product } from "@/lib/shop/products";
 
 const product = (n: number, price: number): Product => ({ title: `Sweater ${n}`, priceText: `$${price}.00`, storeName: "Mock", url: `https://mock.example/s/${n}`, imageUrl: null, query: "sweater" });
@@ -20,6 +20,7 @@ describe("looking for", () => {
     expect(priceCapOf("navy cashmere crewneck under $200")).toBe(200);
     expect(priceCapOf("white sneakers, less than 150")).toBe(150);
     expect(priceCapOf("$80 max linen shirt")).toBe(80);
+    expect(priceCapOf("camel overcoat under $1,200")).toBe(1200); // review E F4: read as $1 before
     expect(priceCapOf("black leather belt")).toBeNull();
     const first = mergeMatches([], [product(1, 48), product(2, 108), product(3, 88)], 100, new Date("2026-10-24T00:00:00Z"));
     expect(first.added).toBe(2);
@@ -76,6 +77,15 @@ describe("looking for", () => {
     expect(v.matches.filter((m) => m.isNew)).toHaveLength(1);
     // Olivia may not see Jeff's list; Jeff keeps one for Mya (a parent); Olivia may not add to Jeff's
     expect(await listWants(olivia, jeff.id)).toEqual([]);
+    // review E A6: a shopper whose grant is taken back loses the lines they added, too
+    await db.shopForGrant.create({ data: { ownerId: jeff.id, shopperId: olivia.id } });
+    const byOlivia = await addWant(olivia, jeff.id, "black boots");
+    await settled(byOlivia.job, 15_000);
+    expect(await getWant(olivia, byOlivia.id)).not.toBeNull();
+    await db.shopForGrant.deleteMany({ where: { ownerId: jeff.id, shopperId: olivia.id } });
+    expect(await getWant(olivia, byOlivia.id)).toBeNull();
+    await expect(deleteWant(olivia, byOlivia.id)).rejects.toMatchObject({ status: 404 });
+    await deleteWant(jeff, byOlivia.id);
     expect(await getWant(olivia, added.id)).toBeNull();
     await expect(editWant(olivia, added.id, "something else")).rejects.toMatchObject({ status: 404 });
     await expect(addWant(olivia, jeff.id, "black boots")).rejects.toMatchObject({ status: 403 });
@@ -103,6 +113,35 @@ describe("looking for", () => {
     await deleteWant(jeff, added.id);
     expect(await getWant(jeff, added.id)).toBeNull();
     await expect(deleteWant(jeff, added.id)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("a search the stores or the judge fail still marks the line checked, with the reason, and the next good one clears it (review E C3)", async () => {
+    const jeff = await by("Jeff");
+    const want = await addWant(jeff, jeff.id, "grey marl hoodie under $1,200");
+    await settled(want.job, 15_000);
+    let v = (await getWant(jeff, want.id))!;
+    expect(v.maxPrice).toBe(1200);
+    expect(v.lastError).toBeNull();
+    // every store answer fails: the stores' key is gone and the mock is off, so the search throws
+    const before = v.lastSearchedAt!.getTime();
+    delete process.env.MOCK_SERPER; process.env.SERPER_API_KEY = "test-key";
+    const broken = (async () => new Response("nope", { status: 503 })) as typeof fetch;
+    const realFetch = globalThis.fetch; globalThis.fetch = broken;
+    try { await expect(searchWant(want.id, { maxAgeHours: 0 })).rejects.toMatchObject({ message: STORES_DID_NOT_ANSWER }); }
+    finally { globalThis.fetch = realFetch; process.env.MOCK_SERPER = "true"; }
+    v = (await getWant(jeff, want.id))!;
+    expect(v.lastError).toBe(STORES_DID_NOT_ANSWER);
+    expect(v.lastSearchedAt!.getTime()).toBeGreaterThanOrEqual(before); // never "Searching the stores…" forever
+    expect(v.matches.length).toBeGreaterThan(0); // what was found before stays
+    // a good search clears the note
+    await searchWant(want.id);
+    expect((await getWant(jeff, want.id))!.lastError).toBeNull();
+    // the sweep's lease: one process at a time
+    await releaseSweepLease();
+    expect(await acquireSweepLease()).toBe(true);
+    expect(await acquireSweepLease()).toBe(false);
+    expect(await acquireSweepLease(new Date(Date.now() + 30 * 60_000))).toBe(true); // lapsed
+    await releaseSweepLease();
   });
 
   it("the sweep searches open wants whose last check is older than the rule, skips found ones, and is off at 0", async () => {

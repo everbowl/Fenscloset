@@ -16,6 +16,11 @@ export const RULE_CHOICES: Record<string, RuleChoice[]> = {
 
 export type RuleKind = "choice" | "onoff" | "color" | "text" | "number";
 
+/** Which input a rule wants is decided by its key, never by the value it happens to hold (review E D1: a number rule set to 0 or 1 turned into an On/Off toggle). */
+export const RULE_ONOFF_KEYS: string[] = [];
+export const RULE_COLOR_KEYS: string[] = ["accentColor"];
+export const RULE_TEXT_KEYS: string[] = ["timezone"];
+
 /** The words on the Rules page, by key: one plain line each, no build notes, no key names. (The row in the database keeps the value; the copy lives here.) */
 export const RULE_COPY: Record<string, { label: string; description: string; unit?: string }> = {
   noRepeatDays: { label: "Days before a piece repeats", description: "A piece worn within this many days is not suggested again.", unit: "days" },
@@ -64,12 +69,11 @@ export const ACCENT_PRESETS: { value: string; label: string }[] = [
   { value: "#1D4ED8", label: "Blue" }, { value: "#047857", label: "Green" }, { value: "#000000", label: "Black" },
 ];
 
-/** A fixed choice, on/off, a color, free text (the time zone), else a whole number. */
-export function ruleKind(rule: { key: string; value: string }): RuleKind {
+/** A fixed choice, on/off, a color, free text (the time zone), else a whole number: read from the key alone. */
+export function ruleKind(rule: { key: string; value?: string }): RuleKind {
   if (rule.key in RULE_CHOICES) return "choice";
-  const v = rule.value.toLowerCase();
-  if (ON_WORDS.includes(v) || OFF_WORDS.includes(v)) return "onoff";
-  if (/^#[0-9a-f]{6}$/i.test(rule.value)) return "color";
-  if (rule.key === "timezone") return "text";
+  if (RULE_ONOFF_KEYS.includes(rule.key)) return "onoff";
+  if (RULE_COLOR_KEYS.includes(rule.key)) return "color";
+  if (RULE_TEXT_KEYS.includes(rule.key)) return "text";
   return "number";
 }
