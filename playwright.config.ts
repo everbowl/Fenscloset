@@ -25,6 +25,6 @@ export default defineConfig({
     url: `http://localhost:${PORT}/api/health`,
     reuseExistingServer: !process.env.CI,
     timeout: 240_000,
-    env: { ...process.env, DATABASE_URL: "postgresql://postgres@localhost:5433/fenscloset_e2e", DEV_MODE: "true", SESSION_SECRET: "e2e", APP_URL: `http://localhost:${PORT}`, MOCK_S3: "true", MOCK_AI: "true", MOCK_WEATHER: "true", MOCK_GOOGLE: "true", MOCK_FETCH: "true", MOCK_SERPER: "true", MOCK_TRYON: "true", MOCK_GOOGLE_IMAGE: "true", MOCK_FASHN: "true", MOCK_KLING: "true", MOCK_SHOP_SLOW_MS: "700", MOCK_WEATHER_SLOW_MS: "1200", UNTIDY_ON_START: "false", WANTS_ON_START: "false" },
+    env: { ...process.env, DATABASE_URL: "postgresql://postgres@localhost:5433/fenscloset_e2e", DEV_MODE: "true", SESSION_SECRET: "e2e", APP_URL: `http://localhost:${PORT}`, MOCK_S3: "true", MOCK_AI: "true", MOCK_WEATHER: "true", MOCK_GOOGLE: "true", MOCK_FETCH: "true", MOCK_SERPER: "true", MOCK_TRYON: "true", MOCK_TRYON_SLOW_MS: "2500", MOCK_GOOGLE_IMAGE: "true", MOCK_FASHN: "true", MOCK_KLING: "true", MOCK_SHOP_SLOW_MS: "700", MOCK_WEATHER_SLOW_MS: "1200", UNTIDY_ON_START: "false", WANTS_ON_START: "false" },
   },
 });

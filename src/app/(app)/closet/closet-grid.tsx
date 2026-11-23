@@ -63,9 +63,9 @@ export function ClosetGrid({ items, showOwner, mirror, lead }: { items: ItemCard
         ))}
       </div>
       {picking ? (
-        <div className="fixed inset-x-0 bottom-[calc(76px_+_env(safe-area-inset-bottom))] z-30 border-t border-line bg-paper/95 px-5 py-3 backdrop-blur lg:bottom-0 lg:py-4">
+        <div className="fixed inset-x-0 bottom-[calc(76px_+_env(safe-area-inset-bottom))] z-30 border-t border-line bg-paper px-5 py-3 lg:bottom-0 lg:py-4">
           <div className="mx-auto flex max-w-[440px] flex-col gap-2 lg:max-w-[1040px]">
-            <Button size="lg" className="w-full" disabled={!picked.length || m.busy} shelf={false} sub={picked.length ? names : "Tap pieces in the grid"}
+            <Button size="lg" className="w-full" disabled={!picked.length || m.busy} sub={picked.length ? names : "Tap pieces in the grid"}
               onClick={() => mirror && m.begin({ look: { kind: "closet", itemIds: picked }, on: onMe ? "me" : "mannequin" })} data-testid="see-picked">
               {m.busy ? "Dressing…" : onMe ? "See it on me" : "See it on a mannequin"}
             </Button>

@@ -128,7 +128,7 @@ export async function lookupProduct(input: string): Promise<StoreProduct> {
     throw new StoreAddError(`${storeNameFromUrl(normalizeUrl(input).toString())} blocks link previews and no search match came back. Take a photo of the piece, or use the receipt.`);
   }
   const variants = await shopifyVariants(page.url).catch(() => ({ colors: [], sizes: [], colorImages: {}, category: null }));
-  const name = (page.title ?? "").replace(/\s*[|–-]\s*[^|–-]*$/, "").trim() || page.title || "Untitled piece";
+  const name = (page.title ?? "").replace(/\s+[|–—-]\s+[^|–—-]*$/, "").trim() || page.title || "Untitled piece"; // "Classic V-Neck Tee | Store": only a spaced separator is a store suffix (review E F3)
   // The page's own category when src/lib/shop/page.ts learns to read one; the Shopify product type otherwise.
   const category = (page as { category?: string | null }).category ?? variants.category ?? null;
   return { url: page.url, name: name.slice(0, 80), brandText: page.brandText, storeName: page.siteName ?? storeNameFromUrl(page.url), priceText: page.priceText, imageUrl: page.imageUrl, colors: variants.colors, sizes: variants.sizes, colorImages: variants.colorImages, category, source: "page" };

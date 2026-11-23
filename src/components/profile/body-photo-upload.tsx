@@ -2,7 +2,7 @@
 
 import { useRef, useState, type ReactNode } from "react";
 import { Sheet } from "@/components/ui/sheet";
-import { shrinkPhoto } from "@/lib/import/client-queue";
+import { putSigned, shrinkPhoto } from "@/lib/import/client-queue";
 import { addBodyPhotoAction } from "@/app/(app)/profile/actions";
 
 export type BodyPhotoView = "front" | "back" | "left" | "right" | "side";
@@ -28,8 +28,7 @@ export function useBodyPhotoUpload(ownerId: string, onDone?: () => void, testId 
       const signRes = await fetch("/api/uploads/sign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contentType: blob.type || "image/jpeg", kind: "bodies", ownerId }) });
       const signed = (await signRes.json()) as { key: string; url: string; headers: Record<string, string>; error?: string };
       if (!signRes.ok) throw new Error(signed.error || "Upload failed.");
-      const put = await fetch(signed.url, { method: "PUT", headers: signed.headers, body: blob });
-      if (!put.ok) throw new Error("Upload failed.");
+      await putSigned(signed.url, signed.headers, blob); // 60 s and one retry, like every other upload (review B B15)
       const r = await addBodyPhotoAction(ownerId, signed.key, onlyMe, view);
       if (!r.ok) throw new Error(r.error);
       onDone?.();

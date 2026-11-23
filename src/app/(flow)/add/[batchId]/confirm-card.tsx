@@ -352,7 +352,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
 
       {/* The one action stays in reach: pinned to the bottom of the screen, above the home bar. */}
       <div className="sticky bottom-0 z-10 mt-auto flex items-center gap-2.5 border-t border-line bg-paper px-5 pb-[calc(16px+env(safe-area-inset-bottom))] pt-3" data-testid="confirm-bar">
-        <Button size="lg" className="flex-1 justify-start" shelf={false} icon={<Icons.check />} sub={readyCount > 1 ? "Saves it · next photo" : "Saves it to your closet"} onClick={confirm} busy={saving === "one"} disabled={busy} data-testid="confirm-next">
+        <Button size="lg" className="flex-1 justify-start" icon={<Icons.check />} sub={readyCount > 1 ? "Saves it · next photo" : "Saves it to your closet"} onClick={confirm} busy={saving === "one"} disabled={busy} data-testid="confirm-next">
           {saving === "one" ? "Adding…" : "Add to closet"}
         </Button>
         <button type="button" onClick={() => setSheet("camera")} aria-label="Add a label or worn photo" className="flex size-[60px] shrink-0 items-center justify-center rounded-full border-2 border-ink bg-paper text-ink active:bg-bone">
@@ -400,7 +400,7 @@ export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists
               <figure><div className="stage h-[150px] overflow-hidden"><img src={`/api/photo/${photoKey}`} alt="" className="size-full object-contain" /></div><figcaption className="caption mt-1.5">This photo</figcaption></figure>
               <figure><div className="stage h-[150px] overflow-hidden">{duplicate.thumbKey ? <img src={`/api/photo/${duplicate.thumbKey}`} alt="" className="size-full object-contain" /> : null}</div><figcaption className="caption mt-1.5 truncate">{duplicate.name ?? "What you own"}</figcaption></figure>
             </div>
-            <Button size="lg" className="w-full justify-start" shelf={false} icon={<Icons.copy />} sub="Copies its details · you check the color" onClick={mirror} busy={merging} data-testid="like-mirror">Another one of these</Button>
+            <Button size="lg" className="w-full justify-start" icon={<Icons.copy />} sub="Copies its details · you check the color" onClick={mirror} busy={merging} data-testid="like-mirror">Another one of these</Button>
             <button type="button" onClick={() => { dismissLike(); void merge(); }} disabled={merging} className="pill h-[50px] w-full" data-testid="like-merge">{merging ? "Adding the photo…" : "It’s the one I have · add this photo"}</button>
             <button type="button" onClick={dismissLike} className="pill pill-quiet h-[50px] w-full" data-testid="like-new">No · something new</button>
           </div>

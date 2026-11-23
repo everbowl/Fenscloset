@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Pencil } from "lucide-react";
 import { Sheet } from "@/components/ui/sheet";
@@ -12,7 +11,6 @@ import type { ListEntry } from "@/lib/lists/service";
 /** Closet category chips from the editable list (Alta's chip row), with a pencil at the end for admins. `keep` is every other URL parameter (the search, the sort, the filters), carried from chip to chip. */
 export function FilterTabs({ categories, active, basePath, keep = {}, canEdit }: { categories: ListEntry[]; active?: string; basePath: string; keep?: Record<string, string>; canEdit: boolean }) {
   const [editing, setEditing] = useState(false);
-  const router = useRouter();
   const href = (cat?: string) => {
     const p = new URLSearchParams(keep);
     if (cat) p.set("cat", cat); else p.delete("cat");
@@ -34,7 +32,7 @@ export function FilterTabs({ categories, active, basePath, keep = {}, canEdit }:
       {canEdit ? (
         <>
           <button type="button" onClick={() => setEditing(true)} aria-label="Edit categories" className="pill pill-sm pill-quiet shrink-0 px-2.5"><Pencil className="size-3.5" strokeWidth={2} /></button>
-          <Sheet open={editing} onClose={() => { setEditing(false); router.refresh(); }} title="Categories">
+          <Sheet open={editing} onClose={() => setEditing(false)} title="Categories">
             <ListEditor kind="category" entries={categories} />
           </Sheet>
         </>

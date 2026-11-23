@@ -96,15 +96,24 @@ async function exactPick(storeName: string | null, line: ReceiptLine): Promise<P
  * store's page found by search), then up to five Google Shopping pictures as alternatives.
  */
 export async function matchReceipt(receipt: Receipt): Promise<MatchedLine[]> {
-  return Promise.all(receipt.lines.map(async (line) => {
-    const q = [receipt.storeName, line.name, line.color].filter(Boolean).join(" ");
-    const [exact, found] = await Promise.all([
-      exactPick(receipt.storeName, line),
-      searchProducts([q], { favoriteStores: receipt.storeName ? [receipt.storeName] : [], favoriteBrands: [] }),
-    ]);
-    const seen = new Set<string>();
-    const picks: Product[] = [];
-    for (const p of [exact, ...found]) if (p?.imageUrl && !seen.has(p.url)) { seen.add(p.url); picks.push(p); }
-    return { ...line, picks: picks.slice(0, 6) };
+  // Four lines at a time (review E B6): twenty-five lines at once meant a hundred outside calls and 429s from the search.
+  const out: MatchedLine[] = new Array(receipt.lines.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(4, receipt.lines.length) }, async () => {
+    for (;;) {
+      const i = next++;
+      if (i >= receipt.lines.length) return;
+      const line = receipt.lines[i];
+      const q = [receipt.storeName, line.name, line.color].filter(Boolean).join(" ");
+      const [exact, found] = await Promise.all([
+        exactPick(receipt.storeName, line),
+        searchProducts([q], { favoriteStores: receipt.storeName ? [receipt.storeName] : [], favoriteBrands: [] }),
+      ]);
+      const seen = new Set<string>();
+      const picks: Product[] = [];
+      for (const p of [exact, ...found]) if (p?.imageUrl && !seen.has(p.url)) { seen.add(p.url); picks.push(p); }
+      out[i] = { ...line, picks: picks.slice(0, 6) };
+    }
   }));
+  return out;
 }

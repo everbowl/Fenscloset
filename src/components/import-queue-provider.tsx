@@ -134,7 +134,11 @@ export function ImportQueueProvider({ children }: { children: ReactNode }) {
   }, [retryHeld]);
 
   // Resume anything left in IndexedDB and learn the open batch.
-  useEffect(() => { void refresh(); void pump(); }, [refresh, pump]);
+  useEffect(() => {
+    // The session cookie is httpOnly, so the path is the only client-side sign of being signed out (review F F2).
+    if (/^\/(login|forgot-password|reset-password|invite|offline)(\/|$)/.test(location.pathname)) { setLoaded(true); return; }
+    void refresh(); void pump();
+  }, [refresh, pump]);
 
   // Poll while the server is still working on photos; not while the tab is in the background (review B G6), and once more the moment it comes back.
   const busy = Boolean(batch && (batch.counts.queued + batch.counts.uploaded + batch.counts.processing > 0)) || upload.active;

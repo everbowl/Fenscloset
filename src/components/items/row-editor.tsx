@@ -45,11 +45,11 @@ export function PickSheet({ open, onClose, title, kind, options, selected, multi
   }
   return (
     <Sheet open={open} onClose={onClose} title={title}>
-      <div className="flex flex-col" role="listbox" aria-multiselectable={multi}>
+      <div className="flex flex-col" role="group">
         {options.map((o) => {
           const on = selected.includes(o.id);
           return (
-            <button key={o.id} type="button" role="option" aria-selected={on} onClick={() => toggle(o.id)} className="tap flex h-12 items-center justify-between border-b border-line text-[15px]">
+            <button key={o.id} type="button" aria-pressed={on} onClick={() => toggle(o.id)} className="tap flex h-12 items-center justify-between border-b border-line text-[15px]">
               <span className="flex items-center gap-3">{o.hex ? <span aria-hidden className="size-4 shrink-0 rounded-full border border-line" style={{ background: o.hex }} /> : null}{o.name}</span>
               <span className={cn("mono", on ? "text-ink" : "text-transparent")}>{on ? "✓" : "·"}</span>
             </button>
@@ -101,6 +101,7 @@ export function TextSheet({ open, onClose, title, label, value, onSave, placehol
             ? <Textarea id={id} value={v} onChange={(e) => setV(e.target.value)} autoFocus maxLength={500} placeholder={placeholder} rows={4} />
             : <Input id={id} value={v} onChange={(e) => setV(e.target.value)} autoFocus placeholder={placeholder} {...KIND_PROPS[kind]} />}
         </Field>
+        {!ok && v ? <p className="mono text-danger" role="alert">{hint ?? "That doesn’t look right yet."}</p> : null}
         <Button type="submit" className="w-full" disabled={!ok} data-testid="text-sheet-save">{submitLabel}</Button>
       </form>
     </Sheet>

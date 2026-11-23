@@ -6,7 +6,7 @@ import { readCapped, safeFetch, UnsafeUrlError } from "@/lib/net/safe-fetch";
  * server call itself, the Railway network or the cloud's metadata address, however it redirects (review E B1/B2).
  * MOCK_FETCH=true serves a canned page (tests, dev container).
  */
-export type ProductPage = { url: string; title: string | null; description: string | null; imageUrl: string | null; priceText: string | null; brandText: string | null; siteName: string | null };
+export type ProductPage = { url: string; title: string | null; description: string | null; imageUrl: string | null; priceText: string | null; brandText: string | null; siteName: string | null; /** The store's own category (JSON-LD `category`, else the last breadcrumb), for the add to map onto the family's list. */ category: string | null };
 
 export class PageError extends Error {
   constructor(message: string, public readonly code: "bad_url" | "blocked" | "unreachable") {
@@ -36,8 +36,8 @@ const meta = (html: string, names: string[]): string | null => {
 };
 const decode = (s: string) => s.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ");
 
-function jsonLd(html: string): { price?: string; currency?: string; brand?: string; name?: string; image?: string } {
-  const out: { price?: string; currency?: string; brand?: string; name?: string; image?: string } = {};
+function jsonLd(html: string): { price?: string; currency?: string; brand?: string; name?: string; image?: string; category?: string } {
+  const out: { price?: string; currency?: string; brand?: string; name?: string; image?: string; category?: string } = {};
   for (const m of html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
     try {
       const walk = (node: unknown) => {
@@ -49,6 +49,11 @@ function jsonLd(html: string): { price?: string; currency?: string; brand?: stri
           if (!out.name && typeof o.name === "string") out.name = o.name;
           if (!out.brand) out.brand = typeof o.brand === "string" ? o.brand : (o.brand as { name?: string } | undefined)?.name;
           if (!out.image) out.image = typeof o.image === "string" ? o.image : Array.isArray(o.image) ? String(o.image[0]) : (o.image as { url?: string } | undefined)?.url;
+          if (!out.category && typeof o.category === "string") out.category = o.category.split(/\s*[>/]\s*/).filter(Boolean).pop();
+        }
+        if (/BreadcrumbList/i.test(type) && !out.category && Array.isArray(o.itemListElement)) {
+          const names = (o.itemListElement as { name?: string; item?: { name?: string } }[]).map((e) => e.name ?? e.item?.name).filter((n): n is string => Boolean(n));
+          if (names.length > 1) out.category = names[names.length - 1]; // the last crumb is the product's own category
         }
         if (/Offer/i.test(type) && !out.price && o.price != null) { out.price = String(o.price); out.currency = typeof o.priceCurrency === "string" ? o.priceCurrency : undefined; }
         for (const v of Object.values(o)) walk(v);
@@ -67,7 +72,7 @@ export function parseProductPage(url: string, html: string): ProductPage {
   const priceText = amount ? (currency && currency !== "USD" ? `${amount} ${currency}` : `$${amount.replace(/^\$/, "")}`) : null;
   let imageUrl = meta(html, ["og:image", "og:image:secure_url", "twitter:image"]) ?? ld.image ?? null;
   if (imageUrl && imageUrl.startsWith("/")) { try { imageUrl = new URL(imageUrl, url).toString(); } catch { imageUrl = null; } }
-  return { url, title, description: meta(html, ["og:description", "description"]), imageUrl, priceText, brandText: meta(html, ["product:brand", "og:brand", "brand"]) ?? ld.brand ?? null, siteName: meta(html, ["og:site_name"]) };
+  return { url, title, description: meta(html, ["og:description", "description"]), imageUrl, priceText, brandText: meta(html, ["product:brand", "og:brand", "brand"]) ?? ld.brand ?? null, category: ld.category ?? null, siteName: meta(html, ["og:site_name"]) };
 }
 
 export const MOCK_PAGE = `<html><head><title>Linen Blazer | Mock Store</title>
