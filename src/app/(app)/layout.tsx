@@ -28,7 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <style>{`:root{--accent:${accent}}`}</style>
       <ServiceWorkerRegistrar />
       <DevModeBanner />
-      <AppHeader left={<div className="flex items-center"><Suspense><HeaderBack /></Suspense><PersonMenu views={views} current={current} isAdmin={isAdmin(person)} logout={logoutAction} setView={setViewAction} /></div>} right={<HeaderActionSlot />} />
+      <AppHeader left={<div className="header-left flex items-center"><Suspense><HeaderBack /></Suspense><PersonMenu views={views} current={current} isAdmin={isAdmin(person)} logout={logoutAction} setView={setViewAction} /></div>} right={<HeaderActionSlot />} />
       {/* Desktop (Q17): the tab row sits under the header; on phones it is the pinned bottom bar. */}
       <AppNav />
       <MirrorJobProvider>

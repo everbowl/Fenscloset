@@ -43,7 +43,8 @@ export function PersonMenu({ views, current, isAdmin, logout, setView }: {
     <>
       <button type="button" onClick={() => setOpen(true)} aria-label={`${label} menu`} className="flex h-11 items-center gap-2 rounded-full pl-1 pr-2 text-[15px] font-semibold active:bg-bone">
         <span aria-hidden className="flex size-8 items-center justify-center rounded-full bg-bone text-[13px] font-semibold text-ink">{label.slice(0, 1).toUpperCase()}</span>
-        {label} <ChevronDown className="size-3.5 text-graphite" strokeWidth={2.5} />
+        {/* On a phone the name steps aside when the back control is in the header (src/app/globals.css .header-left): back, avatar, name and the wordmark do not fit in 393 px. */}
+        <span className="person-name flex items-center gap-2">{label} <ChevronDown className="size-3.5 text-graphite" strokeWidth={2.5} /></span>
       </button>
       <Sheet open={open} onClose={() => setOpen(false)} title="Viewing">
         {/* A group of toggles, not a listbox: VoiceOver reads a <button role="option"> as a button anyway, and aria-pressed is true to what it is. */}

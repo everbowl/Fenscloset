@@ -22,9 +22,7 @@ function setLabel(pathname: string, label: string | null) {
   listeners.forEach((l) => l());
 }
 function subscribe(l: () => void) { listeners.add(l); return () => { listeners.delete(l); }; }
-let version = 0;
-const bump = () => { version++; };
-listeners.add(bump);
+const never = () => () => {};
 
 /** Rendered by a page whose last crumb has a real name. */
 export function CrumbLabel({ label }: { label: string }) {
@@ -36,16 +34,21 @@ export function CrumbLabel({ label }: { label: string }) {
 export function Crumbs() {
   const pathname = usePathname() ?? "/";
   const search = useSearchParams();
-  useSyncExternalStore(subscribe, () => version, () => 0);
+  // Both reads go through useSyncExternalStore with a server snapshot: the page's <CrumbLabel> effect and the remembered
+  // closet view can both land before this row hydrates (it sits in its own Suspense boundary), and reading them straight
+  // made the first paint say "Old parka" where the server had said "Piece" (React #418). The hydration render now matches
+  // the server, and the real name follows one frame later.
+  const named = useSyncExternalStore(subscribe, () => labels.get(pathname) ?? null, () => null);
+  const closetBack = useSyncExternalStore(never, () => lastClosetUrl(), () => null);
   const { crumbs, next } = trailFor(pathname, search);
   if (crumbs.length < 2) return null;
   const last = crumbs[crumbs.length - 1];
-  const lastLabel = labels.get(pathname) ?? last.label;
+  const lastLabel = named ?? last.label;
   return (
     <nav aria-label="Where you are" className="mb-3 flex items-center gap-1 text-[13px] leading-none" data-testid="crumbs">
       <ol className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
         {crumbs.slice(0, -1).map((c) => {
-          const href = c.closet ? (lastClosetUrl() ?? c.href) : c.href;
+          const href = c.closet ? (closetBack ?? c.href) : c.href;
           return (
             <li key={c.href} className="flex shrink-0 items-center gap-1">
               <Link href={href} onClick={() => { if (c.closet) markClosetRestore(); }} className="tap rounded-md px-1 py-1.5 text-graphite hover:text-ink">{c.label}</Link>

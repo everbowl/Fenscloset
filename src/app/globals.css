@@ -148,3 +148,9 @@ html.sheet-open, html.sheet-open body { overflow: hidden; }
 /* Horizontal strips (chips, the looks pager) hide their scrollbar and snap. */
 .strip { display: flex; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .strip::-webkit-scrollbar { display: none; }
+
+/* The header on a phone: back control, avatar, name and the wordmark do not fit in 393 px, so with a back control
+   in the header the person's name steps aside and the avatar stands for it (the menu's aria-label keeps the name). */
+@media (max-width: 1023px) {
+  .header-left:has(a[data-testid="header-back"]) .person-name { display: none; }
+}

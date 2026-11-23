@@ -347,7 +347,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
         <section className="order-3 mt-6 lg:mt-0" data-testid="shop-empty">
           <ol className="grid grid-cols-3 gap-2" aria-label="How it works">
             {[["1", "Show it", "A store link, a screenshot, or a photo"], ["2", "The verdict", "Buy it, maybe, or skip it, with one reason"], ["3", "Wear it", "What you own that goes with it"]].map(([n, t, d]) => (
-              <li key={n} className="card flex min-h-[150px] flex-col justify-between p-3"><span className="caption">{n}</span><span><span className="block text-[17px] font-semibold leading-tight">{t}</span><span className="note mt-1.5 block text-[14px]">{d}</span></span></li>
+              <li key={n} className="card flex min-h-[150px] flex-col p-3"><span className="caption">{n}</span><span className="mt-4 block text-[17px] font-semibold leading-tight">{t}</span><span className="note mt-1.5 block text-[14px]">{d}</span></li>
             ))}
           </ol>
           <p className="note mt-3.5 text-ink text-[16px]">Thinking about something? Show it to the Shop before you pay.</p>
