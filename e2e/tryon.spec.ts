@@ -84,18 +84,32 @@ test("try-on: on by default, needs a body photo, then a picture of the look on y
   await expect(page.getByTestId("try-on-sheet").locator("img").first()).not.toHaveAttribute("src", beforeRetake!, { timeout: 20_000 });
   await expect(page.getByTestId("try-on-sheet")).toContainText("Only you can see this picture");
 
-  // Compare (Admin → Rules → Mirror engine): Google, FASHN and Kling side by side, so the winner can be picked there
+  // Compare (Admin → Rules → Mirror engine): the engines switched on, side by side, so the winner can be picked there.
+  // Kling starts switched off (Jeff, 26 Nov 2026, 1B: no balance), so Compare is Google and FASHN until an admin turns it on.
   await page.keyboard.press("Escape");
   await page.goto("/admin/rules");
   await page.getByTestId("rules-advanced").locator("summary").click(); // Mirror lives under Advanced
   await page.getByLabel("Mirror engine").selectOption("compare");
   await expect(page.getByTestId("rule-saved-mirrorEngine")).toHaveText("✓ Saved");
+  await expect(page.getByRole("radiogroup", { name: "Compare includes Kling" }).getByRole("radio", { name: /^off$/i })).toHaveAttribute("aria-checked", "true");
   await page.goto("/today");
   await page.getByTestId("try-on").click();
   await expect(page.getByTestId("mirror-compare")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("mirror-compare")).toContainText("Google");
   await expect(page.getByTestId("mirror-compare")).toContainText("FASHN");
-  await expect(page.getByTestId("mirror-compare")).toContainText("Kling");
+  await expect(page.getByTestId("mirror-compare")).not.toContainText("Kling");
+  expect(await page.getByTestId("mirror-compare").locator("img").count()).toBe(2);
+  // switched on under Rules, Kling joins the next Compare
+  await page.keyboard.press("Escape");
+  await page.goto("/admin/rules");
+  await page.getByTestId("rules-advanced").locator("summary").click();
+  await page.getByRole("radiogroup", { name: "Compare includes Kling" }).getByRole("radio", { name: /^on$/i }).click();
+  await expect(page.getByTestId("rule-saved-compareKling")).toHaveText("✓ Saved");
+  await page.goto("/today");
+  await page.getByTestId("try-on").click();
+  await expect(page.getByTestId("mirror-compare")).toBeVisible({ timeout: 30_000 }); // the comparison from before, as left
+  await page.getByRole("button", { name: "Dress again" }).click(); // a fresh comparison runs the engines switched on now
+  await expect(page.getByTestId("mirror-compare")).toContainText("Kling", { timeout: 30_000 });
   const pair = await page.getByTestId("mirror-compare").locator("img").evaluateAll((els) => els.map((e) => e.getAttribute("src")));
   expect(pair).toHaveLength(3);
   expect(new Set(pair).size).toBe(3);

@@ -11,8 +11,19 @@ export const test = base.extend({
   page: async ({ page }, use) => {
     const goto = page.goto.bind(page);
     page.goto = async (url, options) => {
-      await page.waitForLoadState("networkidle", { timeout: 3_000 }).catch(() => undefined);
-      return goto(url, options);
+      for (let attempt = 0; ; attempt++) {
+        await page.waitForLoadState("networkidle", { timeout: 3_000 }).catch(() => undefined);
+        try { return await goto(url, options); }
+        catch (e) {
+          // The router's fallback navigation won the race (Today polling for its looks can keep the network busy past
+          // the cap): let it land, then go where the test meant to. Twice, then the error is real.
+          if (attempt < 2 && /interrupted by another navigation|Frame load interrupted/.test((e as Error).message)) {
+            await page.waitForLoadState("load", { timeout: 10_000 }).catch(() => undefined);
+            continue;
+          }
+          throw e;
+        }
+      }
     };
     await use(page);
   },
