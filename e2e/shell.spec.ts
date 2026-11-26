@@ -29,6 +29,16 @@ test("offline page, health check and the security headers respond", async ({ req
   expect((await (await request.get("/api/health")).json()).ok).toBe(true);
 });
 
+test("a private site: every crawler is told to stay out, every response and page says no-index", async ({ request }) => {
+  const robots = await request.get("/robots.txt");
+  expect(robots.status()).toBe(200);
+  expect(await robots.text()).toMatch(/User-Agent: \*\s+Disallow: \//i);
+  expect(robots.headers()["x-robots-tag"]).toBe("noindex, nofollow");
+  const login = await request.get("/login");
+  expect(login.headers()["x-robots-tag"]).toBe("noindex, nofollow");
+  expect(await login.text()).toMatch(/<meta name="robots" content="noindex/);
+});
+
 test.describe("the shell, signed in", () => {
   test.beforeAll(() => { resetAndSeed({ jeffReady: true }); });
 

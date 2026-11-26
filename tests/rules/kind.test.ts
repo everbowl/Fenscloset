@@ -5,6 +5,7 @@ describe("rule kinds (review E D1)", () => {
   it("decides the input from the key, never from the value, so 0 and 1 stay numbers", () => {
     expect(ruleKind({ key: "wantSweepHours", value: "0" })).toBe("number");
     expect(ruleKind({ key: "wantSweepHours", value: "1" })).toBe("number");
+    expect(ruleKind({ key: "compareKling", value: "off" })).toBe("onoff");
     expect(ruleKind({ key: "noRepeatDays", value: "1" })).toBe("number");
     expect(ruleKind({ key: "needSnoozeDays", value: "off" })).toBe("number");
     expect(ruleKind({ key: "sizeBandXsMaxLb", value: "1" })).toBe("number");

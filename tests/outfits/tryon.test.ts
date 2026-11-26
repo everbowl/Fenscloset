@@ -104,10 +104,15 @@ describe("virtual try-on", () => {
     const steps: string[] = [];
     const both = await dressOnMe(jeff, jeff.id, [tee.id], "closet", "front", undefined, true, { step: (s) => steps.push(s) });
     expect(both.engine).toBe("google");
-    expect(both.alts?.map((a) => a.engine)).toEqual(["fashn"]); // Kling has no key here: left out and said
+    expect(both.alts?.map((a) => a.engine)).toEqual(["fashn"]); // Kling is switched off by default (Jeff, 26 Nov 2026, 1B): left out, nothing to say
     expect(both.alts?.[0].key).not.toBe(both.key);
-    expect(both.engineNote).toMatch(/^Kling isn’t set up yet/);
+    expect(both.engineNote).toBeUndefined();
     expect(steps.some((s) => s.includes("Google · ") && s.includes("FASHN · "))).toBe(true);
+    // switched on without its key: left out and said
+    await setRule("compareKling", "on");
+    const noKey = await dressOnMe(jeff, jeff.id, [tee.id], "closet", "front", undefined, true);
+    expect(noKey.alts?.map((a) => a.engine)).toEqual(["fashn"]);
+    expect(noKey.engineNote).toMatch(/^Kling isn’t set up yet/);
     expect((await db.tryOn.findMany({ where: { personId: jeff.id, itemIds: { equals: [tee.id] }, styling: null } })).map((r) => r.engine).sort()).toEqual(["fashn", "google"]);
     // all three engines with keys: three pictures side by side
     process.env.MOCK_KLING = "true";

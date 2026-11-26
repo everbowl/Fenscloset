@@ -10,14 +10,14 @@ export const RULE_CHOICES: Record<string, RuleChoice[]> = {
     { value: "google", label: "Google" },
     { value: "fashn", label: "FASHN" },
     { value: "kling", label: "Kling" },
-    { value: "compare", label: "Compare: every engine, side by side" },
+    { value: "compare", label: "Compare: the engines switched on, side by side" },
   ],
 };
 
 export type RuleKind = "choice" | "onoff" | "color" | "text" | "number";
 
 /** Which input a rule wants is decided by its key, never by the value it happens to hold (review E D1: a number rule set to 0 or 1 turned into an On/Off toggle). */
-export const RULE_ONOFF_KEYS: string[] = [];
+export const RULE_ONOFF_KEYS: string[] = ["compareGoogle", "compareFashn", "compareKling"];
 export const RULE_COLOR_KEYS: string[] = ["accentColor"];
 export const RULE_TEXT_KEYS: string[] = ["timezone"];
 
@@ -29,7 +29,10 @@ export const RULE_COPY: Record<string, { label: string; description: string; uni
   needSnoozeDays: { label: "Days a Not now lasts", description: "Not now on a What’s-needed row of the Closet hides that row for this many days.", unit: "days" },
   timezone: { label: "Household time zone", description: "When “today” starts for check-ins, looks and the Fits calendar." },
   accentColor: { label: "Button color", description: "The color of the main buttons. Everything else stays black and white." },
-  mirrorEngine: { label: "Mirror engine", description: "Who dresses a look on a body photo. Compare runs every engine that is set up and shows them side by side." },
+  mirrorEngine: { label: "Mirror engine", description: "Who dresses a look on a body photo. Compare runs the engines switched on below, side by side." },
+  compareGoogle: { label: "Compare includes Google", description: "Off leaves Google out of Compare without removing its key." },
+  compareFashn: { label: "Compare includes FASHN", description: "Off leaves FASHN out of Compare without removing its key." },
+  compareKling: { label: "Compare includes Kling", description: "Off leaves Kling out of Compare without removing its key. Kling needs a paid balance." },
   wantSweepHours: { label: "Hours between store searches", description: "How often the Shop searches the stores again for Looking-for lines and for what is new from favorite brands. 24 is once a day; 0 turns the automatic search off.", unit: "hours" },
   sizeBandXsMaxLb: { label: "XS up to", description: "", unit: "lb" },
   sizeBandSMaxLb: { label: "S up to", description: "", unit: "lb" },
@@ -47,7 +50,7 @@ export const RULE_GROUPS: { title: string; blurb?: string; keys: string[]; compa
   { title: "Outfits", keys: ["noRepeatDays", "notWornMonths", "laundryCycleDays"] },
   { title: "Closet", keys: ["needSnoozeDays"] },
   { title: "Household", keys: ["timezone", "accentColor"] },
-  { title: "Mirror", keys: ["mirrorEngine"], advanced: true },
+  { title: "Mirror", keys: ["mirrorEngine", "compareGoogle", "compareFashn", "compareKling"], advanced: true },
   { title: "Shop", keys: ["wantSweepHours"] },
   { title: "Likely sizes", blurb: "A starting point from height and weight, shown on the Body page and offered when someone records a size.", keys: ["sizeBandXsMaxLb", "sizeBandSMaxLb", "sizeBandMMaxLb", "sizeBandLMaxLb", "sizeBandXlMaxLb", "sizeTallIn", "sizeShortIn", "waistDivisorX10"], compact: true, advanced: true },
 ];

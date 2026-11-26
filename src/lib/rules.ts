@@ -41,6 +41,19 @@ export async function getRuleFlag(key: string, fallback: boolean): Promise<boole
   return fallback;
 }
 
+/** Several on/off rules in one query; a key missing or holding a stray word takes its fallback. */
+export async function getRuleFlags<K extends string>(fallbacks: Record<K, boolean>): Promise<Record<K, boolean>> {
+  const keys = Object.keys(fallbacks) as K[];
+  const rows = await db.rule.findMany({ where: { key: { in: keys } }, select: { key: true, value: true } });
+  const out = { ...fallbacks };
+  for (const r of rows) {
+    const v = r.value.trim().toLowerCase();
+    if (ON_WORDS.includes(v)) out[r.key as K] = true;
+    else if (OFF_WORDS.includes(v)) out[r.key as K] = false;
+  }
+  return out;
+}
+
 export { ruleKind };
 
 export async function setRule(key: string, value: string): Promise<RuleRow> {

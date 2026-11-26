@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, SESSION_TTL_MS } from "@/lib/auth/cookies";
 import { cookieSecure } from "@/lib/app-url";
 
-const PUBLIC_PREFIXES = ["/login", "/forgot-password", "/reset-password", "/invite", "/offline", "/api/health", "/manifest.webmanifest", "/sw.js", "/icons", "/apple-touch-icon.png", "/icon.png"];
+const PUBLIC_PREFIXES = ["/login", "/forgot-password", "/reset-password", "/invite", "/offline", "/api/health", "/robots.txt", "/manifest.webmanifest", "/sw.js", "/icons", "/apple-touch-icon.png", "/icon.png"];
 
 /** Fast cookie-presence gate. Real validation (and the must-change-password rule) happens in the app layout. */
 export function proxy(request: NextRequest) {

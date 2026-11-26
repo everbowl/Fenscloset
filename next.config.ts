@@ -19,6 +19,8 @@ const securityHeaders = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(self)" },
   { key: "X-Content-Type-Options", value: "nosniff" },
+  // Every response, photos and API answers included: nothing of the closet is indexed or shown in a search result.
+  { key: "X-Robots-Tag", value: "noindex, nofollow" },
 ];
 
 const nextConfig: NextConfig = {

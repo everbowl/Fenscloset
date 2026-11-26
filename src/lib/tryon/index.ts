@@ -4,8 +4,8 @@ import { getObject, newKey, putObject } from "@/lib/storage";
 import { googleTryOn, isGoogleTryOnConfigured, TryOnModelError } from "@/lib/tryon/google";
 import { fashnCategory, fashnTryOn, FashnError, isFashnConfigured } from "@/lib/tryon/fashn";
 import { isKlingConfigured, KlingError, klingTryOn } from "@/lib/tryon/kling";
-import { ENGINE_RULE_KEY, ENGINE_WORD, engineRuleOf, resolveEngines, type Engine, type EngineRule, enginePlacesShoes } from "@/lib/tryon/engines";
-import { getRuleText } from "@/lib/rules";
+import { COMPARE_DEFAULTS, COMPARE_KEYS, ENGINE_RULE_KEY, ENGINE_WORD, engineRuleOf, resolveEngines, type Engine, type EngineRule, enginePlacesShoes } from "@/lib/tryon/engines";
+import { getRuleFlags, getRuleText } from "@/lib/rules";
 import { googleImage, googleImageOnHold } from "@/lib/images/google-image";
 import { checkRender, checkWholeGarment, isGarmentCheckAvailable } from "@/lib/tryon/garment-check";
 import { loadPrefs, loadStylingLists, lookFeatures, resolveStyling, savePrefs, stylingPrompt, type Styling, type StylingChoice, type StylingLists } from "@/lib/tryon/styling";
@@ -109,7 +109,10 @@ function configuredEngines(): Record<Engine, boolean> {
 /** The rule under Admin → Rules and the engines it comes to, given which ones have a key. */
 export async function mirrorEngines(): Promise<{ rule: EngineRule; engines: Engine[]; note?: string }> {
   const rule = engineRuleOf(await getRuleText(ENGINE_RULE_KEY, "google"));
-  return { rule, ...resolveEngines(rule, configuredEngines()) };
+  // Compare runs only the engines switched on under Admin → Rules → Mirror (Kling starts off: no balance, Jeff 26 Nov 2026, 1B).
+  const on = rule === "compare" ? await getRuleFlags({ [COMPARE_KEYS.google]: COMPARE_DEFAULTS.google, [COMPARE_KEYS.fashn]: COMPARE_DEFAULTS.fashn, [COMPARE_KEYS.kling]: COMPARE_DEFAULTS.kling }) : null;
+  const include = on ? { google: on[COMPARE_KEYS.google], fashn: on[COMPARE_KEYS.fashn], kling: on[COMPARE_KEYS.kling] } : undefined;
+  return { rule, ...resolveEngines(rule, configuredEngines(), include) };
 }
 
 /** Why TRY IT ON is or is not available for this viewer on this person. */
