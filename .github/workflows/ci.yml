@@ -47,7 +47,10 @@ jobs:
       - name: Tests (Vitest, includes the privacy test and the dev-identifier check)
         run: npm test
         env:
+          # What .env.test gives a local run (that file is not tracked). Test-only values: the secret signs nothing real.
           DATABASE_URL: postgresql://postgres@localhost:5433/fenscloset_test
+          SESSION_SECRET: ci-only-session-secret-never-used-anywhere-else
+          APP_URL: http://localhost:3000
       - name: Dependency audit (production dependencies, high and above)
         run: npm audit --omit=dev --audit-level=high
       - name: Secret scan of the full history (gitleaks)
