@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 
 /**
- * A small removal happens at once and can be taken back for a few seconds (Jeff, 31 Oct 2026, Q1): the thing leaves
+ * A small removal happens at once and can be taken back for a few seconds (the owner, 31 Oct 2026, Q1): the thing leaves
  * the screen now; the server hears about it when the strip runs out, or the moment the screen is left. A second
  * removal commits the first. Big removals (a person, a body photo, a whole batch) ask first instead.
  */

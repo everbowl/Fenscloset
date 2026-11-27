@@ -27,7 +27,7 @@ function subscribe(l: (t: Toast) => void) {
 
 /**
  * `toast.error("Couldn't save. Try again.")` or `toast.ok("Saved")` from anywhere on the client; the host above the tab
- * bar shows it. `toast.ok("In the look", { label: "Open the look", href })` adds a link and stays longer (Jeff,
+ * bar shows it. `toast.ok("In the look", { label: "Open the look", href })` adds a link and stays longer (the owner,
  * 20 Nov 2026: "I clicked add to look but nothing happened": the word alone went by too fast).
  */
 export const toast = { ok: (text: string, action?: Action) => emit(text, "ok", action), error: (text: string) => emit(text, "error") };

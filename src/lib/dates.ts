@@ -13,7 +13,7 @@ export function hourIn(date: Date, tz: string): number {
   return Number(h) % 24;
 }
 
-/** `SAT, OCT 18` (Jeff, 31 Oct 2026, C1: month before day, as Americans read it). */
+/** `SAT, OCT 18` (the owner, 31 Oct 2026, C1: month before day, as Americans read it). */
 export function monoDate(key: string): string {
   const d = fromDayKey(key);
   const f = (o: Intl.DateTimeFormatOptions) => d.toLocaleDateString("en-US", { ...o, timeZone: "UTC" }).toUpperCase();

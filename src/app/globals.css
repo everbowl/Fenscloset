@@ -20,7 +20,7 @@
   --color-graphite: var(--graphite);
   --color-line: var(--line);
   --color-accent: var(--accent);
-  --color-accent-foreground: var(--black); /* black on orange (Jeff, 31 Oct 2026, B1) */
+  --color-accent-foreground: var(--black); /* black on orange (the owner, 31 Oct 2026, B1) */
   --color-danger: var(--danger);
   --font-sans: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Archivo Variable", ui-sans-serif, system-ui, sans-serif; /* nothing reads in mono any more */

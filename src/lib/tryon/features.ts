@@ -2,7 +2,7 @@
  * Client-safe half of the mirror styling (no database): the feature vocabulary, the pure resolver and the
  * artist's briefs. src/lib/tryon/styling.ts adds the loaders.
  *
- * How a look is styled in the mirror (Jeff, 19 Oct 2026: "don't default to tucking it in; give me
+ * How a look is styled in the mirror (the owner, 19 Oct 2026: "don't default to tucking it in; give me
  * options on pose and how the clothes will show; if it's a button-up, how many open, etc.").
  *
  * The try-on model dresses the body however it likes (it tucks). A second pass, Gemini image, applies

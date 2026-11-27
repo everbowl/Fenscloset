@@ -109,7 +109,7 @@ function configuredEngines(): Record<Engine, boolean> {
 /** The rule under Admin → Rules and the engines it comes to, given which ones have a key. */
 export async function mirrorEngines(): Promise<{ rule: EngineRule; engines: Engine[]; note?: string }> {
   const rule = engineRuleOf(await getRuleText(ENGINE_RULE_KEY, "google"));
-  // Compare runs only the engines switched on under Admin → Rules → Mirror (Kling starts off: no balance, Jeff 26 Nov 2026, 1B).
+  // Compare runs only the engines switched on under Admin → Rules → Mirror (Kling starts off: no balance, the owner 26 Nov 2026, 1B).
   const on = rule === "compare" ? await getRuleFlags({ [COMPARE_KEYS.google]: COMPARE_DEFAULTS.google, [COMPARE_KEYS.fashn]: COMPARE_DEFAULTS.fashn, [COMPARE_KEYS.kling]: COMPARE_DEFAULTS.kling }) : null;
   const include = on ? { google: on[COMPARE_KEYS.google], fashn: on[COMPARE_KEYS.fashn], kling: on[COMPARE_KEYS.kling] } : undefined;
   return { rule, ...resolveEngines(rule, configuredEngines(), include) };
@@ -157,7 +157,7 @@ export async function mockTryOn(person: Buffer, garments: Buffer[]): Promise<Buf
  * Garment image for an item, in this order: the photo the person chose for the mirror, else (from behind) its
  * back photo, else the store's product photo, the person's own photo of the piece, the cutout, any other photo,
  * a thumbnail last. The cutout comes after the real photo on purpose: a background-removal hole is how a tee
- * came out cropped with a hole in the back (Jeff, 19 Oct 2026). A photo that does not show the whole piece (checked once, kept on the photo) is passed over.
+ * came out cropped with a hole in the back (the owner, 19 Oct 2026). A photo that does not show the whole piece (checked once, kept on the photo) is passed over.
  */
 export async function garmentImages(itemIds: string[], back = false): Promise<{ id: string; name: string; category: string | null; buf: Buffer }[]> {
   const items = await db.item.findMany({ where: { id: { in: itemIds } }, select: { id: true, name: true, category: { select: { name: true } }, photos: { select: { id: true, kind: true, bucketKey: true, isPrimary: true, forMirror: true, wholeGarment: true }, orderBy: { createdAt: "asc" } } } });
@@ -336,7 +336,7 @@ async function bodyPhotoKeyFor(personId: string, view: BodyViewSide): Promise<st
 const lookKeyOf = (bodyPhotoKey: string, itemIds: string[]) => `${bodyPhotoKey}|${[...itemIds].sort().join(",")}`;
 
 /**
- * Compare (Jeff, 31 Oct 2026, G1): "Keep this one" under a column. From then on the mirror shows that engine's picture
+ * Compare (the owner, 31 Oct 2026, G1): "Keep this one" under a column. From then on the mirror shows that engine's picture
  * alone for this look; "Dress again" clears the choice and compares again.
  */
 export async function keepTryOn(viewer: Viewer, personId: string, tryOnId: string): Promise<TryOnView> {

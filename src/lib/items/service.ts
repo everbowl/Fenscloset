@@ -140,7 +140,7 @@ export async function createItemFromEntry(personId: string, entryId: string, edi
 
 /** "SAME?": fold this photo into an item that already exists instead of making a second one. */
 /**
- * "Another one like my Black crew tee" (Jeff, 18 Oct 2026): copy everything but the color from a
+ * "Another one like my Black crew tee" (the owner, 18 Oct 2026): copy everything but the color from a
  * piece the person owns onto the entry (name, category, brand, size, fabric, seasons, dress code,
  * pattern), so the new photo only needs its color checked.
  */
@@ -304,7 +304,7 @@ export async function setLaundry(viewer: { id: string; role: string }, itemId: s
   return status;
 }
 
-/** A stack's laundry one copy at a time (F1, Jeff 3 Nov 2026): one in the wash, one to the cleaners, one back clean, or wash day for all. */
+/** A stack's laundry one copy at a time (F1, the owner 3 Nov 2026): one in the wash, one to the cleaners, one back clean, or wash day for all. */
 export async function laundryCopies(viewer: { id: string; role: string }, itemId: string, action: CopyAction): Promise<CopyCounts & { laundryStatus: LaundryStatus }> {
   const it = await ownedItem(viewer, itemId);
   const next = applyCopyAction(countsOf(it), action);
@@ -371,7 +371,7 @@ export async function addItemPhoto(viewer: { id: string; role: string }, itemId:
 }
 
 export type PhotoNudge = "first" | "refresh" | null;
-/** Jeff's rule: a store-photo piece asks for your own photo after one wear; every piece asks for a fresh one every 6 wears. Never required. */
+/** the owner's rule: a store-photo piece asks for your own photo after one wear; every piece asks for a fresh one every 6 wears. Never required. */
 export function photoNudge(it: { storePhoto: boolean; wearCount: number; photoNudgedAt: number | null }): PhotoNudge {
   if (it.storePhoto && it.wearCount >= 1 && it.photoNudgedAt === null) return "first";
   if (it.wearCount >= 6 && it.wearCount - (it.photoNudgedAt ?? 0) >= 6) return "refresh";

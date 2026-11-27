@@ -1,7 +1,7 @@
 import { enginePlacesShoes, type Engine } from "@/lib/tryon/engines";
 
 /**
- * Completing a look before the mirror dresses it (Jeff, 24 Oct 2026: "make me select a top and bottom if it's not a
+ * Completing a look before the mirror dresses it (the owner, 24 Oct 2026: "make me select a top and bottom if it's not a
  * full one piece; a pant or short should then ask me for a top; if I have shoes it should ask; I can decline").
  * Client-safe: the pure rules for which slot is missing, which closet pieces fit it, and how a tap swaps a piece in.
  */

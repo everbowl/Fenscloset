@@ -1,5 +1,5 @@
 /**
- * Where am I, and where can I go: the trail for every page (Jeff, 23 Nov 2026: "Always have breadcrumb navigation to go
+ * Where am I, and where can I go: the trail for every page (the owner, 23 Nov 2026: "Always have breadcrumb navigation to go
  * forward and back"). One map for the breadcrumb row and the header's back control, so the two never disagree.
  *
  * A trail is the tab the page lives under, then each level down to the page. The last crumb is the page itself; a

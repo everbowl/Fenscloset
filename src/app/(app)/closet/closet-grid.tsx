@@ -18,7 +18,7 @@ import type { MirrorConfig } from "@/lib/tryon/config";
 const PICK_MAX = 3;
 
 /**
- * The closet grid, with the mirror's pick mode (Jeff, 19 Oct 2026: "in closet I should be able to choose
+ * The closet grid, with the mirror's pick mode (the owner, 19 Oct 2026: "in closet I should be able to choose
  * pieces and have it show me in mirror"). Tap Mirror, tap pieces, tap "See it on me": the same mirror
  * sheet as Today opens and dresses them. Pieces the model can't place (hats, bags, jewelry) say so.
  */

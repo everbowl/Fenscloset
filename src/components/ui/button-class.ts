@@ -5,7 +5,7 @@ export type Size = "md" | "lg" | "sm";
 
 /** No "use client" here on purpose: server pages (All done, Shop) render Links that must look like the big button. */
 const variants: Record<Variant, string> = {
-  // The one colored button on a screen. Black on the household's orange (Jeff, 31 Oct 2026, B1).
+  // The one colored button on a screen. Black on the household's orange (the owner, 31 Oct 2026, B1).
   primary: "bg-accent text-ink hover:brightness-95 active:brightness-90 active:scale-[0.99] disabled:bg-neutral-300 disabled:text-paper",
   secondary: "bg-ink text-paper hover:bg-neutral-800 active:bg-ink active:scale-[0.99] disabled:bg-neutral-300 disabled:text-paper",
   // Next to the colored button every other button is quiet gray, so the colored one stands alone (D1).

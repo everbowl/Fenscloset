@@ -7,7 +7,7 @@ import { rotateImage } from "@/lib/images/rotate";
 import type { EntryAiResult } from "@/lib/import/process";
 
 /**
- * Undoes Tidy and Smooth (Jeff, 19 Oct 2026: "REMOVE TIDY FOR NOW. DOESN'T WORK AND DON'T WANT IT"). Both put an
+ * Undoes Tidy and Smooth (the owner, 19 Oct 2026: "REMOVE TIDY FOR NOW. DOESN'T WORK AND DON'T WANT IT"). Both put an
  * AI edit in place of a piece's cutout when the person kept it, and the plain cutout was deleted, so the database
  * cannot tell which pieces were touched. Every piece added since Smooth went live (18 Oct 2026, 12:57 PM PT) gets
  * a fresh cutout from its original upload, one remove.bg call each; a piece that was never touched gets the same

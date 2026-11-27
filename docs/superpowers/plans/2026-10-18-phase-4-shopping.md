@@ -12,13 +12,13 @@
 - Photos (screenshots, dressing-room shots) go through the signed upload path under a new `shop/<ownerId>/…` kind, viewable by the shopper and the target person (and a minor's parents).
 - Keys stay in Railway env. No new keys are needed for Phase 4 (Claude only).
 
-## Assumptions flagged for Jeff
+## Assumptions flagged for the owner
 - B1. A link lookup reads the store page's Open Graph title/image/price. Stores that block bots fall back to "paste a screenshot instead".
 - B2. The verdict is one of FITS / RISKY / PASS with a one-line reason, plus a size suggestion when the brand is in the person's sizes-by-brand list.
 - B3. "Similar owned" uses the same tags-plus-colors match as the duplicate check, loosened (same category, shared color or fabric), top 4 shown.
 - B4. Pairings: 3 boards built from the target person's usable closet with the candidate piece pinned as hero, same engine as Today.
 - B5. "You might like": at most 3 picks, only when the verdict is PASS or when the closet lacks a pairing category; each pick is a search link on a favorite store (`<store url>/search?q=…`) rather than a scraped product, so nothing is invented. (Kept as the fallback when no product search key is set.)
-- B5b (added 18 Oct on Jeff's ask): real products. The verdict carries 1–3 shopping queries; Google Shopping via Serper returns title, price, store, picture, link; favorite stores then favorite brands first; interleaved across queries; deduped; 12 max; cached 24h. Shop shows a sideways-scrolling product row with BUY → and JUDGE IT (runs the verdict on that product). Queries never include sizes or measurements (they leave the house).
+- B5b (added 18 Oct on the owner's ask): real products. The verdict carries 1–3 shopping queries; Google Shopping via Serper returns title, price, store, picture, link; favorite stores then favorite brands first; interleaved across queries; deduped; 12 max; cached 24h. Shop shows a sideways-scrolling product row with BUY → and JUDGE IT (runs the verdict on that product). Queries never include sizes or measurements (they leave the house).
 - B6. Lookups are kept (ShoppingLookup) and listed on the Shop screen as "Recent", newest first, with a remove action.
 
 ## Tasks
@@ -26,4 +26,4 @@
 2. **Page reader** (`src/lib/shop/page.ts`): fetch + parse OG/meta (title, image, price, brand guess), download the image to `shop/` for the board; mock for tests.
 3. **Verdict engine** (`src/lib/shop/engine.ts`): Claude structured call with the candidate (image + text), the target's style profile, sizes/measurements when permitted, and the closet summary → verdict, size note, similar-owned (computed locally), pairings (via outfit engine with pinned hero), recommendations. Mock. Tests: permission gates, PASS/FITS shapes, similar-owned match.
 4. **Shop screen** (`/shop`): "Shopping for" switcher (permitted people), three entry buttons (PASTE A LINK / UPLOAD SCREENSHOT / TAKE A PHOTO), result card (image, title, price, verdict strip, "You already own similar" row of thumbs, pairing boards with reasons, "You might like" rows with mono BUY link), Recent list. Desktop: result left, pairings right.
-5. **Acceptance**: unit + e2e (link mock, screenshot, photo; shopping for Mya as parent; Olivia cannot shop for Mya), deploy, screenshots, report. Jeff's test: 3 real store links, 1 screenshot, 1 dressing-room photo.
+5. **Acceptance**: unit + e2e (link mock, screenshot, photo; shopping for Devon as parent; Casey cannot shop for Devon), deploy, screenshots, report. the owner's test: 3 real store links, 1 screenshot, 1 dressing-room photo.

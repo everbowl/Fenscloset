@@ -8,7 +8,7 @@ import { ensureBrandAction } from "@/lib/brands/actions";
 import type { Named } from "@/lib/ai/tag-item";
 
 /**
- * Brand as you type (Jeff, 19 Oct 2026): the family's brands and the national catalog narrow with
+ * Brand as you type (the owner, 19 Oct 2026): the family's brands and the national catalog narrow with
  * every letter. A catalog brand or a typed name joins the family's Brands list on first use, so it
  * stays editable in Admin → Lists → Brands.
  */

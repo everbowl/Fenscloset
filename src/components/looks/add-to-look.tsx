@@ -9,8 +9,8 @@ import type { LookPieceInput } from "@/lib/looks/shared";
 import { addToLookAction } from "@/app/(app)/looks/actions";
 
 /**
- * "Add to a look" on a store find (Jeff, 2 Nov 2026, B1): the piece joins the open look of the person being shopped
- * for. Three things say it worked (Jeff, 20 Nov 2026: "nothing happened"): the button turns into "In the look · Open",
+ * "Add to a look" on a store find (the owner, 2 Nov 2026, B1): the piece joins the open look of the person being shopped
+ * for. Three things say it worked (the owner, 20 Nov 2026: "nothing happened"): the button turns into "In the look · Open",
  * a toast with "Open the look" stays for a few seconds, and the tray at the bottom counts the pieces. Added twice, a
  * piece is kept once.
  */

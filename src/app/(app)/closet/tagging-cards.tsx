@@ -13,7 +13,7 @@ import { isTakingLong } from "@/lib/import/timing";
 import type { PendingAdds, PendingCard } from "@/lib/import/pending";
 
 /**
- * The closet's first cards while a piece is on its way (Jeff, 20 Nov 2026): a store find or a photo shows up at once,
+ * The closet's first cards while a piece is on its way (the owner, 20 Nov 2026): a store find or a photo shows up at once,
  * marked Tagging, and becomes the real card on its own; one that could not be tagged says why, with Try again and
  * Remove right there; one that landed without a category asks for one; one that needs a look opens its review card.
  * Photos waiting on the confirm page are one card that opens it.

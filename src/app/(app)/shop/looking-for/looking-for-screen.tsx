@@ -17,7 +17,7 @@ import { useRefreshWhile, useWantSearch } from "./use-want-search";
 import { ago } from "./ago";
 
 /**
- * "Looking for" (Jeff, 23 Oct 2026, Shop v2 item 2): the lines on someone's list, each with what is new, what was
+ * "Looking for" (the owner, 23 Oct 2026, Shop v2 item 2): the lines on someone's list, each with what is new, what was
  * found so far and when the stores were last checked. Add a line and the stores are searched at once in the
  * background; every day after that on the schedule in Admin → Rules.
  */

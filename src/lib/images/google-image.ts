@@ -8,7 +8,7 @@ import { accessToken, fetchWithBackoff } from "@/lib/tryon/google";
  *   GOOGLE_VERTEX_IMAGE_LOCATION   default global (GOOGLE_VERTEX_SMOOTH_LOCATION still read)
  * MOCK_GOOGLE_IMAGE=true counts as configured, so the flows can be tested without Google.
  *
- * Tidy and Smooth wrinkles (garment photo retouching) lived here until 19 Oct 2026; Jeff: "remove Tidy for
+ * Tidy and Smooth wrinkles (garment photo retouching) lived here until 19 Oct 2026; the owner: "remove Tidy for
  * now, doesn't work and don't want it". Gone from the app; git history has them.
  */
 
@@ -26,7 +26,7 @@ export function isGoogleImageConfigured(): boolean {
 /**
  * After Google answers 429 (quota) even after the backoff, the image model is left alone for GOOGLE_IMAGE_HOLD_MS
  * (five minutes): the mirror's second dressing and styling pass are skipped with a note and the plain try-on is shown
- * at once, instead of each call waiting through the backoff only to fail (Jeff, 23 Oct 2026: four quota failures in
+ * at once, instead of each call waiting through the backoff only to fail (the owner, 23 Oct 2026: four quota failures in
  * one evening, 20 to 40 seconds lost on each).
  */
 let holdUntil = 0;
@@ -43,7 +43,7 @@ export function clearGoogleImageHold(): void {
 }
 
 /** Zero or more JPEG/PNG inputs plus a prompt, image bytes out. */
-export async function googleImage(images: { data: Buffer; mimeType: "image/jpeg" | "image/png" }[], prompt: string, fetchImpl: typeof fetch = fetch, opts: { /** An adult's own body picture (the try-on styling pass): Google's filters are loosened for it (Jeff, 19 Oct 2026). Never set for a minor's look, the mannequin or garment photos, which keep Google's defaults. */ relaxed?: boolean } = {}): Promise<Buffer> {
+export async function googleImage(images: { data: Buffer; mimeType: "image/jpeg" | "image/png" }[], prompt: string, fetchImpl: typeof fetch = fetch, opts: { /** An adult's own body picture (the try-on styling pass): Google's filters are loosened for it (the owner, 19 Oct 2026). Never set for a minor's look, the mannequin or garment photos, which keep Google's defaults. */ relaxed?: boolean } = {}): Promise<Buffer> {
   if (googleImageOnHold()) throw new GoogleImageError(`Google’s image model is out of quota; not called again until ${new Date(holdUntil).toISOString().slice(11, 16)} UTC.`, 429);
   const project = process.env.GOOGLE_VERTEX_PROJECT!;
   const location = process.env.GOOGLE_VERTEX_IMAGE_LOCATION || process.env.GOOGLE_VERTEX_SMOOTH_LOCATION || "global";

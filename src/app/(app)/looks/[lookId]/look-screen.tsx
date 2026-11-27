@@ -22,7 +22,7 @@ type Look = Omit<LookView, "savedAt"> & { savedAt: string | null };
 const LOST = "Lost the connection. Try again.";
 
 /**
- * A look (Jeff, 2 Nov 2026, B1): things to buy and things you own, together. Each store piece keeps its Buy link;
+ * A look (the owner, 2 Nov 2026, B1): things to buy and things you own, together. Each store piece keeps its Buy link;
  * See it on me / on a mannequin dresses the mix (the store pictures ride along); Add from the closet picks more of
  * what the person owns; Name and save puts it under Fits → Looks. The open look (no name yet) is what the tray on
  * the Shop and the closet points at.

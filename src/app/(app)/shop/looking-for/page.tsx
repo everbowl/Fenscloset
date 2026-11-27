@@ -10,7 +10,7 @@ import { listEntries } from "@/lib/lists/service";
 export const metadata = { title: "Looking for" };
 export const dynamic = "force-dynamic";
 
-/** Shop v2 item 2 (Jeff, 23 Oct 2026): the lines a person is looking for, each searched now and again every day, with what is new. */
+/** Shop v2 item 2 (the owner, 23 Oct 2026): the lines a person is looking for, each searched now and again every day, with what is new. */
 export default async function LookingForPage({ searchParams }: { searchParams: Promise<{ for?: string }> }) {
   const me = await requirePerson();
   const { for: forParam } = await searchParams;

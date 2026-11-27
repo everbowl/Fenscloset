@@ -30,7 +30,7 @@ model Person {
   birthdate          DateTime?
   avatarKey          String?
   savedZip           String?
-  /** Virtual try-on (adults only; never minors): on by default (Jeff, 19 Oct 2026: "no limitations or controls"), off in Settings for anyone who wants it off. Sends the person's body photo and garment images to the try-on provider. */
+  /** Virtual try-on (adults only; never minors): on by default (the owner, 19 Oct 2026: "no limitations or controls"), off in Settings for anyone who wants it off. Sends the person's body photo and garment images to the try-on provider. */
   tryOnEnabled       Boolean      @default(true)
   /** "Don't show again" on the Add clothes photo tips. */
   addTipsHidden      Boolean      @default(false)
@@ -64,7 +64,7 @@ model Person {
   favoriteStores     Store[]                  @relation("favoriteStores")
   listRequests       ListRequest[]
   tryOnChoices       TryOnChoice[]
-  /** Which section of a store this person shops in (Men's, Women's, Girls'…): every store search carries it (Jeff, 2 Nov 2026). */
+  /** Which section of a store this person shops in (Men's, Women's, Girls'…): every store search carries it (the owner, 2 Nov 2026). */
   shopSectionId      String?
   shopSection        ShopSection?             @relation(fields: [shopSectionId], references: [id], onDelete: SetNull)
   needSnoozes        NeedSnooze[]
@@ -182,7 +182,7 @@ model Subcategory {
 
 /**
  * Editable list: the sizes offered for a category when someone records their size in a brand
- * (Tops XS–XXL, Bottoms by waist, Shoes in half sizes…). Jeff, 18 Oct 2026: size by item type.
+ * (Tops XS–XXL, Bottoms by waist, Shoes in half sizes…). the owner, 18 Oct 2026: size by item type.
  */
 model SizeOption {
   id         String   @id @default(cuid())
@@ -332,7 +332,7 @@ model CheckInOption {
   @@unique([scaleId, name])
 }
 
-/// "Ask Jeff to add it" (J1): a word someone wanted on a list; an admin adds or dismisses it under Lists.
+/// "Ask the owner to add it" (J1): a word someone wanted on a list; an admin adds or dismisses it under Lists.
 model ListRequest {
   id            String   @id @default(cuid())
   kind          String
@@ -380,7 +380,7 @@ model Item {
   laundryStatus LaundryStatus @default(clean)
   neverSuggest  Boolean       @default(false)
   wearCount     Int           @default(0)
-  /** Identical pieces kept as one card (Jeff, 2 Nov 2026: ten of the same shirt). Laundry is counted per copy; laundryStatus is the summary the closet reads. */
+  /** Identical pieces kept as one card (the owner, 2 Nov 2026: ten of the same shirt). Laundry is counted per copy; laundryStatus is the summary the closet reads. */
   copies        Int           @default(1)
   dirtyCopies   Int           @default(0)
   cleanersCopies Int          @default(0)
@@ -630,7 +630,7 @@ model BodyPhoto {
   @@index([personId])
 }
 
-/// "Not now" on a What's-needed row of the Closet page (Jeff, 2 Nov 2026, D1): the row stays hidden until this date.
+/// "Not now" on a What's-needed row of the Closet page (the owner, 2 Nov 2026, D1): the row stays hidden until this date.
 model NeedSnooze {
   personId  String
   key       String
@@ -641,7 +641,7 @@ model NeedSnooze {
   @@id([personId, key])
 }
 
-/// A look someone is putting together (Jeff, 2 Nov 2026, B1): store finds and closet pieces together, dressed on the person or the mannequin. No name = the open look the tray shows; named = saved under Fits → Looks.
+/// A look someone is putting together (the owner, 2 Nov 2026, B1): store finds and closet pieces together, dressed on the person or the mannequin. No name = the open look the tray shows; named = saved under Fits → Looks.
 model Look {
   id        String      @id @default(cuid())
   /// Whose look: dressed on them, kept under their Fits.
@@ -966,7 +966,7 @@ enum ShopSource {
 }
 
 /**
- * "Shop for something to go with it" (Jeff, 23 Oct 2026, Shop v2 item 1): for one piece in the closet, what would
+ * "Shop for something to go with it" (the owner, 23 Oct 2026, Shop v2 item 1): for one piece in the closet, what would
  * complete it, real products for that, and the looks the closet already makes with it. One row per piece and
  * person per ask; "Look again" makes a fresh one.
  */
@@ -993,7 +993,7 @@ model GoWith {
 }
 
 /**
- * "Looking for" (Jeff, 23 Oct 2026, Shop v2 item 2): one line a person typed about something they want to buy.
+ * "Looking for" (the owner, 23 Oct 2026, Shop v2 item 2): one line a person typed about something they want to buy.
  * Claude turns it into store searches; the stores are searched when it is added and again on a schedule
  * (Admin → Rules, wantSweepHours); every product not seen before is a match, counted as new until the person
  * opens the list. "Found it" keeps the row but retires it.
@@ -1029,7 +1029,7 @@ model Want {
 }
 
 /**
- * "New from your brands" (Jeff, 23 Oct 2026, Shop v2 item 3): what the stores have from a person's favorite brands,
+ * "New from your brands" (the owner, 23 Oct 2026, Shop v2 item 3): what the stores have from a person's favorite brands,
  * fetched when the Shop opens if it is older than the schedule (Admin → Rules, wantSweepHours) and on the sweep.
  * Products not seen before count as new until the Shop is opened.
  */
@@ -1080,7 +1080,7 @@ model SeedSet {
 }
 
 /**
- * Editable lists behind the mirror's styling chips (Jeff, 19 Oct 2026: "don't default to tucking it in;
+ * Editable lists behind the mirror's styling chips (the owner, 19 Oct 2026: "don't default to tucking it in;
  * give me options on pose and how the clothes will show"). The first active entry in each list is the
  * default. `prompt` is what the artist is told; blank means nothing needs changing.
  */

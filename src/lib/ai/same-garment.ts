@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { isMockAi, structured } from "@/lib/ai/claude";
 
 /**
- * "Is this the very same piece?" (Jeff, 19 Oct 2026): ten black shirts from different brands must not
+ * "Is this the very same piece?" (the owner, 19 Oct 2026): ten black shirts from different brands must not
  * ask "looks like one you own". The photo hash only shortlists; Claude looks at both pictures and
  * says whether they show the same garment (same cut, print, logo, hardware), not merely the same kind.
  * MOCK_AI: same only when the two pictures are byte-identical.

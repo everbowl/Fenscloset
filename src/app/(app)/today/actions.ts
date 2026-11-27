@@ -102,7 +102,7 @@ async function dayContext(viewer: Viewer, personId: string, day: TodayDay, step:
 
 /**
  * Looks are built in the background (src/lib/jobs.ts): Claude takes 10 to 40 seconds, and a page or a request
- * that waits that long is what a phone gives up on (Jeff, 19 Oct 2026, midnight: the first Today of the new
+ * that waits that long is what a phone gives up on (the owner, 19 Oct 2026, midnight: the first Today of the new
  * day built its looks inside the page load; his phone showed the offline page). The screen polls
  * looksStatusAction and refreshes when the looks are there.
  */
@@ -119,7 +119,7 @@ export async function moreAction(personId: string): Promise<LooksResult> {
 /**
  * The day's looks (first open of the day), or fresh ones after new inputs (plan, check-in, weather). `afterInputs`:
  * a build already running started before the new input was saved, so it is followed by a fresh one instead of
- * joined (Jeff, 2 Nov 2026: the Check-in sheet's Save was dead while the first looks of the day were building).
+ * joined (the owner, 2 Nov 2026: the Check-in sheet's Save was dead while the first looks of the day were building).
  * The slow wait card's Try again passes it too, so it never re-joins a stuck build (review D 3.4).
  */
 export async function regenerateAction(personId: string, afterInputs = false): Promise<LooksResult> {

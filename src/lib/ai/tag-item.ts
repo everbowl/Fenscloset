@@ -30,7 +30,7 @@ export type TagResult = {
   confidence: number;
   /** How the piece is made (button_front, zip_front, long_sleeve, hood, collar): the mirror's styling chips key off these. */
   features: string[];
-  /** Several garments in one photo (Jeff, 2 Nov 2026): the card offers to split them. 1 for one piece. */
+  /** Several garments in one photo (the owner, 2 Nov 2026): the card offers to split them. 1 for one piece. */
   pieceCount?: number;
   /** Raw names the model said, kept for the confirm screen's "(best guess)" notes and debugging. */
   raw: RawTags;

@@ -65,7 +65,7 @@ Severity words: breaks | wrong | slow | unsafe | dead-end | dead-code.
 
 18. **src/lib/tryon/mannequin.ts:38 → src/lib/storage.ts:113 — slow (minor).** `objectExists` in S3 mode is a full `getObject`, so the shared mannequin base is downloaded twice per mannequin dressing. Fix: `try { return (await getObject(KEY)).body } catch (NotFoundError) { make it }`.
 
-19. **src/lib/tryon/google.ts:77, src/lib/tryon/fashn.ts:85 — knob, not a bug.** `baseSteps` 50 (Google's default 32) and `FASHN_MODE=quality` are Jeff's "quality over speed" choices; together they are a good third of the wait. Worth knowing for a demo.
+19. **src/lib/tryon/google.ts:77, src/lib/tryon/fashn.ts:85 — knob, not a bug.** `baseSteps` 50 (Google's default 32) and `FASHN_MODE=quality` are the owner's "quality over speed" choices; together they are a good third of the wait. Worth knowing for a demo.
 
 ### Honesty of the step line and the status line
 

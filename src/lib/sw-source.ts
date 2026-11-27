@@ -1,7 +1,7 @@
 /**
  * The service worker, as text: src/app/sw.js/route.ts serves it with a version per build.
  *
- * What it promises (review F A1, A2, A8–A11; Jeff, 23 Nov 2026: a deploy while someone is in the app must never leave
+ * What it promises (review F A1, A2, A8–A11; the owner, 23 Nov 2026: a deploy while someone is in the app must never leave
  * dead buttons):
  * - A new worker installs and then WAITS. It never calls skipWaiting() or clients.claim() on its own, so an open page keeps
  *   the worker, and the cache, of the build that served it until the person taps Reload on the "New version ready" bar

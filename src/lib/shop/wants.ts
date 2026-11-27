@@ -8,7 +8,7 @@ import { asShopError, ShopError, type LookupHooks } from "@/lib/shop/engine";
 import { priceDollars, searchProductsDetailed, type Product } from "@/lib/shop/products";
 
 /**
- * "Looking for" (Jeff, 23 Oct 2026, Shop v2 item 2: "state what I'm looking for so the shopping tool lets me know").
+ * "Looking for" (the owner, 23 Oct 2026, Shop v2 item 2: "state what I'm looking for so the shopping tool lets me know").
  * A person types one line about something they want to buy. Claude turns it into store searches (never sizes or
  * measurements), the stores are searched right away in the background, and again on a schedule (Admin → Rules,
  * wantSweepHours; the sweep is started from instrumentation.ts). Every product not seen before is a match and

@@ -1,6 +1,6 @@
 # Fen's Closet — Build Plan (v1, awaiting approval)
 
-Status: APPROVED by Jeff on 2026-10-18. Decisions: Q1 B (remove.bg), Q2 A (Opus 5.5 everywhere), Q3 B (Twilio SMS invites), Q4 B (Jeff creates the Railway project), Q5 A (new Anthropic key), Q6 B (www is the real site; GoDaddy forwards the bare domain), Q7 A (no shareable board images), Q8 A (Olivia = member), Q9 B (Jeff creates `main`). Design: the approved Fen's Closet identity v1 package (DESIGN.md) is the only look; Q12 A (full Fits screen: calendar, photo of the night, share within the family, per-fit visibility, Phase 3); Q13 A (any family member can view another member's closet and fits, respecting privacy rules; minors visible only to their parents); Q14 A (keep the neutral rack hero photo on sign-in); Q15 (Jeff, 2026-10-18): American spelling on every screen (color, colors), overriding the COLOUR label in mockup 03; Q18 (Jeff): each person picks which Google calendars set the day's plan (picker in Settings); Q19 (Jeff): Google OAuth client created later, Today uses the occasion list until then; Q17 (Jeff, 2026-10-18): a desktop layout exists (1040px frame, tab row under the header, two-column Today / Fits / Item detail, 4-column closet), overriding the spec's 480px-only note; Q16 (Jeff): body photos have a per-photo lock, 'Only me' photos are seen by the owner alone (for an adult) and used only by the AI to dress the owner.
+Status: APPROVED by the owner on 2026-10-18. Decisions: Q1 B (remove.bg), Q2 A (Opus 5.5 everywhere), Q3 B (Twilio SMS invites), Q4 B (the owner creates the Railway project), Q5 A (new Anthropic key), Q6 B (www is the real site; GoDaddy forwards the bare domain), Q7 A (no shareable board images), Q8 A (Casey = member), Q9 B (the owner creates `main`). Design: the approved Fen's Closet identity v1 package (DESIGN.md) is the only look; Q12 A (full Fits screen: calendar, photo of the night, share within the family, per-fit visibility, Phase 3); Q13 A (any family member can view another member's closet and fits, respecting privacy rules; minors visible only to their parents); Q14 A (keep the neutral rack hero photo on sign-in); Q15 (the owner, 2026-10-18): American spelling on every screen (color, colors), overriding the COLOUR label in mockup 03; Q18 (the owner): each person picks which Google calendars set the day's plan (picker in Settings); Q19 (the owner): Google OAuth client created later, Today uses the occasion list until then; Q17 (the owner, 2026-10-18): a desktop layout exists (1040px frame, tab row under the header, two-column Today / Fits / Item detail, 4-column closet), overriding the spec's 480px-only note; Q16 (the owner): body photos have a per-photo lock, 'Only me' photos are seen by the owner alone (for an adult) and used only by the AI to dress the owner.
 Branch: `claude/fens-closet-app-1ovr5e`
 Domain: fenscloset.com (GoDaddy)
 
@@ -36,7 +36,7 @@ Domain: fenscloset.com (GoDaddy)
 
 ## 2. Third-party services and cost
 
-| Service | Used for | Cost | Account/key needed from Jeff? |
+| Service | Used for | Cost | Account/key needed from the owner? |
 |---|---|---|---|
 | Railway (already connected to this session as workspace "Everbowl's Projects") | app, Postgres, bucket, optional bg-removal service | Hobby plan $5/mo includes $5 usage. Estimated usage: web ~$5–8, Postgres ~$3–5, bg-removal ~$5–10 (only if Q1 = A), bucket <$0.10. **≈ $15–25/mo total.** | No key — I can create the project myself. Confirm in Q4. |
 | Anthropic (Claude API) | auto-tagging, outfits, shopping, selfie read | Opus 5.5: ~$0.02 per item tagged (2 photos + label), ~$0.05 per outfit set, ~$0.01 per selfie. **Initial catalog of ~800 items ≈ $20 one-time. Ongoing ≈ $5–15/mo.** (Haiku 5.5 would be ~40× cheaper for tagging; see Q2.) | Yes — API key. See Q5. |
@@ -59,10 +59,10 @@ Every "list" below is a real table with `id, name, sortOrder, isArchived, create
 - `Person` — name, email, phone, role (`admin` | `member` | `minor`), birthdate, avatar, savedZip, passwordHash, mustChangePassword, devPasswordUsedAt, createdAt
 - `Session` — personId, token, expiresAt, userAgent
 - `PasswordResetToken`, `InviteToken` (email or link, expires, createdBy, role, parentIds)
-- `GuardianLink` — minorId ↔ parentId (Mya ↔ Jeff, Mya ↔ Brittney)
+- `GuardianLink` — minorId ↔ parentId (Devon ↔ the owner, Devon ↔ Blake)
 - `BodyDataGrant` — ownerId → viewerId (who may see my body data)
 - `ShopForGrant` — ownerId → shopperId (who may shop on my behalf); parents auto-granted for minors
-- `MinorBodyImageApproval` — minorId, approvedByParentId, approvedAt (Mya: approved by Jeff)
+- `MinorBodyImageApproval` — minorId, approvedByParentId, approvedAt (Devon: approved by the owner)
 - `GoogleCalendarConnection` — personId, refreshToken (encrypted), calendarIds[]
 
 **Editable lists (admin-managed, on-screen where used)**
@@ -94,21 +94,21 @@ Every "list" below is a real table with `id, name, sortOrder, isArchived, create
 
 ## 4. Screens (mobile-first; same screens work on desktop)
 
-1. **Login** — email + password, "Forgot password" link right on the page. DEV banner when 0535 is active.
+1. **Login** — email + password, "Forgot password" link right on the page. DEV banner when the retired dev value is active.
 2. **Forgot / Reset password** — email → link → new password.
 3. **Accept invite** — sets name + password; lands in own closet.
-4. **Force password change** — shown after the one-time 0535 login.
+4. **Force password change** — shown after the one-time the retired dev value login.
 5. **Home / Today** — weather strip, today's occasion (from Google Calendar or picked), check-in (taps or selfie), 3 outfit boards with one-line reasons, buttons: Wear this · Swap one piece · More options. "Together" entry point.
 6. **Together mode** — pick people, pick Coordinate/Match/Contrast, side-by-side outfit sets.
 7. **Closet** — grid of cutouts, filters (category, color, season, laundry, favorite, closet, person), search. Switch between My closet / Family / people who shared with me.
 8. **Item detail** — photos (alone/worn/label), all attributes, one-tap laundry toggle, favorite, wear history, "not worn since", share with…, closets, edit/delete.
 9. **Add items (batch)** — pick many photos → queue → progress "42 of 150" → one confirm card per item: one tap Accept or quick edits; "Looks like an item you already have" with side-by-side.
 10. **Add label photo** — optional per item, reads brand + size.
-11. **Profile → Body** — sizes by brand, measurements, height/weight, fit notes, full-body photos, "Who can see this" toggles. Minor: parent-approval switch (Jeff).
+11. **Profile → Body** — sizes by brand, measurements, height/weight, fit notes, full-body photos, "Who can see this" toggles. Minor: parent-approval switch (the owner).
 12. **Profile → Style** — loved/avoid colors, style words, never-suggest items.
 13. **Profile → Brands & Stores** — personal favorites list.
 14. **Profile → Settings** — saved zip, Google Calendar connect/disconnect, password, shop-for-me permissions.
-15. **Shop** — paste link / upload screenshot / take photo; "shopping for: [me ▾ / Mya / …]"; fit verdict, "you already own similar", 3+ pairing boards, and (when a category is missing or the call is PASS) a sideways-scrolling row of real products from several stores with picture, price, BUY and JUDGE IT (Google Shopping via Serper; store search links when no key).
+15. **Shop** — paste link / upload screenshot / take photo; "shopping for: [me ▾ / Devon / …]"; fit verdict, "you already own similar", 3+ pairing boards, and (when a category is missing or the call is PASS) a sideways-scrolling row of real products from several stores with picture, price, BUY and JUDGE IT (Google Shopping via Serper; store search links when no key).
 16. **Clean-out** — items not worn in X months (X editable here), quick actions.
 17. **Admin → People** — add/invite, set role, link minors to parents, remove (with "delete items or move to Family" prompt).
 18. **Admin → Lists** — every taxonomy editable here AND inline wherever it appears (e.g., "+ Add category" inside the confirm card).
@@ -123,19 +123,19 @@ Design rules: one primary action per screen, big tap targets, no modal-inside-mo
 
 **Phase 0 — Foundation & live URL** (goal: you can log in on your phone at fenscloset.com)
 - Repo scaffold, Railway project + Postgres + bucket, env vars, CI build.
-- Auth: login, forgot/reset password (Resend), sessions, DEV MODE 0535 one-time rule + on-site alert + chat alert.
-- Seed 4 people (Jeff, Brittney, Olivia, Mya) + Family closet + all default lists.
+- Auth: login, forgot/reset password (Resend), sessions, DEV MODE the retired dev value one-time rule + on-site alert + chat alert.
+- Seed 4 people (the owner, Blake, Casey, Devon) + Family closet + all default lists.
 - Admin → People, Lists, Rules (all editable).
 - PWA shell (installable). Custom domain fenscloset.com + www.
-- Tests: login all 4 people; 0535 works once then forces change; forgot-password email arrives; installs on iPhone.
+- Tests: login all 4 people; the retired dev value works once then forces change; forgot-password email arrives; installs on iPhone.
 
 **Phase 1 — Add clothes & closet** (the most important flow)
 - Direct-to-bucket uploads, batch queue with resume + progress, background removal, Claude auto-tagging, label reading, confirm card, duplicate detection, item detail, laundry status, favorites, closets + sharing.
-- Test: Jeff adds 10 real items in < 3 minutes on iPhone.
+- Test: the owner adds 10 real items in < 3 minutes on iPhone.
 
 **Phase 2 — Profiles & privacy**
 - Body profile (+ full-body photos for V2), style profile, favorite brands/stores, visibility grants, minor rules + parent approval, shop-for-someone grants, invite flow (email + share link) end-to-end.
-- Test: invite a new person, confirm they get their own closet/profiles; verify Mya's data is invisible to Olivia.
+- Test: invite a new person, confirm they get their own closet/profiles; verify Devon's data is invisible to Casey.
 
 **Phase 3 — Daily outfits & wear tracking**
 - Weather (location → zip → ask), Google Calendar occasion + override, check-in (taps or selfie), 3 outfit boards + reasons, Wear this / Swap / More, Together mode, wear log, no-repeat window, dirty-skip, not-worn alerts + clean-out.
@@ -146,20 +146,20 @@ Design rules: one primary action per screen, big tap targets, no modal-inside-mo
 - Test: 3 real store links, 1 screenshot, 1 dressing-room photo.
 
 **Phase 5 — Launch checklist**
-- All "Done means" items re-verified, the I'm-5 guide, DEV MODE turned off, 0535 rule retired.
+- All "Done means" items re-verified, the I'm-5 guide, DEV MODE turned off, the retired dev value rule retired.
 
 **V2 — Virtual try-on** (not started until you approve providers: cost/image, quality, photo storage location, minors policy.)
 
 ---
 
 ## 6. DEV MODE rules (as specified)
-- Env var `DEV_MODE=true` on Railway. Seeded admin `jeff@everbowl.com` / `0535`, `mustChangePassword=true`.
-- 0535 is valid for exactly ONE login. On use: site shows a persistent red banner "DEV password in use — change it now", the next screen is forced password change, and I report it in chat.
-- When `DEV_MODE=false` (or when any other person's account is activated), the 0535 path is disabled entirely.
+- Env var `DEV_MODE=true` on Railway. Seeded admin `the owner's address` / `the retired dev value`, `mustChangePassword=true`.
+- the retired dev value is valid for exactly ONE login. On use: site shows a persistent red banner "DEV password in use — change it now", the next screen is forced password change, and I report it in chat.
+- When `DEV_MODE=false` (or when any other person's account is activated), the the retired dev value path is disabled entirely.
 
 ---
 
-## 7. What I need from Jeff (with links) — nothing blocks Phase 0 except Railway confirmation
+## 7. What I need from the owner (with links) — nothing blocks Phase 0 except Railway confirmation
 
 1. **Approve this plan** and answer Q1–Q8 below.
 2. **Anthropic API key** → https://console.anthropic.com/settings/keys → "Create Key" → paste it here (or tell me to reuse one — Q5).
@@ -172,11 +172,11 @@ Design rules: one primary action per screen, big tap targets, no modal-inside-mo
    e. https://console.cloud.google.com/auth/audience → **Publish app** (otherwise Google logs everyone out every 7 days). Family members will see a one-time "Google hasn't verified this app" screen → tap Advanced → Continue. That is expected for a private app.
    f. Paste Client ID + Client Secret here.
 5. **GoDaddy DNS** → https://dcc.godaddy.com/control/portfolio/fenscloset.com/settings → DNS → I'll give the exact records once Railway issues them (Q6 decides which records).
-6. **Family emails** for Brittney, Olivia, Mya (so their logins and invites go to the right place).
+6. **Family emails** for Blake, Casey, Devon (so their logins and invites go to the right place).
 
 ---
 
-## 8. Questions for Jeff (answer with the letter)
+## 8. Questions for the owner (answer with the letter)
 
 **Q1 — Background removal.**
 A) Self-hosted open-source model (`rembg`) in a second Railway service. ~$5–10/mo, no per-image fee, photos never leave Railway. ~3–6 s per photo, runs in the background queue. **(Recommended)**
@@ -207,32 +207,32 @@ B) Keep GoDaddy DNS: `www.fenscloset.com` is the real site; GoDaddy forwards `fe
 A) No, boards in the app only.
 B) Yes, add a "Share as image" button.
 
-**Q8 — Olivia (21) is an adult.** Default role:
-A) `member` (controls her own privacy; Jeff/Brittney see nothing of her body data unless she grants it). **(Recommended, matches your spec)**
+**Q8 — Casey (21) is an adult.** Default role:
+A) `member` (controls her own privacy; the owner/Blake see nothing of her body data unless she grants it). **(Recommended, matches your spec)**
 B) `admin`.
 
 
 ## Phase 1 status (2026-10-18)
 
-Screens approved by Jeff (12-screen batch: Add, uploading, ready, Confirm, colour picker, All done, Closet, Family closet, Item detail, row picker, person switcher). Built and tested (56 unit, 20 browser): bucket storage + photo proxy with privacy rules, remove.bg → thumb → hash → Claude tagging bounded to the lists, resumable add-clothes batches, confirm step (design 03) with duplicate merge, closet grid (design 02), item detail, person switcher with the Family closet. Live tagging waits on `ANTHROPIC_API_KEY` and `REMOVE_BG_API_KEY` in Railway. Deviation flagged for Jeff: uploads relay through the app (`PUT /api/uploads/put`) instead of a direct presigned PUT, because Railway bucket CORS is unverified; `S3_DIRECT_UPLOADS=true` switches to direct once CORS is set.
+Screens approved by the owner (12-screen batch: Add, uploading, ready, Confirm, colour picker, All done, Closet, Family closet, Item detail, row picker, person switcher). Built and tested (56 unit, 20 browser): bucket storage + photo proxy with privacy rules, remove.bg → thumb → hash → Claude tagging bounded to the lists, resumable add-clothes batches, confirm step (design 03) with duplicate merge, closet grid (design 02), item detail, person switcher with the Family closet. Live tagging waits on `ANTHROPIC_API_KEY` and `REMOVE_BG_API_KEY` in Railway. Deviation flagged for the owner: uploads relay through the app (`PUT /api/uploads/put`) instead of a direct presigned PUT, because Railway bucket CORS is unverified; `S3_DIRECT_UPLOADS=true` switches to direct once CORS is set.
 
 
 ## Phase 2 status (2026-10-18)
 
-Built and tested (60 unit, 22 browser): body profile (editable measurement list, sizes by brand, fit notes, full-body photos), style profile (loved/avoid colours, editable style words, never-suggest), favorite brands & stores, privacy grants (body data viewers, shop-for), minor body-photo approval (Mya by Jeff, seeded; parents toggle it on the People page), invite flow verified end-to-end (new person gets closet + empty profile; a minor's body data invisible to a sibling until the owner grants it; minors cannot grant). Undrawn screens built from spec parts; 10-screen batch approved by Jeff. Per-photo 'Only me' lock on body photos (Q16) and American spelling (Q15) shipped after approval.
+Built and tested (60 unit, 22 browser): body profile (editable measurement list, sizes by brand, fit notes, full-body photos), style profile (loved/avoid colours, editable style words, never-suggest), favorite brands & stores, privacy grants (body data viewers, shop-for), minor body-photo approval (Devon by the owner, seeded; parents toggle it on the People page), invite flow verified end-to-end (new person gets closet + empty profile; a minor's body data invisible to a sibling until the owner grants it; minors cannot grant). Undrawn screens built from spec parts; 10-screen batch approved by the owner. Per-photo 'Only me' lock on body photos (Q16) and American spelling (Q15) shipped after approval.
 
 ## Phase 3 status (2026-10-18)
-- Forgot-password email verified by Jeff (arrived). Phase 3 plan: `docs/superpowers/plans/2026-10-18-phase-3-daily-outfits.md`.
+- Forgot-password email verified by the owner (arrived). Phase 3 plan: `docs/superpowers/plans/2026-10-18-phase-3-daily-outfits.md`.
 - www.fenscloset.com: CNAME verified, certificate valid, `APP_URL` set.
-- Built and tested (72 unit, 26 browser): weather (Open-Meteo, zip or phone location, household time zone rule), plan (occasion list / free text / Google Calendar read-only, connect in Settings once `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` exist), check-in (taps or selfie read by Claude, selfie private), three looks per day from the person's own closet (text-only prompt, plan A1) with WEAR THIS / SWAP ONE PIECE / MORE LOOKS, Together mode (coordinate / match / contrast, one look per person, minors only with parents), Fits calendar (photo of the night, share, visibility line, save a fit for any past day, remove), wear log + wear counts + no-repeat window (today's wears excluded), laundry/never-suggest/retired skipped, clean-out (keep 3 months / donate / sell), wear history on item detail. Phase 3 screens, desktop layout (D) and Shop screens (E) approved by Jeff (2026-10-18). Google OAuth client in Railway.
+- Built and tested (72 unit, 26 browser): weather (Open-Meteo, zip or phone location, household time zone rule), plan (occasion list / free text / Google Calendar read-only, connect in Settings once `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` exist), check-in (taps or selfie read by Claude, selfie private), three looks per day from the person's own closet (text-only prompt, plan A1) with WEAR THIS / SWAP ONE PIECE / MORE LOOKS, Together mode (coordinate / match / contrast, one look per person, minors only with parents), Fits calendar (photo of the night, share, visibility line, save a fit for any past day, remove), wear log + wear counts + no-repeat window (today's wears excluded), laundry/never-suggest/retired skipped, clean-out (keep 3 months / donate / sell), wear history on item detail. Phase 3 screens, desktop layout (D) and Shop screens (E) approved by the owner (2026-10-18). Google OAuth client in Railway.
 
 ## Phase 4 status (2026-10-18)
-- 2026-10-18 (later): Jeff's Shop links verified in production (Vuori). Jeff asked for real products instead of search links → `src/lib/shop/products.ts`: Claude writes 1–3 shopping queries in the verdict (never sizes or measurements), Google Shopping via Serper (`SERPER_API_KEY` in Railway, `MOCK_SERPER` in tests), favorite stores then favorite brands first, interleaved across queries, deduped, capped at 12, cached a day; product row on the Shop screen with BUY → and JUDGE IT. Without a key the old search links show. Decision Q20 A (Serper). Verified live by Jeff 18 Oct (Nike Jordan link → product row).
+- 2026-10-18 (later): the owner's Shop links verified in production (Vuori). the owner asked for real products instead of search links → `src/lib/shop/products.ts`: Claude writes 1–3 shopping queries in the verdict (never sizes or measurements), Google Shopping via Serper (`SERPER_API_KEY` in Railway, `MOCK_SERPER` in tests), favorite stores then favorite brands first, interleaved across queries, deduped, capped at 12, cached a day; product row on the Shop screen with BUY → and JUDGE IT. Without a key the old search links show. Decision Q20 A (Serper). Verified live by the owner 18 Oct (Nike Jordan link → product row).
 - 2026-10-18 (later): taste memory (`src/lib/outfits/taste.ts`, model `LookFeedback`): WEAR THIS / saved fits record `worn` (one per day), the other looks shown that day and every look before MORE LOOKS record `passed`, SWAP ONE PIECE records `swapped_out` / `swapped_in`. A 90-day digest (reaches for, tends to swap out, passed on, wears X with Y) is appended to the style context so every suggestion, Together look, and Shop verdict weighs it. Style page shows "What it has learned" with FORGET per line and FORGET ALL (owner or parent). Decision Q22 A (build now).
 - 2026-10-18 (later): "How did it go?" (`Fit.rating` loved / fine / never_again): three taps on the Fits panel, and a one-line strip on Today for the most recent unrated fit of the last week. Loved / never-again looks join the taste digest; FORGET clears them too. Inspiration board (`InspirationLook`, photos under `inspo/`, owner + a minor's parents): Style page tiles, Claude reads each into style DNA (summary, silhouettes, color pairings, formality, pieces, words), digest joins the style context, REMOVE per tile. Decision Q23 A. Plan: docs/superpowers/plans/2026-10-18-phase-6-taste.md.
 - 2026-10-18 (later): photo tips. Add clothes shows "Before you start" (the general photo rules, `src/lib/tips.ts`) plus a tab per category with its own tip; each category's tip is an editable field under Lists → Categories (`Category.photoTip`, seeded once, admin edits survive re-seeds); DON'T SHOW AGAIN per person (`Person.addTipsHidden`) with a PHOTO TIPS link to bring it back. The Help topic "Add your clothes" shows the same rules and tips from the database. Approved (I) 18 Oct. Follow-up the same day: confirm card restaged (title above, whole piece centered) and phone-side shrink now steps down in halves to stop moiré on knits (commits 99092d6, 81637bc).
 - 2026-10-18 (later): virtual try-on (Google Vertex AI, adults only, opt-in in Settings, owner-only pictures, cached): TRY IT ON on Today, SEE IT ON ME on Shop. Keys: `GOOGLE_SERVICE_ACCOUNT_JSON` + `GOOGLE_VERTEX_PROJECT` (+ optional location/model) in Railway. Decisions Q24 B, Q25 A, Q26 A.
 - 2026-10-18 (later): outfit engine now drafts count+2 looks by text, then a vision pass (`rankVisually`, cutout thumbnails as images) keeps the best `count` with fresh reasons; falls back to text order if photos are missing or the call fails. Applies to Today, More looks, Together and Shop pairings. Decision Q21 A (build now).
-- Built and tested (74 unit, 28 browser): Shop screen with shopping-for switcher (self, minors, grants), link lookups (store page title/image/price/brand via Open Graph and JSON-LD, mock in tests), screenshot and dressing-room photo lookups, Claude verdict FITS / RISKY / PASS with size note when body data is permitted, "you already own similar", three pairing boards with the new piece pinned first, "you might like" store search links from favorite stores (only on PASS or a missing category), recent list with remove. Screens pending Jeff approval; Jeff still to run the real-store test (3 links, 1 screenshot, 1 dressing-room photo).
-- Google Calendar connected and verified by Jeff (2026-10-18); OAuth client in Railway env; redirects built from APP_URL.
+- Built and tested (74 unit, 28 browser): Shop screen with shopping-for switcher (self, minors, grants), link lookups (store page title/image/price/brand via Open Graph and JSON-LD, mock in tests), screenshot and dressing-room photo lookups, Claude verdict FITS / RISKY / PASS with size note when body data is permitted, "you already own similar", three pairing boards with the new piece pinned first, "you might like" store search links from favorite stores (only on PASS or a missing category), recent list with remove. Screens pending the owner approval; the owner still to run the real-store test (3 links, 1 screenshot, 1 dressing-room photo).
+- Google Calendar connected and verified by the owner (2026-10-18); OAuth client in Railway env; redirects built from APP_URL.
 - 2026-10-18: production AI calls failed with `output_config.format.schema: For 'array' type, property 'maxItems' is not supported`; every schema now states array limits in descriptions only. Affected until the fix: tagging (Phase 1), looks (Phase 3), Shop (Phase 4).

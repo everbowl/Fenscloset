@@ -14,7 +14,7 @@ export default function InviteHelpPage() {
           <p className="note">Open the link from your email or text message. It sets up your password and your own closet in one step.</p>
         </div>
         <div className="card p-4">
-          <p className="text-[15px] leading-snug">Don&apos;t have one? Ask Jeff or Brittney to send it from People in the app.</p>
+          <p className="text-[15px] leading-snug">Don&apos;t have one? Ask a family admin to send it from People in the app.</p>
         </div>
         <Link href="/login" className="pill pill-quiet h-12 w-full">Back to sign in</Link>
       </main>

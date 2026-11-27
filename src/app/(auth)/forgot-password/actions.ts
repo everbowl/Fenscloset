@@ -24,7 +24,7 @@ export async function forgotPasswordAction(_prev: ForgotState, formData: FormDat
     r = { sent: false, reason: "failed" };
   }
   // Whether the address is known stays private; whether the site can send mail at all does not (review A A3).
-  if (!r.sent && r.reason === "not_configured") return { error: "Email isn't set up on the site yet — ask Jeff.", email };
+  if (!r.sent && r.reason === "not_configured") return { error: "Email isn't set up on the site yet — ask an admin.", email };
   if (!r.sent && r.reason === "failed") return { error: "The email couldn't be sent just now. Try again in a minute.", email };
   return { done: true, email };
 }

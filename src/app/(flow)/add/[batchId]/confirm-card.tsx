@@ -45,13 +45,13 @@ type SheetKind = "category" | "subcategory" | "color" | "fabric" | "season" | "f
 const nameOf = (xs: Named[], id: string | null) => xs.find((x) => x.id === id)?.name ?? null;
 
 /**
- * The review card (Add flow v2, Jeff 23 Nov 2026: "much more intuitive"): the photo on a stage, the tagger's name,
+ * The review card (Add flow v2, the owner 23 Nov 2026: "much more intuitive"): the photo on a stage, the tagger's name,
  * category and brand as pills you can tap to change, every other detail as a row, one orange "Add to closet" and a
  * quiet "Not this one". Each action has its own busy word (review B F3): a row edit never turns the main button into
  * "Saving…", and a split says "Splitting…" while Claude finds the pieces.
  */
 export function ConfirmCard({ batchId, entry, tags: initial, lists: initialLists, counter, progress, duplicate, canEditLists, readyCount, myBrands, allSure }: Props) {
-  // "Now the back" asks once per batch (Jeff, 31 Oct 2026, K1): "Not now" sticks for the rest of the pile.
+  // "Now the back" asks once per batch (the owner, 31 Oct 2026, K1): "Not now" sticks for the rest of the pile.
   const askKey = `fc:askmore-no:${batchId}`;
   const [askMore, setAskMore] = useState(true);
   useLayoutEffect(() => { try { if (window.sessionStorage.getItem(askKey)) setAskMore(false); } catch { /* private mode */ } }, [askKey]);

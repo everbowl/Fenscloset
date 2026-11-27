@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { untidyNowAction, type UntidyState } from "./actions";
 
 /**
- * Tidy and Smooth are gone (Jeff, 19 Oct 2026); the pieces they touched get a fresh cutout from the original photo,
+ * Tidy and Smooth are gone (the owner, 19 Oct 2026); the pieces they touched get a fresh cutout from the original photo,
  * one remove.bg credit each. Shown only while some still wait (the server also tries again every hour on its own).
  * Always mounted: a server action's refresh re-renders the page with the new count, and the row must keep its result.
  */

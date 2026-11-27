@@ -67,8 +67,13 @@ export async function setRule(key: string, value: string): Promise<RuleRow> {
     return db.rule.update({ where: { key }, data: { value: v } });
   }
   if (kind === "text") {
-    try { new Intl.DateTimeFormat("en-US", { timeZone: value.trim() }); } catch { throw new Error("Enter a time zone like America/Los_Angeles."); }
-    return db.rule.update({ where: { key }, data: { value: value.trim() } });
+    const v = value.trim();
+    if (key === "timezone") {
+      try { new Intl.DateTimeFormat("en-US", { timeZone: v }); } catch { throw new Error("Enter a time zone like America/Los_Angeles."); }
+    } else if (v.length > 80) {
+      throw new Error("Keep it under 80 characters.");
+    }
+    return db.rule.update({ where: { key }, data: { value: v } });
   }
   if (kind === "onoff") {
     const v = value.trim().toLowerCase();

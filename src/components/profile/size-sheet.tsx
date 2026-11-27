@@ -9,7 +9,7 @@ import { cn } from "@/lib/cn";
 
 /**
  * One tap on a size (or a measurement): chips from the editable list, the likely one marked, and
- * "Other…" for anything the list doesn't have. Jeff, 18 Oct 2026: no more guessing what "32"
+ * "Other…" for anything the list doesn't have. the owner, 18 Oct 2026: no more guessing what "32"
  * means for a T-shirt.
  */
 export function SizeSheet({ open, onClose, title, options, value, suggested, unit, format, onPick, testId = "size-sheet" }: {

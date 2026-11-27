@@ -1,5 +1,5 @@
 /**
- * Slow work runs in the background (Jeff, 19 Oct 2026: his phone gave up on a 37-second mirror request,
+ * Slow work runs in the background (the owner, 19 Oct 2026: his phone gave up on a 37-second mirror request,
  * then on a 23-second Today page that was building the day's looks inside the page load). A screen
  * starts a job, gets a job id back right away unless the work is quick, and polls for it. The job carries
  * on when the browser lets go; its result is saved by the work itself (a TryOn row, an OutfitSuggestion),

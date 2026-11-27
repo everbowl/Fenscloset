@@ -4,7 +4,7 @@ import { openLook } from "@/lib/looks/service";
 /**
  * The open look of the person being shopped for, pinned above the tab bar on every screen that can add to a look (the
  * Shop, Looking-for, a piece's go-with page, the closet): "Look · 3 pieces" and the way in. Solid black so it reads as
- * the result of "Add to a look" (Jeff, 20 Nov 2026), and nothing while the look is empty.
+ * the result of "Add to a look" (the owner, 20 Nov 2026), and nothing while the look is empty.
  */
 export async function LookTray({ personId }: { personId: string }) {
   const open = await openLook(personId);

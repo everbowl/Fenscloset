@@ -267,7 +267,7 @@ export async function lookup(viewer: Viewer, forPersonId: string, input: LookupI
 /**
  * The same lookup as a background job (src/lib/jobs.ts), so the Shop answers at once and polls: a store
  * page, two Claude reads, three looks and a product search take 15 to 40 seconds, longer than a phone
- * waits on one request (Jeff, 23 Oct 2026: a 28-second lookup that Safari gave up on). The job's result
+ * waits on one request (the owner, 23 Oct 2026: a 28-second lookup that Safari gave up on). The job's result
  * is the saved lookup's id; the row itself is the record, so the answer is under Recent even when the
  * browser let go. The same input tapped twice joins the running job instead of paying twice.
  */

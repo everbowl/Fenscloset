@@ -55,7 +55,7 @@ export const TAGS = ["Favorite", "Comfy", "Statement", "Basics", "Needs repair",
 export const BRANDS = ["Lululemon", "Nike", "Adidas", "Levi's", "Zara", "H&M", "Aritzia", "Free People", "Madewell", "J.Crew", "Abercrombie & Fitch", "Gap", "Old Navy", "Target", "Amazon", "Uniqlo", "Reformation", "Skims", "Alo", "Vuori", "Brandy Melville", "Urban Outfitters", "Anthropologie", "Nordstrom", "Steve Madden", "Birkenstock", "Converse", "New Balance", "Coach", "Kate Spade"];
 export const STORES = ["Nordstrom", "Target", "Amazon", "Zara", "Aritzia", "Lululemon", "Urban Outfitters", "Free People", "Madewell", "Abercrombie & Fitch", "Revolve", "Shein", "ASOS", "Nike", "Sephora"];
 
-/** Sizes offered per category (Jeff, 18 Oct 2026: size by item type). Editable under Admin → Lists → Sizes. */
+/** Sizes offered per category (the owner, 18 Oct 2026: size by item type). Editable under Admin → Lists → Sizes. */
 export const SIZE_OPTIONS: Record<string, string[]> = {
   Tops: ["XS", "S", "M", "L", "XL", "XXL", "Youth S", "Youth M", "Youth L", "Youth XL"],
   Outerwear: ["XS", "S", "M", "L", "XL", "XXL", "Youth S", "Youth M", "Youth L", "Youth XL"],
@@ -63,12 +63,12 @@ export const SIZE_OPTIONS: Record<string, string[]> = {
   Swimwear: ["XS", "S", "M", "L", "XL", "XXL", "Youth S", "Youth M", "Youth L", "Youth XL"],
   Dresses: ["XS", "S", "M", "L", "XL", "XXL", "0", "2", "4", "6", "8", "10", "12", "14", "16", "Youth S", "Youth M", "Youth L", "Youth XL"],
   Bottoms: ["XS", "S", "M", "L", "XL", "XXL", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "Youth 4", "Youth 5", "Youth 6", "Youth 7", "Youth 8", "Youth 10", "Youth 12", "Youth 14", "Youth 16"],
-  // Shoes carry men's and women's US sizes side by side (Jeff, 19 Oct 2026): one option covers both.
+  // Shoes carry men's and women's US sizes side by side (the owner, 19 Oct 2026): one option covers both.
   Shoes: ["M 4 / W 5.5", "M 4.5 / W 6", "M 5 / W 6.5", "M 5.5 / W 7", "M 6 / W 7.5", "M 6.5 / W 8", "M 7 / W 8.5", "M 7.5 / W 9", "M 8 / W 9.5", "M 8.5 / W 10", "M 9 / W 10.5", "M 9.5 / W 11", "M 10 / W 11.5", "M 10.5 / W 12", "M 11 / W 12.5", "M 11.5 / W 13", "M 12 / W 13.5", "M 12.5 / W 14", "M 13 / W 14.5", "M 13.5 / W 15", "M 14 / W 15.5", "M 14.5 / W 16", "M 15 / W 16.5", "Youth 1", "Youth 2", "Youth 3", "Youth 4", "Youth 5", "Youth 6"],
   Hats: ["S/M", "L/XL", "One size", "Youth"],
   Belts: ["S", "M", "L", "XL", "28", "30", "32", "34", "36", "38", "40", "42", "44"],
 };
-/** Body measurements in the order they are asked (Jeff, 19 Oct 2026: basics preloaded, categorized and ordered). Each has preloaded options (src/lib/profiles/size-options.ts). */
+/** Body measurements in the order they are asked (the owner, 19 Oct 2026: basics preloaded, categorized and ordered). Each has preloaded options (src/lib/profiles/size-options.ts). */
 export const MEASUREMENT_KINDS: { name: string; unit: string }[] = [
   { name: "Height", unit: "in" }, { name: "Weight", unit: "lb" },
   { name: "Chest / bust", unit: "in" }, { name: "Cup size", unit: "" }, { name: "Waist", unit: "in" }, { name: "Hips", unit: "in" },
@@ -88,9 +88,10 @@ export const RULES = [
   { key: "laundryCycleDays", value: "7", label: "Laundry cycle (days)", description: "How often the wash runs. With ten of the same shirt, this says how many are really needed." },
   { key: "needSnoozeDays", value: "30", label: "What's needed · Not now (days)", description: "Tapping Not now on a What's-needed row of the Closet hides that row for this many days." },
   { key: "timezone", value: "America/Los_Angeles", label: "Household time zone", description: "Decides when 'today' starts for check-ins, looks and the Fits calendar." },
-  { key: "accentColor", value: "#FF5A00", label: "Button color (hex)", description: "The color of the main buttons. Everything else stays black and white. Jeff, 19 Oct 2026: real orange." },
-  { key: "mirrorEngine", value: "fashn", label: "Mirror engine", description: "Who dresses a look on your body photo. FASHN dresses skin as readily as clothes (a bare torso or swimwear photo works; moderation permissive: swimwear and underwear on adults, never nudity; it can't place shoes) and needs FASHN_API_KEY in Railway. Google swaps the clothes it sees, so it wants a photo in a fitted tee and pants, and it can place shoes. Kling (Kuaishou's Virtual Try-on 3.0) is the third: a clean swap that keeps your face, pose and background, no shoes, needs KLING_API_KEY in Railway (an API key from the Kling console; the older access-key and secret-key pair works too) and the photo bucket, since Kling reads the pictures by link. Compare runs every engine with a key and shows them side by side; pick the winner by setting it here. The mannequin uses Google's image model either way. Jeff, 24 Oct 2026: FASHN, no new photo; Kling added." },
-  // Compare's three switches (Jeff, 26 Nov 2026, 1B): Kling starts off, its account has no balance; the key stays in Railway.
+  { key: "householdTagline", value: "", label: "Household line on Today", description: "One line under the date on Today once someone is signed in. Empty shows nothing; the sign-in page never shows it." },
+  { key: "accentColor", value: "#FF5A00", label: "Button color (hex)", description: "The color of the main buttons. Everything else stays black and white. the owner, 19 Oct 2026: real orange." },
+  { key: "mirrorEngine", value: "fashn", label: "Mirror engine", description: "Who dresses a look on your body photo. FASHN dresses skin as readily as clothes (a bare torso or swimwear photo works; moderation permissive: swimwear and underwear on adults, never nudity; it can't place shoes) and needs FASHN_API_KEY in Railway. Google swaps the clothes it sees, so it wants a photo in a fitted tee and pants, and it can place shoes. Kling (Kuaishou's Virtual Try-on 3.0) is the third: a clean swap that keeps your face, pose and background, no shoes, needs KLING_API_KEY in Railway (an API key from the Kling console; the older access-key and secret-key pair works too) and the photo bucket, since Kling reads the pictures by link. Compare runs every engine with a key and shows them side by side; pick the winner by setting it here. The mannequin uses Google's image model either way. the owner, 24 Oct 2026: FASHN, no new photo; Kling added." },
+  // Compare's three switches (the owner, 26 Nov 2026, 1B): Kling starts off, its account has no balance; the key stays in Railway.
   { key: "compareGoogle", value: "on", label: "Compare includes Google", description: "Off leaves Google out of Compare without removing its key." },
   { key: "compareFashn", value: "on", label: "Compare includes FASHN", description: "Off leaves FASHN out of Compare without removing its key." },
   { key: "compareKling", value: "off", label: "Compare includes Kling", description: "Off leaves Kling out of Compare without removing its key. Kling needs a paid balance." },
@@ -109,7 +110,7 @@ export const RULES = [
 export const DEV_PASSWORD = "0535";
 
 /**
- * The mirror's styling lists (Jeff, 19 Oct 2026: "don't default to tucking it in; give me options on pose
+ * The mirror's styling lists (the owner, 19 Oct 2026: "don't default to tucking it in; give me options on pose
  * and how the clothes will show"). Editable under Admin → Lists; the first entry of each list is the
  * default. A prompt is what the artist is told to change; blank means nothing needs changing.
  */

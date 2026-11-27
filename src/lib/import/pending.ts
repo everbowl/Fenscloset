@@ -20,7 +20,7 @@ export type PendingAdds = { cards: PendingCard[]; /** Photos tagged and waiting 
 const EMPTY: PendingAdds = { cards: [], toConfirm: null };
 
 /**
- * What the person added that has not landed in the closet yet (Jeff, 20 Nov 2026: a piece added from a store link
+ * What the person added that has not landed in the closet yet (the owner, 20 Nov 2026: a piece added from a store link
  * "never locked in the closet" because for 10 to 40 seconds nothing showed it was coming). Their own open batches only.
  * Shown in every view of their own closet (review B A2.3): on a category tab only the pieces whose category is known
  * to be another one are left out; a piece whose category is still unknown shows on every tab.

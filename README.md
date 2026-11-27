@@ -34,5 +34,5 @@ PW_CHROMIUM=/path/to/chromium npm run test:e2e   # Playwright (iPhone 15 + deskt
 `railway.json` builds with Railpack and starts with `npx prisma migrate deploy && npm run start`.
 Set every variable from `.env.example` in Railway > Variables (the mirror needs at least one engine key: the Google service account, `FASHN_API_KEY` or `KLING_API_KEY`). Health check: `/api/health`.
 First deploy: run the seed once (`npm run db:seed`) from a Railway shell or one-off command.
-Every push to the deploy branch goes live on its own (Railway builds on push). Before a push, check Railway's http log for ten quiet minutes: a build while someone is in the app is what the "New version ready · Reload" bar is for, but a quiet window is better (Jeff, 26 Nov 2026, 4A).
+Every push to the deploy branch goes live on its own (Railway builds on push). Before a push, check Railway's http log for ten quiet minutes: a build while someone is in the app is what the "New version ready · Reload" bar is for, but a quiet window is better (the owner, 26 Nov 2026, 4A).
 The site is private: `src/app/robots.ts` disallows every crawler, every page carries a no-index tag, and every response an `X-Robots-Tag` header.

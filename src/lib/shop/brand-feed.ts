@@ -8,7 +8,7 @@ import { withSection } from "@/lib/shop/section";
 import { mergeMatches, type Match, type StoredMatch } from "@/lib/shop/wants";
 
 /**
- * "New from your brands" (Jeff, 23 Oct 2026, Shop v2 item 3: "suggest items from my favorite brands"). One feed per
+ * "New from your brands" (the owner, 23 Oct 2026, Shop v2 item 3: "suggest items from my favorite brands"). One feed per
  * person, built from their favorite brands (Profile → My brands): one store search per brand, interleaved so every
  * brand gets a turn, the person's stores first. Fetched in the background when the Shop opens and the feed is older
  * than the schedule (Admin → Rules, wantSweepHours) or the brand list changed, and on the same sweep as Looking-for.

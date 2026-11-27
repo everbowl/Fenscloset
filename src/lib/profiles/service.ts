@@ -38,7 +38,7 @@ export type PrivacyView = {
   canGrant: boolean;
   /** Virtual try-on (adults only): opted in, and whether the site has a provider. */
   tryOn: { enabled: boolean; adult: boolean; configured: boolean; hasBodyPhoto: boolean; /** Who receives the body photo to make the picture (the household's mirror rule). */ engines: Engine[] };
-  /** The part of a store this person shops in (Jeff, 2 Nov 2026), and the list to pick from. */
+  /** The part of a store this person shops in (the owner, 2 Nov 2026), and the list to pick from. */
   shopSection: { id: string; name: string } | null;
   sections: { id: string; name: string }[];
   isAdmin: boolean;

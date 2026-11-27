@@ -8,23 +8,23 @@ Severity key: **breaks** (a family member cannot finish), **wrong** (does the wr
 
 ## 1. Most likely causes of last night's failures
 
-### A1. Sign-in on the second phone: 0535 is single-use and the login page never says so
+### A1. Sign-in on the second phone: the retired dev value is single-use and the login page never says so
 - `src/lib/auth/login.ts:23` returns `reason: "invalid"` when `passwordHash` is null and `devPasswordUsedAt` is set; `src/app/(auth)/login/actions.ts:21` turns that into "That email and password don't match."
 - **Severity:** dead-end (this is the exact shape of "a sign-in that did not go through on a second phone").
-- **Path:** Jeff signs in with 0535 on phone 1 (hash is cleared at `login.ts:35-37`), then types 0535 on phone 2 → "don't match", no hint. Worse: until he finishes `/change-password` on phone 1 the account has **no password at all**, so phone 2 cannot sign in with anything.
-- **Fix:** return a distinct reason (e.g. `"dev_used"`) for the DEV admin when `devPasswordUsedAt` is set and no hash exists, and show "0535 was already used on another phone — finish setting the password there, or tap Forgot password."
+- **Path:** the owner signs in with the retired dev value on phone 1 (hash is cleared at `login.ts:35-37`), then types the retired dev value on phone 2 → "don't match", no hint. Worse: until he finishes `/change-password` on phone 1 the account has **no password at all**, so phone 2 cannot sign in with anything.
+- **Fix:** return a distinct reason (e.g. `"dev_used"`) for the DEV admin when `devPasswordUsedAt` is set and no hash exists, and show "the retired dev value was already used on another phone — finish setting the password there, or tap Forgot password."
 
 ### A2. "Sign out instead" on the forced-change screen can lock the admin out
 - `src/app/(auth)/change-password/page.tsx:26` shows "Sign out instead" while `person.mustChangePassword` is true; at that moment `passwordHash` is null (`login.ts:37`).
 - **Severity:** dead-end / breaks.
-- **Path:** Jeff taps "Sign out instead" to try the other phone → no password, 0535 dead, Forgot password needs `RESEND_API_KEY` (see A3). Only `npm run db:reset-dev-password` on the server recovers.
+- **Path:** the owner taps "Sign out instead" to try the other phone → no password, the retired dev value dead, Forgot password needs `RESEND_API_KEY` (see A3). Only `npm run db:reset-dev-password` on the server recovers.
 - **Fix:** hide the sign-out button (or warn) when the person has no hash; or keep the old hash until the new password is saved.
 
 ### A3. "Forgot password" says the link is on its way even when no email can be sent
 - `src/lib/auth/reset.ts:31` ignores `sendEmail`'s `{ sent: false }`; `src/app/(auth)/forgot-password/actions.ts:10-11` returns `done: true`; `form.tsx:16-18` shows "a reset link is on its way".
 - With `RESEND_API_KEY` unset, `src/lib/email.ts:13` writes the full reset URL (token included) to the server log instead. Same pattern for SMS at `src/lib/sms.ts:19`.
 - **Severity:** dead-end + unsafe (reset/invite tokens in production logs).
-- **Fix:** propagate `sent`; when the failure is configuration show "Email isn't set up on the site yet — ask Jeff"; only log message bodies when `NODE_ENV !== "production"`.
+- **Fix:** propagate `sent`; when the failure is configuration show "Email isn't set up on the site yet — ask the owner"; only log message bodies when `NODE_ENV !== "production"`.
 
 ### A4. Secure cookie dropped over plain http looks like "login did nothing"
 - `src/lib/auth/current.ts:53` sets `secure` in production (correct). If a phone reaches the site over `http://` (typed URL, Railway internal hostname, LAN), Safari discards the `Set-Cookie`; the action redirects to `/today`, `src/proxy.ts:10-14` finds no cookie and bounces to `/login` with no message.
@@ -42,11 +42,11 @@ Severity key: **breaks** (a family member cannot finish), **wrong** (does the wr
 
 ### S1. No rate limiting on sign-in, and the admin email is pre-filled for every visitor while DEV_MODE is on
 - `src/lib/auth/login.ts:18-31`, `src/app/(auth)/login/actions.ts:9-27`: no attempt counter, no delay. `src/app/(auth)/login/page.tsx:19` passes `prefillEmail={isDevMode() ? DEV_ADMIN_EMAIL : undefined}` to a public page.
-- **Severity:** unsafe (high while DEV_MODE=true). 0535 is a 4-digit code: 10,000 guesses with no throttle lets an outsider consume the one-time password, be forced to set their own, and own the admin account. `forgot-password` is equally unthrottled (email bombing).
+- **Severity:** unsafe (high while DEV_MODE=true). the retired dev value is a 4-digit code: 10,000 guesses with no throttle lets an outsider consume the one-time password, be forced to set their own, and own the admin account. `forgot-password` is equally unthrottled (email bombing).
 - **Fix:** per-IP+email attempt limit (e.g. 5 per 15 min, a small `LoginAttempt` table or in-memory map with backoff), the same on `forgotPasswordAction`; stop pre-filling the admin email publicly.
 
-### S2. Two phones can both consume 0535
-- `src/lib/auth/login.ts:30-37`: `verifyPassword` then an unconditional `update`. Two simultaneous 0535 logins both pass verify before either update runs → two sessions, both `usedDevPassword`.
+### S2. Two phones can both consume the retired dev value
+- `src/lib/auth/login.ts:30-37`: `verifyPassword` then an unconditional `update`. Two simultaneous the retired dev value logins both pass verify before either update runs → two sessions, both `usedDevPassword`.
 - **Severity:** unsafe (low likelihood, but it is the "two phones" scenario).
 - **Fix:** `updateMany({ where: { id, devPasswordActive: true }, data: … })` and treat `count !== 1` as invalid.
 
@@ -92,7 +92,7 @@ Severity key: **breaks** (a family member cannot finish), **wrong** (does the wr
 - **Fix:** one message and a constant-time dummy verify for unknown emails. Acceptable for a family app, but it compounds S1.
 
 ### Things that are correct
-- DEV MODE rule as specified: `login.ts:26-41` honours 0535 only for `DEV_ADMIN_EMAIL` while `DEV_MODE=true`, consumes it in one update (hash nulled, `devPasswordUsedAt` set, `mustChangePassword` on); `seed.ts:63-73` seeds it only in DEV mode and only when no hash exists; `scripts/reset-dev-password.ts:13` refuses outside DEV mode; `validateNewPassword` (`change-password.ts:9`) refuses 0535 as a new password; `DevModeBanner` (`dev-mode-banner.tsx:6-15`) shows exactly while `devPasswordActive` is true and disappears after use; the `(app)` and `(flow)` layouts (`layout.tsx:20`, `(flow)/layout.tsx:9`) and `redirectIfSignedIn` (`login/actions.ts:37`) force `/change-password`. Unit tests (`tests/auth/login.test.ts`) and the e2e (`e2e/login.spec.ts`) cover this.
+- DEV MODE rule as specified: `login.ts:26-41` honours the retired dev value only for `DEV_ADMIN_EMAIL` while `DEV_MODE=true`, consumes it in one update (hash nulled, `devPasswordUsedAt` set, `mustChangePassword` on); `seed.ts:63-73` seeds it only in DEV mode and only when no hash exists; `scripts/reset-dev-password.ts:13` refuses outside DEV mode; `validateNewPassword` (`change-password.ts:9`) refuses the retired dev value as a new password; `DevModeBanner` (`dev-mode-banner.tsx:6-15`) shows exactly while `devPasswordActive` is true and disappears after use; the `(app)` and `(flow)` layouts (`layout.tsx:20`, `(flow)/layout.tsx:9`) and `redirectIfSignedIn` (`login/actions.ts:37`) force `/change-password`. Unit tests (`tests/auth/login.test.ts`) and the e2e (`e2e/login.spec.ts`) cover this.
 - Tokens: 32 random bytes base64url, only the sha256 is stored (`tokens.ts`), lookup by hash via unique index (timing-safe by construction), single use via conditional `updateMany` + count check (`reset.ts:44-45`, `invite.ts:80-81`), expiry 60 min / 7 days, invite rolled back on failure (`invite.ts:105`). Reset signs out every other session (`reset.ts:48`); change-password keeps only the current one (`change-password/actions.ts:21-22`).
 - Cookies: `httpOnly`, `sameSite: lax`, `secure` in production, `path: /`, 30-day `expires` (`current.ts:50-56`); `fc_view` the same with a 1-year `maxAge` (`view-actions.ts:11`). Fine for iOS (server-set cookies are not ITP-capped).
 - Open-redirect guard on `next` (`login/actions.ts:26`). Proxy excludes static assets and public auth pages; the production build registers it as a Node-runtime function with the right matcher (`.next/server/functions-config-manifest.json`).
@@ -111,7 +111,7 @@ Severity key: **breaks** (a family member cannot finish), **wrong** (does the wr
 
 ### W2. Moving a removed person's pieces to Family breaks every photo
 - `src/lib/people/service.ts:91` moves `ownerId` to the admin, but photo keys keep the old owner's id (`src/lib/storage.ts:37`); `src/lib/photos/visibility.ts:31-32` resolves the owner from the key and returns `false` for `status: "removed"`.
-- **Severity:** wrong. **Path:** Jeff removes Olivia → "Move Olivia's pieces to Family" → all her items show broken images for everyone.
+- **Severity:** wrong. **Path:** the owner removes Casey → "Move Casey's pieces to Family" → all her items show broken images for everyone.
 - **Fix:** in `canViewKey`, when the key's owner is removed, fall back to `ItemPhoto → Item.ownerId`; or re-key photos on move.
 
 ### W3. Session sliding refresh never reaches the cookie
@@ -128,11 +128,11 @@ Severity key: **breaks** (a family member cannot finish), **wrong** (does the wr
 
 ### W6. People created by invite are invisible until they accept
 - `src/lib/people/service.ts:13-26` lists `Person` rows only; an invite without `personId` creates no Person (`invite.ts:33`), so `/admin/people` shows nothing and the link (shown once in the sheet) cannot be recovered or re-sent.
-- **Severity:** dead-end / wrong. **Path:** Jeff invites Grandma, taps Done, she never gets the email; there is nothing to tap.
+- **Severity:** dead-end / wrong. **Path:** the owner invites Grandma, taps Done, she never gets the email; there is nothing to tap.
 - **Fix:** list open `InviteToken`s on the People page with copy link / resend / cancel.
 
 ### W7. Clearing an email locks the person out
-- `service.ts:36` accepts `email: null` for someone with a password; `login.ts:20` needs an email. Also clearing or changing the DEV admin's email silently disables 0535 and the banner.
+- `service.ts:36` accepts `email: null` for someone with a password; `login.ts:20` needs an email. Also clearing or changing the DEV admin's email silently disables the retired dev value and the banner.
 - **Severity:** wrong (low). **Fix:** refuse clearing when `passwordHash` or `devPasswordActive` is set.
 
 ### W8. `list-requests` hides the row before the server confirms
@@ -217,7 +217,7 @@ Severity key: **breaks** (a family member cannot finish), **wrong** (does the wr
 
 | Where | What the person taps | What they get |
 |---|---|---|
-| `login-form.tsx:22` after 0535 was used on another phone | Sign in | "don't match", no hint (A1) |
+| `login-form.tsx:22` after the retired dev value was used on another phone | Sign in | "don't match", no hint (A1) |
 | `login-form.tsx:22` over plain http | Sign in | bounced back to the empty login form (A4) |
 | `login-form.tsx:22` with a session that expired | any link → `/login?next=` | login form with no "you were signed out" line (`proxy.ts:13`, `current.ts:31`) |
 | `change-password/page.tsx:26` | Sign out instead | signed out with no password left (A2) |

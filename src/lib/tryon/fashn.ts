@@ -2,14 +2,14 @@ import sharp from "sharp";
 import { fetchWithBackoff } from "@/lib/tryon/google";
 
 /**
- * FASHN virtual try-on (https://fashn.ai): the second mirror engine beside Google (Jeff, 20 Oct 2026, A). One
+ * FASHN virtual try-on (https://fashn.ai): the second mirror engine beside Google (the owner, 20 Oct 2026, A). One
  * garment onto one person image per call. What makes it the one for "my true body": segmentation-free dressing,
  * which paints a garment onto skin as readily as over clothes, so a swimwear base photo works; and a permissive
  * moderation level, which allows swimwear, underwear and lingerie on adults. Never nudity: FASHN's terms, the same
  * line as Google's. Minors never reach this call (src/lib/tryon/index.ts assertReady). Env, all in Railway:
  *   FASHN_API_KEY            the key from https://app.fashn.ai (API)
  *   FASHN_MODEL              default tryon-v1.6
- *   FASHN_MODE               performance | balanced | quality, default quality (Jeff, 23 Oct 2026: quality over speed)
+ *   FASHN_MODE               performance | balanced | quality, default quality (the owner, 23 Oct 2026: quality over speed)
  *   FASHN_MODERATION         conservative | permissive | none, default permissive
  *   FASHN_SEGMENTATION_FREE  default true; "false" dresses by detected clothing only, like Google
  * MOCK_FASHN=true pastes the garment on instead, warmer than Google's mock so a comparison shows two pictures.

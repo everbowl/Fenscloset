@@ -114,7 +114,7 @@ export async function processEntry(entryId: string): Promise<ProcessOutcome> {
     // A retry leaves the previous run's cutout and thumb behind otherwise (review B B4).
     for (const old of [entry.cutoutKey, entry.thumbKey]) if (old && old !== cutoutKey && old !== thumbKey) await deleteObject(old).catch(() => undefined);
 
-    // C1 (Jeff, 3 Nov 2026): a piece with store facts (a link or a receipt, not a photo the person took) goes straight
+    // C1 (the owner, 3 Nov 2026): a piece with store facts (a link or a receipt, not a photo the person took) goes straight
     // into the closet, no card; it is fixable on the piece page. A category the AI could not place is no reason to
     // hold it back (review B A2.2): it lands with no category and the closet shows "Needs a category" on it.
     if (meta && !meta.matched) {

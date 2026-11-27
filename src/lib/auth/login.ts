@@ -17,7 +17,7 @@ export function normalizeEmail(email: string): string {
 type PasswordFlags = Pick<Person, "passwordHash" | "devPasswordActive" | "devPasswordUsedAt" | "mustChangePassword">;
 
 /**
- * 0535 was used and no real password has replaced it yet. The consumed hash stays on the row until the new password is
+ * the one-time password was used and no real password has replaced it yet. The consumed hash stays on the row until the new password is
  * saved (review A A2), so the account is never without one; it just never verifies again.
  */
 export function devPasswordConsumed(p: PasswordFlags): boolean {
@@ -36,9 +36,9 @@ function decoyHash(): Promise<string> {
 }
 
 /**
- * Verifies credentials. The one-time DEV password is consumed here: the first phone to sign in with 0535 claims it
+ * Verifies credentials. The one-time DEV password is consumed here: the first phone to sign in with the one-time password claims it
  * (a conditional update, so two phones cannot both win; review A S2), after which the account is forced to a new
- * password and 0535 answers "dev_used" until that password is saved.
+ * password and the one-time password answers "dev_used" until that password is saved.
  */
 export async function login(emailRaw: string, password: string): Promise<LoginResult> {
   const email = normalizeEmail(emailRaw);
@@ -51,7 +51,7 @@ export async function login(emailRaw: string, password: string): Promise<LoginRe
   if (devPasswordConsumed(person)) return { ok: false, reason: "dev_used" };
 
   // A DEV password that is still "active" is only honoured while DEV_MODE is on.
-  if (person.devPasswordActive && (!isDevMode() || person.email !== DEV_ADMIN_EMAIL)) {
+  if (person.devPasswordActive && (!isDevMode() || !DEV_ADMIN_EMAIL || person.email !== DEV_ADMIN_EMAIL)) {
     return { ok: false, reason: "invalid" };
   }
 
@@ -67,7 +67,7 @@ export async function login(emailRaw: string, password: string): Promise<LoginRe
     forgetDevBanner();
     if (claimed.count !== 1) return { ok: false, reason: "dev_used" }; // another phone got there first
     const updated = await db.person.findUniqueOrThrow({ where: { id: person.id } });
-    console.error(`[DEV-MODE] One-time password 0535 used by ${person.email} at ${now.toISOString()}. It is now disabled.`);
+    console.error(`[DEV-MODE] The one-time password was used by person ${person.id} at ${now.toISOString()}. It is now disabled.`);
     return { ok: true, person: updated, usedDevPassword: true };
   }
 

@@ -7,7 +7,7 @@ import { MirrorScreen } from "./mirror-screen";
 export const metadata: Metadata = { title: "Mirror · Fen’s Closet" };
 
 /**
- * The mirror as its own screen (Jeff, 23 Nov 2026: navigate while it dresses). The bar under the header lands here;
+ * The mirror as its own screen (the owner, 23 Nov 2026: navigate while it dresses). The bar under the header lands here;
  * the picture being dressed, or the last one, fills the page, with the person's recent looks under it.
  */
 export default async function MirrorPage() {

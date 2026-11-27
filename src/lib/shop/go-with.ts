@@ -9,7 +9,7 @@ import { searchProducts, type Product } from "@/lib/shop/products";
 import { sectionWord, withSection } from "@/lib/shop/section";
 
 /**
- * "Shop for something to go with it" (Jeff, 23 Oct 2026, Shop v2 item 1): from one piece in the closet, what would
+ * "Shop for something to go with it" (the owner, 23 Oct 2026, Shop v2 item 1): from one piece in the closet, what would
  * complete it (a category and why, from the closet and the style profile), real products for that with the person's
  * stores and brands first, and the looks the closet already makes with the piece. Runs as a background job like the
  * Shop's lookup; the row is the record, so the answer is there when the person comes back. The search is for the

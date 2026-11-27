@@ -16,7 +16,7 @@ import { goWithAction, goWithStatusAction, type GoWithResult } from "./actions";
 const POLL_MS = 2000;
 
 /**
- * "Shop for something to go with it" (Jeff, 23 Oct 2026): the piece, what would complete it, real products for that
+ * "Shop for something to go with it" (the owner, 23 Oct 2026): the piece, what would complete it, real products for that
  * (Buy, or Judge it on the Shop), and the looks the closet already makes with it. The work runs in the background and
  * the screen shows the step and the seconds; today's answer is reused, "Look again" makes a fresh one.
  */

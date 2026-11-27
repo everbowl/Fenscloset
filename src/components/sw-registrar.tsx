@@ -6,7 +6,7 @@ const CHECK_EVERY_MS = 5 * 60 * 1000;
 
 /**
  * Registers the service worker and watches for the next build. A deploy while someone is in the app must never leave dead
- * buttons (Jeff, 23 Nov 2026): the moment a new worker has installed behind an open page, a bar says "New version ready ·
+ * buttons (the owner, 23 Nov 2026): the moment a new worker has installed behind an open page, a bar says "New version ready ·
  * Reload"; the tap tells the new worker to take over (skipWaiting) and the page reloads when it does. Until then the open
  * page keeps the old worker and the old build's cache (src/lib/sw-source.ts). Update checks run on every return to the app
  * and every five minutes, because register() alone looks only once per hard load and <Link> navigations never look.
