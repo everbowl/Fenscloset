@@ -15,13 +15,13 @@ export function UntidyPhotos({ pending }: { pending: number }) {
   const left = state.done ? state.done.failed : pending;
   if (!pending && !state.done) return null;
   return (
-    <form action={action} className="border-t border-ink pt-5" data-testid="untidy-photos">
-      <p className="text-[14px] leading-snug text-graphite">
+    <form action={action} className="border-t border-line pt-4 first:border-t-0 first:pt-4" data-testid="untidy-photos">
+      <p className="note">
         {finished ? <>Every piece has its fresh cutout again.</> : <><span className="font-medium text-ink">{word(left)}</span> still {left === 1 ? "shows" : "show"} the AI-edited picture Tidy or Smooth made. Each gets a fresh cutout from its original photo (one remove.bg credit each). The site tries again every hour on its own; this does it now.</>}
       </p>
-      {finished ? null : <button type="submit" disabled={busy} className="pill mt-4 h-[50px] w-full" data-testid="untidy-now">{busy ? "Re-cutting…" : `Re-cut ${word(left)} now`}</button>}
+      {finished ? null : <button type="submit" disabled={busy} className="pill pill-solid mt-4 h-[50px] w-full" data-testid="untidy-now">{busy ? "Re-cutting…" : `Re-cut ${word(left)} now`}</button>}
       {state.done ? (
-        <p className="mono mt-3 text-graphite" data-testid="untidy-result">
+        <p className="caption mt-3" data-testid="untidy-result">
           {state.done.recut} re-cut{state.done.skipped ? ` · ${state.done.skipped} had no original` : ""}{state.done.failed ? ` · ${state.done.failed} still waiting` : ""}{state.done.done ? " · all done" : ""}
           {state.done.lastError ? <><br />— {state.done.lastError}{/insufficient_credits/.test(state.done.lastError) ? <> · <a href="https://www.remove.bg/dashboard#credits" target="_blank" rel="noreferrer" className="underline">buy credits</a></> : null}</> : null}
         </p>

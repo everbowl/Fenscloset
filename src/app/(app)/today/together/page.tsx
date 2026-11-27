@@ -3,8 +3,9 @@ import { db } from "@/lib/db";
 import { getTimezone } from "@/lib/rules";
 import { dayKey } from "@/lib/dates";
 import { listEntries } from "@/lib/lists/service";
-import { latestTogether, togetherPeople } from "@/lib/outfits/together";
+import { getTogether, latestTogether, togetherPeople } from "@/lib/outfits/together";
 import { TogetherScreen } from "./together-screen";
+import { rememberedShopFor } from "@/lib/shop/remember";
 
 export const metadata = { title: "Together" };
 export const dynamic = "force-dynamic";
@@ -14,17 +15,21 @@ export default async function TogetherPage({ searchParams }: { searchParams: Pro
   const me = await requirePerson();
   const { s } = await searchParams;
   const date = dayKey(new Date(), await getTimezone());
-  const [people, occasions, latest] = await Promise.all([togetherPeople(me), listEntries("occasion"), latestTogether(me, date)]);
-  const session = s ? (await import("@/lib/outfits/together")).getTogether(me, s) : null;
-  const shown = (await session) ?? latest;
-  const minors = (await db.guardianLink.findMany({ where: { parentId: me.id }, select: { minorId: true } })).map((g) => g.minorId);
+  const [people, occasions, latest, session, minors, remembered] = await Promise.all([
+    togetherPeople(me), listEntries("occasion"), latestTogether(me, date),
+    s ? getTogether(me, s) : null,
+    db.guardianLink.findMany({ where: { parentId: me.id }, select: { minorId: true } }),
+    rememberedShopFor(), // N1: the last person picked under Shopping for starts picked here too
+  ]);
+  const shown = session ?? latest;
   return (
     <TogetherScreen
       meId={me.id}
       people={people}
-      canDressIds={[me.id, ...minors]}
+      canDressIds={[me.id, ...minors.map((g) => g.minorId)]}
       occasions={occasions.map((o) => ({ id: o.id, name: o.name }))}
       isAdmin={isAdmin(me)}
+      remembered={remembered && people.some((p) => p.id === remembered) ? remembered : null}
       session={shown && shown.date === date ? shown : null}
     />
   );

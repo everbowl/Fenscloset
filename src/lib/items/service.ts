@@ -6,6 +6,7 @@ import { finishBatchIfDone } from "@/lib/import/service";
 import type { EntryAiResult } from "@/lib/import/process";
 import type { TagResult } from "@/lib/ai/tag-item";
 import type { Item } from "@/generated/prisma/client";
+import type { PhotoKind } from "@/generated/prisma/client";
 
 export class ItemError extends Error {
   constructor(message: string, public readonly status = 400) {
@@ -29,7 +30,7 @@ export type ItemEdits = {
   sizeText?: string | null;
 };
 
-export function applyEdits(tags: TagResult, edits: ItemEdits): TagResult {
+function applyEdits(tags: TagResult, edits: ItemEdits): TagResult {
   const next = { ...tags };
   if (edits.name !== undefined) next.name = edits.name.trim().slice(0, 80) || tags.name;
   if (edits.categoryId !== undefined) { next.categoryId = edits.categoryId; if (edits.subcategoryId === undefined) next.subcategoryId = null; }
@@ -61,19 +62,37 @@ export async function saveEntryEdits(personId: string, entryId: string, edits: I
   return tags;
 }
 
+/**
+ * The person's one personal closet. Two pieces landing at the same moment (a store add of two colors, review B A2.1)
+ * both miss the lookup and both create one; there is no unique key to lean on, so the later one steps back: after
+ * creating, the earliest closet wins and any newer one of ours is removed again.
+ */
 export async function personalClosetId(personId: string): Promise<string> {
-  const closet = await db.closet.findFirst({ where: { ownerId: personId, kind: "personal" } })
-    ?? await db.closet.create({ data: { ownerId: personId, kind: "personal", name: "My closet" } });
-  return closet.id;
+  const found = await db.closet.findFirst({ where: { ownerId: personId, kind: "personal" }, orderBy: { createdAt: "asc" } });
+  if (found) return found.id;
+  const mine = await db.closet.create({ data: { ownerId: personId, kind: "personal", name: "My closet" } });
+  const all = await db.closet.findMany({ where: { ownerId: personId, kind: "personal" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { id: true } });
+  const first = all[0]?.id ?? mine.id;
+  if (first !== mine.id) await db.closet.deleteMany({ where: { id: mine.id, items: { none: {} } } }).catch(() => undefined);
+  return first;
 }
 
-/** The one-tap confirm: entry → Item with photos, tags and the owner's personal closet. */
-export async function createItemFromEntry(personId: string, entryId: string, edits: ItemEdits = {}): Promise<Item> {
+/** "Add all" on the review page is offered only when every remaining card is sure: a category, a color and the tagger's own confidence (review B, Add flow v2). */
+export const SURE_CONFIDENCE = 0.75;
+export function isSure(tags: Pick<TagResult, "categoryId" | "colorIds" | "confidence">): boolean {
+  return Boolean(tags.categoryId) && tags.colorIds.length > 0 && tags.confidence >= SURE_CONFIDENCE;
+}
+
+/**
+ * The one-tap confirm: entry → Item with photos, tags and the owner's personal closet.
+ * `allowNoCategory` is for the store auto-add (review B A2.2): the piece lands with no category and the closet asks for one.
+ */
+export async function createItemFromEntry(personId: string, entryId: string, edits: ItemEdits = {}, opts: { allowNoCategory?: boolean } = {}): Promise<Item> {
   const entry = await ownedEntry(personId, entryId);
   if (entry.status !== "needs_confirm") throw new ItemError(entry.status === "done" ? "Already added." : "This photo is still being tagged.", 409);
   const ai = (entry.aiResult as EntryAiResult | null) ?? { tags: emptyTags(), warnings: [] };
   const tags = applyEdits(ai.tags, edits);
-  if (!tags.categoryId) throw new ItemError("Pick a category first.");
+  if (!tags.categoryId && !opts.allowNoCategory) throw new ItemError("Pick a category first.");
   const closetId = await personalClosetId(personId);
   const connect = (ids: string[]) => ({ connect: ids.map((id) => ({ id })) });
   const meta = (entry.storeMeta as StoreMeta | null) ?? null;
@@ -88,6 +107,7 @@ export async function createItemFromEntry(personId: string, entryId: string, edi
         subcategoryId: tags.subcategoryId,
         brandId: tags.brandId,
         size: tags.sizeText,
+        copies: Math.min(MAX_COPIES, Math.max(1, entry.quantity)),
         phash: entry.phash,
         ...(meta ? { storeId, purchaseUrl: meta.url?.slice(0, 500) ?? null, purchasePrice: priceNumber(meta.priceText), purchaseDate: meta.purchaseDate ? new Date(`${meta.purchaseDate}T12:00:00Z`) : null, storePhoto: !meta.matched, fitNotes: meta.fitNotes?.slice(0, 500) ?? null } : { purchaseUrl: brandUrl }),
         aiConfidence: JSON.parse(JSON.stringify({ confidence: tags.confidence, fabricConfidence: tags.fabricConfidence, warnings: ai.warnings })),
@@ -162,6 +182,13 @@ export async function skipEntry(personId: string, entryId: string): Promise<void
   await finishBatchIfDone(entry.batchId);
 }
 
+/** "Skipped · Undo" on the next card (Q1): the piece comes back to the pile while its batch is still open. */
+export async function unskipEntry(personId: string, entryId: string): Promise<void> {
+  const entry = await ownedEntry(personId, entryId);
+  if (entry.status !== "skipped") throw new ItemError("That one is already back.");
+  await db.importEntry.update({ where: { id: entryId }, data: { status: "needs_confirm" } });
+}
+
 export async function attachEntryPhoto(personId: string, entryId: string, kind: "label" | "worn" | "back", key: string): Promise<void> {
   await ownedEntry(personId, entryId);
   await db.importEntry.update({ where: { id: entryId }, data: kind === "label" ? { labelKey: key } : kind === "worn" ? { wornKey: key } : { backKey: key } });
@@ -177,10 +204,11 @@ export function emptyTags(): TagResult {
 
 // ---------- Item detail editing ----------
 
-import { deleteObject, getObject, newKey, putObject, type PhotoKeyKind } from "@/lib/storage";
+import { deleteObject, getObject, newKey, parseKey, putObject, type PhotoKeyKind } from "@/lib/storage";
 import { quarterTurn, rotateImage, type RotateDirection } from "@/lib/images/rotate";
 import { makeThumb } from "@/lib/images/thumb";
 import { phash } from "@/lib/images/phash";
+import { applyCopyAction, countsFor, countsOf, laundrySummary, MAX_COPIES, type CopyAction, type CopyCounts } from "@/lib/items/copies";
 import type { LaundryStatus } from "@/generated/prisma/client";
 
 export type ItemDetailEdits = ItemEdits & {
@@ -202,7 +230,7 @@ export type ItemDetailEdits = ItemEdits & {
 };
 
 async function ownedItem(viewer: { id: string; role: string }, itemId: string) {
-  const item = await db.item.findUnique({ where: { id: itemId }, select: { id: true, ownerId: true, storePhoto: true, wearCount: true, photoNudgedAt: true } });
+  const item = await db.item.findUnique({ where: { id: itemId }, select: { id: true, ownerId: true, storePhoto: true, wearCount: true, photoNudgedAt: true, copies: true, dirtyCopies: true, cleanersCopies: true, laundryStatus: true } });
   if (!item) throw new ItemError("That item is gone.", 404);
   if (item.ownerId !== viewer.id && viewer.role !== "admin") throw new ItemError("Only the owner or an admin can change this.", 403);
   return item;
@@ -231,7 +259,7 @@ export async function updateItem(viewer: { id: string; role: string }, itemId: s
     if (!e.purchaseDate) data.purchaseDate = null;
     else { const d = new Date(e.purchaseDate); if (Number.isNaN(d.getTime())) throw new ItemError("That date doesn't look right."); data.purchaseDate = d; }
   }
-  if (e.laundryStatus !== undefined) data.laundryStatus = e.laundryStatus;
+  if (e.laundryStatus !== undefined) Object.assign(data, { laundryStatus: e.laundryStatus, ...countsFor(item.copies, e.laundryStatus) });
   if (e.isFavorite !== undefined) data.isFavorite = e.isFavorite;
   if (e.neverSuggest !== undefined) data.neverSuggest = e.neverSuggest;
   if (e.colorIds !== undefined) data.colors = set(e.colorIds);
@@ -260,13 +288,72 @@ export async function updateItem(viewer: { id: string; role: string }, itemId: s
 
 const LAUNDRY_CYCLE: LaundryStatus[] = ["clean", "dirty", "cleaners"];
 
-/** One tap moves CLEAN → LAUNDRY → AT CLEANERS → CLEAN. Returns the new status. */
+/** One tap moves CLEAN → LAUNDRY → AT CLEANERS → CLEAN. Returns the new status. The whole stack moves together. */
 export async function cycleLaundry(viewer: { id: string; role: string }, itemId: string): Promise<LaundryStatus> {
-  await ownedItem(viewer, itemId);
-  const it = await db.item.findUniqueOrThrow({ where: { id: itemId }, select: { laundryStatus: true } });
+  const it = await ownedItem(viewer, itemId);
   const next = LAUNDRY_CYCLE[(LAUNDRY_CYCLE.indexOf(it.laundryStatus) + 1) % LAUNDRY_CYCLE.length];
-  await db.item.update({ where: { id: itemId }, data: { laundryStatus: next } });
+  await db.item.update({ where: { id: itemId }, data: { laundryStatus: next, ...countsFor(it.copies, next) } });
   return next;
+}
+
+/** Laundry as three states, one tap each on the piece page. On a stack every copy moves together. */
+export async function setLaundry(viewer: { id: string; role: string }, itemId: string, status: LaundryStatus): Promise<LaundryStatus> {
+  const it = await ownedItem(viewer, itemId);
+  if (!LAUNDRY_CYCLE.includes(status)) throw new ItemError("Pick clean, in the wash, or at the cleaners.");
+  await db.item.update({ where: { id: itemId }, data: { laundryStatus: status, ...countsFor(it.copies, status) } });
+  return status;
+}
+
+/** A stack's laundry one copy at a time (F1, Jeff 3 Nov 2026): one in the wash, one to the cleaners, one back clean, or wash day for all. */
+export async function laundryCopies(viewer: { id: string; role: string }, itemId: string, action: CopyAction): Promise<CopyCounts & { laundryStatus: LaundryStatus }> {
+  const it = await ownedItem(viewer, itemId);
+  const next = applyCopyAction(countsOf(it), action);
+  const laundryStatus = laundrySummary(next);
+  await db.item.update({ where: { id: itemId }, data: { ...next, laundryStatus } });
+  return { ...next, laundryStatus };
+}
+
+/** How many identical pieces this card stands for. Copies in the wash or at the cleaners shrink to fit. */
+export async function setCopies(viewer: { id: string; role: string }, itemId: string, copies: number): Promise<CopyCounts & { laundryStatus: LaundryStatus }> {
+  const it = await ownedItem(viewer, itemId);
+  const n = Math.floor(Number(copies));
+  if (!Number.isFinite(n) || n < 1 || n > MAX_COPIES) throw new ItemError(`Copies go from 1 to ${MAX_COPIES}.`);
+  const next = countsOf({ ...countsOf(it), copies: n, laundryStatus: it.laundryStatus });
+  const laundryStatus = laundrySummary(next);
+  await db.item.update({ where: { id: itemId }, data: { ...next, laundryStatus } });
+  return { ...next, laundryStatus };
+}
+
+/** One copy becomes its own card (it got a real photo, a stain, a story): same facts and photos, one piece. Returns the new item's id. */
+export async function splitOneOff(viewer: { id: string; role: string }, itemId: string): Promise<string> {
+  const it = await ownedItem(viewer, itemId);
+  if (it.copies <= 1) throw new ItemError("This is already a single piece.");
+  const full = await db.item.findUniqueOrThrow({ where: { id: itemId }, include: { colors: true, patterns: true, fabrics: true, seasons: true, formalities: true, occasions: true, tags: true, photos: true, closets: true } });
+  const ids = (xs: { id: string }[]) => ({ connect: xs.map((x) => ({ id: x.id })) });
+  // A photo key belongs to one piece: the new card gets its own copies of the pictures, copied side by side (review B C5).
+  const photos = (await Promise.all(full.photos.map(async (ph) => {
+    const parsed = parseKey(ph.bucketKey);
+    if (!parsed) return null;
+    const { body, contentType } = await getObject(ph.bucketKey);
+    const key = newKey(parsed.kind, full.ownerId, contentType);
+    await putObject(key, body, contentType);
+    return { kind: ph.kind as PhotoKind, bucketKey: key, isPrimary: ph.isPrimary, forMirror: ph.forMirror, wholeGarment: ph.wholeGarment };
+  }))).filter((p): p is NonNullable<typeof p> => p !== null);
+  return db.$transaction(async (tx) => {
+    const made = await tx.item.create({
+      data: {
+        ownerId: full.ownerId, categoryId: full.categoryId, subcategoryId: full.subcategoryId, brandId: full.brandId, storeId: full.storeId,
+        name: full.name, size: full.size, fitNotes: full.fitNotes, purchasePrice: full.purchasePrice, purchaseDate: full.purchaseDate, purchaseUrl: full.purchaseUrl,
+        storePhoto: full.storePhoto, features: full.features, phash: full.phash, aiConfidence: full.aiConfidence ?? undefined, copies: 1,
+        colors: ids(full.colors), patterns: ids(full.patterns), fabrics: ids(full.fabrics), seasons: ids(full.seasons), formalities: ids(full.formalities), occasions: ids(full.occasions), tags: ids(full.tags),
+        closets: { create: full.closets.map((c) => ({ closetId: c.closetId })) },
+        photos: { create: photos },
+      },
+    });
+    const rest = countsOf({ ...countsOf(it), copies: it.copies - 1, laundryStatus: it.laundryStatus });
+    await tx.item.update({ where: { id: itemId }, data: { ...rest, laundryStatus: laundrySummary(rest) } });
+    return made.id;
+  });
 }
 
 export async function addItemPhoto(viewer: { id: string; role: string }, itemId: string, kind: "alone" | "worn" | "label" | "back", key: string): Promise<void> {
@@ -359,11 +446,14 @@ export async function rotateItemPhoto(viewer: { id: string; role: string }, phot
   return { photoId, key };
 }
 
-/** Deletes the item and its photos from the bucket. */
+/** Deletes the item and its photos from the bucket, and the import entries that pointed at those photos (review B C7). */
 export async function deleteItem(viewer: { id: string; role: string }, itemId: string): Promise<void> {
   await ownedItem(viewer, itemId);
   const photos = await db.itemPhoto.findMany({ where: { itemId }, select: { bucketKey: true } });
-  await db.item.delete({ where: { id: itemId } });
+  await db.$transaction([
+    db.importEntry.deleteMany({ where: { itemId, status: "done" } }),
+    db.item.delete({ where: { id: itemId } }),
+  ]);
   await Promise.all(photos.map((p) => deleteObject(p.bucketKey).catch(() => {})));
 }
 

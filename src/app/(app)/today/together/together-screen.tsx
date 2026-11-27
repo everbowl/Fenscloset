@@ -2,16 +2,17 @@
 
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Check } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
-import { Banner } from "@/components/ui/banner";
+import { toast } from "@/components/ui/toast";
 import { PickSheet, TextSheet } from "@/components/items/row-editor";
 import { cn } from "@/lib/cn";
 import type { TogetherView } from "@/lib/outfits/together";
 import type { TogetherMode } from "@/generated/prisma/client";
-import { dressTogetherAction, wearTogetherAction } from "./actions";
+import { dressTogetherAction, togetherStatusAction, wearTogetherAction, type TogetherResult } from "./actions";
 
 const MODES: { key: TogetherMode; label: string; blurb: string }[] = [
   { key: "coordinate", label: "Coordinate", blurb: "Same mood, complementary colors" },
@@ -19,94 +20,167 @@ const MODES: { key: TogetherMode; label: string; blurb: string }[] = [
   { key: "contrast", label: "Contrast", blurb: "Deliberately different, still together" },
 ];
 
-export function TogetherScreen({ meId, people, canDressIds, occasions, isAdmin, session }: {
+/** "Tops" from "TOPS": labels arrive shouted; the screen reads them in sentence case. */
+const sentence = (s: string) => s.length ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
+const LOST = "Lost the connection. Try again.";
+const POLL_MS = 2000, POLL_SLOW_MS = 4000, POLL_SLOW_AFTER_MS = 30_000, POLL_GIVE_UP_MS = 5 * 60_000;
+
+/**
+ * Together (v2): who, how, the plan, one colored button; then a card per person with their look. Dressing runs in the
+ * background and is polled like Today's looks, with the wait card saying where it is (review D 8.1).
+ */
+export function TogetherScreen({ meId, people, canDressIds, occasions, isAdmin, session, remembered = null }: {
   meId: string; people: { id: string; name: string }[]; canDressIds: string[]; occasions: { id: string; name: string }[]; isAdmin: boolean; session: TogetherView | null;
+  /** The last person picked under "Shopping for" (N1): starts picked beside you. */ remembered?: string | null;
 }) {
   const router = useRouter();
   const [, start] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string>();
-  const [ids, setIds] = useState<string[]>(session ? session.boards.map((b) => b.personId) : [meId]);
+  const [ids, setIds] = useState<string[]>(session ? [...session.boards.map((b) => b.personId), ...session.missing.map((m) => m.personId)] : [meId, ...(remembered && remembered !== meId ? [remembered] : [])]);
   const [mode, setMode] = useState<TogetherMode>(session?.mode ?? "coordinate");
-  const [occasionId, setOccasionId] = useState<string | null>(null);
-  const [text, setText] = useState<string | null>(session?.occasionLabel ?? null);
+  // Seeded from the session, so "Change" then "Dress us" keeps the occasion an occasion, not free text (review D 8.7).
+  const [occasionId, setOccasionId] = useState<string | null>(session?.occasionId ?? null);
+  const [text, setText] = useState<string | null>(session && !session.occasionId ? session.occasionLabel : null);
   const [sheet, setSheet] = useState<"occasion" | "text" | null>(null);
   const [editing, setEditing] = useState(!session);
+  const [step, setStep] = useState<string | null>(null);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [secs, setSecs] = useState(0);
+  const poll = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seq = useRef(0);
+  useEffect(() => () => { seq.current++; if (poll.current) clearTimeout(poll.current); }, []);
+  useEffect(() => {
+    if (startedAt === null) { setSecs(0); return; }
+    const tick = () => setSecs(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [startedAt]);
 
-  function run(label: string, fn: () => Promise<{ ok: boolean; error?: string; id?: string }>) {
-    setError(undefined); setBusy(label);
+  /** One tap, one answer (review D 7.1): a dropped request is an error with words, never a stuck button. */
+  function run(label: string, fn: () => Promise<{ ok: boolean; error?: string }>, after?: () => void) {
+    setBusy(label);
     start(async () => {
-      const r = await fn(); setBusy(null);
-      if (!r.ok) setError(r.error); else { setEditing(false); if (r.id) router.replace(`/today/together?s=${r.id}`); }
+      let r: { ok: boolean; error?: string };
+      try { r = await fn(); } catch { r = { ok: false, error: LOST }; }
+      setBusy(null);
+      if (!r.ok) toast.error(r.error ?? LOST); else after?.();
       router.refresh();
     });
   }
+
+  function dressed(r: TogetherResult, mine: number, since: number) {
+    if (mine !== seq.current) return;
+    if (!r.ok) { setBusy(null); setStep(null); setStartedAt(null); toast.error(r.error); return; }
+    if ("pending" in r) {
+      setStep(r.pending.step);
+      if (Date.now() - since > POLL_GIVE_UP_MS) { setBusy(null); setStep(null); setStartedAt(null); toast.error("Dressing everyone is taking too long. Try again."); return; }
+      poll.current = setTimeout(async () => {
+        if (mine !== seq.current) return;
+        let next: TogetherResult;
+        try { next = await togetherStatusAction(r.pending.jobId); } catch { next = r; } // a dropped poll (phone asleep): ask again
+        dressed(next, mine, since);
+      }, Date.now() - since > POLL_SLOW_AFTER_MS ? POLL_SLOW_MS : POLL_MS);
+      return;
+    }
+    setBusy(null); setStep(null); setStartedAt(null); setEditing(false);
+    router.replace(`/today/together?s=${r.id}`);
+    router.refresh();
+  }
+  function dress() {
+    const mine = ++seq.current;
+    if (poll.current) clearTimeout(poll.current);
+    setBusy("dress"); setStep("Getting ready…"); setStartedAt(Date.now());
+    start(async () => {
+      let r: TogetherResult;
+      try { r = await dressTogetherAction({ personIds: ids, mode, occasionId, occasionText: occasionId ? null : text }); } catch { r = { ok: false, error: LOST }; }
+      dressed(r, mine, Date.now());
+    });
+  }
   const planLabel = occasionId ? occasions.find((o) => o.id === occasionId)?.name ?? null : text;
+  const dressing = busy === "dress";
 
   return (
     <div data-testid="together">
-      <PageHeader title="Going out" accent="together" aside={session && !editing ? <button type="button" onClick={() => setEditing(true)} className="pill pill-sm">Change</button> : undefined} />
-      {error ? <Banner tone="danger" title={error} className="mb-3" /> : null}
+      <PageHeader title="Together" aside={session && !editing ? <button type="button" onClick={() => setEditing(true)} className="pill pill-sm">Change</button> : undefined} />
 
       {editing ? (
-        <div className="space-y-6 lg:max-w-[560px]">
-          <section>
-            <p className="mono border-b border-ink pb-2 text-graphite">Who</p>
-            {people.map((p) => {
-              const on = ids.includes(p.id);
-              return (
-                <button key={p.id} type="button" role="checkbox" aria-checked={on} onClick={() => setIds(on ? ids.filter((x) => x !== p.id) : [...ids, p.id])} className="flex h-[42px] w-full items-center justify-between border-b border-line text-[14px]" data-testid={`together-person-${p.name}`}>
-                  <span>{p.name}{p.id === meId ? " (me)" : ""}</span><span className={cn("mono", on ? "text-ink" : "text-transparent")}>✓</span>
-                </button>
-              );
-            })}
-          </section>
-          <section>
-            <p className="mono border-b border-ink pb-2 text-graphite">How</p>
-            <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Mode">
-              {MODES.map((m) => <button key={m.key} type="button" role="radio" aria-checked={mode === m.key} onClick={() => setMode(m.key)} className={cn("mono mono-11 h-[46px] border border-ink uppercase", mode === m.key ? "bg-ink text-paper" : "bg-paper text-ink")} data-testid={`mode-${m.key}`}>{m.label}</button>)}
+        <div className="flex flex-col gap-4 lg:max-w-[560px]">
+          <section className="card p-4">
+            <p className="section mb-2">Who</p>
+            <div className="flex flex-col">
+              {people.map((p) => {
+                const on = ids.includes(p.id);
+                return (
+                  <button key={p.id} type="button" role="checkbox" aria-checked={on} onClick={() => setIds(on ? ids.filter((x) => x !== p.id) : [...ids, p.id])} className="tap -mx-2 flex min-h-12 items-center justify-between rounded-xl px-2 text-[16px]" data-testid={`together-person-${p.name}`}>
+                    <span>{p.name}{p.id === meId ? " (me)" : ""}</span>
+                    <span className={cn("flex size-6 items-center justify-center rounded-full", on ? "bg-ink text-paper" : "ring-1 ring-inset ring-line")}>{on ? <Check className="size-3.5" strokeWidth={3} aria-hidden /> : null}</span>
+                  </button>
+                );
+              })}
             </div>
-            <p className="mono mt-2 text-graphite">{MODES.find((m) => m.key === mode)?.blurb}</p>
+            {ids.length < 2 ? <p className="caption mt-1">Pick at least two people.</p> : null}
           </section>
-          <section>
-            <p className="mono border-b border-ink pb-2 text-graphite">Plan</p>
-            <button type="button" onClick={() => setSheet("occasion")} className="flex h-[42px] w-full items-center border-b border-line text-left" data-testid="together-plan">
-              <span className="mono w-[120px] shrink-0 text-graphite">Occasion</span>
-              <span className={cn("flex-1 truncate text-[14px]", !planLabel && "text-graphite")}>{planLabel ?? "Pick one"}</span>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6B6B6B" strokeWidth="2" aria-hidden><path d="m9 6 6 6-6 6" /></svg>
+          <section className="card p-4">
+            <p className="section mb-3">How</p>
+            <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Mode">
+              {MODES.map((m) => <button key={m.key} type="button" role="radio" aria-checked={mode === m.key} onClick={() => setMode(m.key)} className={cn("pill", mode === m.key && "pill-on")} data-testid={`mode-${m.key}`}>{m.label}</button>)}
+            </div>
+            <p className="note mt-2">{MODES.find((m) => m.key === mode)?.blurb}</p>
+          </section>
+          <section className="card p-4">
+            <p className="section mb-2">Plan</p>
+            <button type="button" onClick={() => setSheet("occasion")} className="tap -mx-2 flex min-h-12 w-[calc(100%+16px)] items-center justify-between rounded-xl px-2 text-left" data-testid="together-plan">
+              <span className={cn("text-[16px]", !planLabel && "text-graphite")}>{planLabel ?? "Pick an occasion"}</span>
+              <span aria-hidden className="text-graphite">›</span>
             </button>
             <button type="button" onClick={() => setSheet("text")} className="pill pill-sm mt-2">Something else…</button>
           </section>
-          <Button size="lg" className="w-full" disabled={busy !== null || ids.length < 2} onClick={() => run("dress", () => dressTogetherAction({ personIds: ids, mode, occasionId, occasionText: occasionId ? null : text }))} data-testid="dress-us">{busy === "dress" ? "Thinking…" : "Dress us"}</Button>
-          {ids.length < 2 ? <p className="mono text-center text-graphite">Pick at least two people</p> : null}
+          <Button size="lg" className="w-full" busy={dressing} disabled={busy !== null || ids.length < 2} sub="One look for each person" onClick={dress} data-testid="dress-us">{dressing ? "Dressing…" : "Dress us"}</Button>
         </div>
       ) : null}
 
       {session && !editing ? (
-        <div className="space-y-7 lg:grid lg:grid-cols-3 lg:gap-x-8 lg:space-y-0" data-testid="together-boards">
-          <p className="mono text-graphite lg:col-span-3 lg:mb-4">{session.mode.toUpperCase()}{session.occasionLabel ? ` · ${session.occasionLabel.toUpperCase()}` : ""}</p>
+        <div className="flex flex-col gap-4 lg:grid lg:grid-cols-3 lg:gap-6" data-testid="together-boards">
+          <p className="caption lg:col-span-3">{MODES.find((m) => m.key === session.mode)?.label ?? sentence(session.mode)}{session.occasionLabel ? ` · ${session.occasionLabel}` : ""}</p>
           {session.boards.map((b) => (
-            <section key={b.personId} data-testid={`together-board-${b.personName}`}>
-              <p className="serif mb-2 text-[30px]">{b.personName}</p>
+            <section key={b.personId} className="card flex flex-col gap-3 p-4" data-testid={`together-board-${b.personName}`}>
+              <p className="section">{b.personName}</p>
               <div className="grid grid-cols-2 grid-rows-[150px_150px] gap-1.5">
                 {[0, 1, 2, 3].map((i) => {
                   const piece = b.pieces[i];
                   return (
-                    <div key={i} className={cn("overflow-hidden bg-bone", i === 0 && "row-span-2")}>
-                      {piece?.thumbKey ? <img src={`/api/photo/${piece.thumbKey}`} alt={piece.name} className="size-full object-cover" /> : piece ? <div className="flex size-full items-end p-2"><span className="mono text-graphite">{piece.name}</span></div> : null}
+                    <div key={i} className={cn("stage overflow-hidden", i === 0 && "row-span-2")}>
+                      {piece?.thumbKey ? <img src={`/api/photo/${piece.thumbKey}`} alt={piece.name} className="size-full object-contain p-2" loading="lazy" decoding="async" /> : piece ? <div className="flex size-full items-end p-2"><span className="caption">{piece.name}</span></div> : null}
                     </div>
                   );
                 })}
               </div>
-              <p className="mono mt-3 text-graphite">{b.pieces.map((x) => x.label).join(" · ")}</p>
-              <p className="mt-1 text-[16px] leading-snug">{b.board.reason}</p>
+              <p className="caption">{b.pieces.map((x) => sentence(x.label)).join(" · ")}</p>
+              <p className="text-[17px] leading-snug">{b.board.reason}</p>
+              {!canDressIds.includes(b.personId) ? <p className="caption">{b.wornFitId ? `${b.personName} is wearing this` : `Only ${b.personName} (or a parent) can wear it`}</p> : null}
               {canDressIds.includes(b.personId) ? (
-                b.wornFitId ? <Link href="/fits" className="pill mt-3 h-[50px]">Wearing this · see Fits</Link>
-                : <Button className="mt-3 w-full" disabled={busy !== null} onClick={() => run(`wear-${b.personId}`, () => wearTogetherAction(b.personId, b.suggestionId, session.occasionLabel ?? "Together"))} data-testid={`wear-${b.personName}`}>{busy === `wear-${b.personId}` ? "Saving…" : `Wear this · ${b.personName}`}</Button>
+                b.wornFitId ? <Link href="/fits" className="pill h-[50px]">✓ Wearing this · see Fits</Link>
+                : <Button className="w-full" busy={busy === `wear-${b.personId}`} disabled={busy !== null} onClick={() => run(`wear-${b.personId}`, () => wearTogetherAction(b.personId, b.suggestionId, session.occasionLabel ?? "Together"))} data-testid={`wear-${b.personName}`}>{busy === `wear-${b.personId}` ? "Saving…" : `Wear this · ${b.personName}`}</Button>
               ) : null}
             </section>
           ))}
-          {session.boards.length === 0 ? <p className="mono text-graphite">Nobody had enough clean pieces for a look. Add clothes or do laundry.</p> : null}
+          {/* A person who got no look is a line, not an absence (review D 8.2). */}
+          {session.missing.map((m) => (
+            <p key={m.personId} className="note" role="status" data-testid={`together-missing-${m.personName}`}>No look for {m.personName}: {m.reason}</p>
+          ))}
+          {session.boards.length === 0 ? <div className="flex flex-col items-start gap-3 lg:col-span-3"><p className="note">Nobody had enough clean pieces for a look.</p><Link href="/add" className="pill">+ Add clothes</Link></div> : null}
+        </div>
+      ) : null}
+
+      {/* The wait card: what is happening, how long it has been, and that you can leave. */}
+      {dressing ? (
+        <div className="wait flex items-center gap-3" role="status" aria-live="polite" data-testid="together-wait">
+          <span aria-hidden className="size-2.5 shrink-0 animate-pulse rounded-full bg-paper" />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="text-[15px] font-semibold">Dressing everyone<span className="font-normal opacity-70"> · {secs}s</span></span>
+            <span className="truncate text-[13px] opacity-80">{step ?? "Getting ready…"} · You can leave; the looks will be here.</span>
+          </span>
         </div>
       ) : null}
 

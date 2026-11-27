@@ -15,7 +15,10 @@ export function encrypt(plain: string): string {
 }
 
 export function decrypt(packed: string): string {
-  const [iv, enc, tag] = packed.split(".").map((p) => Buffer.from(p, "base64url"));
+  const parts = packed.split(".");
+  // A clear error, not a TypeError from destructuring, when the stored value is not ours (review A §5).
+  if (parts.length !== 3) throw new Error("Not an encrypted value");
+  const [iv, enc, tag] = parts.map((p) => Buffer.from(p, "base64url"));
   const d = createDecipheriv("aes-256-gcm", key(), iv);
   d.setAuthTag(tag);
   return Buffer.concat([d.update(enc), d.final()]).toString("utf8");

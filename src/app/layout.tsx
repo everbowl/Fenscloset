@@ -1,9 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "@fontsource-variable/archivo/wdth.css";
 import "@fontsource/instrument-serif/400.css";
-import "@fontsource/instrument-serif/400-italic.css";
-import "@fontsource/ibm-plex-mono/400.css";
-import "@fontsource/ibm-plex-mono/500.css";
 import "./globals.css";
 import { ImportQueueProvider } from "@/components/import-queue-provider";
 
@@ -13,6 +10,8 @@ export const metadata: Metadata = {
   applicationName: "Fen's Closet",
   appleWebApp: { capable: true, statusBarStyle: "default", title: "Fen's Closet" },
   manifest: "/manifest.webmanifest",
+  // Private: no page of the closet is ever listed by a search engine (robots.ts disallows the crawl; this covers a page reached by a link).
+  robots: { index: false, follow: false, nocache: true, googleBot: { index: false, follow: false } },
 };
 
 export const viewport: Viewport = {

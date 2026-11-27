@@ -1,15 +1,15 @@
 import { execSync } from "node:child_process";
-import { expect, test } from "@playwright/test";
-import { E2E_DB, JEFF_PASSWORD, loginAs, resetAndSeed } from "./helpers";
+import { expect, test } from "./fixtures";
+import { E2E_DB, ADMIN_PASSWORD, loginAs, resetAndSeed } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 test.beforeAll(() => {
-  resetAndSeed({ jeffReady: true });
-  execSync("npx tsx e2e/seed-brands.ts Jeff Everlane Vuori", { stdio: "ignore", env: { ...process.env, DATABASE_URL: E2E_DB } });
+  resetAndSeed({ adminReady: true });
+  execSync("npx tsx e2e/seed-brands.ts Avery Everlane Vuori", { stdio: "ignore", env: { ...process.env, DATABASE_URL: E2E_DB } });
 });
 
 test("new from your brands: the feed is built when the Shop opens, new this once, Judge it, Refresh; a kid with no brands", async ({ page }) => {
-  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
   await page.goto("/shop");
   // the feed is fetched in the background on the first open, then everything in it is new this once
   await expect(page.getByTestId("brand-feed-new")).toContainText(/^[1-9]\d* new$/, { timeout: 20000 });
@@ -29,10 +29,10 @@ test("new from your brands: the feed is built when the Shop opens, new this once
   await page.getByTestId("brand-feed-refresh").click();
   await expect(page.getByTestId("brand-feed-refresh")).toBeVisible({ timeout: 20000 });
   await expect(page.getByTestId("brand-feed-new")).toHaveCount(0);
-  // shopping for Mya (a parent): she has no brands yet, and only she can pick them
+  // shopping for Devon (a parent): she has no brands yet, and only she can pick them
   await page.getByTestId("shop-for").click();
-  await page.getByRole("dialog").getByRole("option", { name: "Mya" }).click();
+  await page.getByRole("dialog").getByRole("option", { name: "Devon" }).click();
   await expect(page).toHaveURL(/for=/);
-  await expect(page.getByTestId("brand-feed-none")).toContainText("When Mya picks favorite brands");
+  await expect(page.getByTestId("brand-feed-none")).toContainText("When Devon picks favorite brands");
   await expect(page.getByTestId("brand-feed-pick")).toHaveCount(0);
 });

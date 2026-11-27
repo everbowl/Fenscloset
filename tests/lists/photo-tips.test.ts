@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
-import { seed } from "../../prisma/seed";
+import { seed } from "../helpers";
 import { createEntry, listEntries, updateEntry } from "@/lib/lists/service";
 import { GENERAL_TIPS, getAddTips, setAddTipsHidden } from "@/lib/tips";
 
@@ -22,17 +22,17 @@ describe("photo tips", () => {
   });
 
   it("the Add page gets the general rules plus every category that has a tip; each person can hide and restore it", async () => {
-    const jeff = await db.person.findFirstOrThrow({ where: { name: "Jeff" } });
-    const mya = await db.person.findFirstOrThrow({ where: { name: "Mya" } });
-    const tips = await getAddTips(jeff.id);
+    const avery = await db.person.findFirstOrThrow({ where: { name: "Avery" } });
+    const devon = await db.person.findFirstOrThrow({ where: { name: "Devon" } });
+    const tips = await getAddTips(avery.id);
     expect(tips.hidden).toBe(false);
     expect(tips.general).toEqual(GENERAL_TIPS);
     expect(tips.categories.map((c) => c.name)).toContain("Tops");
     expect(tips.categories.every((c) => c.tip.length > 0)).toBe(true);
-    await setAddTipsHidden(jeff, true);
-    expect((await getAddTips(jeff.id)).hidden).toBe(true);
-    expect((await getAddTips(mya.id)).hidden).toBe(false); // per person
-    await setAddTipsHidden(jeff, false);
-    expect((await getAddTips(jeff.id)).hidden).toBe(false);
+    await setAddTipsHidden(avery, true);
+    expect((await getAddTips(avery.id)).hidden).toBe(true);
+    expect((await getAddTips(devon.id)).hidden).toBe(false); // per person
+    await setAddTipsHidden(avery, false);
+    expect((await getAddTips(avery.id)).hidden).toBe(false);
   });
 });

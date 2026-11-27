@@ -1,58 +1,36 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
-import { resetDb } from "../helpers";
-import { applySeedSets, seed } from "../../prisma/seed";
-import { verifyPassword } from "@/lib/auth/password";
+import { resetDb, seed } from "../helpers";
+import { applySeedSets, seed as seedDefaults } from "../../prisma/seed";
+import { seedPeople } from "../fixtures/people";
 
 describe("seed", () => {
   beforeEach(resetDb);
 
-  it("is idempotent and seeds the family, closets, lists and rules", async () => {
+  it("an empty database seeds no people: the lists, rules and the Family closet, idempotently", async () => {
     process.env.DEV_MODE = "true";
-    await seed();
-    const first = {
+    await seedDefaults();
+    const count = async () => ({
       people: await db.person.count(), closets: await db.closet.count(), cats: await db.category.count(),
       subs: await db.subcategory.count(), colors: await db.color.count(), rules: await db.rule.count(),
-      scales: await db.checkInScale.count(), options: await db.checkInOption.count(),
-    };
-    await seed();
-    const second = {
-      people: await db.person.count(), closets: await db.closet.count(), cats: await db.category.count(),
-      subs: await db.subcategory.count(), colors: await db.color.count(), rules: await db.rule.count(),
-      scales: await db.checkInScale.count(), options: await db.checkInOption.count(),
-    };
-    expect(second).toEqual(first);
-    expect(first.people).toBe(4);
-    expect(first.closets).toBe(5); // 4 personal + Family
+      scales: await db.checkInScale.count(), options: await db.checkInOption.count(), guardians: await db.guardianLink.count(),
+      approvals: await db.minorBodyImageApproval.count(),
+    });
+    const first = await count();
+    await seedDefaults();
+    expect(await count()).toEqual(first);
+    expect(first.people).toBe(0); // security item 1: no one's name or address lives in the repository
+    expect(first.guardians).toBe(0);
+    expect(first.approvals).toBe(0);
+    expect(first.closets).toBe(1); // the Family closet only
+    expect((await db.closet.findFirstOrThrow()).kind).toBe("family");
     expect(first.scales).toBe(3);
-    expect(first.rules).toBe(14); // 3 originals + 8 size-band rules + button color + mirror engine + the Looking-for search interval
+    expect(first.rules).toBe(19); // 3 originals + the laundry cycle + the Not-now days + 8 size-band rules + button color + mirror engine + the Looking-for search interval + Compare's three switches
     // a rule that left the code (the Tidy and Smooth switch) is removed on the next deploy
     await db.rule.create({ data: { key: "photoRetouch", value: "off", label: "AI photo retouch", description: "gone" } });
-    await seed();
+    await seedDefaults();
     expect(await db.rule.findUnique({ where: { key: "photoRetouch" } })).toBeNull();
-    expect(await db.rule.count()).toBe(14);
-
-    const mya = await db.person.findFirstOrThrow({ where: { name: "Mya" }, include: { guardians: true } });
-    expect(mya.role).toBe("minor");
-    expect(mya.guardians.map((g) => g.parentId).sort()).toHaveLength(2);
-    const olivia = await db.person.findFirstOrThrow({ where: { name: "Olivia" } });
-    expect(olivia.role).toBe("member");
-  });
-
-  it("gives Jeff the one-time 0535 password only in DEV mode", async () => {
-    process.env.DEV_MODE = "true";
-    await seed();
-    let jeff = await db.person.findUniqueOrThrow({ where: { email: "jeff@everbowl.com" } });
-    expect(jeff.devPasswordActive).toBe(true);
-    expect(jeff.mustChangePassword).toBe(true);
-    expect(await verifyPassword(jeff.passwordHash!, "0535")).toBe(true);
-
-    await resetDb();
-    process.env.DEV_MODE = "false";
-    await seed();
-    jeff = await db.person.findUniqueOrThrow({ where: { email: "jeff@everbowl.com" } });
-    expect(jeff.passwordHash).toBeNull();
-    expect(jeff.devPasswordActive).toBe(false);
+    expect(await db.rule.count()).toBe(19);
   });
 });
 
@@ -61,19 +39,20 @@ describe("seed guard", () => {
     await resetDb();
     process.env.DEV_MODE = "true";
     process.env.SEED_FORCE = "true";
-    await seed();
+    await seedDefaults();
+    await seedPeople();
     await db.brand.deleteMany({ where: { name: "Nike" } });
     delete process.env.SEED_FORCE;
-    await seed();
+    await seedDefaults();
     expect(await db.brand.count({ where: { name: "Nike" } })).toBe(0); // admin's deletion survives a deploy
     process.env.SEED_FORCE = "true";
-    await seed();
+    await seedDefaults();
     expect(await db.brand.count({ where: { name: "Nike" } })).toBe(1);
   });
 
   it("additive seed sets land once on a database that already has people, and never re-create what was removed after", async () => {
     await seed();
-    expect(await db.seedSet.count()).toBe(9);
+    expect(await db.seedSet.count()).toBe(10);
     expect(await db.brand.count()).toBeGreaterThan(150); // the national catalog is in the Brands list
     // the mirror's styling lists: untucked first, poses with "as photographed" first
     expect((await db.mirrorPose.findMany({ orderBy: { sortOrder: "asc" } }))[0].name).toBe("Standing, as photographed");
@@ -87,7 +66,7 @@ describe("seed guard", () => {
     await db.measurementKind.deleteMany({ where: { name: "Cup size" } });
     await db.seedSet.delete({ where: { name: "measurement-kinds-v2" } });
     delete process.env.SEED_FORCE;
-    await seed(); // people exist → only the missing set runs
+    await seedDefaults(); // people exist → only the missing set runs
     expect(await db.measurementKind.count({ where: { name: "Cup size" } })).toBe(1);
     const kinds = await db.measurementKind.findMany({ orderBy: { sortOrder: "asc" }, select: { name: true } });
     expect(kinds.map((k) => k.name).slice(0, 4)).toEqual(["Height", "Weight", "Chest / bust", "Cup size"]);
@@ -95,11 +74,21 @@ describe("seed guard", () => {
     await db.measurementKind.deleteMany({ where: { name: "Cup size" } });
     expect(await applySeedSets()).toEqual([]);
     expect(await db.measurementKind.count({ where: { name: "Cup size" } })).toBe(0);
+    // shop sections (2 Nov 2026): a database from before gets the list once; nobody is put in a section by the seed; a section an admin removed stays removed
+    await db.person.updateMany({ data: { shopSectionId: null } });
+    await db.shopSection.deleteMany({});
+    await db.seedSet.delete({ where: { name: "shop-sections-v1" } });
+    await seedDefaults();
+    expect((await db.shopSection.findMany({ orderBy: { sortOrder: "asc" } })).map((x) => x.name)).toEqual(["Men's", "Women's", "Boys'", "Girls'", "Unisex"]);
+    expect(await db.person.count({ where: { shopSectionId: { not: null } } })).toBe(0);
+    await db.shopSection.delete({ where: { name: "Unisex" } });
+    expect(await applySeedSets()).toEqual([]);
+    expect(await db.shopSection.count()).toBe(4);
     // shoes: a database seeded with plain numbers gets M / W side by side once
     const shoes = await db.category.findUniqueOrThrow({ where: { name: "Shoes" } });
     await db.sizeOption.create({ data: { categoryId: shoes.id, name: "10", sortOrder: 99 } });
     await db.seedSet.delete({ where: { name: "shoe-sizes-v2" } });
-    await seed();
+    await seedDefaults();
     const names = (await db.sizeOption.findMany({ where: { categoryId: shoes.id }, orderBy: { sortOrder: "asc" } })).map((o) => o.name);
     expect(names).toContain("M 10 / W 11.5");
     expect(names).not.toContain("10");

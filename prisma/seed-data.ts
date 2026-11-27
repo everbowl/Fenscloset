@@ -1,12 +1,5 @@
 /** Default lists. Every one of these is editable in the app; this is only the starting point. */
 
-export const PEOPLE = [
-  { key: "jeff", name: "Jeff", email: "jeff@everbowl.com", role: "admin" as const },
-  { key: "brittney", name: "Brittney", email: null, role: "admin" as const, age: 43 },
-  { key: "olivia", name: "Olivia", email: null, role: "member" as const, age: 21 },
-  { key: "mya", name: "Mya", email: null, role: "minor" as const, age: 15, guardians: ["jeff", "brittney"] },
-];
-
 /** Default photo tips per category. Seeded only where a category has none, so admin edits stick. */
 export const PHOTO_TIPS: Record<string, string> = {
   Tops: "Lay flat, buttoned or zipped, sleeves out to the sides. Front side up.",
@@ -83,9 +76,6 @@ export const MEASUREMENT_KINDS: { name: string; unit: string }[] = [
   { name: "Shoe size", unit: "US" }, { name: "Hat size", unit: "" },
 ];
 export const STYLE_WORDS = ["Minimal", "Classic", "Streetwear", "Preppy", "Boho", "Edgy", "Sporty", "Romantic", "Vintage", "Glam", "Comfy", "Polished"];
-/** Body photos approved for a minor by a parent admin (spec: Mya, approved by Jeff). */
-export const BODY_IMAGE_APPROVALS: { minor: string; by: string }[] = [{ minor: "mya", by: "jeff" }];
-
 export const CHECK_IN_SCALES: Record<string, string[]> = {
   Tan: ["None", "Light", "Medium", "Deep"],
   Hair: ["Great", "Fine", "Bad hair day"],
@@ -95,9 +85,15 @@ export const CHECK_IN_SCALES: Record<string, string[]> = {
 export const RULES = [
   { key: "noRepeatDays", value: "14", label: "No-repeat window (days)", description: "Don't suggest an outfit piece that was worn within this many days." },
   { key: "notWornMonths", value: "6", label: "Not-worn alert (months)", description: "Flag items that haven't been worn in this many months for a closet clean-out." },
+  { key: "laundryCycleDays", value: "7", label: "Laundry cycle (days)", description: "How often the wash runs. With ten of the same shirt, this says how many are really needed." },
+  { key: "needSnoozeDays", value: "30", label: "What's needed · Not now (days)", description: "Tapping Not now on a What's-needed row of the Closet hides that row for this many days." },
   { key: "timezone", value: "America/Los_Angeles", label: "Household time zone", description: "Decides when 'today' starts for check-ins, looks and the Fits calendar." },
   { key: "accentColor", value: "#FF5A00", label: "Button color (hex)", description: "The color of the main buttons. Everything else stays black and white. Jeff, 19 Oct 2026: real orange." },
-  { key: "mirrorEngine", value: "fashn", label: "Mirror engine", description: "Who dresses a look on your body photo. FASHN dresses skin as readily as clothes (a bare torso or swimwear photo works; moderation permissive: swimwear and underwear on adults, never nudity; it can't place shoes) and needs FASHN_API_KEY in Railway. Google swaps the clothes it sees, so it wants a photo in a fitted tee and pants, and it can place shoes. Compare runs both and shows them side by side; pick the winner by setting it here. The mannequin uses Google's image model either way. Jeff, 24 Oct 2026: FASHN, no new photo." },
+  { key: "mirrorEngine", value: "fashn", label: "Mirror engine", description: "Who dresses a look on your body photo. FASHN dresses skin as readily as clothes (a bare torso or swimwear photo works; moderation permissive: swimwear and underwear on adults, never nudity; it can't place shoes) and needs FASHN_API_KEY in Railway. Google swaps the clothes it sees, so it wants a photo in a fitted tee and pants, and it can place shoes. Kling (Kuaishou's Virtual Try-on 3.0) is the third: a clean swap that keeps your face, pose and background, no shoes, needs KLING_API_KEY in Railway (an API key from the Kling console; the older access-key and secret-key pair works too) and the photo bucket, since Kling reads the pictures by link. Compare runs every engine with a key and shows them side by side; pick the winner by setting it here. The mannequin uses Google's image model either way. Jeff, 24 Oct 2026: FASHN, no new photo; Kling added." },
+  // Compare's three switches (Jeff, 26 Nov 2026, 1B): Kling starts off, its account has no balance; the key stays in Railway.
+  { key: "compareGoogle", value: "on", label: "Compare includes Google", description: "Off leaves Google out of Compare without removing its key." },
+  { key: "compareFashn", value: "on", label: "Compare includes FASHN", description: "Off leaves FASHN out of Compare without removing its key." },
+  { key: "compareKling", value: "off", label: "Compare includes Kling", description: "Off leaves Kling out of Compare without removing its key. Kling needs a paid balance." },
   // Likely sizes from height and weight (adults only; a starting point, shown on the Body page and offered when recording a size in a brand).
   { key: "wantSweepHours", value: "24", label: "Shop · search the stores again every (hours)", description: "How often the Shop searches the stores again for each line on a Looking-for list and for what is new from each person's favorite brands, and counts what is new. 24 is once a day. 0 turns the automatic search off; Search now and Refresh still work." },
   { key: "sizeBandXsMaxLb", value: "125", label: "Likely size · XS up to (lb)", description: "Weight at or under this reads as XS for tops, outerwear and dresses." },

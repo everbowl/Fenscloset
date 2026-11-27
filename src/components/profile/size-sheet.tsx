@@ -30,7 +30,7 @@ export function SizeSheet({ open, onClose, title, options, value, suggested, uni
             const likely = o === suggested && !on;
             return (
               <button key={o} type="button" role="option" aria-selected={on} onClick={() => pick(o)} data-testid={`size-${o.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`}
-                className={cn("mono mono-11 h-9 min-w-11 px-3", on ? "bg-ink text-paper" : likely ? "border border-dashed border-ink" : "border border-line")}>
+                className={cn("mono mono-11 h-11 min-w-11 rounded-full px-3", on ? "bg-ink text-paper" : likely ? "border border-dashed border-ink" : "border border-line")}>
                 {show(o)}{likely ? <span className="ml-1 text-graphite">likely</span> : null}
               </button>
             );

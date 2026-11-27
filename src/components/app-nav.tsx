@@ -2,36 +2,41 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { CalendarCheck, Plus, Shirt, ShoppingBag, Sun } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { LinkPending } from "@/components/link-pending";
 
-/* Five-slot bar from the mockups: TODAY · CLOSET · [+] · SHOP · FITS. 76px, black top rule, mono 10px. */
+/* The tab bar (docs/redesign-2026-11-23.md): Today · Closet · + · Shop · Fits, icons with labels, the + a black circle. */
 const tabs = [
-  { href: "/today", label: "Today" },
-  { href: "/closet", label: "Closet" },
-  { href: "/add", label: "Add clothes", plus: true },
-  { href: "/shop", label: "Shop" },
-  { href: "/fits", label: "Fits" },
+  { href: "/today", label: "Today", Icon: Sun },
+  { href: "/closet", label: "Closet", Icon: Shirt },
+  { href: "/add", label: "Add clothes", plus: true, Icon: Plus },
+  { href: "/shop", label: "Shop", Icon: ShoppingBag },
+  { href: "/fits", label: "Fits", Icon: CalendarCheck },
 ];
 
 export function AppNav() {
   const pathname = usePathname();
   return (
-    <nav aria-label="Main" className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-ink bg-paper lg:static lg:border-t-0 lg:border-b lg:border-line">
-      <div className="mx-auto grid h-[76px] max-w-[480px] grid-cols-5 items-center px-2 pb-[10px] lg:flex lg:h-12 lg:max-w-[1040px] lg:items-stretch lg:gap-8 lg:px-10 lg:pb-0">
-        {tabs.map(({ href, label, plus }) => {
+    // Opaque, no backdrop blur: the blur over a 95% white was invisible and cost a repaint on every scroll frame (WebKit most of all).
+    <nav aria-label="Main" className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-line bg-paper lg:static lg:border-t-0 lg:border-b">
+      <div className="mx-auto grid h-[76px] max-w-[480px] grid-cols-5 items-center px-2 lg:flex lg:h-12 lg:max-w-[1040px] lg:items-stretch lg:gap-8 lg:px-10">
+        {tabs.map(({ href, label, plus, Icon }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           if (plus) {
+            // The + marks itself current on /add (a ring) and pulses while its navigation is in flight, like the other tabs.
             return (
-              <Link key={href} href={href} aria-label={label} className={cn("flex size-[46px] items-center justify-center justify-self-center bg-ink text-paper lg:ml-auto lg:h-auto lg:w-auto lg:gap-2 lg:bg-transparent lg:px-0 lg:text-ink", active && "ring-2 ring-ink ring-offset-2 lg:ring-0")}>
-                <span className="flex size-[46px] items-center justify-center lg:size-8 lg:bg-ink lg:text-paper"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><path d="M12 4v16M4 12h16" /></svg></span>
-                <span className={cn("mono hidden lg:inline", active ? "text-ink" : "text-graphite")}>Add clothes</span>
+              <Link key={href} href={href} aria-label={label} aria-current={active ? "page" : undefined} className="flex items-center justify-center justify-self-center lg:order-last lg:ml-auto">
+                <LinkPending className={cn("flex size-[52px] items-center justify-center rounded-full bg-ink text-paper shadow-[0_6px_16px_rgba(0,0,0,0.18)] transition-transform active:scale-95 lg:size-9 lg:shadow-none", active && "ring-2 ring-ink ring-offset-2 ring-offset-paper")}><Icon className="size-6 lg:size-5" strokeWidth={2.2} /></LinkPending>
+                <span className={cn("ml-2 hidden text-[14px] font-medium lg:inline", active ? "text-ink" : "text-graphite")}>Add clothes</span>
               </Link>
             );
           }
           return (
             <Link key={href} href={href} aria-current={active ? "page" : undefined}
-              className={cn("mono justify-self-center px-1 py-3.5 lg:flex lg:items-center lg:px-0", active ? "border-b-[1.5px] border-ink text-ink" : "text-graphite")}>
-              {label}
+              className={cn("flex h-full w-full flex-col items-center justify-center gap-1 self-stretch active:opacity-70 lg:w-auto lg:flex-row lg:gap-2 lg:px-0", active ? "text-ink" : "text-graphite")}>
+              <Icon className="size-[22px] lg:size-[18px]" strokeWidth={active ? 2.2 : 1.8} />
+              <LinkPending className={cn("text-[11px] font-medium lg:text-[14px]", active && "lg:border-b-2 lg:border-ink")}>{label}</LinkPending>
             </Link>
           );
         })}

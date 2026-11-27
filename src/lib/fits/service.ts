@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
 import { deleteObject } from "@/lib/storage";
 import { fromDayKey } from "@/lib/dates";
-import { canDress, OutfitError, wearItems, type Piece } from "@/lib/outfits/engine";
+import { getTimezone } from "@/lib/rules";
+import { canDress, OutfitError, relastWorn, wearItems, type Piece } from "@/lib/outfits/engine";
 import type { ClosetView, Viewer } from "@/lib/people/visibility";
 
 /**
@@ -128,18 +129,21 @@ export async function setFitViewers(viewer: Viewer, fitId: string, personIds: st
 }
 
 /** Remove a fit and undo its wear log. */
-export async function deleteFit(viewer: Viewer, fitId: string): Promise<void> {
+export async function deleteFit(viewer: Viewer, fitId: string, now = new Date()): Promise<void> {
   await assertOwnerish(viewer, fitId);
-  await db.$transaction(async (tx) => {
-    const fit = await tx.fit.findUniqueOrThrow({ where: { id: fitId }, include: { wearLogs: true } });
+  const tz = await getTimezone();
+  // Batched, and the pieces' last-worn instants come from the shared helper (review D 6.4/6.5: UTC midnight, one update per piece).
+  const photoKey = await db.$transaction(async (tx) => {
+    const fit = await tx.fit.findUniqueOrThrow({ where: { id: fitId }, include: { wearLogs: { select: { itemId: true } } } });
+    const itemIds = [...new Set(fit.wearLogs.map((w) => w.itemId))];
     await tx.wearLog.deleteMany({ where: { fitId } });
-    for (const w of fit.wearLogs) {
-      const prev = await tx.wearLog.findFirst({ where: { itemId: w.itemId }, orderBy: { wornOn: "desc" }, select: { wornOn: true } });
-      await tx.item.update({ where: { id: w.itemId }, data: { wearCount: { decrement: 1 }, lastWornAt: prev ? fromDayKey(prev.wornOn) : null } });
-    }
+    if (itemIds.length) await tx.item.updateMany({ where: { id: { in: itemIds } }, data: { wearCount: { decrement: 1 } } });
+    await relastWorn(tx, itemIds, now, tz);
     await tx.fit.delete({ where: { id: fitId } });
-    if (fit.photoKey) await deleteObject(fit.photoKey).catch(() => {});
-  });
+    return fit.photoKey;
+  }, { timeout: 15_000 });
+  // The photo goes after the commit, never inside the transaction's clock.
+  if (photoKey) await deleteObject(photoKey).catch(() => {});
 }
 
 /** Wear history for the item detail screen. */

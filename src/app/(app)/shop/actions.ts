@@ -9,6 +9,8 @@ import { refreshBrandFeedNow } from "@/lib/shop/brand-feed";
 import { tryOnLook, tryOnState, TryOnError, type TryOnView } from "@/lib/tryon";
 import { featuresOf } from "@/lib/tryon/features";
 import { isMannequinConfigured, mannequinLook } from "@/lib/tryon/mannequin";
+import { canShopFor } from "@/lib/people/visibility";
+import { rememberShopFor } from "@/lib/shop/remember";
 
 export type Result = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -60,7 +62,8 @@ export async function lookupPhotoAction(forPersonId: string, form: FormData): Pr
 export async function lookupStatusAction(jobId: string): Promise<LookupResult> {
   const me = await requirePerson();
   const status = jobStatus<string>(jobId, me.id);
-  if (!status) return { ok: false, error: "That lookup is gone. Try again." };
+  // The server restarted while the phone was away: the work may well have landed, and the row is the record (review E H2).
+  if (!status) return { ok: false, error: "That lookup is gone. If it finished, it's under Recent." };
   return answer(status, jobId);
 }
 
@@ -91,7 +94,8 @@ export async function brandFeedAction(forPersonId: string): Promise<FeedResult> 
 export async function brandFeedStatusAction(jobId: string): Promise<FeedResult> {
   const me = await requirePerson();
   const status = jobStatus<string>(jobId, me.id);
-  if (!status) return { ok: false, error: "That refresh is gone. Try again." };
+  // Lost to a restart: the feed row is the record, so count it done and let the screen re-read it (review E H2).
+  if (!status) return { ok: true, done: true };
   return feedAnswer(status, jobId);
 }
 
@@ -120,4 +124,10 @@ export async function tryOnLookupAction(lookupId: string): Promise<Result & { tr
     if (e instanceof TryOnError || e instanceof ShopError) return { ok: false, error: e.message };
     console.error(e); return { ok: false, error: "The try-on didn’t come back. Try again." };
   }
+}
+
+/** "Shopping for" (N1): the pick is remembered, and Shop, Looking-for and Together open on that person next time. */
+export async function rememberShopForAction(personId: string): Promise<void> {
+  const me = await requirePerson();
+  if (personId === me.id || (await canShopFor(me, personId))) await rememberShopFor(personId);
 }

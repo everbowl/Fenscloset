@@ -2,13 +2,14 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    // A fixed id keeps the installed app the same app if start_url ever moves.
+    id: "/",
     name: "Fen's Closet",
     short_name: "Fen's Closet",
     description: "The family wardrobe: closet, outfits, and shopping.",
     start_url: "/today",
     scope: "/",
     display: "standalone",
-    orientation: "portrait",
     background_color: "#ffffff",
     theme_color: "#ffffff",
     icons: [

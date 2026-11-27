@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { peekInvite } from "@/lib/auth/invite";
-import { Banner } from "@/components/ui/banner";
 import { AuthHero } from "@/components/auth-hero";
 import { AcceptForm } from "./form";
 
@@ -12,17 +11,20 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
   return (
     <>
       <AuthHero />
-      <main className="flex flex-1 flex-col gap-[22px] px-6 pb-7 pt-7">
+      <main className="safe-bottom flex flex-1 flex-col gap-6 px-6 pb-7 pt-7">
         {!invite ? (
           <>
-            <Banner tone="danger" title="This invite doesn't work anymore">It expired (invites last 7 days) or was already used. Ask an admin to send a new one.</Banner>
-            <Link href="/login" className="mono mono-11 py-2.5 underline underline-offset-4">Go to sign in</Link>
+            <div className="flex flex-col gap-1.5" role="alert">
+              <h1 className="title">This invite doesn&apos;t work anymore</h1>
+              <p className="note">It expired (invites last 7 days) or was already used. Ask an admin to send a new one.</p>
+            </div>
+            <Link href="/login" className="pill pill-solid h-12 w-full">Go to sign in</Link>
           </>
         ) : (
           <>
-            <div className="flex flex-col gap-1">
-              <h1 className="serif text-[38px]">Welcome, <em>{invite.name.split(" ")[0]}</em></h1>
-              <p className="mono mono-11 text-graphite">Set a password and your closet is ready</p>
+            <div className="flex flex-col gap-1.5">
+              <h1 className="serif text-[38px]">Welcome, {invite.name.split(" ")[0]}</h1>
+              <p className="note">Set a password and your closet is ready.</p>
             </div>
             <AcceptForm token={token} name={invite.name} email={invite.email} />
           </>

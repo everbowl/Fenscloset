@@ -17,8 +17,8 @@ import { priceNumber, storeIdByName, type StoreMeta } from "@/lib/store/add";
  */
 
 export type StyleProbe = { brand: string; name: string; category?: string | null; color?: string | null };
-export const MAX_MATCHES = 6;
-export const MAX_RETAIL_PHOTOS = 3;
+const MAX_MATCHES = 6;
+const MAX_RETAIL_PHOTOS = 3;
 
 const host = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return ""; } };
 
@@ -50,10 +50,10 @@ export async function ensureBrand(name: string): Promise<Named & { url: string |
   return { id: made.id, name: made.name, url: cat ? `https://www.${cat.domain}` : null };
 }
 
-export type MatchDetails = { fabric: string | null; fitNotes: string | null };
+type MatchDetails = { fabric: string | null; fitNotes: string | null };
 
 /** Fabric and a one-line fit note read off the store's description (Claude), or nothing. */
-export async function detailsFromDescription(title: string, description: string | null, fabrics: Named[]): Promise<MatchDetails> {
+async function detailsFromDescription(title: string, description: string | null, fabrics: Named[]): Promise<MatchDetails> {
   if (!description?.trim()) return { fabric: null, fitNotes: null };
   if (isMockAi()) return { fabric: null, fitNotes: description.split(/(?<=[.!?])\s/)[0].slice(0, 120) };
   try {
@@ -70,15 +70,16 @@ export async function detailsFromDescription(title: string, description: string 
 
 /** Download the pick's photo and the page's main photo when different; keys under the owner's originals. */
 async function saveRetailPhotos(ownerId: string, urls: (string | null | undefined)[]): Promise<string[]> {
-  const keys: string[] = [];
-  for (const u of [...new Set(urls.filter((x): x is string => Boolean(x)))].slice(0, MAX_RETAIL_PHOTOS)) {
+  // The two store photos at once (review E B7); order kept.
+  const wanted = [...new Set(urls.filter((x): x is string => Boolean(x)))].slice(0, MAX_RETAIL_PHOTOS);
+  const keys = await Promise.all(wanted.map(async (u) => {
     const img = await fetchImage(u);
-    if (!img) continue;
+    if (!img) return null;
     const key = newKey("originals", ownerId, img.contentType);
     await putObject(key, img.data, img.contentType);
-    keys.push(key);
-  }
-  return keys;
+    return key;
+  }));
+  return keys.filter((k): k is string => Boolean(k));
 }
 
 export type EntryMatchResult = { tags: TagResult; retailKeys: string[]; store: string; priceText: string | null; fitNotes: string | null };
@@ -89,12 +90,10 @@ export async function applyStyleMatchToEntry(personId: string, entryId: string, 
   if (!entry || entry.batch.personId !== personId) throw new ItemError("Not yours.", 403);
   const ai = (entry.aiResult as EntryAiResult | null);
   if (!ai) throw new ItemError("This photo is still being tagged.", 409);
-  const page = await readProductPage(pick.url).catch(() => null);
-  const lists = await loadTagLists();
+  const [page, lists] = await Promise.all([readProductPage(pick.url).catch(() => null), loadTagLists()]); // side by side (review E B7)
   const brand = await ensureBrand(brandName?.trim() || ai.tags.brandText || (await db.brand.findUnique({ where: { id: ai.tags.brandId ?? "" }, select: { name: true } }))?.name || page?.brandText || pick.storeName);
-  const details = await detailsFromDescription(pick.title, page?.description ?? null, lists.fabrics);
+  const [details, retailKeys] = await Promise.all([detailsFromDescription(pick.title, page?.description ?? null, lists.fabrics), saveRetailPhotos(personId, [pick.imageUrl, page?.imageUrl])]);
   const fabricId = !ai.tags.fabricId && details.fabric ? lists.fabrics.find((f) => f.name === details.fabric)?.id ?? null : ai.tags.fabricId;
-  const retailKeys = await saveRetailPhotos(personId, [pick.imageUrl, page?.imageUrl]);
   for (const old of entry.retailKeys) await deleteObject(old).catch(() => undefined);
   const prev = (entry.storeMeta as StoreMeta | null) ?? null;
   const meta: StoreMeta = {
@@ -114,12 +113,10 @@ export async function applyStyleMatchToItem(viewer: { id: string; role: string }
   const item = await db.item.findUnique({ where: { id: itemId }, include: { brand: true, fabrics: { select: { id: true } }, photos: { where: { kind: "retail" } } } });
   if (!item) throw new ItemError("That piece is gone.", 404);
   if (item.ownerId !== viewer.id && viewer.role !== "admin") throw new ItemError("Not yours.", 403);
-  const page = await readProductPage(pick.url).catch(() => null);
-  const lists = await loadTagLists();
+  const [page, lists] = await Promise.all([readProductPage(pick.url).catch(() => null), loadTagLists()]); // side by side (review E B7)
   const brand = await ensureBrand(brandName?.trim() || item.brand?.name || page?.brandText || pick.storeName);
-  const details = await detailsFromDescription(pick.title, page?.description ?? null, lists.fabrics);
+  const [details, keys] = await Promise.all([detailsFromDescription(pick.title, page?.description ?? null, lists.fabrics), saveRetailPhotos(item.ownerId, [pick.imageUrl, page?.imageUrl])]);
   const fabricId = !item.fabrics.length && details.fabric ? lists.fabrics.find((f) => f.name === details.fabric)?.id ?? null : null;
-  const keys = await saveRetailPhotos(item.ownerId, [pick.imageUrl, page?.imageUrl]);
   const storeId = await storeIdByName(pick.storeName.slice(0, 60) || "Store");
   const made = await db.$transaction(async (tx) => {
     await tx.itemPhoto.deleteMany({ where: { itemId, kind: "retail" } });

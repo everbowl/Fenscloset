@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { requirePerson, getCurrentSession } from "@/lib/auth/current";
 import { setPassword, validateNewPassword } from "@/lib/auth/change-password";
 import { db } from "@/lib/db";
-import { SESSION_COOKIE } from "@/lib/auth/session";
+import { SESSION_COOKIE } from "@/lib/auth/cookies";
 import { cookies } from "next/headers";
 import { hashToken } from "@/lib/auth/tokens";
 
@@ -13,10 +13,8 @@ export type ChangePasswordState = { error?: string };
 export async function changePasswordAction(_prev: ChangePasswordState, formData: FormData): Promise<ChangePasswordState> {
   const person = await requirePerson();
   const password = String(formData.get("password") ?? "");
-  const confirm = String(formData.get("confirm") ?? "");
   const problem = validateNewPassword(password);
   if (problem) return { error: problem };
-  if (password !== confirm) return { error: "The two passwords don't match." };
 
   await setPassword(person.id, password);
   // Keep this session, drop every other one.

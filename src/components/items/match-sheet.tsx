@@ -13,7 +13,12 @@ export function MatchSheet({ open, onClose, probe, onPick, busy }: { open: boole
   useEffect(() => {
     if (!open) return;
     setRows(null); setError(undefined);
-    styleMatchesAction(probe).then((r) => { if (r.ok) setRows(r.value); else setError(r.error); });
+    let live = true;
+    styleMatchesAction(probe)
+      .then((r) => { if (!live) return; if (r.ok) setRows(r.value); else setError(r.error); })
+      // A rejection used to leave "Looking at …" on forever (review F A5); Close is always there, now the words change too.
+      .catch(() => { if (live) setError("Couldn’t reach the store. Try again."); });
+    return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
   return (

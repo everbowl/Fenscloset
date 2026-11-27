@@ -63,6 +63,11 @@ export async function accessToken(fetchImpl: typeof fetch = fetch): Promise<stri
   return cached.token;
 }
 
+/** Safety levels Google refused (400 naming the setting) this process: not asked for again, so a dressing is one call, not two (review C). */
+const refusedLevels = new Set<string>();
+/** Tests: forget the refusals. */
+export function clearGoogleTryOnRefusals(): void { refusedLevels.clear(); }
+
 /** One garment onto one person image → JPEG/PNG bytes. */
 export async function googleTryOn(person: Buffer, garment: Buffer, fetchImpl: typeof fetch = fetch): Promise<{ data: Buffer; mimeType: string }> {
   const project = process.env.GOOGLE_VERTEX_PROJECT!;
@@ -80,20 +85,28 @@ export async function googleTryOn(person: Buffer, garment: Buffer, fetchImpl: ty
     parameters: { sampleCount: 1, baseSteps, personGeneration: process.env.GOOGLE_VERTEX_TRYON_PERSON || "allow_adult", safetySetting, addWatermark: false },
   });
   const token = await accessToken(fetchImpl);
+  // A level Google already refused is skipped; the last level is always kept so there is something to call.
+  const tryLevels = levels.filter((l, i) => !refusedLevels.has(l) || i === levels.length - 1);
   let res: Response | null = null;
+  let errorText: string | null = null;
   outer: for (const model of models) {
     const url = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:predict`;
-    for (const [i, level] of levels.entries()) {
+    for (const [i, level] of tryLevels.entries()) {
       res = await fetchWithBackoff(fetchImpl, url, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: bodyFor(level), signal: AbortSignal.timeout(90_000) });
       if (res.status === 404) continue outer; // this model id is not on for the project; try the next id
-      if (res.status === 400 && i < levels.length - 1) { console.log(`tryon: Google refused safetySetting ${level}; trying ${levels[i + 1]}`); continue; }
+      if (res.status === 400) {
+        errorText = await res.text();
+        // Only a 400 that names the safety setting means "this level needs approval"; any other 400 (a bad picture) is reported as it is.
+        if (/safety/i.test(errorText) && i < tryLevels.length - 1) { refusedLevels.add(level); console.log(`tryon: Google refused safetySetting ${level}; trying ${tryLevels[i + 1]} (and not asking for ${level} again)`); continue; }
+        break outer;
+      }
       if (res.ok && i > 0) console.log(`tryon: safetySetting ${level}`);
       break outer;
     }
   }
   if (!res) throw new Error("Vertex try-on: no model to call");
   if (res.status === 404 || res.status === 403) throw new TryOnModelError(`Google's try-on model isn't turned on for project ${project} yet (${res.status}). Enable Vertex AI and the Virtual Try-On model, then try again.`);
-  if (!res.ok) throw new Error(`Vertex try-on ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  if (!res.ok) throw new Error(`Vertex try-on ${res.status}: ${(errorText ?? (await res.text())).slice(0, 200)}`);
   const json = (await res.json()) as { predictions?: { bytesBase64Encoded?: string; mimeType?: string }[] };
   const p = json.predictions?.[0];
   if (!p?.bytesBase64Encoded) throw new Error("Vertex try-on returned no image");

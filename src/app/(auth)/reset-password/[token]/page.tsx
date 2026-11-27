@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { peekResetToken } from "@/lib/auth/reset";
-import { Banner } from "@/components/ui/banner";
 import { AuthHero } from "@/components/auth-hero";
 import { ResetForm } from "./form";
 
@@ -12,17 +11,21 @@ export default async function ResetPasswordPage({ params }: { params: Promise<{ 
   return (
     <>
       <AuthHero />
-      <main className="flex flex-1 flex-col gap-[22px] px-6 pb-7 pt-7">
+      <main className="safe-bottom flex flex-1 flex-col gap-6 px-6 pb-7 pt-7">
         {!peek.valid ? (
           <>
-            <Banner tone="danger" title="This link doesn't work anymore">It expired or was already used. Reset links last 60 minutes and work once.</Banner>
-            <Link href="/forgot-password" className="mono mono-11 py-2.5 underline underline-offset-4">Request a new link</Link>
+            <div className="flex flex-col gap-1.5" role="alert">
+              <h1 className="title">This link doesn&apos;t work anymore</h1>
+              <p className="note">It expired or was already used. Reset links last 60 minutes and work once.</p>
+            </div>
+            <Link href="/forgot-password" className="pill pill-solid h-12 w-full">Request a new link</Link>
+            <Link href="/login" className="pill pill-quiet h-12 w-full">Back to sign in</Link>
           </>
         ) : (
           <>
-            <div className="flex flex-col gap-1">
-              <h1 className="serif text-[34px]">Choose a new <em>password</em></h1>
-              <p className="mono mono-11 normal-case text-graphite">for {peek.email}</p>
+            <div className="flex flex-col gap-1.5">
+              <h1 className="title">Choose a new password</h1>
+              <p className="note">for {peek.email}</p>
             </div>
             <ResetForm token={token} />
           </>

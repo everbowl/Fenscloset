@@ -12,7 +12,7 @@ import { accessToken, fetchWithBackoff } from "@/lib/tryon/google";
  * now, doesn't work and don't want it". Gone from the app; git history has them.
  */
 
-export class GoogleImageError extends Error {
+class GoogleImageError extends Error {
   constructor(message: string, public readonly status = 400) {
     super(message);
     this.name = "GoogleImageError";
@@ -34,9 +34,12 @@ const holdMs = () => Number(process.env.GOOGLE_IMAGE_HOLD_MS ?? 5 * 60_000);
 export function googleImageOnHold(): boolean {
   return Date.now() < holdUntil;
 }
-/** Tests: forget the hold. */
+/** Safety thresholds Google refused (a 400 naming safety) this process: skipped on later calls, so a pass is one call (review C). */
+const refusedThresholds = new Set<string>();
+/** Tests: forget the hold and the refusals. */
 export function clearGoogleImageHold(): void {
   holdUntil = 0;
+  refusedThresholds.clear();
 }
 
 /** Zero or more JPEG/PNG inputs plus a prompt, image bytes out. */
@@ -53,8 +56,10 @@ export async function googleImage(images: { data: Buffer; mimeType: "image/jpeg"
   const CATEGORIES = ["HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_HATE_SPEECH", "HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_DANGEROUS_CONTENT"];
   const thresholds: (string | null)[] = opts.relaxed ? [...new Set([process.env.GOOGLE_VERTEX_IMAGE_SAFETY || "OFF", "BLOCK_NONE", "BLOCK_ONLY_HIGH"]), null] : [null];
   const token = await accessToken(fetchImpl);
+  const tryThresholds = thresholds.filter((t) => t === null || !refusedThresholds.has(t)); // the defaults (null) always stay
   let res: Response | null = null;
-  for (const [i, threshold] of thresholds.entries()) {
+  let errorText: string | null = null;
+  for (const [i, threshold] of tryThresholds.entries()) {
     res = await fetchWithBackoff(fetchImpl, url, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -65,7 +70,11 @@ export async function googleImage(images: { data: Buffer; mimeType: "image/jpeg"
       }),
       signal: AbortSignal.timeout(90_000),
     });
-    if (res.status === 400 && i < thresholds.length - 1) { console.log(`image: Google refused safety threshold ${threshold}; trying ${thresholds[i + 1] ?? "defaults"}`); continue; }
+    if (res.status === 400) {
+      errorText = await res.text();
+      if (threshold && /safety/i.test(errorText) && i < tryThresholds.length - 1) { refusedThresholds.add(threshold); console.log(`image: Google refused safety threshold ${threshold}; trying ${tryThresholds[i + 1] ?? "defaults"} (and not asking for it again)`); continue; }
+      break;
+    }
     if (res.ok && opts.relaxed && i > 0) console.log(`image: safety threshold ${threshold ?? "defaults"}`);
     break;
   }
@@ -75,7 +84,7 @@ export async function googleImage(images: { data: Buffer; mimeType: "image/jpeg"
     console.log(`image: Google 429 (quota); the image model is left alone for ${Math.round(holdMs() / 60_000)} min`);
     throw new GoogleImageError("Google’s image model is out of quota (429).", 429);
   }
-  if (!res.ok) throw new GoogleImageError(`Google image ${res.status}: ${(await res.text()).slice(0, 200)}`, 502);
+  if (!res.ok) throw new GoogleImageError(`Google image ${res.status}: ${(errorText ?? (await res.text())).slice(0, 200)}`, 502);
   const json = (await res.json()) as { candidates?: { finishReason?: string; content?: { parts?: { inlineData?: { data?: string } }[] } }[]; promptFeedback?: { blockReason?: string } };
   const part = json.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
   if (!part?.inlineData?.data) throw new GoogleImageError(`Google returned no image${json.promptFeedback?.blockReason ? ` (blocked: ${json.promptFeedback.blockReason})` : json.candidates?.[0]?.finishReason ? ` (${json.candidates[0].finishReason})` : ""}.`, 502);

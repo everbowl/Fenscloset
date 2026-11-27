@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { db } from "@/lib/db";
 import { resetDb } from "./helpers";
-import { seed } from "../prisma/seed";
+import { seed } from "./helpers";
 import { deleteObject, getObject, newKey, objectExists, parseKey, putObject, signUpload, storageMode, verifyUploadToken } from "@/lib/storage";
 import { canViewKey } from "@/lib/photos/visibility";
 
@@ -58,40 +58,40 @@ describe("photo visibility", () => {
   beforeEach(async () => { await resetDb(); process.env.DEV_MODE = "true"; await seed(); });
 
   async function people() {
-    const [jeff, brittney, olivia, mya] = await Promise.all(
-      ["jeff@everbowl.com", "brittney", "olivia", "mya"].map((q) =>
+    const [avery, blake, casey, devon] = await Promise.all(
+      ["avery@example.test", "blake", "casey", "devon"].map((q) =>
         q.includes("@") ? db.person.findUniqueOrThrow({ where: { email: q } }) : db.person.findFirstOrThrow({ where: { name: { contains: q, mode: "insensitive" } } })),
     );
-    return { jeff, brittney, olivia, mya };
+    return { avery, blake, casey, devon };
   }
 
   it("owner and parents see everything of a minor; siblings see only confirmed item photos, never worn", async () => {
-    const { jeff, olivia, mya } = await people();
-    const original = newKey("originals", mya.id, "image/jpeg");
-    const worn = newKey("worn", mya.id, "image/jpeg");
-    const cutout = newKey("cutouts", mya.id, "image/png");
+    const { avery, casey, devon } = await people();
+    const original = newKey("originals", devon.id, "image/jpeg");
+    const worn = newKey("worn", devon.id, "image/jpeg");
+    const cutout = newKey("cutouts", devon.id, "image/png");
     // unconfirmed upload: owner + parent only
-    expect(await canViewKey(mya, original)).toBe(true);
-    expect(await canViewKey(jeff, original)).toBe(true);
-    expect(await canViewKey(olivia, original)).toBe(false);
+    expect(await canViewKey(devon, original)).toBe(true);
+    expect(await canViewKey(avery, original)).toBe(true);
+    expect(await canViewKey(casey, original)).toBe(false);
     // confirmed item with an alone cutout and a worn photo
-    const item = await db.item.create({ data: { ownerId: mya.id, name: "Hoodie", photos: { create: [{ kind: "cutout", bucketKey: cutout }, { kind: "worn", bucketKey: worn }, { kind: "alone", bucketKey: original }] } } });
+    const item = await db.item.create({ data: { ownerId: devon.id, name: "Hoodie", photos: { create: [{ kind: "cutout", bucketKey: cutout }, { kind: "worn", bucketKey: worn }, { kind: "alone", bucketKey: original }] } } });
     expect(item.id).toBeTruthy();
-    expect(await canViewKey(olivia, cutout)).toBe(true);
-    expect(await canViewKey(olivia, original)).toBe(true);
-    expect(await canViewKey(olivia, worn)).toBe(false);
-    expect(await canViewKey(jeff, worn)).toBe(true);
-    expect(await canViewKey(mya, worn)).toBe(true);
+    expect(await canViewKey(casey, cutout)).toBe(true);
+    expect(await canViewKey(casey, original)).toBe(true);
+    expect(await canViewKey(casey, worn)).toBe(false);
+    expect(await canViewKey(avery, worn)).toBe(true);
+    expect(await canViewKey(devon, worn)).toBe(true);
   });
 
   it("an adult's confirmed photos, worn included, are visible to the family; malformed keys never are", async () => {
-    const { jeff, olivia, mya } = await people();
-    const worn = newKey("worn", jeff.id, "image/jpeg");
-    expect(await canViewKey(olivia, worn)).toBe(false);
-    await db.item.create({ data: { ownerId: jeff.id, name: "Blazer", photos: { create: [{ kind: "worn", bucketKey: worn }] } } });
-    expect(await canViewKey(olivia, worn)).toBe(true);
-    expect(await canViewKey(mya, worn)).toBe(true);
-    expect(await canViewKey(olivia, "../../etc/passwd")).toBe(false);
-    expect(await canViewKey({ ...olivia, status: "removed" }, worn)).toBe(false);
+    const { avery, casey, devon } = await people();
+    const worn = newKey("worn", avery.id, "image/jpeg");
+    expect(await canViewKey(casey, worn)).toBe(false);
+    await db.item.create({ data: { ownerId: avery.id, name: "Blazer", photos: { create: [{ kind: "worn", bucketKey: worn }] } } });
+    expect(await canViewKey(casey, worn)).toBe(true);
+    expect(await canViewKey(devon, worn)).toBe(true);
+    expect(await canViewKey(casey, "../../etc/passwd")).toBe(false);
+    expect(await canViewKey({ ...casey, status: "removed" }, worn)).toBe(false);
   });
 });

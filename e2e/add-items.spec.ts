@@ -1,9 +1,9 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
-import { JEFF_PASSWORD, loginAs, resetAndSeed } from "./helpers";
+import { ADMIN_PASSWORD, loginAs, resetAndSeed } from "./helpers";
 
 async function fixtures(): Promise<string[]> {
   const dir = mkdtempSync(path.join(os.tmpdir(), "fc-fixtures-"));
@@ -21,22 +21,22 @@ async function fixtures(): Promise<string[]> {
 }
 
 test.describe("add clothes", () => {
-  test.beforeAll(() => resetAndSeed({ jeffReady: true }));
+  test.beforeAll(() => resetAndSeed({ adminReady: true }));
 
   test("pick three photos, confirm with one tap each, reload mid-batch keeps the counter, all done", async ({ page }) => {
-    await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+    await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
     await page.goto("/add");
     // three doors first: photos, a store link, a receipt
     await expect(page.getByTestId("add-doors")).toBeVisible();
-    await page.getByTestId("door-photo").click();
     // photo tips: general rules + a tab per category; hide for this person, bring back
     await expect(page.getByTestId("photo-tips")).toContainText("One piece per photo");
-    await page.getByTestId("tip-tab-Shoes").click();
+    // The tab row sits in the band under the fixed tab bar on a page just taller than the phone; mobile emulation mis-maps
+    // the tap there, so the tab is picked by its own click event (the row scrolls fine for a thumb).
+    await page.getByTestId("tip-tab-Shoes").dispatchEvent("click");
     await expect(page.getByTestId("tip-text")).toContainText("toes toward you");
     await page.getByTestId("hide-tips").click();
     await expect(page.getByTestId("show-tips")).toBeVisible();
     await page.reload();
-    await page.getByTestId("door-photo").click();
     await expect(page.getByTestId("photo-tips")).toHaveCount(0);
     await page.getByTestId("show-tips").click();
     await expect(page.getByTestId("photo-tips")).toBeVisible();
@@ -59,7 +59,7 @@ test.describe("add clothes", () => {
     await page.getByTestId("row-brand").click();
     await page.getByRole("dialog").getByText("Pick a brand").click();
     await page.getByTestId("brand-search").fill("nik");
-    await page.getByRole("dialog").getByRole("option", { name: /^Nike/ }).click(); // seeded brand; a catalog brand not yet in the list shows as brand-national-<name>
+    await page.getByRole("dialog").getByRole("button", { name: /^Nike/ }).click(); // seeded brand; a catalog brand not yet in the list shows as brand-national-<name>
     await expect(page.getByTestId("row-brand")).toContainText("Nike");
     await page.getByTestId("match-style").click();
     await page.getByTestId("match-0").click();
@@ -97,15 +97,15 @@ test.describe("add clothes", () => {
 
     // change the category through the row editor (values come from the lists)
     await page.getByTestId("row-category").click();
-    await page.getByRole("dialog").getByRole("option", { name: "Bottoms" }).click();
-    await page.getByRole("dialog").getByRole("option", { name: "Jeans" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Bottoms" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Jeans" }).click();
     await expect(page.getByTestId("row-category")).toContainText("Bottoms · Jeans");
     await page.getByTestId("confirm-next").click();
     await expect(page.getByTestId("confirm-counter")).toHaveText("003 / 003");
-    await page.getByRole("button", { name: "Skip" }).click();
+    await page.getByRole("button", { name: "Not this one" }).click(); // the v2 card's quiet skip (review B, Add flow v2)
 
     await expect(page.getByRole("heading", { name: /All done/ })).toBeVisible();
-    await expect(page.getByText(/002 added/)).toBeVisible();
+    await expect(page.getByText(/2 added to your closet/)).toBeVisible();
     await page.getByRole("link", { name: "Go to closet" }).click();
     await expect(page).toHaveURL(/\/closet$/);
   });

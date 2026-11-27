@@ -72,12 +72,19 @@ export function useWantSearch() {
   return { searching, error, setError, run, secondsOf };
 }
 
-/** A search this screen did not start is still running (a row with no first check yet): ask the server again every few seconds until it is done. */
-export function useRefreshWhile(waiting: boolean, everyMs = 3000) {
+/**
+ * A search this screen did not start is still running (a row with no first check yet): ask the server again every few
+ * seconds until it is done, and give up after `maxTries` (a minute): a line stuck for longer is not going to finish while
+ * we watch, and the page must not reload forever (review E C3). Returns true while still asking.
+ */
+export function useRefreshWhile(waiting: boolean, everyMs = 3000, maxTries = 20): boolean {
   const router = useRouter();
+  const [gaveUp, setGaveUp] = useState(false);
   useEffect(() => {
-    if (!waiting) return;
-    const id = setInterval(() => router.refresh(), everyMs);
+    if (!waiting) { setGaveUp(false); return; }
+    let tries = 0;
+    const id = setInterval(() => { if (++tries > maxTries) { clearInterval(id); setGaveUp(true); return; } router.refresh(); }, everyMs);
     return () => clearInterval(id);
-  }, [waiting, everyMs, router]);
+  }, [waiting, everyMs, maxTries, router]);
+  return waiting && !gaveUp;
 }

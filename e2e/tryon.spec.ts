@@ -1,15 +1,15 @@
 import { execSync } from "node:child_process";
-import { expect, test } from "@playwright/test";
-import { E2E_DB, JEFF_PASSWORD, loginAs, resetAndSeed } from "./helpers";
+import { expect, test } from "./fixtures";
+import { E2E_DB, ADMIN_PASSWORD, loginAs, resetAndSeed } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 test.beforeAll(() => {
-  resetAndSeed({ jeffReady: true });
-  execSync("npx tsx e2e/seed-closets.ts Jeff", { stdio: "ignore", env: { ...process.env, DATABASE_URL: E2E_DB, MOCK_S3: "true" } });
+  resetAndSeed({ adminReady: true });
+  execSync("npx tsx e2e/seed-closets.ts Avery", { stdio: "ignore", env: { ...process.env, DATABASE_URL: E2E_DB, MOCK_S3: "true" } });
 });
 
 test("try-on: on by default, needs a body photo, then a picture of the look on you (yours alone)", async ({ page }) => {
-  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
   await page.goto("/today");
   // no body photo yet: SEE IT ON dresses the mannequin (no body photo involved), with a nudge toward the Body page
   await expect(page.getByTestId("try-on-photo")).toBeVisible();
@@ -34,9 +34,9 @@ test("try-on: on by default, needs a body photo, then a picture of the look on y
   await expect(page.getByTestId("try-on-sheet")).toContainText("Only you can see this picture");
   await expect(page.getByTestId("try-on-sheet").locator("img").first()).toHaveAttribute("src", /\/api\/photo\/tryon\//);
   await expect(page.getByTestId("mirror-back")).toHaveCount(0); // no back photo yet
-  // how it shows: untucked by default (the look has a top and a bottom); a chip re-styles the same picture
+  // how it shows: the chips are there (the look has a top and a bottom) but a plain dressing has no styling pass (23 Nov 2026); a chip re-styles the same picture
   await expect(page.getByTestId("mirror-styling")).toBeVisible();
-  await expect(page.getByTestId("styling-summary")).toContainText("Untucked");
+  await expect(page.getByTestId("styling-summary")).toHaveCount(0);
   const firstSrc = await page.getByTestId("try-on-sheet").locator("img").first().getAttribute("src");
   await page.getByTestId("style-group-tuck").getByRole("button", { name: "Tucked", exact: true }).click();
   await expect(page.getByTestId("styling-summary")).toContainText("Tucked", { timeout: 20_000 });
@@ -75,7 +75,7 @@ test("try-on: on by default, needs a body photo, then a picture of the look on y
   await page.getByTestId("item-card").filter({ hasNotText: "Not in the mirror" }).first().click();
   await page.getByTestId("see-picked").click();
   // one piece picked: the mirror asks to complete the look first (e2e/mirror-complete.spec.ts covers the asking); go without
-  while (await page.getByTestId("complete-skip").isVisible()) await page.getByTestId("complete-skip").click();
+  if (await page.getByTestId("complete-go").isVisible()) await page.getByTestId("complete-go").click(); // the panel: nothing picked, just the piece
   await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId("try-on-sheet")).toContainText("Only you can see this picture");
   const beforeRetake = await page.getByTestId("try-on-sheet").locator("img").first().getAttribute("src");
@@ -84,19 +84,38 @@ test("try-on: on by default, needs a body photo, then a picture of the look on y
   await expect(page.getByTestId("try-on-sheet").locator("img").first()).not.toHaveAttribute("src", beforeRetake!, { timeout: 20_000 });
   await expect(page.getByTestId("try-on-sheet")).toContainText("Only you can see this picture");
 
-  // Compare (Admin → Rules → Mirror engine): Google and FASHN side by side, so the winner can be picked there
+  // Compare (Admin → Rules → Mirror engine): the engines switched on, side by side, so the winner can be picked there.
+  // Kling starts switched off (owner, 26 Nov 2026, 1B: no balance), so Compare is Google and FASHN until an admin turns it on.
   await page.keyboard.press("Escape");
   await page.goto("/admin/rules");
+  await page.getByTestId("rules-advanced").locator("summary").click(); // Mirror lives under Advanced
   await page.getByLabel("Mirror engine").selectOption("compare");
-  await page.getByTestId("rule-mirrorEngine").getByRole("button", { name: "Save" }).click();
-  await expect(page.getByTestId("rule-mirrorEngine").getByRole("button", { name: "Saved" })).toBeVisible();
+  await expect(page.getByTestId("rule-saved-mirrorEngine")).toHaveText("✓ Saved");
+  await expect(page.getByRole("radiogroup", { name: "Compare includes Kling" }).getByRole("radio", { name: /^off$/i })).toHaveAttribute("aria-checked", "true");
   await page.goto("/today");
   await page.getByTestId("try-on").click();
   await expect(page.getByTestId("mirror-compare")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("mirror-compare")).toContainText("Google");
   await expect(page.getByTestId("mirror-compare")).toContainText("FASHN");
+  await expect(page.getByTestId("mirror-compare")).not.toContainText("Kling");
+  expect(await page.getByTestId("mirror-compare").locator("img").count()).toBe(2);
+  // switched on under Rules, Kling joins the next Compare
+  await page.keyboard.press("Escape");
+  await page.goto("/admin/rules");
+  await page.getByTestId("rules-advanced").locator("summary").click();
+  await page.getByRole("radiogroup", { name: "Compare includes Kling" }).getByRole("radio", { name: /^on$/i }).click();
+  await expect(page.getByTestId("rule-saved-compareKling")).toHaveText("✓ Saved");
+  await page.goto("/today");
+  await page.getByTestId("try-on").click();
+  await expect(page.getByTestId("mirror-compare")).toBeVisible({ timeout: 30_000 }); // the comparison from before, as left
+  await page.getByRole("button", { name: "Dress again" }).click(); // a fresh comparison runs the engines switched on now
+  await expect(page.getByTestId("mirror-compare")).toContainText("Kling", { timeout: 30_000 });
   const pair = await page.getByTestId("mirror-compare").locator("img").evaluateAll((els) => els.map((e) => e.getAttribute("src")));
-  expect(pair).toHaveLength(2);
-  expect(pair[0]).not.toBe(pair[1]);
+  expect(pair).toHaveLength(3);
+  expect(new Set(pair).size).toBe(3);
   await expect(page.getByTestId("try-on-sheet")).toContainText("side by side");
+  // G1: keep one column and the mirror shows it alone
+  await page.getByTestId("mirror-keep").nth(1).click();
+  await expect(page.getByTestId("mirror-compare")).toHaveCount(0, { timeout: 20_000 });
+  await expect(page.getByTestId("try-on-sheet")).toContainText("your pick");
 });

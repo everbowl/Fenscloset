@@ -5,7 +5,7 @@
 export const LIST_KINDS = [
   "category", "subcategory", "color", "pattern", "fabric", "season", "formality", "occasion",
   "tag", "brand", "store", "closet", "checkInScale", "checkInOption", "measurementKind", "styleWord", "size",
-  "mirrorPose", "wearGroup", "wearOption",
+  "mirrorPose", "wearGroup", "wearOption", "shopSection",
 ] as const;
 export type ListKind = (typeof LIST_KINDS)[number];
 
@@ -18,7 +18,7 @@ export type ListKindDef = {
   /** Singular label for buttons ("+ Add brand"). */
   singular: string;
   /** Prisma delegate name on the client. */
-  delegate: "category" | "subcategory" | "color" | "pattern" | "fabric" | "season" | "formalityLevel" | "occasion" | "tag" | "brand" | "store" | "closet" | "checkInScale" | "checkInOption" | "measurementKind" | "styleWord" | "sizeOption" | "mirrorPose" | "wearGroup" | "wearOption";
+  delegate: "category" | "subcategory" | "color" | "pattern" | "fabric" | "season" | "formalityLevel" | "occasion" | "tag" | "brand" | "store" | "closet" | "checkInScale" | "checkInOption" | "measurementKind" | "styleWord" | "sizeOption" | "mirrorPose" | "wearGroup" | "wearOption" | "shopSection";
   extraFields: ExtraField[];
   /** For nested lists: which kind owns entries and which column stores the parent id. */
   parent?: { kind: ListKind; field: "categoryId" | "scaleId" | "groupId"; label: string };
@@ -45,6 +45,7 @@ export const LIST_DEFS: Record<ListKind, ListKindDef> = {
   checkInOption: { kind: "checkInOption", label: "Check-in options", singular: "option", delegate: "checkInOption", extraFields: [], parent: { kind: "checkInScale", field: "scaleId", label: "Scale" }, description: "The answers available for each check-in scale." },
   mirrorPose: { kind: "mirrorPose", label: "Mirror poses", singular: "pose", delegate: "mirrorPose", extraFields: [{ name: "prompt", label: "Tell the artist", type: "text", long: true, placeholder: "both hands in the front pockets, shoulders relaxed (blank = keep the pose from the photo)", maxLength: 300 }], description: "How you stand in the mirror. The top one is the default. “Tell the artist” is the change the picture gets; leave it blank when nothing should change." },
   wearGroup: { kind: "wearGroup", label: "How clothes show", singular: "group", delegate: "wearGroup", extraFields: [{ name: "needs", label: "Shows when the look has", type: "text", placeholder: "top bottom · button_front · long_sleeve · hood · zip_front · collar · outer", maxLength: 80 }], description: "The choices the mirror offers on a look: tuck, buttons, sleeves… Each group shows only when the look has what it needs (top bottom, button_front, long_sleeve, hood, zip_front, collar, outer; blank = always). Its options live in “Wear options”." },
+  shopSection: { kind: "shopSection", label: "Shop sections", singular: "section", delegate: "shopSection", extraFields: [], description: "Men's, Women's, Boys', Girls', Unisex: which part of a store a person shops in. Each person picks theirs (Settings, or on the Shop); every store search carries it and results from another section are left out." },
   wearOption: { kind: "wearOption", label: "Wear options", singular: "option", delegate: "wearOption", extraFields: [{ name: "prompt", label: "Tell the artist", type: "text", long: true, placeholder: "the top is tucked fully into the waistband (blank = nothing to change)", maxLength: 300 }], parent: { kind: "wearGroup", field: "groupId", label: "Group" }, description: "The choices inside each group. The top one is the default. “Tell the artist” is the change the picture gets; leave it blank when nothing should change." },
 };
 

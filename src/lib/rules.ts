@@ -13,6 +13,15 @@ export async function getRuleNumber(key: string, fallback: number): Promise<numb
   return Number.isFinite(n) ? n : fallback;
 }
 
+/** Several number rules in one query (review E G5: the size bands were eight round trips). Keys missing or not a number take their fallback. */
+export async function getRuleNumbers<K extends string>(fallbacks: Record<K, number>): Promise<Record<K, number>> {
+  const keys = Object.keys(fallbacks) as K[];
+  const rows = await db.rule.findMany({ where: { key: { in: keys } }, select: { key: true, value: true } });
+  const out = { ...fallbacks };
+  for (const r of rows) { const n = Number(r.value); if (Number.isFinite(n)) out[r.key as K] = n; }
+  return out;
+}
+
 export async function getRuleText(key: string, fallback: string): Promise<string> {
   const r = await db.rule.findUnique({ where: { key } });
   return r?.value?.trim() || fallback;
@@ -30,6 +39,19 @@ export async function getRuleFlag(key: string, fallback: boolean): Promise<boole
   if (ON_WORDS.includes(v)) return true;
   if (OFF_WORDS.includes(v)) return false;
   return fallback;
+}
+
+/** Several on/off rules in one query; a key missing or holding a stray word takes its fallback. */
+export async function getRuleFlags<K extends string>(fallbacks: Record<K, boolean>): Promise<Record<K, boolean>> {
+  const keys = Object.keys(fallbacks) as K[];
+  const rows = await db.rule.findMany({ where: { key: { in: keys } }, select: { key: true, value: true } });
+  const out = { ...fallbacks };
+  for (const r of rows) {
+    const v = r.value.trim().toLowerCase();
+    if (ON_WORDS.includes(v)) out[r.key as K] = true;
+    else if (OFF_WORDS.includes(v)) out[r.key as K] = false;
+  }
+  return out;
 }
 
 export { ruleKind };

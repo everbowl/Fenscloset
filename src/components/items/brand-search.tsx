@@ -41,6 +41,9 @@ export function BrandSearch({ open, onClose, brands, selectedId, selectedIds, mu
       if (!brands.some((x) => x.id === b.id)) onAdded(b);
       if (!multi) onClose();
       onPick(b);
+    }).catch(() => {
+      // A dropped connection or a stale deploy used to leave "Adding…" on forever (review F A4).
+      setBusy(false); setError("Couldn’t add it. Try again.");
     });
   }
 
@@ -48,14 +51,14 @@ export function BrandSearch({ open, onClose, brands, selectedId, selectedIds, mu
     <Sheet open={open} onClose={onClose} title={title}>
       <Input value={q} onChange={(e) => setQ(e.target.value)} autoFocus placeholder="Start typing · Nike, Levi's, Vuori…" aria-label="Brand" data-testid="brand-search" maxLength={60} />
       {error ? <p className="mono mt-2 text-danger">{error}</p> : null}
-      <div className="mt-3 flex flex-col" role="listbox" aria-label="Brands">
+      <div className="mt-3 flex flex-col" role="group" aria-label="Brands">
         {mine.map((b) => (
-          <button key={b.id} type="button" role="option" aria-selected={isOn(b.id)} onClick={() => { if (!multi) onClose(); onPick(b); }} className="flex h-12 items-center justify-between border-b border-line text-[15px]" data-testid={`brand-pick-${b.id}`}>
+          <button key={b.id} type="button" aria-pressed={isOn(b.id)} onClick={() => { if (!multi) onClose(); onPick(b); }} className="flex h-12 items-center justify-between border-b border-line text-[15px]" data-testid={`brand-pick-${b.id}`}>
             <span>{b.name}</span><span className={`mono ${isOn(b.id) ? "text-ink" : "text-graphite"}`}>{isOn(b.id) ? "✓" : "Yours"}</span>
           </button>
         ))}
         {national.map((c) => (
-          <button key={c.domain + c.name} type="button" role="option" aria-selected={false} disabled={busy} onClick={() => add(c.name)} className="flex h-12 items-center justify-between border-b border-line text-[15px] disabled:opacity-60" data-testid={`brand-national-${c.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`}>
+          <button key={c.domain + c.name} type="button" disabled={busy} onClick={() => add(c.name)} className="flex h-12 items-center justify-between border-b border-line text-[15px] disabled:opacity-60" data-testid={`brand-national-${c.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`}>
             <span>{c.name}</span><span className="mono text-graphite">{c.domain}</span>
           </button>
         ))}

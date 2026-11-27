@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { getRuleNumber } from "@/lib/rules";
+import { getRuleNumbers } from "@/lib/rules";
 import type { LikelySizes } from "@/lib/profiles/size-options";
 export type { LikelySizes } from "@/lib/profiles/size-options";
 
@@ -31,10 +31,8 @@ export async function likelySizes(ownerId: string): Promise<LikelySizes | null> 
   const num = (name: RegExp) => { const v = values.find((m) => name.test(m.kind.name)); const n = v ? Number(v.value) : NaN; return Number.isFinite(n) && n > 0 ? n : null; };
   const heightIn = num(/height/i), weightLb = num(/weight/i);
   if (!heightIn || !weightLb) return null;
-  const [xs, s, m, l, xl, tall, short, divX10] = await Promise.all([
-    getRuleNumber("sizeBandXsMaxLb", 125), getRuleNumber("sizeBandSMaxLb", 150), getRuleNumber("sizeBandMMaxLb", 180), getRuleNumber("sizeBandLMaxLb", 210), getRuleNumber("sizeBandXlMaxLb", 240),
-    getRuleNumber("sizeTallIn", 74), getRuleNumber("sizeShortIn", 64), getRuleNumber("waistDivisorX10", 55),
-  ]);
+  const r = await getRuleNumbers({ sizeBandXsMaxLb: 125, sizeBandSMaxLb: 150, sizeBandMMaxLb: 180, sizeBandLMaxLb: 210, sizeBandXlMaxLb: 240, sizeTallIn: 74, sizeShortIn: 64, waistDivisorX10: 55 });
+  const { sizeBandXsMaxLb: xs, sizeBandSMaxLb: s, sizeBandMMaxLb: m, sizeBandLMaxLb: l, sizeBandXlMaxLb: xl, sizeTallIn: tall, sizeShortIn: short, waistDivisorX10: divX10 } = r;
   let band = weightLb <= xs ? 0 : weightLb <= s ? 1 : weightLb <= m ? 2 : weightLb <= l ? 3 : weightLb <= xl ? 4 : 5;
   if (heightIn >= tall) band = Math.min(5, band + 1);
   if (heightIn <= short) band = Math.max(0, band - 1);
@@ -43,5 +41,3 @@ export async function likelySizes(ownerId: string): Promise<LikelySizes | null> 
   const waist = Math.round(weightLb / (Math.max(10, divX10) / 10) - (heightIn - 70) / 2);
   return { letter, waist: String(Math.max(22, Math.min(60, waist))), dress: DRESS_BY_LETTER[letter], from: { heightIn, weightLb } };
 }
-
-export { likelyFor, measurementOptions, formatMeasurement } from "@/lib/profiles/size-options";

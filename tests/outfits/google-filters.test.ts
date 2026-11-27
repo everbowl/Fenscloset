@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { generateKeyPairSync } from "node:crypto";
-import { googleTryOn } from "@/lib/tryon/google";
+import { clearGoogleTryOnRefusals, googleTryOn } from "@/lib/tryon/google";
 import { clearGoogleImageHold, googleImage, googleImageOnHold } from "@/lib/images/google-image";
 
 /**
- * Google's visual filters (Jeff, 19 Oct 2026: none on his own body pictures). The loosest level is sent first; when Google
+ * Google's visual filters (owner, 19 Oct 2026: none on his own body pictures). The loosest level is sent first; when Google
  * refuses it (400: the project is not on the allowlist) the next level down is sent, and the first one Google accepts wins.
  * A fake service account and a fake fetch stand in for Google.
  */
@@ -30,6 +30,7 @@ describe("Google visual filters: loosest first, step down on refusal", () => {
     process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify({ client_email: "t@example.com", private_key: privateKey.export({ type: "pkcs8", format: "pem" }).toString() });
     process.env.GOOGLE_VERTEX_PROJECT = "fens-closet-test";
     delete process.env.GOOGLE_VERTEX_TRYON_SAFETY; delete process.env.GOOGLE_VERTEX_IMAGE_SAFETY; delete process.env.MOCK_GOOGLE_IMAGE;
+    clearGoogleTryOnRefusals(); clearGoogleImageHold(); // a refused level is remembered per process (one call per dressing, not two)
   });
   afterEach(() => { process.env = { ...env }; });
 
@@ -39,7 +40,12 @@ describe("Google visual filters: loosest first, step down on refusal", () => {
     expect(out.data.length).toBeGreaterThan(0);
     expect(calls.map((c) => (c.body.parameters as { safetySetting: string }).safetySetting)).toEqual(["block_none", "block_only_high"]);
     expect((calls[0].body.parameters as { personGeneration: string }).personGeneration).toBe("allow_adult");
-    expect((calls[0].body.parameters as { baseSteps: number }).baseSteps).toBe(50); // quality over speed (Jeff, 23 Oct 2026)
+    expect((calls[0].body.parameters as { baseSteps: number }).baseSteps).toBe(50); // quality over speed (owner, 23 Oct 2026)
+    // the refusal is remembered: the next dressing asks for block_only_high straight away
+    const second: Call[] = [];
+    await googleTryOn(png, png, fakeGoogle((b) => (b.parameters as { safetySetting: string }).safetySetting === "block_none", second));
+    expect(second.map((c) => (c.body.parameters as { safetySetting: string }).safetySetting)).toEqual(["block_only_high"]);
+    clearGoogleTryOnRefusals();
     process.env.GOOGLE_VERTEX_TRYON_STEPS = "32";
     const fewer: Call[] = [];
     await googleTryOn(png, png, fakeGoogle(() => false, fewer));
@@ -65,6 +71,20 @@ describe("Google visual filters: loosest first, step down on refusal", () => {
     const plain: Call[] = [];
     await googleImage([{ data: png, mimeType: "image/png" }], "x", fakeGoogle(() => false, plain));
     expect(plain.map((c) => level(c.body))).toEqual([null]); // a minor's look, the mannequin, a garment photo: Google's defaults
+    // the refusals are remembered: the next relaxed call starts at BLOCK_ONLY_HIGH
+    const next: Call[] = [];
+    await googleImage([{ data: png, mimeType: "image/png" }], "x", fakeGoogle(() => false, next), { relaxed: true });
+    expect(next.map((c) => level(c.body))).toEqual(["BLOCK_ONLY_HIGH"]);
+    clearGoogleImageHold();
+    // a 400 that is not about safety is reported as it is, not stepped past
+    const bad: Call[] = [];
+    const badFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      if (String(input).includes("oauth2.googleapis.com/token")) return new Response(JSON.stringify({ access_token: "t", expires_in: 3600 }), { status: 200 });
+      bad.push({ url: String(input), body: JSON.parse(String(init?.body)) as Record<string, unknown> });
+      return new Response(JSON.stringify({ error: { message: "Invalid image data" } }), { status: 400 });
+    }) as typeof fetch;
+    await expect(googleImage([{ data: png, mimeType: "image/png" }], "x", badFetch, { relaxed: true })).rejects.toThrow(/Invalid image data/);
+    expect(bad.length).toBe(1);
     // everything refused: the last try is Google's defaults; if that fails too the error says so
     const all: Call[] = [];
     await expect(googleImage([{ data: png, mimeType: "image/png" }], "x", fakeGoogle(() => true, all), { relaxed: true })).rejects.toThrow(/Google image 400/);

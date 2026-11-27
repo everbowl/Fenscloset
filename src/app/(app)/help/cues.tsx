@@ -18,7 +18,7 @@ export type Cue =
   | { kind: "strip"; label: string }
   | { kind: "row"; label: string; value?: string }
   | { kind: "icon"; name: "camera" | "calendar" | "search" | "image" | "link" | "mail" }
-  | { kind: "verdict"; word: "FITS" | "RISKY" | "PASS" }
+  | { kind: "verdict"; word: "BUY IT" | "MAYBE" | "SKIP IT" }
   | { kind: "calendar" }
   | { kind: "board" }
   | { kind: "wait" };
@@ -44,13 +44,13 @@ function PlusGlyph({ size }: { size: number }) {
 
 function MiniButton({ label, variant = "primary" }: { label: string; variant?: "primary" | "secondary" }) {
   return (
-    <span className={cn("mono inline-flex h-8 max-w-full items-center justify-center truncate px-3 text-[8px] tracking-[0.14em]", variant === "primary" ? "bg-ink text-paper" : "border border-ink bg-paper text-ink")}>{label}</span>
+    <span className={cn("mono inline-flex h-8 max-w-full items-center justify-center truncate rounded-full px-3 text-[8px]", variant === "primary" ? "bg-accent text-ink" : "bg-bone text-ink ring-1 ring-inset ring-line")}>{label}</span>
   );
 }
 
 const ICONS = { camera: Camera, calendar: Calendar, search: Search, image: ImageIcon, link: Link2, mail: Mail } as const;
 
-export function CueArt({ cue }: { cue: Cue }) {
+function CueArt({ cue }: { cue: Cue }) {
   switch (cue.kind) {
     case "nav": return <NavCue tab={cue.tab} />;
     case "plus": return <span className="flex size-9 items-center justify-center bg-ink text-paper"><PlusGlyph size={16} /></span>;
@@ -97,10 +97,10 @@ export function CueArt({ cue }: { cue: Cue }) {
   }
 }
 
-/** Bone tile that holds a cue, the way photos sit on Bone everywhere else. */
+/** Bone stage that holds a cue, the way photos sit on the stage everywhere else. */
 export function CueTile({ cue, className, children }: { cue?: Cue; className?: string; children?: ReactNode }) {
   return (
-    <div className={cn("flex items-center justify-center overflow-hidden bg-bone px-2", className)}>
+    <div className={cn("stage flex items-center justify-center overflow-hidden px-2", className)}>
       <div className="flex w-full max-w-[220px] items-center justify-center">{cue ? <CueArt cue={cue} /> : children}</div>
     </div>
   );

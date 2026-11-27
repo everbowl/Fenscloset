@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import { ChevronDown } from "lucide-react";
 import { Sheet } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 
 export type ViewOption = { key: string; label: string };
@@ -19,45 +20,57 @@ export function PersonMenu({ views, current, isAdmin, logout, setView }: {
 }) {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
+  /** The choice just tapped: the check mark moves at once, before the server answers. */
+  const [chosen, setChosen] = useState<string | null>(null);
   const router = useRouter();
+  const shown = pending && chosen ? chosen : current;
   const label = views.find((v) => v.key === current)?.label ?? views[0]?.label ?? "";
   const Row = ({ href, label }: { href: string; label: string }) => (
-    <Link href={href} onClick={() => setOpen(false)} className="flex h-12 items-center justify-between border-b border-line text-[15px]">
-      {label}<span className="mono text-graphite">→</span>
+    <Link href={href} onClick={() => setOpen(false)} className="tap flex h-12 items-center justify-between rounded-xl px-1 text-[16px]">
+      {label}<span className="text-graphite">›</span>
     </Link>
   );
   function choose(key: string) {
-    start(async () => { await setView(key); setOpen(false); router.refresh(); });
+    setChosen(key);
+    start(async () => {
+      try { await setView(key); } catch { setChosen(null); toast.error("Couldn’t switch. Try again."); return; }
+      setOpen(false); router.refresh();
+    });
   }
+  /** Signing out empties the worker's photo cache first: on a shared phone the next person must not see this one's photos. */
+  function forgetPhotos() { navigator.serviceWorker?.controller?.postMessage({ type: "logout" }); }
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} aria-label={`${label} menu`} className="mono mono-11 flex h-11 items-center gap-1.5 px-2">
-        {label} <ChevronDown className="size-2.5" strokeWidth={2.5} />
+      <button type="button" onClick={() => setOpen(true)} aria-label={`${label} menu`} className="flex h-11 items-center gap-2 rounded-full pl-1 pr-2 text-[15px] font-semibold active:bg-bone">
+        <span aria-hidden className="flex size-8 items-center justify-center rounded-full bg-bone text-[13px] font-semibold text-ink">{label.slice(0, 1).toUpperCase()}</span>
+        {/* On a phone the name steps aside when the back control is in the header (src/app/globals.css .header-left): back, avatar, name and the wordmark do not fit in 393 px. */}
+        <span className="person-name flex items-center gap-2">{label} <ChevronDown className="size-3.5 text-graphite" strokeWidth={2.5} /></span>
       </button>
       <Sheet open={open} onClose={() => setOpen(false)} title="Viewing">
-        <div className="flex flex-col" role="listbox" aria-label="Closet to view">
+        {/* A group of toggles, not a listbox: VoiceOver reads a <button role="option"> as a button anyway, and aria-pressed is true to what it is. */}
+        <div className="flex flex-col" role="group" aria-label="Closet to view">
           {views.map((v) => (
-            <button key={v.key} type="button" role="option" aria-selected={v.key === current} disabled={pending} onClick={() => choose(v.key)} className="flex h-12 items-center justify-between border-b border-line text-[15px]">
+            <button key={v.key} type="button" aria-pressed={v.key === shown} disabled={pending} onClick={() => choose(v.key)} className={cn("tap flex h-12 items-center justify-between rounded-xl px-1 text-[16px]", pending && v.key !== shown && "opacity-60")}>
               <span>{v.label}{v.key === "family" ? " closet" : ""}</span>
-              <span className={cn("mono", v.key === current ? "text-ink" : "text-transparent")}>{v.key === current ? "✓" : "·"}</span>
+              <span className={cn("mono", v.key === shown ? "text-ink" : "text-transparent")}>{v.key === shown ? "✓" : "·"}</span>
             </button>
           ))}
         </div>
         <div className="flex flex-col pt-5">
-          <p className="mono pb-2 text-graphite">You</p>
+          <p className="caption pb-2">You</p>
           <Row href="/profile" label="Profile" />
           <Row href="/change-password" label="Change password" />
           <Row href="/help" label="Help · how to use it" />
           {isAdmin ? (
             <>
-              <p className="mono pt-5 pb-2 text-graphite">Admin</p>
+              <p className="caption pt-5 pb-2">Admin</p>
               <Row href="/admin/people" label="People" />
               <Row href="/admin/lists" label="Lists" />
               <Row href="/admin/rules" label="Rules" />
             </>
           ) : null}
         </div>
-        <form action={logout} className="pt-6">
+        <form action={logout} onSubmit={forgetPhotos} className="pt-6">
           <Button type="submit" variant="secondary" className="w-full">Log out</Button>
         </form>
       </Sheet>

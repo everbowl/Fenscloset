@@ -1,9 +1,9 @@
 import { db } from "@/lib/db";
 import { generateToken, hashToken } from "@/lib/auth/tokens";
+import { SESSION_COOKIE, SESSION_TTL_MS } from "@/lib/auth/cookies";
 import type { Person } from "@/generated/prisma/client";
 
-export const SESSION_COOKIE = "fc_session";
-export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+export { SESSION_COOKIE, SESSION_TTL_MS };
 const REFRESH_WHEN_LEFT_MS = 15 * 24 * 60 * 60 * 1000; // refresh when < 15 days remain
 
 export type SessionWithPerson = {
@@ -44,8 +44,9 @@ export async function validateSession(token: string): Promise<SessionWithPerson 
     return null;
   }
   if (session.person.status === "removed") return null;
-  const timeLeft = session.expiresAt.getTime() - Date.now();
-  if (timeLeft < REFRESH_WHEN_LEFT_MS) {
+  // The sliding refresh is one write every fifteen days at most: once it runs, thirty days remain and nothing else writes
+  // until fewer than fifteen do. The cookie's own expiry is pushed along by the proxy on each page load (review A W3).
+  if (session.expiresAt.getTime() - Date.now() < REFRESH_WHEN_LEFT_MS) {
     const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
     await db.session.update({ where: { id: session.id }, data: { expiresAt, lastSeenAt: new Date() } });
     session.expiresAt = expiresAt;

@@ -5,7 +5,7 @@ import path from "node:path";
 import sharp from "sharp";
 import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
-import { seed } from "../../prisma/seed";
+import { seed } from "../helpers";
 import { deleteObject, getObject, newKey, objectExists, putObject } from "@/lib/storage";
 import { getOrCreateOpenBatch, registerEntry } from "@/lib/import/service";
 import { drainQueue } from "@/lib/import/queue";
@@ -25,24 +25,24 @@ const dims = async (key: string) => { const m = await sharp((await getObject(key
 const warningsOf = async (id: string) => ((await db.importEntry.findUniqueOrThrow({ where: { id } })).aiResult as EntryAiResult).warnings;
 
 describe("untidy: Tidy and Smooth undone on the pieces they touched", () => {
-  let jeffId: string;
+  let averyId: string;
   beforeEach(async () => {
     await resetDb();
     process.env.DEV_MODE = "true"; process.env.MOCK_AI = "true"; process.env.MOCK_S3 = "true";
     delete process.env.MOCK_REMOVE_BG_FAIL; delete process.env.MOCK_ORIENTATION;
     process.env.MOCK_S3_DIR = await mkdtemp(path.join(os.tmpdir(), "fc-untidy-"));
     await seed();
-    jeffId = (await db.person.findUniqueOrThrow({ where: { email: "jeff@everbowl.com" } })).id;
+    averyId = (await db.person.findUniqueOrThrow({ where: { email: "avery@example.test" } })).id;
   });
 
   /** A piece added the normal way (the mock cutter's cutout is the photo itself). */
   async function piece() {
-    const b = await getOrCreateOpenBatch(jeffId, 1);
-    const key = newKey("originals", jeffId, "image/jpeg");
+    const b = await getOrCreateOpenBatch(averyId, 1);
+    const key = newKey("originals", averyId, "image/jpeg");
     await putObject(key, await photo(), "image/jpeg");
-    const e = await registerEntry(jeffId, b.id, key, 0);
+    const e = await registerEntry(averyId, b.id, key, 0);
     await drainQueue();
-    const item = await createItemFromEntry(jeffId, e.id);
+    const item = await createItemFromEntry(averyId, e.id);
     const entry = await db.importEntry.findUniqueOrThrow({ where: { id: e.id } });
     const cutout = await db.itemPhoto.findFirstOrThrow({ where: { itemId: item.id, kind: "cutout" } });
     const thumb = await db.itemPhoto.findFirstOrThrow({ where: { itemId: item.id, kind: "thumb" } });
@@ -89,7 +89,7 @@ describe("untidy: Tidy and Smooth undone on the pieces they touched", () => {
     await deleteObject(a.entry.originalKey);
     const b = await piece();
     process.env.MOCK_REMOVE_BG_FAIL = "insufficient_credits";
-    expect(await untidyAll()).toEqual({ recut: 0, skipped: 1, failed: 1, done: false, lastError: "remove.bg insufficient_credits: Mock remove.bg failure" });
+    expect(await untidyAll()).toEqual({ recut: 0, skipped: 1, failed: 1, done: false, lastError: "remove.bg insufficient_credits: Mock remove.bg failure", waitForAdmin: true });
     expect(await untidyPending()).toBe(1); // the one left for later
     expect(await warningsOf(a.entry.id)).toContain("recut:no_original");
     expect(await warningsOf(b.entry.id)).not.toContain("recut");
@@ -101,13 +101,42 @@ describe("untidy: Tidy and Smooth undone on the pieces they touched", () => {
 
   it("on server start it keeps trying until every piece is done", async () => {
     const a = await piece();
-    process.env.MOCK_REMOVE_BG_FAIL = "insufficient_credits";
+    process.env.MOCK_REMOVE_BG_FAIL = "http_503"; // a passing fault, not the key or the credits
     await untidyOnStart(0, 40);
     expect(await db.seedSet.findUnique({ where: { name: UNTIDY_SET } })).toBeNull();
-    delete process.env.MOCK_REMOVE_BG_FAIL; // credits bought: the next pass, 40 ms later, finishes
+    delete process.env.MOCK_REMOVE_BG_FAIL; // the next pass, 40 ms later, finishes
     await new Promise((r) => setTimeout(r, 600));
     expect(await db.seedSet.findUnique({ where: { name: UNTIDY_SET } })).not.toBeNull();
     expect(await warningsOf(a.entry.id)).toContain("recut");
+  });
+
+  it("no credits or no key stops the hourly loop and waits for Admin → Rules instead of calling remove.bg forever (review B C8)", async () => {
+    const a = await piece();
+    const b = await piece();
+    process.env.MOCK_REMOVE_BG_FAIL = "insufficient_credits";
+    const r = await untidyAll();
+    expect(r).toMatchObject({ recut: 0, skipped: 0, failed: 2, done: false, waitForAdmin: true });
+    expect(await warningsOf(a.entry.id)).toEqual([]); // nothing marked: the admin's button tries them all again
+    expect(await warningsOf(b.entry.id)).toEqual([]);
+    await untidyOnStart(0, 40); // the loop does not reschedule itself
+    await new Promise((r2) => setTimeout(r2, 200));
+    delete process.env.MOCK_REMOVE_BG_FAIL;
+    await new Promise((r2) => setTimeout(r2, 200));
+    expect(await db.seedSet.findUnique({ where: { name: UNTIDY_SET } })).toBeNull(); // nobody tried again on their own
+    expect(await untidyAll()).toEqual({ recut: 2, skipped: 0, failed: 0, done: true }); // the admin's button
+  });
+
+  it("a piece that fails three times is given up on and marked, so the rest can finish (review B C8)", async () => {
+    const a = await piece();
+    process.env.MOCK_REMOVE_BG_FAIL = "unknown_foreground";
+    expect(await untidyAll()).toMatchObject({ failed: 1, done: false });
+    expect(await untidyAll()).toMatchObject({ failed: 1, done: false });
+    expect(await warningsOf(a.entry.id)).toEqual(["recut:try", "recut:try"]);
+    expect(await untidyPending()).toBe(1);
+    expect(await untidyAll()).toMatchObject({ skipped: 1, failed: 0, done: true });
+    expect(await warningsOf(a.entry.id)).toContain("recut:failed:unknown_foreground");
+    expect(await untidyPending()).toBe(0);
+    delete process.env.MOCK_REMOVE_BG_FAIL;
   });
 
   it("pieces added before Smooth went live are left alone", async () => {

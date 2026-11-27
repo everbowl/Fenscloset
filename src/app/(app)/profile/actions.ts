@@ -5,8 +5,8 @@ import { revalidatePath } from "next/cache";
 import { requirePerson } from "@/lib/auth/current";
 import { updatePersonDetails } from "@/lib/people/service";
 import {
-  addBodyPhoto, ProfileError, removeBodyPhoto, removeSize, setBodyPhotoPrivacy, setBodyViewers, setFitNotes, setMeasurement, setMinorBodyImageApproval,
-  setNeverSuggest, setShoppers, updateFavorites, updateStyle, upsertSize,
+  addBodyPhoto, ProfileError, removeBodyPhoto, setBodyPhotoPrivacy, setBodyViewers, setFitNotes, setMeasurement, setMinorBodyImageApproval,
+  setNeverSuggest, setShoppers, setShopSection, updateFavorites, updateStyle,
 } from "@/lib/profiles/service";
 import { forgetTasteFor } from "@/lib/profiles/service";
 import { addInspiration, removeInspiration } from "@/lib/profiles/inspiration";
@@ -32,12 +32,6 @@ export async function setMeasurementAction(ownerId: string, kindId: string, valu
 }
 export async function setFitNotesAction(ownerId: string, notes: string): Promise<Result> {
   const me = await requirePerson(); return run(() => setFitNotes(me, ownerId, notes));
-}
-export async function upsertSizeAction(ownerId: string, input: { id?: string; brandId: string; categoryId: string | null; size: string }): Promise<Result> {
-  const me = await requirePerson(); return run(() => upsertSize(me, ownerId, input));
-}
-export async function removeSizeAction(ownerId: string, id: string): Promise<Result> {
-  const me = await requirePerson(); return run(() => removeSize(me, ownerId, id));
 }
 export async function addBodyPhotoAction(ownerId: string, key: string, onlyMe = false, view: "front" | "back" | "left" | "right" | "side" = "front"): Promise<Result> {
   const me = await requirePerson(); return run(() => addBodyPhoto(me, ownerId, key, { onlyMe, view }));
@@ -82,10 +76,22 @@ export async function disconnectCalendarAction(): Promise<Result> {
   const me = await requirePerson();
   return run(async () => { const { disconnect } = await import("@/lib/plans/google"); await disconnect(me.id); });
 }
+/** The person's Google calendars, read when the Calendars row is tapped, never while the page loads (review E G1). */
+export async function listCalendarsAction(): Promise<{ ok: true; calendars: { id: string; name: string; primary: boolean }[] } | { ok: false; error: string }> {
+  const me = await requirePerson();
+  try { const { listCalendars } = await import("@/lib/plans/google"); return { ok: true, calendars: await listCalendars(me.id) }; }
+  catch (e) { console.error("calendars", e); return { ok: false, error: "Google didn't answer. Try again in a minute." }; }
+}
 export async function setCalendarIdsAction(ids: string[]): Promise<Result> {
   const me = await requirePerson();
   return run(async () => { const { setCalendarIds } = await import("@/lib/plans/google"); await setCalendarIds(me.id, ids); });
 }
+/** The section a person shops in (null owner = me). Revalidates the Shop, where the ask lives. */
+export async function setShopSectionAction(ownerId: string | null, sectionId: string | null): Promise<Result> {
+  const me = await requirePerson();
+  return run(() => setShopSection(me, ownerId ?? me.id, sectionId), ["/profile", "/profile/settings", "/shop", "/shop/looking-for"]);
+}
+
 export async function setSavedZipAction(zip: string): Promise<Result> {
   const me = await requirePerson();
   const z = zip.trim();
