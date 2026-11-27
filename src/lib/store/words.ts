@@ -61,12 +61,9 @@ export function mockOwnedRows(text: string, page: OwnedPage): OwnedRow[] {
   return rows.slice(0, MAX_ROWS);
 }
 
-/** Claude reads the words into rows; the page's color and size names are used where they match. */
-export async function ownedRowsFromWords(text: string, page: OwnedPage): Promise<OwnedRow[]> {
-  const words = text.replace(/\s+/g, " ").trim().slice(0, 600);
-  if (!words) return [];
-  if (isMockAi()) return mockOwnedRows(words, page);
-  const schema = {
+/** JSON schema for the rows Claude reads out of the note. Bounds live in descriptions: the API rejects numeric keywords. */
+export function ownedRowsSchema(): Record<string, unknown> {
+  return {
     type: "object", additionalProperties: false, required: ["rows"],
     properties: {
       rows: {
@@ -77,12 +74,20 @@ export async function ownedRowsFromWords(text: string, page: OwnedPage): Promise
           properties: {
             color: { type: ["string", "null"], description: "The page's spelling of the color when it matches one of the page's colors, else as the person wrote it; null when none was said." },
             size: { type: ["string", "null"], description: "The page's spelling of the size when it matches one of the page's sizes (medium → M), else as written; null when none was said." },
-            quantity: { type: "integer", minimum: 1, description: "How many of this color and size; 1 when not said. If they gave a total and colors without counts, spread the total only when it divides evenly, else 1 each." },
+            quantity: { type: "integer", description: "How many of this color and size, at least 1; 1 when not said. If they gave a total and colors without counts, spread the total only when it divides evenly, else 1 each." },
           },
         },
       },
     },
   };
+}
+
+/** Claude reads the words into rows; the page's color and size names are used where they match. */
+export async function ownedRowsFromWords(text: string, page: OwnedPage): Promise<OwnedRow[]> {
+  const words = text.replace(/\s+/g, " ").trim().slice(0, 600);
+  if (!words) return [];
+  if (isMockAi()) return mockOwnedRows(words, page);
+  const schema = ownedRowsSchema();
   const out = await structured<{ rows: OwnedRow[] }>({
     system: "You turn one person's note about clothes they already own into rows of color, size and quantity. Answer with JSON only.",
     prompt: [

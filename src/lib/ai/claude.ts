@@ -33,6 +33,28 @@ export type StructuredRequest = {
   maxTokens?: number;
 };
 
+/** JSON Schema keywords the structured-output endpoint rejects on number and integer properties (seen live 26 Nov: "For 'integer'
+ * type, property 'minimum' is not supported"). A bound belongs in the description instead; this strips any that slip in so one
+ * stray keyword cannot fail every tagging call. */
+const UNSUPPORTED_NUMERIC_KEYWORDS = new Set(["minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf"]);
+
+/** The schema as the API accepts it: a deep copy with the unsupported numeric keywords removed at every level. */
+export function apiSchema(schema: Record<string, unknown>): Record<string, unknown> {
+  const strip = (node: unknown): unknown => {
+    if (Array.isArray(node)) return node.map(strip);
+    if (node && typeof node === "object") {
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+        if (UNSUPPORTED_NUMERIC_KEYWORDS.has(k) && typeof v === "number") continue;
+        out[k] = strip(v);
+      }
+      return out;
+    }
+    return node;
+  };
+  return strip(schema) as Record<string, unknown>;
+}
+
 /** One vision/text call that must come back as JSON matching `schema`. Server-side refusal fallbacks are on. */
 export async function structured<T>(req: StructuredRequest, retried = false): Promise<T> {
   const content: Anthropic.Beta.BetaContentBlockParam[] = [];
@@ -51,7 +73,7 @@ export async function structured<T>(req: StructuredRequest, retried = false): Pr
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       system: [{ type: "text", text: req.system, cache_control: { type: "ephemeral" } }],
-      output_config: { effort: req.effort ?? "low", format: { type: "json_schema", schema: req.schema } },
+      output_config: { effort: req.effort ?? "low", format: { type: "json_schema", schema: apiSchema(req.schema) } },
       messages: [{ role: "user", content }],
     });
   } catch (e) {

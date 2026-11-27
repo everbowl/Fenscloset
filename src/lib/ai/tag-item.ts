@@ -100,7 +100,7 @@ export function tagSchema(lists: TagLists): Record<string, unknown> {
       brandText: { type: ["string", "null"], description: "Brand if a logo or label is readable, else null." },
       sizeText: { type: ["string", "null"], description: "Size if a label is readable (S, M, 28, 8…), else null." },
       confidence: { type: "number", description: "0 to 1: overall confidence that category and colors are right." },
-      pieceCount: { type: "integer", minimum: 1, description: "How many separate garments lie in the photo. 1 for one piece (a folded pile or a stack counts as 1). More only when several garments lie side by side, each fully visible." },
+      pieceCount: { type: "integer", description: "How many separate garments lie in the photo, at least 1. 1 for one piece (a folded pile or a stack counts as 1). More only when several garments lie side by side, each fully visible." },
       features: { type: "array", items: { type: "string", enum: [...FEATURE_KEYS] }, description: "How the piece is made, every one that applies: button_front = buttons (or a placket) down the front; zip_front = a zipper down the front; long_sleeve = sleeves to the wrist; hood = a hood; collar = a collar. Empty for pieces with none (a t-shirt, shorts, shoes)." },
       orientation: { type: "string", enum: ["upright", "rotate_right", "rotate_left", "upside_down"], description: "Is the piece shown the way it is worn (collar, waistband, hood or neckline at the TOP of the photo; shoes sole down)? If not, which single turn fixes it: rotate_right = turn the photo 90° clockwise, rotate_left = 90° counterclockwise, upside_down = 180°. Bags, hats and accessories with no clear top are upright." },
     },
