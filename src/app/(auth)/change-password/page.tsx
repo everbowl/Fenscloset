@@ -20,7 +20,8 @@ export default async function ChangePasswordPage() {
           <h1 className="title">{person.mustChangePassword ? "Set a new password" : "Change password"}</h1>
           <p className="note">Signed in as {person.email}</p>
         </div>
-        <ChangePasswordForm email={person.email ?? ""} />
+        <ChangePasswordForm email={person.email ?? ""} askCurrent={!person.mustChangePassword} />
+        {!person.mustChangePassword ? <p className="note">Forgot the current one? Sign out and use Forgot password on the sign-in page.</p> : null}
         {!person.mustChangePassword
           ? <Link href="/profile/settings" className="pill pill-quiet h-12 w-full" data-testid="change-password-cancel">Cancel</Link>
           : canLeave
