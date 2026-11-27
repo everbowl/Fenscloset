@@ -1,0 +1,62 @@
+# Security item 5 (PF-07): every push and pull request is typechecked, tested against Postgres 16, audited, and swept for
+# secrets over the whole history, before anything may deploy. The job is named `ci` so branch protection can require it.
+name: ci
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_USER: postgres
+          POSTGRES_DB: fenscloset_test
+        ports: ["5433:5432"] # the same port .env.test uses locally, so the test setup needs no CI-only branch
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the secret scan reads every commit
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Tests (Vitest, includes the privacy test and the dev-identifier check)
+        run: npm test
+        env:
+          # What .env.test gives a local run (that file is not tracked). Test-only values: the secret signs nothing real.
+          DATABASE_URL: postgresql://postgres@localhost:5433/fenscloset_test
+          SESSION_SECRET: ci-only-session-secret-never-used-anywhere-else
+          APP_URL: http://localhost:3000
+      - name: Dependency audit (production dependencies, high and above)
+        run: npm audit --omit=dev --audit-level=high
+      - name: Secret scan of the full history (gitleaks)
+        run: |
+          set -euo pipefail
+          curl -sSL -o gitleaks.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz
+          echo "9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c  gitleaks.tgz" | sha256sum -c -
+          tar xzf gitleaks.tgz gitleaks
+          ./gitleaks detect --source . --log-opts="--all" --no-banner --redact=100 --exit-code 1

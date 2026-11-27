@@ -1,0 +1,13 @@
+# Secret scan configuration (security items 1 and 5). The default rules apply everywhere; the only allowance is the
+# test and e2e trees, which hold synthetic passwords for the synthetic household by design (never a real credential).
+title = "Fen's Closet"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "synthetic test fixtures"
+paths = [
+  '''^tests/''',
+  '''^e2e/''',
+]
