@@ -13,7 +13,10 @@ export function proxy(request: NextRequest) {
   // /api is left alone.
   const appUrl = process.env.APP_URL ?? "";
   if (appUrl.startsWith("https://") && request.headers.get("x-forwarded-proto") === "http" && !pathname.startsWith("/api/")) {
-    return NextResponse.redirect(new URL(pathname + request.nextUrl.search, appUrl), 308);
+    const target = new URL(appUrl);
+    target.pathname = pathname; // set, never parsed: a `//host` path must stay a path (security item 13)
+    target.search = request.nextUrl.search;
+    return NextResponse.redirect(target, 308);
   }
 
   if (PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"))) return NextResponse.next();

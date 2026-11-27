@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { login, normalizeEmail } from "@/lib/auth/login";
+import { safeNextPath } from "@/lib/auth/next-path";
 import { signIn, getCurrentPerson } from "@/lib/auth/current";
 import { accountKey, clientKey, recordAttempt, throttleStatus } from "@/lib/auth/rate-limit";
 import { cookieSecure } from "@/lib/app-url";
@@ -36,7 +37,7 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   if (!result.ok) return { email, error: FAILED };
   await signIn(result.person.id);
   if (result.person.mustChangePassword) redirect("/change-password");
-  redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/today");
+  redirect(safeNextPath(next)); // only a path on this site; `/\\host` and friends land on Today (security item 13)
 }
 
 export async function logoutAction() {
