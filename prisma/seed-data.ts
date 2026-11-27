@@ -76,7 +76,6 @@ export const MEASUREMENT_KINDS: { name: string; unit: string }[] = [
   { name: "Shoe size", unit: "US" }, { name: "Hat size", unit: "" },
 ];
 export const STYLE_WORDS = ["Minimal", "Classic", "Streetwear", "Preppy", "Boho", "Edgy", "Sporty", "Romantic", "Vintage", "Glam", "Comfy", "Polished"];
-/** Body photos approved for a minor by a parent admin (spec: Mya, approved by Jeff). */
 export const CHECK_IN_SCALES: Record<string, string[]> = {
   Tan: ["None", "Light", "Medium", "Deep"],
   Hair: ["Great", "Fine", "Bad hair day"],
