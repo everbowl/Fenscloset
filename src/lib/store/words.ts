@@ -1,7 +1,7 @@
 import { isMockAi, structured } from "@/lib/ai/claude";
 
 /**
- * "Tell it in words" on a product card (Jeff, 2 Nov 2026): one line like "I own 7 of these, all Medium:
+ * "Tell it in words" on a product card (the owner, 2 Nov 2026): one line like "I own 7 of these, all Medium:
  * black ×2, navy, white, grey ×3" becomes rows of color, size and how many, for the bulk add. Claude reads
  * it against the page's own color and size names so the rows use them; the mock parser covers the tests.
  * Nothing here reaches a store: it is the person's words and the page's choice lists only.

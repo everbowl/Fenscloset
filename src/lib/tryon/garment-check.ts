@@ -2,7 +2,7 @@ import sharp from "sharp";
 import { isMockAi, structured } from "@/lib/ai/claude";
 
 /**
- * Two looks by Claude around the try-on model (Jeff, 19 Oct 2026: a polo came out as a crop top, a tee with a
+ * Two looks by Claude around the try-on model (the owner, 19 Oct 2026: a polo came out as a crop top, a tee with a
  * hole in the back and no front).
  *
  * 1. Before a garment picture goes to the model: does the whole piece show, hem to collar, cuff to cuff, with

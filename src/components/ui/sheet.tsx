@@ -105,7 +105,7 @@ export function Sheet({ open, onClose, title, children, footer }: { open: boolea
       </div>
       {/* The body takes what is left of the 90dvh and scrolls; the header and the footer (the one button that matters) always stay in view.
           `flex-auto`, not `flex-1`: the dialog's height is its content's, and Safari sizes a `flex: 1 1 0%` child of an auto-height
-          column to nothing, so the sheet opened empty on iPhones (Jeff, 22 Nov 2026, the mirror). Chromium, and so the suites, never showed it. */}
+          column to nothing, so the sheet opened empty on iPhones (the owner, 22 Nov 2026, the mirror). Chromium, and so the suites, never showed it. */}
       <div className={footer ? "min-h-0 flex-auto overflow-y-auto px-5 py-5" : "safe-bottom min-h-0 flex-auto overflow-y-auto px-5 py-5"}>{children}</div>
       {footer ? <div className="safe-bottom shrink-0 border-t border-line bg-paper px-5 py-3">{footer}</div> : null}
     </dialog>

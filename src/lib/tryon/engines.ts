@@ -8,7 +8,7 @@ export type Engine = "google" | "fashn" | "kling";
 export type EngineRule = Engine | "compare";
 const ENGINES: Engine[] = ["google", "fashn", "kling"];
 export const ENGINE_RULE_KEY = "mirrorEngine";
-/** The on/off switch per engine for Compare (Admin → Rules → Mirror), and what each starts as: Kling off until its balance is topped up (Jeff, 26 Nov 2026, 1B). */
+/** The on/off switch per engine for Compare (Admin → Rules → Mirror), and what each starts as: Kling off until its balance is topped up (the owner, 26 Nov 2026, 1B). */
 export const COMPARE_KEYS: Record<Engine, string> = { google: "compareGoogle", fashn: "compareFashn", kling: "compareKling" };
 export const COMPARE_DEFAULTS: Record<Engine, boolean> = { google: true, fashn: true, kling: false };
 export const ENGINE_WORD: Record<Engine, string> = { google: "Google", fashn: "FASHN", kling: "Kling" };

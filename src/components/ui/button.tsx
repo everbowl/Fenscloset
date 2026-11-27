@@ -5,10 +5,10 @@ import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from "
 import { buttonClass, type Size, type Variant } from "./button-class";
 
 /*
- * Brand buttons (Jeff, 19 Oct 2026, Q11 A + C + D + motion, restyled for v2 on 23 Nov 2026): pills in the household accent
+ * Brand buttons (the owner, 19 Oct 2026, Q11 A + C + D + motion, restyled for v2 on 23 Nov 2026): pills in the household accent
  * (real orange, editable in Admin → Rules); big ones carry a line icon and a second line that says what happens next. Press:
  * the pill dips and the arrow slides. Done: a quick black "✓ …" flash. The big button rises in a beat after the page.
- * Everything else on the page stays black and white: secondary is a solid black pill (Jeff, 23 Oct 2026: "all buttons
+ * Everything else on the page stays black and white: secondary is a solid black pill (the owner, 23 Oct 2026: "all buttons
  * should be louder and apparent"; it was a 1px outline), danger an outlined one, and every text action on a screen is a
  * .pill (globals.css) so that anything tappable reads as a button.
  */

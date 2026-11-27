@@ -7,7 +7,7 @@ import { ProfileError } from "@/lib/profiles/service";
 import type { Viewer } from "@/lib/people/visibility";
 
 /**
- * "What's needed" at the top of a person's own closet (Jeff, 2 Nov 2026: "on the individual closet page, I should
+ * "What's needed" at the top of a person's own closet (the owner, 2 Nov 2026: "on the individual closet page, I should
  * have a what's needed or suggested, so if I need to provide another selfie for the mirror to be better, or
  * whatever"; D1: the Closet page only). One row per gap, the fix in the row: a front photo so the mirror can dress
  * the person, a retake when an engine could not make out the body, the shop section, a size in a favorite brand,

@@ -8,7 +8,7 @@ import { LookTray } from "@/components/looks/look-tray";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "To go with it" };
 
-/** Shop v2 item 1 (Jeff, 23 Oct 2026): what would complete this piece, products for it, and the looks the closet already makes with it. */
+/** Shop v2 item 1 (the owner, 23 Oct 2026): what would complete this piece, products for it, and the looks the closet already makes with it. */
 export default async function GoWithPage({ params, searchParams }: { params: Promise<{ itemId: string }>; searchParams: Promise<{ fresh?: string }> }) {
   const me = await requirePerson();
   const [{ itemId }, { fresh }] = await Promise.all([params, searchParams]);

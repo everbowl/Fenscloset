@@ -12,7 +12,7 @@
 - All keys in env: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (Google Calendar). Weather (Open-Meteo) and zip lookup (Zippopotam.us) need no key. `MOCK_WEATHER=true` and `MOCK_AI=true` give canned results for tests.
 - Weather attribution "Weather by Open-Meteo" appears under the context line (their license requires it).
 
-## Assumptions flagged for Jeff (built this way unless he says otherwise)
+## Assumptions flagged for the owner (built this way unless he says otherwise)
 - A1. Outfit generation is text-only: Claude gets the catalog as tags (name, category, colors, fabric, seasons, formality, occasions, wear history), not photos. Keeps a 3-look set near $0.05. Photos are shown on the board from our cutouts.
 - A2. A "fit" is a new record (`Fit`) created when WEAR THIS is tapped (today) or SAVE THE FIT is tapped on the Fits screen (any day). The Fits calendar reads fits, not the raw wear log.
 - A3. Location order: browser location (if the phone allows it) → saved zip → ask for a zip right on Today (saved for next time).

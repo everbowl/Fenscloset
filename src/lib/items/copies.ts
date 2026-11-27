@@ -1,7 +1,7 @@
 import type { LaundryStatus } from "@/generated/prisma/client";
 
 /**
- * Identical pieces as one card (Jeff, 2 Nov 2026: "ten Kirkland Medium white crew necks: show one in the closet,
+ * Identical pieces as one card (the owner, 2 Nov 2026: "ten Kirkland Medium white crew necks: show one in the closet,
  * list ten"). A piece carries how many copies it stands for and how many are in the wash or at the cleaners;
  * `laundryStatus` stays the one word the closet, Today and the filters read (clean while any copy is clean).
  */

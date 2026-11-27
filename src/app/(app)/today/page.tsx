@@ -19,6 +19,7 @@ import { addDays, isEvening, monoDate } from "@/lib/dates";
 import { listMonth } from "@/lib/fits/service";
 import { calendarNeedsReconnect, planLine } from "@/lib/plans";
 import { newMatchCount } from "@/lib/shop/wants";
+import { getRuleText } from "@/lib/rules";
 import { TodayScreen, type WeatherView, type WeekDay } from "./today-screen";
 
 export const metadata = { title: "Today" };
@@ -64,10 +65,12 @@ export default async function TodayPage() {
   const needsLooks = enough && dress && !suggestion;
   const backPhoto = tryOn === "ready" ? await hasBackPhoto(personId) : false;
   const context = planLine(ctx.plan, ctx.tz) ?? "NO PLANS · EVERYDAY";
+  const householdTagline = (await getRuleText("householdTagline", "")).trim();
   return (
     <TodayScreen
       personId={personId}
       personName={person.name.split(" ")[0]}
+      householdTagline={householdTagline}
       mine={personId === me.id}
       canDress={dress}
       isAdmin={isAdmin(me)}

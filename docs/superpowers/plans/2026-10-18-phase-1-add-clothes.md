@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Jeff adds 10 real items from his iPhone in under 3 minutes: pick photos, the app cuts backgrounds, tags each piece with Claude, and he confirms each with one tap.
+**Goal:** the owner adds 10 real items from his iPhone in under 3 minutes: pick photos, the app cuts backgrounds, tags each piece with Claude, and he confirms each with one tap.
 
 **Architecture:** Photos go straight from the phone to the Railway bucket via presigned PUT (resized client-side to ≤1600px). A batch queue persisted in the database (and mirrored in IndexedDB for resume) processes entries one by one on request: remove.bg → cutout PNG → thumbnail → perceptual hash → Claude vision tags (structured output constrained to the editable lists) → `needs_confirm`. The confirm screen (design 03) creates the Item. Photos are served through an authenticated proxy route so privacy rules apply to every image.
 
@@ -22,7 +22,7 @@
 2. A remove.bg failure (quota, bad image) must leave the entry retryable with the original photo still usable as the item photo, never a stuck batch (Task 3 test).
 3. Claude returning a color/category that isn't in the lists must map to "unknown" and show the row for the user to pick, never crash or invent a list entry (Task 5 test).
 4. Duplicate detection must not flag two different black tees as the same unless the hash says so; "SAME?" merges photos into the existing item instead of creating a second one (Task 6 test).
-5. Viewing another person's closet (Q13 A): closets are browsable by family; only body data is private. Test: Olivia sees Mya's closet grid, but a minor's worn photos are shown only to the minor and parents (Task 8 test).
+5. Viewing another person's closet (Q13 A): closets are browsable by family; only body data is private. Test: Casey sees Devon's closet grid, but a minor's worn photos are shown only to the minor and parents (Task 8 test).
 
 ---
 
@@ -68,4 +68,4 @@
 - [ ] Commit.
 
 ### Task 9: Acceptance
-- [ ] Deploy; Jeff adds 10 real items on iPhone; measure time; screenshots of every new screen sent for approval in one batch.
+- [ ] Deploy; the owner adds 10 real items on iPhone; measure time; screenshots of every new screen sent for approval in one batch.

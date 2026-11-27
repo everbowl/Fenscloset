@@ -116,7 +116,7 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
     start(async () => { const r = await updateItemAction(it.id, patch); if (!r.ok) { setError(r.error); router.refresh(); } });
   }
   /** Laundry is three states, one tap each (it used to be a button that cycled through them). */
-  /** A stack: one copy at a time (F1, Jeff 3 Nov 2026); the counts and the summary word come back from the server. */
+  /** A stack: one copy at a time (F1, the owner 3 Nov 2026); the counts and the summary word come back from the server. */
   const counts = countsOf(it);
   function copyAction(a: CopyAction) {
     setError(undefined);
@@ -195,11 +195,11 @@ export function ItemEditor({ item, version, lists: initialLists, canEdit, canEdi
         ) : null}
       </div>
       <p className="mono mt-2 text-graphite">{[!it.mine ? it.ownerName : null, category?.name, copiesWord(counts), it.status, it.isFavorite ? "Favorite" : null].filter(Boolean).join(" · ")}</p>
-      {/* The one orange action on a piece (Jeff, 31 Oct 2026, E1): this piece in the mirror, on you or on the mannequin. */}
+      {/* The one orange action on a piece (the owner, 31 Oct 2026, E1): this piece in the mirror, on you or on the mannequin. */}
       {mirror && (mirror.tryOn === "ready" || mirror.mannequinAvailable) && !it.retired && mirrorCanPlace(category?.name) ? (
         <div className="mt-4"><Button size="lg" className="w-full" busy={m.busy} sub={mirror.tryOn === "ready" ? "This piece on your photo" : "On the mannequin · no body photo needed"} onClick={() => m.begin({ look: { kind: "closet", itemIds: [it.id] }, on: mirror.tryOn === "ready" ? "me" : "mannequin" })} data-testid="see-on-me">{m.busy ? "Dressing…" : mirror.tryOn === "ready" ? "See it on me" : "See it on a mannequin"}</Button></div>
       ) : null}
-      {/* Shop v2 item 1 (Jeff, 23 Oct 2026): what would complete this piece, products for it, looks from the closet. Outlined next to the orange one (D1). */}
+      {/* Shop v2 item 1 (the owner, 23 Oct 2026): what would complete this piece, products for it, looks from the closet. Outlined next to the orange one (D1). */}
       {!it.retired ? <Link href={`/closet/${it.id}/go-with`} className={buttonClass({ variant: "outline", className: "mt-3 w-full" })} data-testid="go-with">Shop for something to go with it <span aria-hidden>→</span></Link> : null}
 
       {justAdded ? (

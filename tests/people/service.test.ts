@@ -123,7 +123,7 @@ describe("people, invites, roles, removal", () => {
   it("an email that someone signs in with can change but not vanish", async () => {
     const j = await avery();
     await expect(updatePersonDetails(j.id, { email: null })).rejects.toThrow(/can't be cleared/);
-    await expect(updatePersonDetails(j.id, { email: "other@example.com" })).rejects.toThrow(/DEV password/); // 0535 is tied to the address
+    await expect(updatePersonDetails(j.id, { email: "other@example.com" })).rejects.toThrow(/DEV password/); // the one-time password is tied to the address
     const casey = await byName("Casey");
     await updatePersonDetails(casey.id, { email: "casey@example.com" });
     await updatePersonDetails(casey.id, { email: null }); // no password yet: clearing is fine

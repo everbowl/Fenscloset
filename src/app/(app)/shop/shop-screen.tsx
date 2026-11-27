@@ -21,7 +21,7 @@ import { brandFeedAction, brandFeedStatusAction, deleteLookupAction, lookupLinkA
 import type { TryOnState, TryOnView } from "@/lib/tryon";
 import { ago } from "./looking-for/ago";
 
-/** The call in plain words (Jeff, 31 Oct 2026, L1): it answers "Should I buy it?" directly. The hero line is the word alone. */
+/** The call in plain words (the owner, 31 Oct 2026, L1): it answers "Should I buy it?" directly. The hero line is the word alone. */
 const CALL_WORD = { FITS: "Buy it", RISKY: "Maybe", PASS: "Skip it" } as const;
 /** How often the screen asks after a lookup that is still running. */
 const POLL_MS = 2000;
@@ -153,7 +153,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
   // The answer takes the result's place: scroll it into view (Judge it on a card can be far below).
   useEffect(() => { if (thinking) pendingRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }); }, [thinking]);
 
-  // Shop v2 item 3 (Jeff, 23 Oct 2026): "suggest items from my favorite brands". The feed is refreshed in the
+  // Shop v2 item 3 (the owner, 23 Oct 2026): "suggest items from my favorite brands". The feed is refreshed in the
   // background when it is stale (never fetched, a day old, or the brand list changed) and on Refresh.
   const [feedBusy, setFeedBusy] = useState<{ step: string; startedAt: number } | null>(null);
   const [feedSecs, setFeedSecs] = useState(0);
@@ -205,7 +205,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
       {/* The right column on desktop (the ways in, Recent); on phones its children take their own places in the order. */}
       <div className="contents lg:col-start-2 lg:row-start-2 lg:flex lg:flex-col lg:gap-8 lg:self-start lg:sticky lg:top-24">
       <div className="order-2">
-        {/* Jeff, 31 Oct 2026 (M1): one orange way in, the other two beside it; a computer can also drop or paste a picture. */}
+        {/* the owner, 31 Oct 2026 (M1): one orange way in, the other two beside it; a computer can also drop or paste a picture. */}
         <Button size="lg" className="w-full" icon={<Icons.link />} sub="Any store page" disabled={thinking} onClick={() => setSheet("link")} data-testid="paste-link">Paste a link</Button>
         <div className="mt-3 grid grid-cols-2 gap-2">
           <Button variant="outline" className="h-[50px] px-2 text-[14px]" disabled={thinking} onClick={() => { setSource("screenshot"); file.current?.removeAttribute("capture"); file.current?.click(); }} data-testid="upload-screenshot">Screenshot</Button>
@@ -232,7 +232,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
       {/* The left column: the answer, then what is new. On phones the Looking-for strip sits under the answer. */}
       <div className="contents lg:col-start-1 lg:row-start-2 lg:flex lg:flex-col lg:gap-8">
       <div className="order-4 mt-6 lg:mt-0">
-        {/* Shop v2 item 2 (Jeff, 23 Oct 2026): "state what I'm looking for so the shopping tool lets me know". */}
+        {/* Shop v2 item 2 (the owner, 23 Oct 2026): "state what I'm looking for so the shopping tool lets me know". */}
         <Link href={`/shop/looking-for?for=${forPersonId}`} className="card tap flex min-h-[64px] items-center justify-between gap-3 px-4 py-3" data-testid="looking-for-link">
           <span className="flex min-w-0 flex-col gap-0.5">
             <span className="text-[17px] font-semibold">Looking for something?</span>
@@ -282,7 +282,7 @@ export function ShopScreen({ meId, people, forPersonId, selected, recent, tryOn,
             <div className="mt-2"><AddToLook personId={forPersonId} piece={{ title: selected.title ?? selected.read.name, url: selected.inputUrl, priceText: selected.priceText, imageKey: selected.imageKey, category: selected.read.categoryName }} testId="lookup-add-look" /></div>
           ) : null}
           {selected.similar.length ? (
-            // Jeff, 23 Oct 2026 (Shop v2, A): bigger, with a tap to see the two side by side.
+            // the owner, 23 Oct 2026 (Shop v2, A): bigger, with a tap to see the two side by side.
             <div className="mt-6" data-testid="own-similar">
               <h2 className="section">{forMe ? "You already own" : `${forName} already owns`} similar</h2>
               <p className="caption mt-0.5">Tap one to compare</p>

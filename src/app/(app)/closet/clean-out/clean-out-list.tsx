@@ -10,7 +10,7 @@ import { cleanOutAction, unretireAction } from "./actions";
 type Row = { id: string; name: string; thumbKey: string | null; categoryName: string | null; lastWornAt: string | null; createdAt: string; wearCount: number };
 type Decision = "keep" | "donate" | "sell" | "trim";
 const WORD: Record<Decision, string> = { keep: "Kept · back in 3 months", donate: "Donated", sell: "Set aside to sell", trim: "Trimmed" };
-/** A stack with more copies than its wears call for (Jeff, 2 Nov 2026: "advise when I should remove"). */
+/** A stack with more copies than its wears call for (the owner, 2 Nov 2026: "advise when I should remove"). */
 type Stack = { id: string; name: string; thumbKey: string | null; categoryName: string | null; copies: number; wears90: number; keep: number; cycleDays: number };
 
 const month = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", year: "numeric" }).toUpperCase();

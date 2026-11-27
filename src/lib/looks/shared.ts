@@ -1,5 +1,5 @@
 /**
- * Looks (Jeff, 2 Nov 2026, B1): the client-safe half. "I should be able to add a bunch of items to a look and then see
+ * Looks (the owner, 2 Nov 2026, B1): the client-safe half. "I should be able to add a bunch of items to a look and then see
  * it on a mannequin or me, with it being a mix of all things to buy, some things to buy plus some in my closet, or my
  * entire closet." A look holds store finds and closet pieces together; the one without a name is the open look the
  * tray shows; naming it saves it under Fits → Looks.

@@ -30,7 +30,7 @@ export default async function HelpPage() {
           </li>
         ))}
       </ul>
-      <p className="note mt-8">Stuck? Tell Jeff what you tapped and what you saw.</p>
+      <p className="note mt-8">Stuck? Tell an admin what you tapped and what you saw.</p>
     </div>
   );
 }

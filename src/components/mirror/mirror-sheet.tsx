@@ -18,7 +18,7 @@ import type { Mirror } from "./use-mirror";
 /**
  * "In the mirror": the look on the person's own body photo (theirs alone) or on the shared mannequin,
  * with the view row (on me, from behind, mannequin), the styling chips (pose, tuck, buttons…), "Dress
- * again", and the body photo right there (Jeff, 19 Oct 2026: the mirror must never send him away to
+ * again", and the body photo right there (the owner, 19 Oct 2026: the mirror must never send him away to
  * fix something it needs). Shared by Today, the closet's pick mode and a piece's page.
  */
 /** The line under the panel's button: what the mirror is about to dress. */
@@ -210,8 +210,8 @@ export function MirrorBody({ m, pieces, mine, personId, personName, tryOnState, 
 const TAG = "mono absolute left-1 top-1 bg-ink px-1 py-0.5 text-[11px] text-paper";
 
 /**
- * Before the mirror dresses a piece from the closet (Jeff, 24 Oct 2026): what would complete the look, every slot on one
- * panel (Jeff, 20 Nov 2026: one question at a time read as "it only asked about bottoms"). A bottom for a top, a top for
+ * Before the mirror dresses a piece from the closet (the owner, 24 Oct 2026): what would complete the look, every slot on one
+ * panel (the owner, 20 Nov 2026: one question at a time read as "it only asked about bottoms"). A bottom for a top, a top for
  * a bottom, shoes when the picture can show them; the closet's pieces for each slot as thumbnails, the Shop's suggestions
  * first; every row optional. The one button at the bottom dresses it.
  */
@@ -265,7 +265,7 @@ function CompletePanel({ m }: { m: Mirror }) {
 }
 
 /**
- * Under the picture (Jeff, 24 Oct 2026: "go to the bottom of the page and decide or observe suggested shoes, other
+ * Under the picture (the owner, 24 Oct 2026: "go to the bottom of the page and decide or observe suggested shoes, other
  * shirts or tops or bottoms to go with the outfit"): the closet's shoes, other tops and other bottoms, the Shop's
  * suggestions first; a tap swaps the piece in and the mirror dresses the look again.
  */

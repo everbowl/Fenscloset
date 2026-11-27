@@ -25,12 +25,12 @@ describe("seed", () => {
     expect(first.closets).toBe(1); // the Family closet only
     expect((await db.closet.findFirstOrThrow()).kind).toBe("family");
     expect(first.scales).toBe(3);
-    expect(first.rules).toBe(19); // 3 originals + the laundry cycle + the Not-now days + 8 size-band rules + button color + mirror engine + the Looking-for search interval + Compare's three switches
+    expect(first.rules).toBe(20); // 3 originals + the laundry cycle + the Not-now days + 8 size-band rules + button color + mirror engine + the Looking-for search interval + Compare's three switches + the household line
     // a rule that left the code (the Tidy and Smooth switch) is removed on the next deploy
     await db.rule.create({ data: { key: "photoRetouch", value: "off", label: "AI photo retouch", description: "gone" } });
     await seedDefaults();
     expect(await db.rule.findUnique({ where: { key: "photoRetouch" } })).toBeNull();
-    expect(await db.rule.count()).toBe(19);
+    expect(await db.rule.count()).toBe(20);
   });
 });
 

@@ -2,7 +2,7 @@ import type { ItemCardData } from "@/lib/items/query";
 import type { LaundryStatus } from "@/generated/prisma/client";
 
 /**
- * Closet views (Shop v2 item 5; Jeff, 28 Oct 2026: "C", filters and sorts). Client-safe: what a filter is, how
+ * Closet views (Shop v2 item 5; the owner, 28 Oct 2026: "C", filters and sorts). Client-safe: what a filter is, how
  * it lives in the URL, which pieces it keeps, how a sort orders them, and the counts the filter sheet shows.
  * Every facet comes from an editable list (Admin → Lists), so nothing here names a color or a season.
  */

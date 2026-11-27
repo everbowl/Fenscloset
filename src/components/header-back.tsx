@@ -7,7 +7,7 @@ import { lastClosetUrl, markClosetRestore } from "@/lib/closet-memory";
 import { parentOf as parentOfTrail, type Crumb } from "@/lib/crumbs";
 
 /**
- * The back control lives in the sticky header (Jeff, 19 Oct 2026: "back should never leave the
+ * The back control lives in the sticky header (the owner, 19 Oct 2026: "back should never leave the
  * header"). It shows on any page that has a parent, and goes to that parent, never off the site.
  * From a piece it goes back to the closet view the person left (tab, search, sort, filters, scroll).
  */

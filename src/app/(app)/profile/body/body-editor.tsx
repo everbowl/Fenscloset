@@ -62,7 +62,7 @@ export function BodyEditor({ ownerId, ownerFirst, isMinor, body, likely, canEdit
         ) : !isMinor ? <p className="note mt-3">Add height and weight to see likely sizes.</p> : null}
       </section>
 
-      {/* Sizes are edited in one place, the Brands page (Jeff, 31 Oct 2026, P1); here they are read. */}
+      {/* Sizes are edited in one place, the Brands page (the owner, 31 Oct 2026, P1); here they are read. */}
       <section data-testid="body-sizes">
         <div className="flex items-center justify-between gap-3">
           <h2 className="section">Sizes by brand</h2>

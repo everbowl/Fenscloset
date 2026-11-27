@@ -18,6 +18,10 @@ pasted into a chat. Claim work in `docs/SESSIONS.md` before starting it.
   `--project=iphone-webkit` (`PW_CHROMIUM=/opt/pw-browsers/chromium`), and `npm run build` with the e2e env sourced.
   Never run Vitest and Playwright at the same time.
 - `npm audit --omit=dev` and a secret scan of the diff; report both even when they find nothing.
+- Harness rules learned the hard way: run Vitest with the plain test environment (sourcing the e2e env adds the slow-mock
+  delays and the image tests time out); before `next start -p 3100`, free the port with `fuser -k 3100/tcp` (a `pkill` on
+  "next start" misses the `next-server` child, the new server logs EADDRINUSE and the old one serves a rewritten `.next`);
+  never edit the working tree while Playwright runs from it; never run Vitest and Playwright at the same time.
 
 ## Privacy and secrets
 - **Never write** the retired 4-digit dev value, the owner's e-mail address, or any family member's name or age into a commit,

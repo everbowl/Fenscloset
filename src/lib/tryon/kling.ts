@@ -4,7 +4,7 @@ import { fetchWithBackoff } from "@/lib/tryon/google";
 import { deleteObject, newKey, putObject, signDownload } from "@/lib/storage";
 
 /**
- * Kling virtual try-on, Kuaishou's engine (https://kling.ai): the third mirror engine beside Google and FASHN (Jeff,
+ * Kling virtual try-on, Kuaishou's engine (https://kling.ai): the third mirror engine beside Google and FASHN (the owner,
  * 24 Oct 2026: "add Kling"). This is Kling's Virtual Try-on 3.0 (15 Sept 2026); the Kolors endpoint it replaced
  * answers "404, 1203: This API is no longer available" since. Kling 3.0 reads the two pictures **by link**, so each one
  * sits in the bucket under tryon/<personId>/… for the length of the task, goes over as a signed link, and is removed as

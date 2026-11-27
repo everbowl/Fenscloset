@@ -3,7 +3,7 @@ import { LIST_DEFS, type ListKind } from "@/lib/lists/registry";
 
 export class RequestError extends Error {}
 
-/** "Jeff and Brittney": the admins, by first name, for the line after an ask. */
+/** "the owner and Blake": the admins, by first name, for the line after an ask. */
 async function adminFirstNames(): Promise<string> {
   const admins = await db.person.findMany({ where: { role: "admin", status: { not: "removed" } }, select: { name: true }, orderBy: { createdAt: "asc" } });
   const names = admins.map((a) => a.name.split(" ")[0]).filter(Boolean);
@@ -13,7 +13,7 @@ async function adminFirstNames(): Promise<string> {
 }
 
 /**
- * "Ask Jeff to add it" (Jeff, 31 Oct 2026, J1): someone who can't edit the lists asks for a word; an admin adds or
+ * "Ask the owner to add it" (the owner, 31 Oct 2026, J1): someone who can't edit the lists asks for a word; an admin adds or
  * dismisses it under Admin → Lists. The same open ask is not recorded twice.
  */
 export async function requestListEntry(personId: string, kind: ListKind, rawName: string, parentId?: string | null): Promise<{ admins: string; already: boolean }> {

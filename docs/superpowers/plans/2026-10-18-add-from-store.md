@@ -14,7 +14,7 @@
 2. Each line is matched by Google Shopping search (`store + name + color`), shown with the matched picture, price and PICK ANOTHER.
 3. ADD n PIECES creates the entries like the link flow, with `purchaseDate` from the receipt.
 
-## Photo nudges (Jeff, 18 Oct)
+## Photo nudges (the owner, 18 Oct)
 - A store-photo piece worn once: the item page suggests "Add a photo of your own" (ADD PHOTO / NOT NOW).
 - Every piece: after 6 wears since the last photo nudge (or since it was added), suggest a fresh photo. Never required. `photoNudgedAt` records the wearCount when the person answered.
 - Adding your own hanger/flat-lay photo to a store-photo piece makes it the piece's photo and clears the store-photo mark.

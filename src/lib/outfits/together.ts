@@ -33,7 +33,7 @@ export async function togetherPeople(viewer: Viewer): Promise<{ id: string; name
 
 type Per = { id: string; name: string; label: string; cand: CandidateSet; style: string };
 
-/** First names, made unique for the model's answer: two Jeffs become "Jeff (1)" and "Jeff (2)" (review D 8.3). */
+/** First names, made unique for the model's answer: two Jeffs become "the owner (1)" and "the owner (2)" (review D 8.3). */
 function uniqueLabels(names: string[]): string[] {
   const counts = new Map<string, number>();
   for (const n of names) counts.set(n, (counts.get(n) ?? 0) + 1);

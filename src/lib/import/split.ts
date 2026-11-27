@@ -7,7 +7,7 @@ import { enqueueProcessing } from "@/lib/import/queue";
 import { ImportError } from "@/lib/import/service";
 
 /**
- * Several shirts in one photo (Jeff, 2 Nov 2026, E1): Claude finds each garment laid out in the picture and its
+ * Several shirts in one photo (the owner, 2 Nov 2026, E1): Claude finds each garment laid out in the picture and its
  * color; every garment is cropped out as its own photo and becomes its own entry in the same batch, ready for
  * the normal card. Pieces of the same color become one entry with that many copies.
  */

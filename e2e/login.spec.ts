@@ -1,5 +1,6 @@
 import { expect, test } from "./fixtures";
 import { resetAndSeed } from "./helpers";
+import { DEV_PASSWORD } from "../prisma/seed-data";
 
 test.describe.configure({ mode: "serial" });
 
@@ -9,13 +10,14 @@ test("signed-out visitors are sent to login, which shows Forgot password and the
   await page.goto("/today");
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole("link", { name: "Forgot password?" })).toBeVisible();
+  await expect(page.getByText("A private wardrobe for one family")).toBeVisible(); // the sign-in page names no family (security item 2)
   await expect(page.getByRole("status").filter({ hasText: /dev mode/i })).toBeVisible();
 });
 
-test("Avery logs in with 0535 once, is forced to change it, then 0535 is dead", async ({ page }) => {
+test("Avery logs in with the one-time password once, is forced to change it, then the one-time password is dead", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel("Email").fill("avery@example.test");
-  await page.getByLabel("Password").fill("0535");
+  await page.getByLabel("Password").fill(DEV_PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
 
   await expect(page).toHaveURL(/\/change-password$/);
@@ -25,10 +27,10 @@ test("Avery logs in with 0535 once, is forced to change it, then 0535 is dead", 
   await page.goto("/today");
   await expect(page).toHaveURL(/\/change-password$/);
 
-  await page.getByLabel("New password").fill("0535abcd"); // long enough for the field, still the DEV password inside: the server refuses it
+  await page.getByLabel("New password").fill(`${DEV_PASSWORD}abcd`); // long enough for the field, still the DEV password inside: the server refuses it
   await page.getByRole("button", { name: "Save new password" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "Pick a real one" })).toBeVisible();
-  // With 0535 spent and no real password yet there is no way out but setting one (review A A2).
+  // With the one-time password spent and no real password yet there is no way out but setting one (review A A2).
   await expect(page.getByTestId("change-password-signout")).toHaveCount(0);
 
   await page.getByLabel("New password").fill("closet-rocks-2026");
@@ -43,7 +45,7 @@ test("Avery logs in with 0535 once, is forced to change it, then 0535 is dead", 
   await expect(page).toHaveURL(/\/login$/);
 
   await page.getByLabel("Email").fill("avery@example.test");
-  await page.getByLabel("Password").fill("0535");
+  await page.getByLabel("Password").fill(DEV_PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "don't match" })).toBeVisible();
   await expect(page).toHaveURL(/\/login$/);

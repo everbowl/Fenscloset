@@ -75,7 +75,7 @@ export function useMirror(personId: string, wardrobe: Wardrobe = EMPTY_WARDROBE,
 
   /**
    * From a piece or the closet's picks: offer to complete the look first, every missing slot on one panel (a bottom for
-   * a top, a top for a bottom, shoes when the picture can show them), each optional (Jeff, 20 Nov 2026: one question
+   * a top, a top for a bottom, shoes when the picture can show them), each optional (the owner, 20 Nov 2026: one question
    * at a time read as "it asked me only about bottoms"); a one-piece or a full pick goes straight to the mirror.
    */
   const begin = useCallback((req: { look: MirrorLook; on: MirrorOn; pieces?: string }) => {

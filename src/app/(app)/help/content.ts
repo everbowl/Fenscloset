@@ -23,7 +23,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     { text: "Tap CLOSET (bottom of the screen on a phone, top on a computer).", cue: { kind: "nav", tab: "Closet" } },
     { text: "Tap a word at the top (TOPS, SHOES…) to see only those.", cue: { kind: "tabs", active: "Tops", others: ["Bottoms", "Shoes"] } },
     { text: "Tap a piece to open it. Tap IN THE WASH? when it's dirty so the app stops suggesting it.", cue: { kind: "button", label: "In the wash?", variant: "secondary" } },
-    { text: "Tap your name at the top left to look at someone else's closet, or the whole FAMILY closet.", cue: { kind: "switcher", label: "Jeff" } },
+    { text: "Tap your name at the top left to look at someone else's closet, or the whole FAMILY closet.", cue: { kind: "switcher", label: "Your name" } },
     { text: "Ten of the same shirt show as one card with ×10. On the piece, tap ONE IN THE WASH as you wear them; Today keeps offering the shirt while any copy is clean, and the Clean-out says when ten is too many.", cue: { kind: "button", label: "One in the wash" } },
     { text: "WHAT’S NEEDED at the top of your closet lists what the app still needs from you: a front photo for the mirror, your size in a favorite brand, pieces still on the store’s photo. Fix it right there, or tap NOT NOW to hide that row for a while.", cue: { kind: "strip", label: "What’s needed · 3" } },
   ] },
@@ -58,10 +58,10 @@ export const HELP_TOPICS: HelpTopic[] = [
     { text: "Tap PASTE A LINK and paste the store link, or tap SCREENSHOT, or tap TAKE A PHOTO in the dressing room.", cue: { kind: "button", label: "Paste a link" } },
     { text: "Read the verdict: BUY IT, MAYBE, or SKIP IT, with one reason.", cue: { kind: "verdict", word: "MAYBE" } },
     { text: "Look at WEAR IT WITH to see three ways to wear it with clothes you already own.", cue: { kind: "board" } },
-    { text: "Shopping for someone else? Tap SHOPPING FOR at the top. You can shop for your kids, or anyone who allowed it in their Settings.", cue: { kind: "switcher", label: "Shopping for Mya" } },
+    { text: "Shopping for someone else? Tap SHOPPING FOR at the top. You can shop for your kids, or anyone who allowed it in their Settings.", cue: { kind: "switcher", label: "Shopping for a kid" } },
   ] },
-  { slug: "profile", title: "Your", accent: "profile", blurb: "Sizes, style, stores, and who sees what.", link: { href: "/profile", label: "Open Profile" }, cover: { kind: "switcher", label: "Jeff" }, steps: [
-    { text: "Tap your name at the top left, then PROFILE.", cue: { kind: "switcher", label: "Jeff" } },
+  { slug: "profile", title: "Your", accent: "profile", blurb: "Sizes, style, stores, and who sees what.", link: { href: "/profile", label: "Open Profile" }, cover: { kind: "switcher", label: "the owner" }, steps: [
+    { text: "Tap your name at the top left, then PROFILE.", cue: { kind: "switcher", label: "Your name" } },
     { text: "BODY: your sizes and measurements. Only you can see them, plus parents for kids, plus anyone you choose in Settings. They never go into a store search.", cue: { kind: "row", label: "Body", value: "Private" } },
     { text: "Body photos: when you add one, pick ONLY ME to keep it to yourself. The app can still use it to dress you.", cue: { kind: "tabs", active: "Only me", others: ["Parents", "Family"] } },
     { text: "STYLE: colors you love, colors you avoid, words that describe you. The looks follow this.", cue: { kind: "row", label: "Style", value: "Loves navy" } },

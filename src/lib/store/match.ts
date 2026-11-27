@@ -11,7 +11,7 @@ import { ItemError } from "@/lib/items/service";
 import { priceNumber, storeIdByName, type StoreMeta } from "@/lib/store/add";
 
 /**
- * Style match (Jeff, 19 Oct 2026): once a brand is on a piece, find the same style at the store so
+ * Style match (the owner, 19 Oct 2026): once a brand is on a piece, find the same style at the store so
  * the closet gets the details (store, price, link, fabric, fit notes) and the store's photos sit
  * behind the person's own photo. The search carries only brand and product words, never the person.
  */

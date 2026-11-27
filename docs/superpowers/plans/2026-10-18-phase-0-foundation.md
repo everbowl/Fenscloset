@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A deployable Next.js app where all four family members can log in at www.fenscloset.com, Jeff's one-time DEV password 0535 is enforced, every list is admin-editable, and the app installs to an iPhone home screen.
+**Goal:** A deployable Next.js app where all four family members can log in at www.fenscloset.com, the owner's one-time DEV password the retired dev value is enforced, every list is admin-editable, and the app installs to an iPhone home screen.
 
 **Architecture:** Single Next.js 15 App Router service. Prisma + Postgres hold people, sessions, tokens, and every taxonomy list. Auth is in-house (argon2id + DB sessions + httpOnly cookie). Admin screens are driven by one generic list-CRUD component backed by a registry of Prisma delegates, so adding a list kind is a one-line registration.
 
@@ -16,13 +16,13 @@
 - No secrets in code. All config via env: `DATABASE_URL`, `SESSION_SECRET`, `DEV_MODE`, `RESEND_API_KEY`, `APP_URL`, `EMAIL_FROM`.
 - Mobile-first: every screen works at 390px wide (iPhone 15) and at desktop widths.
 - Every list (people, categories, subcategories, colors, patterns, fabrics, seasons, formality levels, occasions, tags, brands, stores, closets, check-in scales/options, rules) is editable, creatable, deletable by admins in the app.
-- Login page has a visible "Forgot password" link. DEV MODE: `jeff@everbowl.com` / `0535` works exactly once, then forces a password change; a red banner shows while 0535 is active.
-- Roles: `admin`, `member`, `minor`. Seed: Jeff (admin), Brittney (admin), Olivia (member, 21), Mya (minor, 15, guardians Jeff + Brittney).
+- Login page has a visible "Forgot password" link. DEV MODE: `the owner's address` / `the retired dev value` works exactly once, then forces a password change; a red banner shows while the retired dev value is active.
+- Roles: `admin`, `member`, `minor`. Seed: the owner (admin), Blake (admin), Casey (member, 21), Devon (minor, 15, guardians the owner + Blake).
 
 ## Review Focus
 
-1. A second login attempt with 0535 after it was used must fail with the normal "wrong password" message (test in Task 5).
-2. `DEV_MODE=false` must make 0535 fail even on a fresh seed (test in Task 5).
+1. A second login attempt with the retired dev value after it was used must fail with the normal "wrong password" message (test in Task 5).
+2. `DEV_MODE=false` must make the retired dev value fail even on a fresh seed (test in Task 5).
 3. A non-admin (member/minor) hitting `/admin/*` must get a 403 page, not a redirect loop and not the data (test in Task 8).
 4. Deleting a list entry that is in use (e.g. a category with items, a closet with items) must be blocked with a clear message rather than cascading (test in Task 7; items don't exist yet, so the guard is written against the relation count and tested with a closet that has an ItemCloset row stubbed).
 5. Password reset token must be single-use and expire after 60 minutes (test in Task 6).
@@ -62,9 +62,9 @@
 - Create: `prisma/seed.ts`, `prisma/seed-data.ts`, `tests/seed.test.ts`
 
 **Interfaces:**
-- Produces: `npm run db:seed` idempotent (upsert by email / by name+kind). Seeds: 4 people; GuardianLink Mya→Jeff, Mya→Brittney; personal closet per person + "Family" closet; categories (Tops, Bottoms, Dresses, Outerwear, Shoes, Purses, Hats, Belts, Jewelry, Sunglasses, Activewear, Swimwear, Sleepwear, Accessories) with subcategories; 24 colors with hex; patterns; fabrics; seasons (Spring, Summer, Fall, Winter); formality (Lounge, Casual, Smart Casual, Business, Cocktail, Formal); occasions; starter tags; brands; stores; check-in scales Tan (None, Light, Medium, Deep), Hair (Great, Fine, Bad hair day), Skin (Clear, Okay, Breakout); rules `noRepeatDays=14`, `notWornMonths=6`. When `DEV_MODE=true`, Jeff gets `passwordHash=hash("0535")`, `mustChangePassword=true`, `devPasswordActive=true`; otherwise Jeff gets no password (invite flow).
+- Produces: `npm run db:seed` idempotent (upsert by email / by name+kind). Seeds: 4 people; GuardianLink Devon→the owner, Devon→Blake; personal closet per person + "Family" closet; categories (Tops, Bottoms, Dresses, Outerwear, Shoes, Purses, Hats, Belts, Jewelry, Sunglasses, Activewear, Swimwear, Sleepwear, Accessories) with subcategories; 24 colors with hex; patterns; fabrics; seasons (Spring, Summer, Fall, Winter); formality (Lounge, Casual, Smart Casual, Business, Cocktail, Formal); occasions; starter tags; brands; stores; check-in scales Tan (None, Light, Medium, Deep), Hair (Great, Fine, Bad hair day), Skin (Clear, Okay, Breakout); rules `noRepeatDays=14`, `notWornMonths=6`. When `DEV_MODE=true`, the owner gets `passwordHash=hash("the retired dev value")`, `mustChangePassword=true`, `devPasswordActive=true`; otherwise the owner gets no password (invite flow).
 
-- [ ] Step 1: Test: running seed twice yields same counts; Jeff has devPasswordActive only when DEV_MODE=true.
+- [ ] Step 1: Test: running seed twice yields same counts; the owner has devPasswordActive only when DEV_MODE=true.
 - [ ] Step 2: Implement; wire `"prisma": {"seed": "tsx prisma/seed.ts"}`.
 - [ ] Step 3: PASS. Commit `feat(db): seed people, closets, default lists, rules`.
 
@@ -80,7 +80,7 @@
 - [ ] Step 2: Manifest: name "Fen's Closet", `display: standalone`, theme color, 192/512 icons (generated SVG→PNG with sharp script `scripts/icons.ts`). Serwist service worker with offline fallback page.
 - [ ] Step 3: Playwright smoke: `/today` renders tab bar at 390×844; manifest served with correct `display`. Commit `feat(ui): app shell, components, PWA manifest and service worker`.
 
-### Task 5: Login + DEV MODE 0535 rule + forced password change
+### Task 5: Login + DEV MODE the retired dev value rule + forced password change
 
 **Files:**
 - Create: `src/app/(auth)/layout.tsx`, `src/app/(auth)/login/page.tsx`, `src/app/(auth)/login/actions.ts`, `src/app/(auth)/change-password/page.tsx`, `src/app/(auth)/change-password/actions.ts`, `src/lib/auth/login.ts`, `src/lib/auth/dev-mode.ts`, `src/middleware.ts`, `tests/auth/login.test.ts`, `e2e/login.spec.ts`
@@ -88,10 +88,10 @@
 **Interfaces:**
 - Produces: `login(email, password, meta): Promise<{ok:true; person; usedDevPassword:boolean} | {ok:false; reason:'invalid'|'no_password'}>`; `isDevMode(): boolean` (env `DEV_MODE === 'true'`); middleware redirects unauthenticated to `/login`, and authenticated-with-`mustChangePassword` to `/change-password` for every route except `/change-password`, `/logout`, `/api/health`.
 
-- [ ] Step 1: Tests: (a) DEV_MODE=true + fresh seed: 0535 logs Jeff in, sets `devPasswordActive=false`, `devPasswordUsedAt` set, returns `usedDevPassword=true`; (b) second 0535 attempt → `{ok:false,reason:'invalid'}`; (c) DEV_MODE=false + fresh seed → 0535 fails; (d) wrong password fails; (e) person with no passwordHash → `no_password`.
-- [ ] Step 2: FAIL. Step 3: Implement; on dev password use, `console.error('[DEV-MODE] 0535 used by jeff@everbowl.com at <iso>')` so it shows in Railway logs.
-- [ ] Step 4: Login page: email, password, "Forgot password?" link under the button, red banner when `isDevMode()` and Jeff's `devPasswordActive` is true: "DEV password 0535 is active for jeff@everbowl.com. It works once. Change it right after logging in." After the dev login, the app banner reads "You logged in with the one-time DEV password. Set a new password now." and middleware forces `/change-password` (new password ≥ 8 chars, not "0535").
-- [ ] Step 5: e2e: dev login → forced change → lands on /today; logout; login with new password works; 0535 fails. Commit `feat(auth): login, one-time DEV password rule, forced password change`.
+- [ ] Step 1: Tests: (a) DEV_MODE=true + fresh seed: the retired dev value logs the owner in, sets `devPasswordActive=false`, `devPasswordUsedAt` set, returns `usedDevPassword=true`; (b) second the retired dev value attempt → `{ok:false,reason:'invalid'}`; (c) DEV_MODE=false + fresh seed → the retired dev value fails; (d) wrong password fails; (e) person with no passwordHash → `no_password`.
+- [ ] Step 2: FAIL. Step 3: Implement; on dev password use, `console.error('[DEV-MODE] the retired dev value used by the owner's address at <iso>')` so it shows in Railway logs.
+- [ ] Step 4: Login page: email, password, "Forgot password?" link under the button, red banner when `isDevMode()` and the owner's `devPasswordActive` is true: "DEV password the retired dev value is active for the owner's address. It works once. Change it right after logging in." After the dev login, the app banner reads "You logged in with the one-time DEV password. Set a new password now." and middleware forces `/change-password` (new password ≥ 8 chars, not "the retired dev value").
+- [ ] Step 5: e2e: dev login → forced change → lands on /today; logout; login with new password works; the retired dev value fails. Commit `feat(auth): login, one-time DEV password rule, forced password change`.
 
 ### Task 6: Forgot / reset password via Resend
 
@@ -128,14 +128,14 @@
 
 - [ ] Step 1: Tests: invite accept creates active person with personal closet; role change; guardians; remove revokes sessions; member cannot call admin actions.
 - [ ] Step 2: Screens: People list with role badges; person detail: role select, guardians (for minors), "Send invite" (email now; SMS button present but disabled with "SMS arrives in Phase 2" until Twilio keys exist), copy link; Remove → sheet asking "Delete their items or move them to the Family closet?"; Rules page with two editable numbers.
-- [ ] Step 3: e2e: Jeff invites a test person, accepts in a second context, sees own closet; member visiting /admin/people gets 403. Commit `feat(admin): people, roles, guardians, invites, rules`.
+- [ ] Step 3: e2e: the owner invites a test person, accepts in a second context, sees own closet; member visiting /admin/people gets 403. Commit `feat(admin): people, roles, guardians, invites, rules`.
 
 ### Task 9: Deploy to Railway + domain
 
 **Files:**
 - Modify: `README.md` (runbook), `.env.example`
 
-- [ ] Step 1: Jeff's Railway project connected to GitHub `everbowl/Fenscloset`; variables set; Postgres plugged; `DEV_MODE=true`.
+- [ ] Step 1: the owner's Railway project connected to GitHub `everbowl/Fenscloset`; variables set; Postgres plugged; `DEV_MODE=true`.
 - [ ] Step 2: Verify `/api/health`, run seed once via `railway run npm run db:seed` (or one-shot command).
 - [ ] Step 3: Custom domain `www.fenscloset.com` (CNAME at GoDaddy) + GoDaddy forwarding of bare domain → www. Verify HTTPS.
-- [ ] Step 4: Phase 0 acceptance on iPhone: install to home screen; Jeff logs in with 0535 once; forced change; forgot-password email arrives; admin lists editable. Report to Jeff.
+- [ ] Step 4: Phase 0 acceptance on iPhone: install to home screen; the owner logs in with the retired dev value once; forced change; forgot-password email arrives; admin lists editable. Report to the owner.

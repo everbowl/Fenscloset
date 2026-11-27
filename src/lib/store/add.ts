@@ -172,7 +172,7 @@ export type StoreAddResult = { batchId: string; entryIds: string[]; pieces: numb
 
 /**
  * Make the entry: the store photo is downloaded once and stored under `originals/`; one entry stands for every
- * identical piece (`quantity`, Jeff 3 Nov 2026: ten of the same shirt is one card with ten copies), and a piece
+ * identical piece (`quantity`, the owner 3 Nov 2026: ten of the same shirt is one card with ten copies), and a piece
  * with store facts lands in the closet on its own once tagged (C1). Returns the batch to continue on.
  *
  * When the store will not hand over its photo (hot-link block, an odd image type, a timeout) the piece is still
@@ -218,7 +218,7 @@ export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T, i:
 }
 
 /**
- * Several rows of one product at once (Jeff, 2 Nov 2026: "I own 7 of these, all Medium, these colors…", or
+ * Several rows of one product at once (the owner, 2 Nov 2026: "I own 7 of these, all Medium, these colors…", or
  * a count beside every color): every row becomes its entries in the same open batch, a few downloads at a time
  * (review B E9). Rows with no count are skipped.
  */

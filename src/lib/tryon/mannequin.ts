@@ -8,7 +8,7 @@ import { MANNEQUIN_BASE_KEY } from "@/lib/tryon/mannequin-key";
 import type { Viewer } from "@/lib/people/visibility";
 
 /**
- * SEE IT ON for anyone without a try-on of their own (Jeff, 18 Oct 2026, T A): the look dressed on a
+ * SEE IT ON for anyone without a try-on of their own (the owner, 18 Oct 2026, T A): the look dressed on a
  * plain mannequin. No body photo and no measurements are involved, so it is allowed for minors and
  * for a parent dressing a minor. The mannequin itself is one shared picture, made once (Gemini image)
  * and kept at MANNEQUIN_BASE_KEY; each look is one Gemini image call with the mannequin plus up to

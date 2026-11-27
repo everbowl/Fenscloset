@@ -246,7 +246,7 @@ export function plainError(raw: string | null | undefined): string {
   if (e.includes("unsupported image") || e.includes("heic") || e.includes("heif") || e.includes("decode") || e.includes("jpeg, png or webp")) return "This photo is in a format the app can’t read. A screenshot of it works.";
   if (e.includes("413") || e.includes("too large") || e.includes("too big") || e.includes("entity too large")) return "This photo is too big to upload.";
   if (e.includes("timed out") || e.includes("took too long")) return "That took too long. Try again.";
-  if (e.includes("api_key") || e.includes("api key") || e.includes("not configured") || e.includes("not set up")) return "Tagging isn’t set up on the site yet. Jeff has been told.";
+  if (e.includes("api_key") || e.includes("api key") || e.includes("not configured") || e.includes("not set up")) return "Tagging isn’t set up on the site yet. the owner has been told.";
   if (e.includes("failed to fetch") || e.includes("network") || e.includes("load failed")) return "The connection dropped. It will try again.";
   if (e.includes("could not add it on its own")) return raw!.replace(/^Could not add it on its own: /i, "Couldn’t add it on its own: ");
   if (/\b5\d\d\b/.test(e)) return "The site hiccuped. Try again in a moment.";

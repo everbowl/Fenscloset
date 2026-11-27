@@ -19,7 +19,7 @@ export type RuleKind = "choice" | "onoff" | "color" | "text" | "number";
 /** Which input a rule wants is decided by its key, never by the value it happens to hold (review E D1: a number rule set to 0 or 1 turned into an On/Off toggle). */
 export const RULE_ONOFF_KEYS: string[] = ["compareGoogle", "compareFashn", "compareKling"];
 export const RULE_COLOR_KEYS: string[] = ["accentColor"];
-export const RULE_TEXT_KEYS: string[] = ["timezone"];
+export const RULE_TEXT_KEYS: string[] = ["timezone", "householdTagline"];
 
 /** The words on the Rules page, by key: one plain line each, no build notes, no key names. (The row in the database keeps the value; the copy lives here.) */
 export const RULE_COPY: Record<string, { label: string; description: string; unit?: string }> = {
@@ -28,6 +28,7 @@ export const RULE_COPY: Record<string, { label: string; description: string; uni
   laundryCycleDays: { label: "Days between washes", description: "With ten of the same shirt, this says how many you really need: the Clean-out suggests the rest can go.", unit: "days" },
   needSnoozeDays: { label: "Days a Not now lasts", description: "Not now on a What’s-needed row of the Closet hides that row for this many days.", unit: "days" },
   timezone: { label: "Household time zone", description: "When “today” starts for check-ins, looks and the Fits calendar." },
+  householdTagline: { label: "Household line on Today", description: "One line under the date on Today once someone is signed in, e.g. “The Smith family wardrobe”. Empty shows nothing. The sign-in page never shows it." },
   accentColor: { label: "Button color", description: "The color of the main buttons. Everything else stays black and white." },
   mirrorEngine: { label: "Mirror engine", description: "Who dresses a look on a body photo. Compare runs the engines switched on below, side by side." },
   compareGoogle: { label: "Compare includes Google", description: "Off leaves Google out of Compare without removing its key." },
@@ -45,11 +46,11 @@ export const RULE_COPY: Record<string, { label: string; description: string; uni
 };
 
 /** The order and the headings on the Rules page. Keys not listed here show at the end under Other. */
-/** `advanced` groups fold under one "Advanced" heading on the Rules page (Jeff, 31 Oct 2026, R1). */
+/** `advanced` groups fold under one "Advanced" heading on the Rules page (the owner, 31 Oct 2026, R1). */
 export const RULE_GROUPS: { title: string; blurb?: string; keys: string[]; compact?: boolean; advanced?: boolean }[] = [
   { title: "Outfits", keys: ["noRepeatDays", "notWornMonths", "laundryCycleDays"] },
   { title: "Closet", keys: ["needSnoozeDays"] },
-  { title: "Household", keys: ["timezone", "accentColor"] },
+  { title: "Household", keys: ["householdTagline", "timezone", "accentColor"] },
   { title: "Mirror", keys: ["mirrorEngine", "compareGoogle", "compareFashn", "compareKling"], advanced: true },
   { title: "Shop", keys: ["wantSweepHours"] },
   { title: "Likely sizes", blurb: "A starting point from height and weight, shown on the Body page and offered when someone records a size.", keys: ["sizeBandXsMaxLb", "sizeBandSMaxLb", "sizeBandMMaxLb", "sizeBandLMaxLb", "sizeBandXlMaxLb", "sizeTallIn", "sizeShortIn", "waistDivisorX10"], compact: true, advanced: true },

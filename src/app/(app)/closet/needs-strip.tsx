@@ -16,7 +16,7 @@ type Named = { id: string; name: string };
 const SHOWN = 3;
 
 /**
- * "What's needed" at the top of your own closet (Jeff, 2 Nov 2026; D1): one row per gap with the fix in the row
+ * "What's needed" at the top of your own closet (the owner, 2 Nov 2026; D1): one row per gap with the fix in the row
  * (the photo picker, the size sheet, the section pills, a link to the pieces), and Not now to hide a row for a
  * while (Admin → Rules says how long). Three rows show; the rest wait behind "n more".
  */

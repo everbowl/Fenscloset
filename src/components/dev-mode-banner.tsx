@@ -1,6 +1,6 @@
 import { devPasswordLive } from "@/lib/auth/dev-banner";
 
-/** The black DEV strip from the sign-in mockup. Shown only while the one-time 0535 password is live. */
+/** The black DEV strip from the sign-in mockup. Shown only while the one-time dev password is live. */
 export async function DevModeBanner() {
   let active = false;
   try {

@@ -7,7 +7,7 @@ import { looksLikeStaleBuild } from "@/components/ui/stale-build";
 
 /**
  * Something failed inside the shell: say so in the app's voice, offer the ways on. A page left open across a deploy gets
- * one way only, Reload, because Try again would call the build that is gone (Jeff, 23 Nov 2026: no dead buttons after a
+ * one way only, Reload, because Try again would call the build that is gone (the owner, 23 Nov 2026: no dead buttons after a
  * deploy). The raw error goes to the console, never to the family.
  */
 export default function AppError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {

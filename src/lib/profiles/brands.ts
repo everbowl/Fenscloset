@@ -3,7 +3,7 @@ import { ProfileError } from "@/lib/profiles/service";
 import { canSeeBodyData, type Viewer } from "@/lib/people/visibility";
 
 /**
- * My brands & sizes (Jeff, 18 Oct 2026): the brands a person wears, their size in each per item
+ * My brands & sizes (the owner, 18 Oct 2026): the brands a person wears, their size in each per item
  * type (Tops L, Bottoms 32…), and the brand's store link. The confirm card offers them as one-tap
  * picks, so adding fifteen shirts is "which brand?" and the right size and link come along.
  * Favorites (Person.favoriteBrands) say which brands; BodySizeByBrand holds one size per category

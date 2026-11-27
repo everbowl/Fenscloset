@@ -4,7 +4,7 @@ import type { LikelySizes } from "@/lib/profiles/size-options";
 export type { LikelySizes } from "@/lib/profiles/size-options";
 
 /**
- * Sizes by item type (Jeff, 18 Oct 2026): the size options offered per category come from the
+ * Sizes by item type (the owner, 18 Oct 2026): the size options offered per category come from the
  * editable Sizes list (Admin → Lists → Sizes), measurements are picked from preloaded options,
  * and height + weight give "likely sizes" as a starting point. Nothing here is shared beyond the
  * body-data rules; likely sizes are computed on the fly, never stored.

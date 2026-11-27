@@ -13,7 +13,7 @@ export { MAX_LOOK_PIECES } from "@/lib/looks/shared";
 export type { LookPieceInput, LookSummary, LookView } from "@/lib/looks/shared";
 
 /**
- * Looks (Jeff, 2 Nov 2026, B1): store finds and closet pieces in one look, dressed on the person or the mannequin
+ * Looks (the owner, 2 Nov 2026, B1): store finds and closet pieces in one look, dressed on the person or the mannequin
  * (src/lib/tryon: the store pictures ride along as extra garments). Each person has at most one open look (no name);
  * "Add to a look" lands there; naming it saves it under Fits → Looks. Whoever may shop for the person (the person, a
  * parent of a minor, a shopper they allowed) may build it.

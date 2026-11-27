@@ -1,6 +1,6 @@
 # Phase 6 — Make outfitting great (taste loops)
 
-**Goal:** the looks engine stops being "fine" and starts feeling like a stylist who knows the person. Three feedback loops plus one wow feature, approved by Jeff 18 Oct 2026 (Q21 A visual ranking, Q22 A taste memory, Q23 A inspiration + "how did it go?", Q24 B virtual try-on adults only, opt-in).
+**Goal:** the looks engine stops being "fine" and starts feeling like a stylist who knows the person. Three feedback loops plus one wow feature, approved by the owner 18 Oct 2026 (Q21 A visual ranking, Q22 A taste memory, Q23 A inspiration + "how did it go?", Q24 B virtual try-on adults only, opt-in).
 
 ## Done means
 1. **Visual ranking** ✔ — text pass drafts count+2 looks, vision pass sees the cutouts and keeps the best (`rankVisually`).

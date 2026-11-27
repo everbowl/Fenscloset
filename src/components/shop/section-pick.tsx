@@ -9,7 +9,7 @@ import { cn } from "@/lib/cn";
 type Named = { id: string; name: string };
 
 /**
- * Which part of a store the person being shopped for shops in (Jeff, 2 Nov 2026). Unset: a one-tap ask
+ * Which part of a store the person being shopped for shops in (the owner, 2 Nov 2026). Unset: a one-tap ask
  * right on the Shop, nobody leaves the page to fix it. Set: a small pill under the title that opens the list.
  * Anyone who may shop for the person may pick it (the person, a parent of a minor, a shopper they allowed).
  */

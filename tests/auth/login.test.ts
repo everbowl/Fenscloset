@@ -6,16 +6,17 @@ import { hasUsablePassword, login } from "@/lib/auth/login";
 import { hashPassword } from "@/lib/auth/password";
 import { setPassword, validateNewPassword } from "@/lib/auth/change-password";
 import { checkRateLimit, MAX_TRIES, noteFailure, clearRateLimit, rateLimitKey, resetRateLimits } from "@/lib/auth/rate-limit";
+import { DEV_PASSWORD } from "../../prisma/seed-data";
 
-describe("login + DEV MODE 0535 rule", () => {
+describe("login + DEV MODE the one-time password rule", () => {
   beforeEach(async () => {
     await resetDb();
     process.env.DEV_MODE = "true";
     await seed();
   });
 
-  it("lets Avery in once with 0535, then says it was used until a real password is saved", async () => {
-    const first = await login("Avery@Example.test", "0535");
+  it("lets Avery in once with the one-time password, then says it was used until a real password is saved", async () => {
+    const first = await login("Avery@Example.test", DEV_PASSWORD);
     expect(first.ok).toBe(true);
     if (!first.ok) return;
     expect(first.usedDevPassword).toBe(true);
@@ -27,13 +28,13 @@ describe("login + DEV MODE 0535 rule", () => {
     expect(avery.passwordHash).not.toBeNull();
     expect(hasUsablePassword(avery)).toBe(false);
 
-    const second = await login("avery@example.test", "0535");
+    const second = await login("avery@example.test", DEV_PASSWORD);
     expect(second).toEqual({ ok: false, reason: "dev_used" });
     expect(await login("avery@example.test", "anything-else")).toEqual({ ok: false, reason: "dev_used" });
   });
 
-  it("two phones at once: only one consumes 0535", async () => {
-    const [a, b] = await Promise.all([login("avery@example.test", "0535"), login("avery@example.test", "0535")]);
+  it("two phones at once: only one consumes the one-time password", async () => {
+    const [a, b] = await Promise.all([login("avery@example.test", DEV_PASSWORD), login("avery@example.test", DEV_PASSWORD)]);
     expect([a.ok, b.ok].filter(Boolean)).toHaveLength(1);
     const loser = a.ok ? b : a;
     expect(loser).toEqual({ ok: false, reason: "dev_used" });
@@ -52,16 +53,16 @@ describe("login + DEV MODE 0535 rule", () => {
     expect(checkRateLimit(key).ok).toBe(true);
   });
 
-  it("refuses 0535 when DEV_MODE is off, even if the seed left it active", async () => {
+  it("refuses the one-time password when DEV_MODE is off, even if the seed left it active", async () => {
     process.env.DEV_MODE = "false";
-    expect(await login("avery@example.test", "0535")).toEqual({ ok: false, reason: "invalid" });
+    expect(await login("avery@example.test", DEV_PASSWORD)).toEqual({ ok: false, reason: "invalid" });
     const avery = await db.person.findUniqueOrThrow({ where: { email: "avery@example.test" } });
     expect(avery.devPasswordActive).toBe(true); // untouched: not consumed by a refused attempt
   });
 
   it("rejects wrong passwords and unknown emails", async () => {
     expect(await login("avery@example.test", "0536")).toEqual({ ok: false, reason: "invalid" });
-    expect(await login("nobody@example.com", "0535")).toEqual({ ok: false, reason: "invalid" });
+    expect(await login("nobody@example.com", DEV_PASSWORD)).toEqual({ ok: false, reason: "invalid" });
   });
 
   it("reports no_password for invited people without a password", async () => {
@@ -72,17 +73,17 @@ describe("login + DEV MODE 0535 rule", () => {
     expect(await login("casey@example.com", "anything")).toEqual({ ok: false, reason: "no_password" });
   });
 
-  it("after a forced change, the new password works and 0535 does not", async () => {
-    const first = await login("avery@example.test", "0535");
+  it("after a forced change, the new password works and the one-time password does not", async () => {
+    const first = await login("avery@example.test", DEV_PASSWORD);
     expect(first.ok).toBe(true);
     const averyId = (await db.person.findUniqueOrThrow({ where: { email: "avery@example.test" } })).id;
-    expect(validateNewPassword("0535")).not.toBeNull();
+    expect(validateNewPassword(DEV_PASSWORD)).not.toBeNull();
     expect(validateNewPassword("short")).not.toBeNull();
     expect(validateNewPassword("closet-rocks-2026")).toBeNull();
     await setPassword(averyId, "closet-rocks-2026");
     const again = await login("avery@example.test", "closet-rocks-2026");
     expect(again.ok && !again.usedDevPassword && !again.person.mustChangePassword).toBe(true);
-    expect(await login("avery@example.test", "0535")).toEqual({ ok: false, reason: "invalid" });
+    expect(await login("avery@example.test", DEV_PASSWORD)).toEqual({ ok: false, reason: "invalid" });
   });
 
   it("normal members log in with their own password", async () => {

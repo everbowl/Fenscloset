@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 
 const SHOP_FOR_COOKIE = "fc_shop_for";
 
-/** The last person picked under "Shopping for" (Jeff, 31 Oct 2026, N1): carries across Shop, Looking-for and Together. */
+/** The last person picked under "Shopping for" (the owner, 31 Oct 2026, N1): carries across Shop, Looking-for and Together. */
 export async function rememberedShopFor(): Promise<string | null> {
   return (await cookies()).get(SHOP_FOR_COOKIE)?.value ?? null;
 }

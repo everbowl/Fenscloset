@@ -79,7 +79,7 @@ export async function reorderEntriesAction(kind: string, orderedIds: string[]): 
   }
 }
 
-// ---------- "Ask Jeff to add it" (J1) ----------
+// ---------- "Ask the owner to add it" (J1) ----------
 
 export async function requestEntryAction(kind: string, name: string, parentId?: string | null): Promise<{ ok: true; admins: string; already: boolean } | { ok: false; error: string }> {
   const me = await requirePerson();

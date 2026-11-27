@@ -32,7 +32,7 @@ export type WeatherView = { weather: { condition: string; source: string; nowF: 
 export type WeekDay = { key: string; weekday: string; day: number; today: boolean; thumbKey: string | null; fitId: string | null };
 
 type Props = {
-  personId: string; personName: string; mine: boolean; canDress: boolean; isAdmin: boolean;
+  personId: string; personName: string; householdTagline?: string; mine: boolean; canDress: boolean; isAdmin: boolean;
   date: string; evening: boolean; hour: number; contextLine: string; dateLabel: string;
   /** The forecast: a promise while it is on its way (the chip breathes, the rest of the page is already there), a plain answer when there is nowhere to ask about. */
   weather: WeatherView | Promise<WeatherView>; savedZip: string | null;
@@ -257,6 +257,7 @@ export function TodayScreen(p: Props) {
         <div className="min-w-0">
           <h1 className="serif text-[32px] leading-none" data-testid="greeting">{greeting}</h1>
           <p className="caption mt-2" data-testid="weather-date">{longDate(p.date)}<span className="sr-only"> · {p.dateLabel}</span></p>
+          {p.householdTagline ? <p className="caption mt-1" data-testid="household-tagline">{p.householdTagline}</p> : null}
         </div>
         <Suspense fallback={<WeatherChipPending />}>
           <WeatherArea weather={p.weather} canDress={p.canDress} savedZip={p.savedZip} finding={busy === "location"} onZip={() => setSheet("zip")} onLocation={askLocation} />
@@ -628,7 +629,7 @@ function CheckInSheet({ open, onClose, scales, current, busy, isAdmin, mine, per
   // Two ways in (review D 7.8): the camera (`capture` forces it on iOS), and the photo library.
   const camera = useRef<HTMLInputElement>(null);
   const library = useRef<HTMLInputElement>(null);
-  // Usable while the day's looks are building (Jeff, 2 Nov 2026: "can't click button"); blocked only while another action runs.
+  // Usable while the day's looks are building (the owner, 2 Nov 2026: "can't click button"); blocked only while another action runs.
   const blocked = busy !== null && busy !== "regen";
   const picked = (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (f) onSelfie(f); e.target.value = ""; };
   return (

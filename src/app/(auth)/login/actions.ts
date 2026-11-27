@@ -13,7 +13,7 @@ export type LoginState = { error?: string; email?: string };
 const WORDS: Record<LoginReason, string> = {
   invalid: "That email and password don't match.",
   no_password: "This account doesn't have a password yet. Use the invite link you were sent, or tap “Forgot password”.",
-  dev_used: "0535 was already used on another phone. Finish setting the password on that phone, or tap “Forgot password”.",
+  dev_used: "The one-time password was already used on another phone. Finish setting the password on that phone, or tap “Forgot password”.",
 };
 
 export async function loginAction(_prev: LoginState, formData: FormData): Promise<LoginState> {

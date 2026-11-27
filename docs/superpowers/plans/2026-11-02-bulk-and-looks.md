@@ -1,7 +1,7 @@
-# Bulk wardrobe, sections, looks, copies (Jeff, 2 Nov 2026)
+# Bulk wardrobe, sections, looks, copies (the owner, 2 Nov 2026)
 
 Six asks arrived in one sitting. Each is recorded here with what exists, what gets built, and the questions
-Jeff answers in chat (letters and numbers, recommended pick first). Decisions are appended as they land.
+the owner answers in chat (letters and numbers, recommended pick first). Decisions are appended as they land.
 
 ## A. Men's and women's mixed in the Shop
 - **Cause**: nothing on `Person` says which section they shop in; the Looking-for query writer only guesses
@@ -10,7 +10,7 @@ Jeff answers in chat (letters and numbers, recommended pick first). Decisions ar
   person (Profile → Settings; admins on People; a one-tap ask on Shop and Looking-for while unset). Every
   store search carries it: Looking-for queries, the Shop verdict's shopping queries, Go with it, Find a photo
   in this color; results whose title names the other section are dropped.
-- **Q A1 (rec.)** Jeff = Men's now, everyone else picks on first Shop open. **A2** Jeff names each person's section.
+- **Q A1 (rec.)** the owner = Men's now, everyone else picks on first Shop open. **A2** the owner names each person's section.
 
 ## B. Build a look from a mix (buy + closet)
 - **Build**: "Add to a look" on any store find (Looking-for matches, Shop results, Go with it) and on closet
@@ -36,7 +36,7 @@ Jeff answers in chat (letters and numbers, recommended pick first). Decisions ar
   "Add n to closet" (`createStoreRows`). The receipt tab takes many files at once, reads three at a time
   with a progress line, groups lines per receipt (store · date), one "Add n pieces" for all
   (`addReceiptsAction`); each receipt image is deleted after reading, as before.
-- **Unchanged until Jeff answers**: every piece still waits on a confirm card (one tap each); the real-photo
+- **Unchanged until the owner answers**: every piece still waits on a confirm card (one tap each); the real-photo
   ask still comes after the first wear and every six wears (`photoNudge`).
 - **Q C1 (rec.)** link/receipt pieces go straight into the closet, fixable on the piece page. **C2** keep the
   one-tap cards. **C3** a "Confirm all" button.
@@ -86,6 +86,6 @@ Jeff answers in chat (letters and numbers, recommended pick first). Decisions ar
 - **O1 (rec.)** Check-in fix (done, 9fb9a1c) → C (done) → F → A → E → D → B. **O2** B before C.
 
 ## Decisions
-- 2 Nov 2026: A built as A1 while Jeff's answer is pending (Jeff = Men's by the seed; everyone else picks on the Shop or Looking-for the first time, or in Settings → Shops in). A2 would only add the other people's picks.
-- 3 Nov 2026 (Jeff): B1, C1, D1, E1, F1, O1. The real-photo ask was not answered: built as C4 (a quiet line on the piece page), flagged in chat. Order: C1 → F → E → D → B.
-- 6 Nov 2026 (Jeff): B-a, B-b, B-c, D-a, D-b confirmed as built. B-a five pieces per look, the mirror dresses three. B-b whoever may shop for the person builds their look (the person, a parent of a minor, an allowed shopper). B-c naming a look saves it under Fits → Looks and the next Add starts a fresh open look. D-a only the owner sees their What's-needed strip. D-b store photos: one row for all pieces plus the quiet line on each piece page (C4 stands).
+- 2 Nov 2026: A built as A1 while the owner's answer is pending (the owner = Men's by the seed; everyone else picks on the Shop or Looking-for the first time, or in Settings → Shops in). A2 would only add the other people's picks.
+- 3 Nov 2026 (the owner): B1, C1, D1, E1, F1, O1. The real-photo ask was not answered: built as C4 (a quiet line on the piece page), flagged in chat. Order: C1 → F → E → D → B.
+- 6 Nov 2026 (the owner): B-a, B-b, B-c, D-a, D-b confirmed as built. B-a five pieces per look, the mirror dresses three. B-b whoever may shop for the person builds their look (the person, a parent of a minor, an allowed shopper). B-c naming a look saves it under Fits → Looks and the next Add starts a fresh open look. D-a only the owner sees their What's-needed strip. D-b store photos: one row for all pieces plus the quiet line on each piece page (C4 stands).

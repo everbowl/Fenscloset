@@ -14,7 +14,7 @@ async function cleanOutCutoff(now = new Date()): Promise<{ months: number; cutof
   return { months, cutoff };
 }
 
-/** A stack with more copies than its wears call for: "ten, worn five times in 90 days, two would do" (Jeff, 2 Nov 2026). */
+/** A stack with more copies than its wears call for: "ten, worn five times in 90 days, two would do" (the owner, 2 Nov 2026). */
 export type StackAdvice = { id: string; name: string; thumbKey: string | null; categoryName: string | null; copies: number; wears90: number; keep: number; cycleDays: number };
 
 /** How many copies a stack needs: the wears of the last 90 days spread over laundry cycles, at least one. */

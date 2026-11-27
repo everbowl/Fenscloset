@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 
 /**
- * Which part of a store a person shops in (Jeff, 2 Nov 2026: Looking-for brought back men's and women's jeans
+ * Which part of a store a person shops in (the owner, 2 Nov 2026: Looking-for brought back men's and women's jeans
  * together). The sections are an editable list (Lists → Shop sections); each person picks theirs. Every store
  * search starts with the section's word, and a result titled for another section is left out.
  */

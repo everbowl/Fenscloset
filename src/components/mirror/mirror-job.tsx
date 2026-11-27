@@ -7,7 +7,7 @@ import type { TryOnView } from "@/lib/tryon";
 import { dressAction, dressingStatusAction, keepTryOnAction, type MirrorLook, type MirrorRequest, type MirrorResult } from "@/app/(app)/mirror/actions";
 
 /*
- * The mirror's one job, kept at the shell so it outlives the screen that started it (Jeff, 23 Nov 2026: "If mirror takes
+ * The mirror's one job, kept at the shell so it outlives the screen that started it (the owner, 23 Nov 2026: "If mirror takes
  * that long, let me navigate while loading"). A dressing starts from Today, the closet, a piece or a look; the person can
  * go anywhere in the app while it runs. The bar under the header says where it stands and, when it is done, "Your look
  * is ready · See it" opens the full-screen mirror. The job is also written to sessionStorage, so a reload mid-dressing

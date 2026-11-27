@@ -31,7 +31,7 @@ export function ListEditor({ kind, entries: initial, parentId }: { kind: ListKin
   const filtering = q.trim().length > 0;
   const shown = filtering ? active.filter((e) => e.name.toLowerCase().includes(q.trim().toLowerCase())) : active;
 
-  // Drag to reorder (Jeff, 19 Oct 2026): press the grip, move, let go. Pointer events, so it works with a finger too.
+  // Drag to reorder (the owner, 19 Oct 2026): press the grip, move, let go. Pointer events, so it works with a finger too.
   const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [drag, setDrag] = useState<{ from: number; to: number; dy: number; h: number } | null>(null);
   const dragStart = useRef<{ y: number; from: number; h: number; to: number } | null>(null); // `to` lives in the ref too: pointerup can land before React re-renders with the latest state

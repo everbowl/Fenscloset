@@ -7,7 +7,7 @@ import { trailFor } from "@/lib/crumbs";
 import { lastClosetUrl, markClosetRestore } from "@/lib/closet-memory";
 
 /*
- * The breadcrumb row under the header (Jeff, 23 Nov 2026): every level back is a tap, the current page is plain text,
+ * The breadcrumb row under the header (the owner, 23 Nov 2026): every level back is a tap, the current page is plain text,
  * and a flow's next step sits at the right as an arrow. Tab roots show no row: the tab bar is the location there.
  * A page with a real name (a piece, a person, a want) renders <CrumbLabel label="Blue linen shirt" /> and the row
  * swaps the placeholder for it.
