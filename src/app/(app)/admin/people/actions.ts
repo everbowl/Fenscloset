@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { currentAdmin } from "@/lib/auth/current";
 import { cancelInvite, createInvite, deliverInvite, renewInvite } from "@/lib/auth/invite";
 import { removePerson, setGuardians, setRole, updatePersonDetails } from "@/lib/people/service";
 import { smsConfigured } from "@/lib/sms";
+import { accountKey, clientKey, recordAttempt, sendAllowed, throttleRules } from "@/lib/auth/rate-limit";
 import type { Role } from "@/generated/prisma/client";
 
 export type InviteResult = { ok: true; url: string; delivered: { email?: boolean; sms?: boolean }; deliveryError?: string } | { ok: false; error: string };
@@ -20,6 +22,16 @@ function msg(e: unknown) { return e instanceof Error ? e.message : "Something we
 async function deliver(token: string, channels: Array<"email" | "sms">, contact: { email?: string | null; phone?: string | null }) {
   const delivered: { email?: boolean; sms?: boolean } = {};
   const errors: string[] = [];
+  // A cooldown per contact and a daily ceiling (security item 6): texts and mails cost money, and a link can be copied instead.
+  if (channels.length && (contact.email || contact.phone)) {
+    const account = accountKey(contact.email ?? contact.phone ?? token);
+    const client = clientKey(await headers());
+    if (!(await sendAllowed("invite_send", account, client))) {
+      const r = await throttleRules();
+      return { delivered, deliveryError: `This invite was sent recently. Wait ${r.inviteResendMinutes} minute${r.inviteResendMinutes === 1 ? "" : "s"} (at most ${r.inviteSendsPerDay} sends a day), or copy the link instead.` };
+    }
+    await recordAttempt("invite_send", account, client, true);
+  }
   if (channels.includes("email") && contact.email) {
     try { const r = await deliverInvite(token, "email"); delivered.email = r.sent; if (!r.sent && r.error) errors.push(`Email: ${r.error}`); }
     catch (e) { console.error("[invite] email delivery threw", e); delivered.email = false; errors.push("Email: couldn't be sent just now. Copy the link instead."); }

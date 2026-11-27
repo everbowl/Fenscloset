@@ -3,6 +3,7 @@ import { generateToken, hashToken } from "@/lib/auth/tokens";
 import { normalizeEmail } from "@/lib/auth/login";
 import { setPassword } from "@/lib/auth/change-password";
 import { destroyAllSessionsFor } from "@/lib/auth/session";
+import { accountKey, clearFailures } from "@/lib/auth/rate-limit";
 import { appUrl, emailConfigured, renderEmail, sendEmail } from "@/lib/email";
 
 const RESET_TTL_MS = 60 * 60 * 1000; // 60 minutes
@@ -54,5 +55,8 @@ export async function consumeResetToken(token: string, newPassword: string): Pro
   await setPassword(row.personId, newPassword);
   await db.passwordResetToken.updateMany({ where: { personId: row.personId, usedAt: null }, data: { usedAt: new Date() } });
   await destroyAllSessionsFor(row.personId);
+  // A completed reset is the owner's way back in during a backoff (security item 6): their sign-in failures go.
+  const person = await db.person.findUnique({ where: { id: row.personId }, select: { email: true } });
+  if (person?.email) await clearFailures("login", accountKey(person.email));
   return { ok: true, personId: row.personId };
 }

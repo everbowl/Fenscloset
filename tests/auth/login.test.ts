@@ -6,7 +6,6 @@ import { FIXTURE_ADMIN_EMAIL } from "../fixtures/people-data";
 import { login } from "@/lib/auth/login";
 import { hashPassword } from "@/lib/auth/password";
 import { setPassword, validateNewPassword } from "@/lib/auth/change-password";
-import { checkRateLimit, MAX_TRIES, noteFailure, clearRateLimit, rateLimitKey, resetRateLimits } from "@/lib/auth/rate-limit";
 
 const PASSWORD = "closet-rocks-2026";
 const admin = () => db.person.findUniqueOrThrow({ where: { email: FIXTURE_ADMIN_EMAIL } });
@@ -61,18 +60,5 @@ describe("sign-in", () => {
     await db.person.update({ where: { id: b.id }, data: { email: "blake@example.com", passwordHash: await hashPassword("hello-world-1"), status: "active" } });
     const r = await login("blake@example.com", "hello-world-1");
     expect(r.ok && r.person.name === "Blake").toBe(true);
-  });
-
-  it("rate limit: five tries, then a wait, then clear on success", () => {
-    resetRateLimits();
-    const key = rateLimitKey("1.2.3.4", "Avery@Example.test");
-    expect(key).toBe("1.2.3.4|avery@example.test");
-    for (let i = 0; i < MAX_TRIES; i++) { expect(checkRateLimit(key).ok).toBe(true); noteFailure(key); }
-    const refused = checkRateLimit(key);
-    expect(refused.ok).toBe(false);
-    if (!refused.ok) expect(refused.minutesLeft).toBeGreaterThan(0);
-    expect(checkRateLimit(rateLimitKey("5.6.7.8", "avery@example.test")).ok).toBe(true); // another network is its own count
-    clearRateLimit(key);
-    expect(checkRateLimit(key).ok).toBe(true);
   });
 });

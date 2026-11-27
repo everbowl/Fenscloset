@@ -45,6 +45,11 @@ export function redeemPhoneCode(raw: string): { ok: true; personId: string } | {
   return { ok: true, personId: e.personId };
 }
 
+/** Every live code dies: after too many wrong guesses (security item 6), and between tests. */
+export function voidAllPhoneCodes(): void {
+  live.clear();
+}
+
 /** Tests only. */
 export function resetPhoneCodes(): void {
   live.clear();
