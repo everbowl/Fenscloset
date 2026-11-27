@@ -13,7 +13,7 @@ export async function resetDb() {
   const tables = [
     "LookPiece", "Look", "Want", "BrandFeed", "GoWith", "ShoppingLookup", "LookFeedback", "InspirationLook", "TryOn", "DayPlan", "CheckInAnswer", "CheckIn", "FitViewer", "FitItem", "WearLog", "Fit", "OutfitSuggestion", "TogetherPerson", "TogetherSession", "GoogleCalendarConnection", "WeatherCache",
     "NeedSnooze", "BodyMeasurement", "BodySizeByBrand", "BodyPhoto", "BodyProfile", "BodyDataGrant", "ShopForGrant", "MinorBodyImageApproval", "MeasurementKind", "StyleWord",
-    "ImportEntry", "ImportBatch", "ItemPhoto", "ItemShare", "ItemCloset", "Item", "Session", "PasswordResetToken", "InviteToken", "GuardianLink",
+    "ImportEntry", "ImportBatch", "ItemPhoto", "ItemShare", "ItemCloset", "Item", "Session", "PasswordResetToken", "InviteToken", "GuardianLink", "AiUsage",
     "Closet", "Subcategory", "Category", "Color", "Pattern", "Fabric", "Season",
     "FormalityLevel", "Occasion", "Tag", "Brand", "Store", "CheckInOption", "CheckInScale",
     "Rule", "Person", "MirrorPose", "WearOption", "WearGroup", "SeedSet",

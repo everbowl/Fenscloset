@@ -165,7 +165,7 @@ function mockRaw(lists: TagLists): RawTags {
 }
 
 /** Vision tagging constrained to the editable lists. `image` is base64 JPEG/PNG. */
-export async function tagItem(opts: { image: { data: string; mediaType: "image/jpeg" | "image/png" | "image/webp" }; back?: { data: string; mediaType: "image/jpeg" | "image/png" | "image/webp" }; lists: TagLists }): Promise<TagResult> {
+export async function tagItem(opts: { image: { data: string; mediaType: "image/jpeg" | "image/png" | "image/webp" }; back?: { data: string; mediaType: "image/jpeg" | "image/png" | "image/webp" }; lists: TagLists; personId?: string }): Promise<TagResult> {
   const raw = isMockAi()
     ? mockRaw(opts.lists)
     : await structured<RawTags>({
@@ -175,6 +175,7 @@ export async function tagItem(opts: { image: { data: string; mediaType: "image/j
         images: opts.back ? [{ label: "Back of the piece", ...opts.back }] : undefined,
         schema: tagSchema(opts.lists),
         effort: "low",
+        personId: opts.personId,
       });
   return mapTags(raw, opts.lists);
 }

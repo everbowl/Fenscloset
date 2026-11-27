@@ -40,7 +40,7 @@ export async function pendingAdds(personId: string, opts: { categoryId?: string 
   const entries = await db.importEntry.findMany({
     where: { batchId: { in: batchIds }, status: { in: ["queued", "uploaded", "processing", "failed", "needs_confirm"] } },
     orderBy: [{ createdAt: "desc" }, { order: "desc" }],
-    select: { id: true, batchId: true, status: true, error: true, originalKey: true, thumbKey: true, storeMeta: true, aiResult: true, updatedAt: true },
+    select: { id: true, batchId: true, status: true, error: true, retryAfter: true, originalKey: true, thumbKey: true, storeMeta: true, aiResult: true, updatedAt: true },
   });
   const knownCategory = (e: (typeof entries)[number]) => (e.aiResult as EntryAiResult | null)?.tags?.categoryId ?? null;
   // On a category tab, a piece known to belong elsewhere is not shown; an unknown one is.
@@ -57,7 +57,7 @@ export async function pendingAdds(personId: string, opts: { categoryId?: string 
     cards.push({
       id: e.id, batchId: e.batchId,
       status: e.status === "failed" ? "failed" : e.status === "needs_confirm" ? "review" : "tagging",
-      error: e.status === "failed" || e.status === "needs_confirm" ? e.error : null,
+      error: e.status === "failed" || e.status === "needs_confirm" || (e.status === "queued" && e.retryAfter) ? e.error : null,
       photoKey: e.thumbKey ?? e.originalKey,
       name: meta?.name ?? null,
       since: e.updatedAt.toISOString(),
