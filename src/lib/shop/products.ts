@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { inOtherSection } from "./section";
 import { db } from "@/lib/db";
+import { chargeAi, isAiCapError } from "@/lib/ai/usage";
 import { catalogBrand } from "@/lib/brands/catalog";
 
 /**
@@ -66,11 +67,12 @@ function mockProducts(query: string): RawShopping[] {
 }
 
 /** One Serper Shopping call (or the mock), cached per query for a day, or for `maxAgeHours` when the caller wants it fresher. */
-async function fetchQuery(query: string, fetchImpl: typeof fetch, maxAgeHours = CACHE_HOURS): Promise<RawShopping[]> {
-  if (process.env.MOCK_SERPER === "true") return mockProducts(query);
+async function fetchQuery(query: string, fetchImpl: typeof fetch, maxAgeHours = CACHE_HOURS, personId?: string): Promise<RawShopping[]> {
+  if (process.env.MOCK_SERPER === "true") { await chargeAi("shop", personId); return mockProducts(query); }
   const key = `shop:q:${createHash("sha1").update(query.toLowerCase()).digest("hex")}`;
   const hit = await db.weatherCache.findUnique({ where: { key } });
   if (hit && Date.now() - hit.fetchedAt.getTime() < maxAgeHours * 3600 * 1000) return hit.payload as RawShopping[];
+  await chargeAi("shop", personId); // a cached answer is free; a real call counts (security item 8)
   const res = await fetchImpl("https://google.serper.dev/shopping", {
     method: "POST",
     headers: { "X-API-KEY": process.env.SERPER_API_KEY ?? "", "Content-Type": "application/json" },
@@ -117,7 +119,7 @@ export function rankProducts(products: Product[], prefs: ProductPrefs): Product[
   return products.map((p, i) => ({ p, i, s: score(p) })).sort((a, b) => b.s - a.s || a.i - b.i).map((x) => x.p);
 }
 
-export type SearchOptions = {
+export type SearchOptions = { /** Who pays against the daily caps (security item 8); the signed-in person or the household when unset. */ personId?: string;
   /** Reuse a cached answer up to this old (default a day). The Looking-for sweep asks for fresher so a new arrival is seen. */
   maxAgeHours?: number;
   /** Return up to this many (default MAX_PRODUCTS). */
@@ -137,8 +139,11 @@ export async function searchProductsDetailed(queries: string[], prefs: ProductPr
   if (!qs.length || !isProductSearchConfigured()) return { products: [], failed: [] };
   const failed: string[] = [];
   const lists = await Promise.all(qs.map(async (q) => {
-    try { return (await fetchQuery(q, fetchImpl, opts.maxAgeHours)).map((r) => normalizeProduct(r, q)).filter((p): p is Product => Boolean(p)); }
-    catch (e) { console.error("product search failed", q, e); failed.push(q); return []; }
+    try { return (await fetchQuery(q, fetchImpl, opts.maxAgeHours, opts.personId)).map((r) => normalizeProduct(r, q)).filter((p): p is Product => Boolean(p)); }
+    catch (e) {
+      if (isAiCapError(e)) throw e; // the allowance is used up: nothing else today will answer either, and the screen says so (security item 8)
+      console.error("product search failed", q, e); failed.push(q); return [];
+    }
   }));
   const merged: Product[] = [];
   const seen = new Set<string>();

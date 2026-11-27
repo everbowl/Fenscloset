@@ -97,6 +97,19 @@ model Person {
   brandFeed          BrandFeed?
 }
 
+/// Paid AI calls per person (or the household bucket), provider and household day (security item 8): the daily caps.
+model AiUsage {
+  id        String   @id @default(cuid())
+  personId  String
+  provider  String
+  day       String
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([personId, provider, day])
+  @@index([day])
+}
+
 model Session {
   id              String   @id @default(cuid())
   personId        String
@@ -526,6 +539,8 @@ model ImportEntry {
   phash       String?
   aiResult    Json?
   error       String?
+  /// Set when the day's AI allowance ran out mid-import (security item 8): the entry waits, and is picked up again after this moment.
+  retryAfter  DateTime?
   itemId      String?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt

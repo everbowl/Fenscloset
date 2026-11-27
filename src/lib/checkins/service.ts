@@ -73,7 +73,10 @@ export async function saveTaps(viewer: Viewer, personId: string, date: string, a
 export async function saveSelfie(viewer: Viewer, personId: string, date: string, image: { data: Buffer; contentType: "image/jpeg" | "image/png" | "image/webp" }): Promise<CheckInView> {
   await assertCanTouch(viewer, personId);
   const scales = await getScales();
-  const answers = await readSelfie(image, scales);
+  // A minor's face never goes to a provider (security item 8, decision C1): the selfie is kept for the family and the
+  // check-in questions are answered by tapping.
+  const who = await db.person.findUniqueOrThrow({ where: { id: personId }, select: { role: true } });
+  const answers = who.role === "minor" ? [] : await readSelfie(image, scales);
   const key = newKey("checkins", personId, image.contentType);
   await putObject(key, image.data, image.contentType);
   try {

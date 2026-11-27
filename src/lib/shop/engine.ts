@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { db } from "@/lib/db";
 import { startJob, type Job } from "@/lib/jobs";
 import { AiError, isMockAi, structured } from "@/lib/ai/claude";
+import { isAiCapError } from "@/lib/ai/usage";
 import { loadTagLists, type TagLists } from "@/lib/ai/tag-item";
 import { newKey, putObject, deleteObject } from "@/lib/storage";
 import { normalizeOriginal, toAiImage } from "@/lib/images/thumb";
@@ -39,6 +40,7 @@ export function asShopError(e: unknown): ShopError | null {
     return new ShopError("The judge couldn't read that one. Try again.", 502);
   }
   if (e instanceof UnsafeUrlError) return new ShopError(e.message, 400);
+  if (isAiCapError(e)) return new ShopError(e.message, 429); // today's AI allowance is used up (security item 8)
   return null;
 }
 

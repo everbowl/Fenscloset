@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import { chargeAi } from "@/lib/ai/usage";
 
 export class RemoveBgError extends Error {
   constructor(public readonly code: string, message: string) {
@@ -13,7 +14,8 @@ const ENDPOINT = "https://api.remove.bg/v1.0/removebg";
  * Cuts the background out of a product/hanger photo. Returns a PNG with transparency.
  * MOCK_AI=true returns the input re-encoded as PNG (MOCK_REMOVE_BG_FAIL=<code> simulates an API error).
  */
-export async function removeBackground(input: Buffer): Promise<Buffer> {
+export async function removeBackground(input: Buffer, opts: { personId?: string } = {}): Promise<Buffer> {
+  await chargeAi("removebg", opts.personId); // charged before the mock too, so the caps are testable
   if (process.env.MOCK_AI === "true") {
     if (process.env.MOCK_REMOVE_BG_FAIL) throw new RemoveBgError(process.env.MOCK_REMOVE_BG_FAIL, "Mock remove.bg failure");
     return sharp(input).png().toBuffer();

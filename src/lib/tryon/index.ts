@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import { chargeAi } from "@/lib/ai/usage";
 import { db } from "@/lib/db";
 import { getObject, newKey, putObject } from "@/lib/storage";
 import { googleTryOn, isGoogleTryOnConfigured, TryOnModelError } from "@/lib/tryon/google";
@@ -253,6 +254,7 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
     const body = await sharp((await getObject(photo.bucketKey)).body).rotate().resize(1024, 1024, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
     person = body;
     step(`Dressing you · ${dressed.map((g) => g.name).join(", ")}`);
+    await chargeAi("tryon", personId); // one paid dressing per look (security item 8), checked before the mock too
     if (by === "google" && process.env.MOCK_TRYON === "true") {
       person = await mockTryOn(person, dressed.map((g) => g.buf));
     } else {
@@ -288,7 +290,7 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
       console.log(`tryon: render check: ${verdict.problem}; dressing again with the image model`);
       step("Dressing again…");
       try {
-        const again = process.env.MOCK_TRYON === "true" ? await mockStyle(person) : await sharp(await googleImage([{ data: body, mimeType: "image/jpeg" }, ...(await Promise.all(dressed.map(async (g) => ({ data: await sharp(g.buf).flatten({ background: "#ffffff" }).resize(1024, 1024, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer(), mimeType: "image/jpeg" as const }))))], dressPrompt(dressed.map((g) => g.name)), fetch, { relaxed: true })).jpeg({ quality: 90 }).toBuffer();
+        const again = process.env.MOCK_TRYON === "true" ? await mockStyle(person) : await sharp(await googleImage([{ data: body, mimeType: "image/jpeg" }, ...(await Promise.all(dressed.map(async (g) => ({ data: await sharp(g.buf).flatten({ background: "#ffffff" }).resize(1024, 1024, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer(), mimeType: "image/jpeg" as const }))))], dressPrompt(dressed.map((g) => g.name)), fetch, { relaxed: true, personId })).jpeg({ quality: 90 }).toBuffer();
         step("Checking again…");
         const second = await renderVerdict(again, dressed);
         // The redraw is shown only when it passes, and then it says so on the picture: the person was redrawn, not dressed.
@@ -309,7 +311,7 @@ export async function tryOnLook(viewer: Viewer, personId: string, itemIds: strin
   step(`Styling · ${styling.summary}`);
   try {
     // An adult's own body picture (assertReady keeps minors out): Google's filters are loosened for this pass only.
-    styledBuf = process.env.MOCK_TRYON === "true" ? await mockStyle(person) : await sharp(await googleImage([{ data: person, mimeType: "image/jpeg" }], stylingPrompt(styling.instructions), fetch, { relaxed: true })).jpeg({ quality: 90 }).toBuffer();
+    styledBuf = process.env.MOCK_TRYON === "true" ? await mockStyle(person) : await sharp(await googleImage([{ data: person, mimeType: "image/jpeg" }], stylingPrompt(styling.instructions), fetch, { relaxed: true, personId })).jpeg({ quality: 90 }).toBuffer();
   } catch (e) {
     console.error("styling pass failed", e);
     return pack(raw, rawCached, true);
