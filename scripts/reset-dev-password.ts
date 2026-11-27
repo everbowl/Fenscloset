@@ -17,7 +17,7 @@ async function main() {
     where: { id: admin.id },
     data: { passwordHash: await hashPassword(DEV_PASSWORD), mustChangePassword: true, devPasswordActive: true, devPasswordUsedAt: null, status: "active" },
   });
-  await destroyAllSessionsFor(jeff.id);
+  await destroyAllSessionsFor(admin.id);
   console.log(`[DEV-MODE] Password for ${DEV_ADMIN_EMAIL} reset to ${DEV_PASSWORD} (one login only).`);
 }
 
