@@ -4,8 +4,8 @@ import { resetDb } from "../helpers";
 import { createSession, destroySession, destroyAllSessionsFor, validateSession, SESSION_TTL_MS } from "@/lib/auth/session";
 import { hashToken } from "@/lib/auth/tokens";
 
-async function makePerson(email = "jeff@everbowl.com") {
-  return db.person.create({ data: { name: "Jeff", email, role: "admin", status: "active" } });
+async function makePerson(email = "avery@example.test") {
+  return db.person.create({ data: { name: "Avery", email, role: "admin", status: "active" } });
 }
 
 describe("sessions", () => {
@@ -25,7 +25,7 @@ describe("sessions", () => {
     const p = await makePerson();
     const { token } = await createSession(p.id);
     const s = await validateSession(token);
-    expect(s?.person.email).toBe("jeff@everbowl.com");
+    expect(s?.person.email).toBe("avery@example.test");
     expect(await validateSession("nope")).toBeNull();
     expect(await validateSession("")).toBeNull();
   });

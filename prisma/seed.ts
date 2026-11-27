@@ -1,11 +1,9 @@
 import "dotenv/config";
 import { db } from "../src/lib/db";
-import { hashPassword } from "../src/lib/auth/password";
 import { BRAND_CATALOG } from "../src/lib/brands/catalog";
-import { isDevMode } from "../src/lib/auth/dev-mode";
 import {
-  BODY_IMAGE_APPROVALS, BRANDS, CATEGORIES, CHECK_IN_SCALES, COLORS, DEV_PASSWORD, FABRICS, FORMALITY, MEASUREMENT_KINDS, OCCASIONS,
-  PATTERNS, PEOPLE, RULES, SEASONS, SIZE_OPTIONS, STORES, STYLE_WORDS, TAGS, PHOTO_TIPS, MIRROR_POSES, WEAR_GROUPS } from "./seed-data";
+  BRANDS, CATEGORIES, CHECK_IN_SCALES, COLORS, FABRICS, FORMALITY, MEASUREMENT_KINDS, OCCASIONS,
+  PATTERNS, RULES, SEASONS, SIZE_OPTIONS, STORES, STYLE_WORDS, TAGS, PHOTO_TIPS, MIRROR_POSES, WEAR_GROUPS } from "./seed-data";
 
 type SimpleDelegate = {
   upsert: (args: { where: { name: string }; update: object; create: { name: string; sortOrder: number } }) => Promise<unknown>;
@@ -22,17 +20,10 @@ async function seedSimple(delegate: SimpleDelegate, names: string[]) {
  * admins own every list and the seed must never re-create something they deleted or renamed.
  * Set SEED_FORCE=true to re-run the upserts on purpose (local dev / tests).
  */
-/** The parts of a store a person shops in (Jeff, 2 Nov 2026). The first one is Jeff's. */
+/** The parts of a store a person shops in. Each person picks theirs on the Shop page. */
 const SHOP_SECTIONS = ["Men's", "Women's", "Boys'", "Girls'", "Unisex"];
 
-/** Jeff shops the men's section; set once, never over a pick he changed. */
-async function setJeffSection() {
-  const mens = await db.shopSection.findUnique({ where: { name: SHOP_SECTIONS[0] } });
-  if (mens) await db.person.updateMany({ where: { email: "jeff@everbowl.com", shopSectionId: null }, data: { shopSectionId: mens.id } });
-}
-
 export async function seed() {
-  const devMode = isDevMode();
   // Rules are keyed settings, not admin-owned list rows: a new rule must appear after a deploy, so they are
   // always upserted (values an admin changed are kept; only label/description refresh).
   for (const r of RULES) {
@@ -46,48 +37,8 @@ export async function seed() {
     return;
   }
 
-  // People
-  const ids: Record<string, string> = {};
-  for (const p of PEOPLE) {
-    const existing = p.email
-      ? await db.person.findUnique({ where: { email: p.email } })
-      : await db.person.findFirst({ where: { name: p.name, email: null } });
-    const person = existing
-      ? await db.person.update({ where: { id: existing.id }, data: { role: p.role } })
-      : await db.person.create({ data: { name: p.name, email: p.email, role: p.role, status: "invited" } });
-    ids[p.key] = person.id;
-  }
-
-  // Jeff's DEV password: set only on first seed in DEV mode, and only if he has no password yet.
-  const jeff = await db.person.findUniqueOrThrow({ where: { id: ids.jeff } });
-  if (devMode && !jeff.passwordHash) {
-    await db.person.update({
-      where: { id: jeff.id },
-      data: {
-        passwordHash: await hashPassword(DEV_PASSWORD),
-        mustChangePassword: true,
-        devPasswordActive: true,
-        status: "active",
-      },
-    });
-  }
-
-  // Guardians
-  for (const p of PEOPLE) {
-    for (const g of p.guardians ?? []) {
-      await db.guardianLink.upsert({
-        where: { minorId_parentId: { minorId: ids[p.key], parentId: ids[g] } },
-        update: {},
-        create: { minorId: ids[p.key], parentId: ids[g] },
-      });
-    }
-  }
-
-  // Closets: one personal per person + Family
-  for (const p of PEOPLE) {
-    const exists = await db.closet.findFirst({ where: { ownerId: ids[p.key], kind: "personal" } });
-    if (!exists) await db.closet.create({ data: { name: `${p.name}'s closet`, kind: "personal", ownerId: ids[p.key] } });
-  }
+  // No people: the repository holds no one's name or address (security item 1). The first admin is created by hand
+  // (see README); tests and e2e specs add the synthetic household from tests/fixtures/people.ts.
   const family = await db.closet.findFirst({ where: { kind: "family" } });
   if (!family) await db.closet.create({ data: { name: "Family", kind: "family", sortOrder: 100 } });
 
@@ -120,11 +71,7 @@ export async function seed() {
   await seedSimple(db.store, STORES);
   await seedSimple(db.styleWord, STYLE_WORDS);
   await seedSimple(db.shopSection, SHOP_SECTIONS);
-  await setJeffSection();
   await seedMeasurementKinds();
-  for (const a of BODY_IMAGE_APPROVALS) {
-    if (ids[a.minor] && ids[a.by]) await db.minorBodyImageApproval.upsert({ where: { minorId: ids[a.minor] }, update: {}, create: { minorId: ids[a.minor], approvedById: ids[a.by] } });
-  }
 
   let si = 0;
   for (const [name, options] of Object.entries(CHECK_IN_SCALES)) {
@@ -142,6 +89,7 @@ export async function seed() {
   await SEED_SETS["brands-catalog-v1"]();
   await SEED_SETS["mirror-styling-v1"]();
   for (const name of Object.keys(SEED_SETS)) await db.seedSet.upsert({ where: { name }, update: {}, create: { name } });
+  console.log("Seed: lists, rules and the Family closet are in; no people are seeded — create the first admin by hand (README).");
 }
 
 async function seedSizeOptions() {
@@ -186,11 +134,11 @@ const SEED_SETS: Record<string, () => Promise<void>> = {
   "measurement-kinds-v2": seedMeasurementKinds,
   "photo-tips-v1": seedPhotoTips,
   "style-words-v1": () => seedSimple(db.styleWord, STYLE_WORDS),
-  // Shop sections (Jeff, 2 Nov 2026: the Shop mixed men's and women's). Jeff starts in Men's; everyone else picks on the Shop.
-  "shop-sections-v1": async () => { await seedSimple(db.shopSection, SHOP_SECTIONS); await setJeffSection(); },
+  // Shop sections (2 Nov 2026: the Shop mixed men's and women's). Everyone picks theirs on the Shop.
+  "shop-sections-v1": () => seedSimple(db.shopSection, SHOP_SECTIONS),
   "brands-v1": () => seedSimple(db.brand, BRANDS),
   "stores-v1": () => seedSimple(db.store, STORES),
-  // The national brand catalog lands in the Brands list (Jeff, 19 Oct 2026: "brands didn't auto populate"), each with its store link.
+  // The national brand catalog lands in the Brands list (owner, 19 Oct 2026: "brands didn't auto populate"), each with its store link.
   "brands-catalog-v1": async () => {
     const have = new Set((await db.brand.findMany({ select: { name: true } })).map((b) => b.name.toLowerCase()));
     let order = (await db.brand.aggregate({ _max: { sortOrder: true } }))._max.sortOrder ?? 0;
@@ -200,9 +148,9 @@ const SEED_SETS: Record<string, () => Promise<void>> = {
       have.add(b.name.toLowerCase());
     }
   },
-  // The mirror's styling chips (Jeff, 19 Oct 2026): poses and "how clothes show", untucked first.
+  // The mirror's styling chips (owner, 19 Oct 2026): poses and "how clothes show", untucked first.
   "mirror-styling-v1": seedMirrorStyling,
-  // Shoes: plain numbers become "M 10 / W 11.5" (Jeff, 19 Oct 2026); only untouched numeric options are swapped.
+  // Shoes: plain numbers become "M 10 / W 11.5" (owner, 19 Oct 2026); only untouched numeric options are swapped.
   "shoe-sizes-v2": async () => {
     const shoes = await db.category.findUnique({ where: { name: "Shoes" } });
     if (!shoes) return;

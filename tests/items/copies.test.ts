@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
-import { seed } from "../../prisma/seed";
+import { seed } from "../helpers";
 import { drainQueue } from "@/lib/import/queue";
 import { createStoreEntries, lookupProduct } from "@/lib/store/add";
 import { laundryCopies, setCopies, setLaundry, splitOneOff } from "@/lib/items/service";
@@ -15,19 +15,19 @@ import { cleanOutDecision, copiesNeeded, listStacks } from "@/lib/outfits/cleano
 
 const dayBefore = (n: number) => { const d = new Date(); d.setUTCDate(d.getUTCDate() - n); return d.toISOString().slice(0, 10); };
 
-describe("copies: ten of the same shirt as one card (Jeff, 2–3 Nov 2026, F1 + C1)", () => {
-  let jeff: { id: string; role: "admin" };
+describe("copies: ten of the same shirt as one card (owner, 2–3 Nov 2026, F1 + C1)", () => {
+  let avery: { id: string; role: "admin" };
   beforeEach(async () => {
     await resetDb();
     process.env.DEV_MODE = "true"; process.env.MOCK_AI = "true"; process.env.MOCK_S3 = "true"; process.env.MOCK_FETCH = "true"; process.env.MOCK_SERPER = "true";
     process.env.MOCK_S3_DIR = await mkdtemp(path.join(os.tmpdir(), "fc-copies-"));
     await seed();
-    jeff = { id: (await db.person.findUniqueOrThrow({ where: { email: "jeff@everbowl.com" } })).id, role: "admin" };
+    avery = { id: (await db.person.findUniqueOrThrow({ where: { email: "avery@example.test" } })).id, role: "admin" };
   });
 
   async function stackOf(n: number) {
     const p = await lookupProduct("https://mock.example/products/linen-blazer");
-    const r = await createStoreEntries(jeff.id, { product: p, imageUrl: p.colorImages.Black, color: "Black", size: "M", quantity: n });
+    const r = await createStoreEntries(avery.id, { product: p, imageUrl: p.colorImages.Black, color: "Black", size: "M", quantity: n });
     await drainQueue();
     const entry = await db.importEntry.findUniqueOrThrow({ where: { id: r.entryIds[0] } });
     expect(entry.status).toBe("done"); // C1: a piece with store facts lands in the closet on its own
@@ -61,50 +61,50 @@ describe("copies: ten of the same shirt as one card (Jeff, 2–3 Nov 2026, F1 + 
     expect(item.copies).toBe(3);
     expect(item.storePhoto).toBe(true);
     expect(item.laundryStatus).toBe("clean");
-    let v = await laundryCopies(jeff, item.id, "one_dirty");
+    let v = await laundryCopies(avery, item.id, "one_dirty");
     expect(v).toMatchObject({ dirtyCopies: 1, laundryStatus: "clean" }); // two still clean: Today may keep offering it
-    await laundryCopies(jeff, item.id, "one_dirty");
-    v = await laundryCopies(jeff, item.id, "one_cleaners");
+    await laundryCopies(avery, item.id, "one_dirty");
+    v = await laundryCopies(avery, item.id, "one_cleaners");
     expect(v).toMatchObject({ dirtyCopies: 2, cleanersCopies: 1, laundryStatus: "dirty" });
-    v = await laundryCopies(jeff, item.id, "all_clean");
+    v = await laundryCopies(avery, item.id, "all_clean");
     expect(v).toMatchObject({ dirtyCopies: 0, cleanersCopies: 0, laundryStatus: "clean" });
     // the three-state tap moves the whole stack
-    expect(await setLaundry(jeff, item.id, "cleaners")).toBe("cleaners");
+    expect(await setLaundry(avery, item.id, "cleaners")).toBe("cleaners");
     expect(await db.item.findUniqueOrThrow({ where: { id: item.id } })).toMatchObject({ cleanersCopies: 3, laundryStatus: "cleaners" });
-    await setLaundry(jeff, item.id, "clean");
-    expect(await setCopies(jeff, item.id, 2)).toMatchObject({ copies: 2, laundryStatus: "clean" });
-    await expect(setCopies(jeff, item.id, 0)).rejects.toThrow(/1 to 99/);
-    const newId = await splitOneOff(jeff, item.id);
+    await setLaundry(avery, item.id, "clean");
+    expect(await setCopies(avery, item.id, 2)).toMatchObject({ copies: 2, laundryStatus: "clean" });
+    await expect(setCopies(avery, item.id, 0)).rejects.toThrow(/1 to 99/);
+    const newId = await splitOneOff(avery, item.id);
     const [one, rest] = await Promise.all([db.item.findUniqueOrThrow({ where: { id: newId }, include: { photos: true, colors: true } }), db.item.findUniqueOrThrow({ where: { id: item.id } })]);
     expect(one.copies).toBe(1);
     expect(rest.copies).toBe(1);
     expect(one.name).toBe(rest.name);
     expect(one.photos.length).toBeGreaterThan(0);
-    await expect(splitOneOff(jeff, item.id)).rejects.toThrow(/single piece/);
+    await expect(splitOneOff(avery, item.id)).rejects.toThrow(/single piece/);
   });
 
   it("a stack rests only once every copy was worn inside the window; the clean-out says when ten is too many", async () => {
     const item = await stackOf(3);
-    const wear = (daysAgo: number) => wearItems(jeff.id, dayBefore(daysAgo), [item.id], { title: "t", now: new Date(`${dayBefore(daysAgo)}T12:00:00Z`) });
+    const wear = (daysAgo: number) => wearItems(avery.id, dayBefore(daysAgo), [item.id], { title: "t", now: new Date(`${dayBefore(daysAgo)}T12:00:00Z`) });
     // days 4, 3 and 2 ago: all before "today" in the household's time zone (a wear logged today is never "resting")
     await wear(4); await wear(3);
-    let set = await loadCandidates(jeff.id, new Date());
+    let set = await loadCandidates(avery.id, new Date());
     expect(set.usable.some((c) => c.id === item.id)).toBe(true); // two of three worn: one copy is still fresh
     expect(set.restingIds).not.toContain(item.id);
     await wear(2);
-    set = await loadCandidates(jeff.id, new Date());
+    set = await loadCandidates(avery.id, new Date());
     expect(set.restingIds).toContain(item.id); // all three worn inside the no-repeat window
     // ten copies, three wears in 90 days: one would do with a wash a week
-    await setCopies(jeff, item.id, 10);
-    const stacks = await listStacks(jeff.id, new Date());
+    await setCopies(avery, item.id, 10);
+    const stacks = await listStacks(avery.id, new Date());
     expect(stacks).toHaveLength(1);
     expect(stacks[0]).toMatchObject({ id: item.id, copies: 10, wears90: 3, keep: 1, cycleDays: 7 });
-    await cleanOutDecision(jeff, item.id, "trim", new Date(), 2);
+    await cleanOutDecision(avery, item.id, "trim", new Date(), 2);
     expect((await db.item.findUniqueOrThrow({ where: { id: item.id } })).copies).toBe(2);
-    await expect(cleanOutDecision(jeff, item.id, "trim", new Date(), 5)).rejects.toThrow(/fewer/);
+    await expect(cleanOutDecision(avery, item.id, "trim", new Date(), 5)).rejects.toThrow(/fewer/);
     // "Leave it" hides the advice for three months
-    await setCopies(jeff, item.id, 10);
-    await cleanOutDecision(jeff, item.id, "keep");
-    expect(await listStacks(jeff.id, new Date())).toHaveLength(0);
+    await setCopies(avery, item.id, 10);
+    await cleanOutDecision(avery, item.id, "keep");
+    expect(await listStacks(avery.id, new Date())).toHaveLength(0);
   });
 });

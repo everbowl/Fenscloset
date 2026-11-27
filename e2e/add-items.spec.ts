@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
-import { JEFF_PASSWORD, loginAs, resetAndSeed } from "./helpers";
+import { ADMIN_PASSWORD, loginAs, resetAndSeed } from "./helpers";
 
 async function fixtures(): Promise<string[]> {
   const dir = mkdtempSync(path.join(os.tmpdir(), "fc-fixtures-"));
@@ -21,10 +21,10 @@ async function fixtures(): Promise<string[]> {
 }
 
 test.describe("add clothes", () => {
-  test.beforeAll(() => resetAndSeed({ jeffReady: true }));
+  test.beforeAll(() => resetAndSeed({ adminReady: true }));
 
   test("pick three photos, confirm with one tap each, reload mid-batch keeps the counter, all done", async ({ page }) => {
-    await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+    await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
     await page.goto("/add");
     // three doors first: photos, a store link, a receipt
     await expect(page.getByTestId("add-doors")).toBeVisible();

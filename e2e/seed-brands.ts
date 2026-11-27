@@ -1,4 +1,4 @@
-/** e2e helper: make brands someone's favorites, e.g. `npx tsx e2e/seed-brands.ts Jeff Everlane Vuori` (brands are created when missing). */
+/** e2e helper: make brands someone's favorites, e.g. `npx tsx e2e/seed-brands.ts Avery Everlane Vuori` (brands are created when missing). */
 import "dotenv/config";
 import { db } from "../src/lib/db";
 

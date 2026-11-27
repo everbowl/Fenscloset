@@ -5,7 +5,7 @@ import path from "node:path";
 import sharp from "sharp";
 import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
-import { seed } from "../../prisma/seed";
+import { seed } from "../helpers";
 import { newKey, putObject } from "@/lib/storage";
 import { getOrCreateOpenBatch, registerEntry } from "@/lib/import/service";
 import { drainQueue } from "@/lib/import/queue";
@@ -20,21 +20,21 @@ async function photo() {
 }
 
 describe("cutout fit + back photo", () => {
-  let jeffId: string;
+  let averyId: string;
   beforeEach(async () => {
     await resetDb();
     process.env.DEV_MODE = "true"; process.env.MOCK_AI = "true"; process.env.MOCK_S3 = "true";
     delete process.env.MOCK_REMOVE_BG_FAIL;
     process.env.MOCK_S3_DIR = await mkdtemp(path.join(os.tmpdir(), "fc-back-"));
     await seed();
-    jeffId = (await db.person.findUniqueOrThrow({ where: { email: "jeff@everbowl.com" } })).id;
+    averyId = (await db.person.findUniqueOrThrow({ where: { email: "avery@example.test" } })).id;
   });
 
   async function readyEntry() {
-    const b = await getOrCreateOpenBatch(jeffId, 1);
-    const key = newKey("originals", jeffId, "image/jpeg");
+    const b = await getOrCreateOpenBatch(averyId, 1);
+    const key = newKey("originals", averyId, "image/jpeg");
     await putObject(key, await photo(), "image/jpeg");
-    const e = await registerEntry(jeffId, b.id, key, 0);
+    const e = await registerEntry(averyId, b.id, key, 0);
     await drainQueue();
     return db.importEntry.findUniqueOrThrow({ where: { id: e.id } });
   }
@@ -52,10 +52,10 @@ describe("cutout fit + back photo", () => {
 
   it("a back photo is re-read with the front, keeps what the person edited, and lands on the item", async () => {
     const e = await readyEntry();
-    await saveEntryEdits(jeffId, e.id, { name: "Make Moves tee", colorIds: [] });
-    const backKey = newKey("originals", jeffId, "image/jpeg");
+    await saveEntryEdits(averyId, e.id, { name: "Make Moves tee", colorIds: [] });
+    const backKey = newKey("originals", averyId, "image/jpeg");
     await putObject(backKey, await photo(), "image/jpeg");
-    await attachEntryPhoto(jeffId, e.id, "back", backKey);
+    await attachEntryPhoto(averyId, e.id, "back", backKey);
     const res = await readBackForEntry(e.id, backKey);
     expect(res?.tags.name).toBe("Make Moves tee"); // edited: kept
     expect(res?.tags.colorIds).toEqual([]); // edited: kept
@@ -63,7 +63,7 @@ describe("cutout fit + back photo", () => {
     const saved = await db.importEntry.findUniqueOrThrow({ where: { id: e.id } });
     expect(saved.backKey).toBe(backKey);
     expect((saved.aiResult as EntryAiResult).edited).toEqual(["name", "colorIds"]);
-    const item = await createItemFromEntry(jeffId, e.id);
+    const item = await createItemFromEntry(averyId, e.id);
     const photos = await db.itemPhoto.findMany({ where: { itemId: item.id } });
     expect(photos.find((p) => p.kind === "back")?.bucketKey).toBe(backKey);
     expect(photos.find((p) => p.kind === "back")?.isPrimary).toBe(false);

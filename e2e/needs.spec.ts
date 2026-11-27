@@ -1,15 +1,15 @@
 import { execSync } from "node:child_process";
 import { expect, test } from "./fixtures";
-import { E2E_DB, JEFF_PASSWORD, loginAs, resetAndSeed } from "./helpers";
+import { E2E_DB, ADMIN_PASSWORD, loginAs, resetAndSeed } from "./helpers";
 
 test.describe("what's needed on the closet page", () => {
   test.beforeAll(() => {
-    resetAndSeed({ jeffReady: true });
-    execSync("npx tsx e2e/seed-brands.ts Jeff Everlane", { stdio: "ignore", env: { ...process.env, DATABASE_URL: E2E_DB } });
+    resetAndSeed({ adminReady: true });
+    execSync("npx tsx e2e/seed-brands.ts Avery Everlane", { stdio: "ignore", env: { ...process.env, DATABASE_URL: E2E_DB } });
   });
 
   test("the strip lists the gaps; Not now hides one; a size and a front photo added in the row clear their rows", async ({ page }) => {
-    await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+    await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
     await page.goto("/closet");
     const strip = page.getByTestId("needs");
     await expect(strip).toContainText(/things? to finish/);

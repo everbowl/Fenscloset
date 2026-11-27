@@ -1,6 +1,5 @@
 import { expect, test } from "./fixtures";
-import { DEV_ADMIN_EMAIL } from "../src/lib/auth/dev-mode";
-import { JEFF_PASSWORD, loginAs, resetAndSeed } from "./helpers";
+import { ADMIN_EMAIL, ADMIN_PASSWORD, loginAs, resetAndSeed } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 
@@ -40,18 +39,18 @@ test("a private site: every crawler is told to stay out, every response and page
 });
 
 test.describe("the shell, signed in", () => {
-  test.beforeAll(() => { resetAndSeed({ jeffReady: true }); });
+  test.beforeAll(() => { resetAndSeed({ adminReady: true }); });
 
   /** The page that registers the worker is not controlled by it until its next navigation; these tests need a controlled page. */
   async function signInUnderTheWorker(page: import("@playwright/test").Page) {
-    await loginAs(page, DEV_ADMIN_EMAIL, JEFF_PASSWORD);
+    await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.goto("/today");
     await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
   }
 
   test("the tab bar marks the current screen, the + included", async ({ page }) => {
-    await loginAs(page, DEV_ADMIN_EMAIL, JEFF_PASSWORD);
+    await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
     const nav = page.getByRole("navigation", { name: "Main" });
     await page.goto("/closet");
     await expect(nav.locator("[aria-current=page]")).toHaveCount(1);
@@ -61,17 +60,17 @@ test.describe("the shell, signed in", () => {
   });
 
   test("a toast shows, can be tapped away, and otherwise leaves on its own", async ({ page }) => {
-    await loginAs(page, DEV_ADMIN_EMAIL, JEFF_PASSWORD);
+    await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
     await page.goto("/admin/people");
-    await page.getByRole("link", { name: /Mya/ }).click();
+    await page.getByRole("link", { name: /Devon/ }).click();
     // a parent toggle on a minor's page answers with a toast (the Details fields say "✓ Saved" inline instead, review A I1)
-    const brittney = page.getByRole("checkbox", { name: /Brittney/ });
-    await brittney.uncheck();
+    const blake = page.getByRole("checkbox", { name: /Blake/ });
+    await blake.uncheck();
     const toast = page.getByTestId("toast-ok");
     await expect(toast).toContainText("Parents updated");
     await toast.click();
     await expect(toast).toHaveCount(0);
-    await brittney.check();
+    await blake.check();
     await expect(toast).toBeVisible();
     await expect(toast).toHaveCount(0, { timeout: 6000 }); // 4 s for a plain success
   });

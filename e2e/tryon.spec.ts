@@ -1,15 +1,15 @@
 import { execSync } from "node:child_process";
 import { expect, test } from "./fixtures";
-import { E2E_DB, JEFF_PASSWORD, loginAs, resetAndSeed } from "./helpers";
+import { E2E_DB, ADMIN_PASSWORD, loginAs, resetAndSeed } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 test.beforeAll(() => {
-  resetAndSeed({ jeffReady: true });
-  execSync("npx tsx e2e/seed-closets.ts Jeff", { stdio: "ignore", env: { ...process.env, DATABASE_URL: E2E_DB, MOCK_S3: "true" } });
+  resetAndSeed({ adminReady: true });
+  execSync("npx tsx e2e/seed-closets.ts Avery", { stdio: "ignore", env: { ...process.env, DATABASE_URL: E2E_DB, MOCK_S3: "true" } });
 });
 
 test("try-on: on by default, needs a body photo, then a picture of the look on you (yours alone)", async ({ page }) => {
-  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
   await page.goto("/today");
   // no body photo yet: SEE IT ON dresses the mannequin (no body photo involved), with a nudge toward the Body page
   await expect(page.getByTestId("try-on-photo")).toBeVisible();
@@ -85,7 +85,7 @@ test("try-on: on by default, needs a body photo, then a picture of the look on y
   await expect(page.getByTestId("try-on-sheet")).toContainText("Only you can see this picture");
 
   // Compare (Admin → Rules → Mirror engine): the engines switched on, side by side, so the winner can be picked there.
-  // Kling starts switched off (Jeff, 26 Nov 2026, 1B: no balance), so Compare is Google and FASHN until an admin turns it on.
+  // Kling starts switched off (owner, 26 Nov 2026, 1B: no balance), so Compare is Google and FASHN until an admin turns it on.
   await page.keyboard.press("Escape");
   await page.goto("/admin/rules");
   await page.getByTestId("rules-advanced").locator("summary").click(); // Mirror lives under Advanced

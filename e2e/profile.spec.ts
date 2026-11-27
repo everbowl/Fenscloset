@@ -1,17 +1,17 @@
 import { expect, test } from "./fixtures";
-import { JEFF_PASSWORD, loginAs, resetAndSeed } from "./helpers";
+import { ADMIN_PASSWORD, loginAs, resetAndSeed } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
-test.beforeAll(() => resetAndSeed({ jeffReady: true }));
+test.beforeAll(() => resetAndSeed({ adminReady: true }));
 
-test("Jeff fills his body profile and settings; parents edit Mya's; Olivia is invited, gets her closet, and cannot see body data until granted", async ({ page, browser }) => {
-  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+test("Avery fills his body profile and settings; parents edit Devon's; Casey is invited, gets her closet, and cannot see body data until granted", async ({ page, browser }) => {
+  await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
 
   // own body profile from the editable measurement list
   await page.goto("/profile");
   await page.getByTestId("row-body").click();
   await expect(page).toHaveURL(/\/profile\/body$/);
-  await expect(page.getByText("Visible to Jeff")).toBeVisible();
+  await expect(page.getByText("Visible to Avery")).toBeVisible();
   await page.getByTestId("measure-waist").click();
   await page.getByTestId("measure-sheet").getByRole("option", { name: "32" }).click();
   await expect(page.getByTestId("measure-waist")).toContainText("32 in");
@@ -28,72 +28,72 @@ test("Jeff fills his body profile and settings; parents edit Mya's; Olivia is in
   await expect(page.getByTestId("row-zip")).toContainText("92101");
   await expect(page.getByTestId("row-body-viewers")).toContainText("Only me");
 
-  // parent views and edits Mya's body profile
-  await page.getByRole("button", { name: /Jeff menu/ }).click();
-  await page.getByRole("button", { name: "Mya" }).click();
-  await expect(page.getByRole("button", { name: /Mya menu/ })).toBeVisible();
+  // parent views and edits Devon's body profile
+  await page.getByRole("button", { name: /Avery menu/ }).click();
+  await page.getByRole("button", { name: "Devon" }).click();
+  await expect(page.getByRole("button", { name: /Devon menu/ })).toBeVisible();
   await page.goto("/profile/body");
-  await expect(page.getByText("Visible to Mya, Jeff, Brittney only")).toBeVisible();
-  await expect(page.getByText("Approved by Jeff")).toBeVisible();
+  await expect(page.getByText("Visible to Devon, Avery, Blake only")).toBeVisible();
+  await expect(page.getByText("Approved by Avery")).toBeVisible();
   await page.getByTestId("measure-height").click();
   await page.getByTestId("measure-sheet").getByRole("option", { name: `5'4"` }).click();
   await expect(page.getByTestId("measure-height")).toContainText(`5'4"`);
-  await page.getByRole("button", { name: /Mya menu/ }).click();
-  await page.getByRole("button", { name: "Jeff" }).click();
-  await expect(page.getByRole("button", { name: /Jeff menu/ })).toBeVisible();
+  await page.getByRole("button", { name: /Devon menu/ }).click();
+  await page.getByRole("button", { name: "Avery" }).click();
+  await expect(page.getByRole("button", { name: /Avery menu/ })).toBeVisible();
 
-  // invite Olivia (seeded, no password yet) end-to-end
+  // invite Casey (seeded, no password yet) end-to-end
   await page.goto("/admin/people");
-  await page.getByRole("link", { name: /Olivia/ }).click();
+  await page.getByRole("link", { name: /Casey/ }).click();
   await page.getByRole("button", { name: "Send invite" }).click();
   const sheet = page.getByRole("dialog");
-  await sheet.getByRole("textbox", { name: "Email" }).fill("olivia@example.com");
+  await sheet.getByRole("textbox", { name: "Email" }).fill("casey@example.com");
   await sheet.getByRole("button", { name: "Create invite" }).click();
   await expect(page.getByTestId("invite-url")).toBeVisible({ timeout: 20_000 }); // the link always comes, even when no email could be sent
   const url = (await page.getByTestId("invite-url").textContent())!.trim();
 
   const ctx = await browser.newContext();
-  const olivia = await ctx.newPage();
-  await olivia.goto(url);
-  await olivia.getByLabel("Choose a password").fill("olivia-rules-21");
-  await olivia.getByRole("button", { name: "Open my closet" }).click();
-  await expect(olivia).toHaveURL(/\/today$/);
-  await olivia.goto("/closet");
-  await expect(olivia.getByRole("heading", { name: "Closet" })).toBeVisible();
-  await expect(olivia.getByText("0 pieces")).toBeVisible();
-  await olivia.goto("/profile");
-  await expect(olivia.getByTestId("row-body")).toContainText("Not filled in");
+  const casey = await ctx.newPage();
+  await casey.goto(url);
+  await casey.getByLabel("Choose a password").fill("casey-rules-21");
+  await casey.getByRole("button", { name: "Open my closet" }).click();
+  await expect(casey).toHaveURL(/\/today$/);
+  await casey.goto("/closet");
+  await expect(casey.getByRole("heading", { name: "Closet" })).toBeVisible();
+  await expect(casey.getByText("0 pieces")).toBeVisible();
+  await casey.goto("/profile");
+  await expect(casey.getByTestId("row-body")).toContainText("Not filled in");
 
-  // Mya's body data is invisible to Olivia
-  await olivia.getByRole("button", { name: /Olivia menu/ }).click();
-  await olivia.getByRole("button", { name: "Mya" }).click();
-  await expect(olivia.getByRole("button", { name: /Mya menu/ })).toBeVisible();
-  await olivia.goto("/profile");
-  await expect(olivia.getByTestId("row-body")).toContainText("Private");
-  await olivia.goto("/profile/body");
-  await expect(olivia.getByText("Mya's body profile is private")).toBeVisible();
-  await expect(olivia.getByText("64 in")).toHaveCount(0);
+  // Devon's body data is invisible to Casey
+  await casey.getByRole("button", { name: /Casey menu/ }).click();
+  await casey.getByRole("button", { name: "Devon" }).click();
+  await expect(casey.getByRole("button", { name: /Devon menu/ })).toBeVisible();
+  await casey.goto("/profile");
+  await expect(casey.getByTestId("row-body")).toContainText("Private");
+  await casey.goto("/profile/body");
+  await expect(casey.getByText("Devon's body profile is private")).toBeVisible();
+  await expect(casey.getByText("64 in")).toHaveCount(0);
 
-  // Jeff's too, until he grants it
-  await olivia.getByRole("button", { name: /Mya menu/ }).click();
-  await olivia.getByRole("button", { name: "Jeff" }).click();
-  await expect(olivia.getByRole("button", { name: /Jeff menu/ })).toBeVisible();
-  await olivia.goto("/profile");
-  await expect(olivia.getByTestId("row-body")).toContainText("Private");
+  // Avery's too, until he grants it
+  await casey.getByRole("button", { name: /Devon menu/ }).click();
+  await casey.getByRole("button", { name: "Avery" }).click();
+  await expect(casey.getByRole("button", { name: /Avery menu/ })).toBeVisible();
+  await casey.goto("/profile");
+  await expect(casey.getByTestId("row-body")).toContainText("Private");
 
   await page.goto("/profile/settings");
   await page.getByTestId("row-body-viewers").click();
-  await page.getByRole("dialog").getByRole("button", { name: "Olivia" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Casey" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Done" }).click();
-  await expect(page.getByTestId("row-body-viewers")).toContainText("Olivia");
+  await expect(page.getByTestId("row-body-viewers")).toContainText("Casey");
 
-  await olivia.goto("/profile/body");
-  await expect(olivia.getByTestId("measure-waist")).toContainText("32 in");
+  await casey.goto("/profile/body");
+  await expect(casey.getByTestId("measure-waist")).toContainText("32 in");
   await ctx.close();
 });
 
 test("inspiration board: add a look, see what it read, remove it", async ({ page }) => {
-  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
   await page.goto("/profile/style");
   await expect(page.getByTestId("inspiration")).toBeVisible();
   const buffer = Buffer.from(await (await import("sharp")).default({ create: { width: 240, height: 320, channels: 3, background: { r: 190, g: 170, b: 130 } } }).jpeg().toBuffer());
@@ -107,7 +107,7 @@ test("inspiration board: add a look, see what it read, remove it", async ({ page
 });
 
 test("my brands & sizes: add Lululemon with a size per item type and a link, then one tap on the confirm card fills brand and the right size", async ({ page }) => {
-  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
   // height + weight → likely sizes, offered as the dashed chip
   await page.goto("/profile/body");
   await page.getByTestId("measure-height").click();

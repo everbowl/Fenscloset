@@ -1,18 +1,18 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
-import { seed } from "../../prisma/seed";
+import { seed } from "../helpers";
 import { listOpenRequests, requestListEntry, resolveRequest } from "@/lib/lists/requests";
 
-describe("list requests (J1: Ask Jeff to add it)", () => {
+describe("list requests (J1: Ask Avery to add it)", () => {
   beforeEach(async () => { await resetDb(); await seed(); });
   it("records an ask once, names the admins, and an admin resolves it", async () => {
-    const jeff = await db.person.findFirstOrThrow({ where: { role: "admin" } });
-    const asker = (await db.person.findFirst({ where: { role: { not: "admin" }, status: { not: "removed" } } })) ?? jeff;
+    const avery = await db.person.findFirstOrThrow({ where: { role: "admin" } });
+    const asker = (await db.person.findFirst({ where: { role: { not: "admin" }, status: { not: "removed" } } })) ?? avery;
     const name = `Teal ${Date.now()}`;
     const first = await requestListEntry(asker.id, "color", name);
     expect(first.already).toBe(false);
-    expect(first.admins).toContain(jeff.name.split(" ")[0]);
+    expect(first.admins).toContain(avery.name.split(" ")[0]);
     const again = await requestListEntry(asker.id, "color", name.toLowerCase());
     expect(again.already).toBe(true);
     const open = await listOpenRequests();

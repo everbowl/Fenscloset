@@ -1,11 +1,11 @@
 import { expect, test } from "./fixtures";
-import { JEFF_PASSWORD, loginAs, resetAndSeed } from "./helpers";
+import { ADMIN_PASSWORD, loginAs, resetAndSeed } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
-test.beforeAll(() => { resetAndSeed({ jeffReady: true }); });
+test.beforeAll(() => { resetAndSeed({ adminReady: true }); });
 
 test("looking for: add a line, the stores are searched, the new count shows on the Shop and Today, the matches page, Judge it, found, edit, remove", async ({ page }) => {
-  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
   await page.goto("/shop");
   await expect(page.getByTestId("looking-for-line")).toContainText("Tell the Shop what to find");
   await page.getByTestId("looking-for-link").click();

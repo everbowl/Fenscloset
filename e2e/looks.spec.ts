@@ -1,15 +1,15 @@
 import { execSync } from "node:child_process";
 import { expect, test } from "./fixtures";
-import { E2E_DB, JEFF_PASSWORD, loginAs, resetAndSeed } from "./helpers";
+import { E2E_DB, ADMIN_PASSWORD, loginAs, resetAndSeed } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 test.beforeAll(() => {
-  resetAndSeed({ jeffReady: true });
-  execSync("npx tsx e2e/seed-closets.ts Jeff", { stdio: "ignore", env: { ...process.env, DATABASE_URL: E2E_DB, MOCK_S3: "true" } });
+  resetAndSeed({ adminReady: true });
+  execSync("npx tsx e2e/seed-closets.ts Avery", { stdio: "ignore", env: { ...process.env, DATABASE_URL: E2E_DB, MOCK_S3: "true" } });
 });
 
 test("a look from a store find and the closet: the tray, the look screen, the mannequin, a name under Fits", async ({ page }) => {
-  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
   // a Looking-for line brings store finds; one of them goes into a look
   await page.goto("/shop/looking-for");
   await page.getByTestId("want-add").click();
@@ -27,7 +27,7 @@ test("a look from a store find and the closet: the tray, the look screen, the ma
   await page.getByTestId("want-add-look").first().click();
   await expect(page.getByTestId("look-tray")).toContainText("1 piece so far");
 
-  // the closet's pick mode adds what Jeff owns
+  // the closet's pick mode adds what Avery owns
   await page.goto("/closet");
   await expect(page.getByTestId("look-tray")).toContainText("1 piece so far");
   await page.getByTestId("closet-mirror").click();

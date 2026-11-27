@@ -1,12 +1,5 @@
 /** Default lists. Every one of these is editable in the app; this is only the starting point. */
 
-export const PEOPLE = [
-  { key: "jeff", name: "Jeff", email: "jeff@everbowl.com", role: "admin" as const },
-  { key: "brittney", name: "Brittney", email: null, role: "admin" as const, age: 43 },
-  { key: "olivia", name: "Olivia", email: null, role: "member" as const, age: 21 },
-  { key: "mya", name: "Mya", email: null, role: "minor" as const, age: 15, guardians: ["jeff", "brittney"] },
-];
-
 /** Default photo tips per category. Seeded only where a category has none, so admin edits stick. */
 export const PHOTO_TIPS: Record<string, string> = {
   Tops: "Lay flat, buttoned or zipped, sleeves out to the sides. Front side up.",
@@ -83,9 +76,6 @@ export const MEASUREMENT_KINDS: { name: string; unit: string }[] = [
   { name: "Shoe size", unit: "US" }, { name: "Hat size", unit: "" },
 ];
 export const STYLE_WORDS = ["Minimal", "Classic", "Streetwear", "Preppy", "Boho", "Edgy", "Sporty", "Romantic", "Vintage", "Glam", "Comfy", "Polished"];
-/** Body photos approved for a minor by a parent admin (spec: Mya, approved by Jeff). */
-export const BODY_IMAGE_APPROVALS: { minor: string; by: string }[] = [{ minor: "mya", by: "jeff" }];
-
 export const CHECK_IN_SCALES: Record<string, string[]> = {
   Tan: ["None", "Light", "Medium", "Deep"],
   Hair: ["Great", "Fine", "Bad hair day"],

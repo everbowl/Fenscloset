@@ -1,16 +1,19 @@
 import { execSync } from "node:child_process";
 import type { Page } from "@playwright/test";
+import { FIXTURE_ADMIN_EMAIL, FIXTURE_ADMIN_PASSWORD } from "../tests/fixtures/people-data";
 
 export const E2E_DB = "postgresql://postgres@localhost:5433/fenscloset_e2e";
-export const JEFF_PASSWORD = "closet-rocks-2026";
+export const ADMIN_EMAIL = FIXTURE_ADMIN_EMAIL;
+export const ADMIN_PASSWORD = FIXTURE_ADMIN_PASSWORD;
 
-/** Fresh seeded database for a spec. With jeffReady, Jeff already has a real password (skips the 0535 flow). */
-export function resetAndSeed(opts: { jeffReady?: boolean } = {}) {
-  const env = { ...process.env, DATABASE_URL: E2E_DB, DEV_MODE: "true", SEED_FORCE: "true" };
+/** Fresh seeded database plus the synthetic household. With adminReady, the fixture admin already has a real password (skips the first-login flow). */
+export function resetAndSeed(opts: { adminReady?: boolean } = {}) {
+  const env = { ...process.env, DATABASE_URL: E2E_DB, DEV_MODE: "true", DEV_ADMIN_EMAIL: ADMIN_EMAIL, SEED_FORCE: "true" };
   execSync(`psql -h localhost -p 5433 -U postgres -d fenscloset_e2e -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'`, { stdio: "ignore" });
   execSync("npx prisma migrate deploy", { stdio: "ignore", env });
   execSync("npx tsx prisma/seed.ts", { stdio: "ignore", env });
-  if (opts.jeffReady) execSync(`npx tsx e2e/set-password.ts jeff@everbowl.com ${JEFF_PASSWORD}`, { stdio: "ignore", env });
+  execSync("npx tsx e2e/seed-people.ts", { stdio: "ignore", env });
+  if (opts.adminReady) execSync(`npx tsx e2e/set-password.ts ${ADMIN_EMAIL} ${ADMIN_PASSWORD}`, { stdio: "ignore", env });
 }
 
 export async function loginAs(page: Page, email: string, password: string) {

@@ -1,15 +1,15 @@
 import { execSync } from "node:child_process";
 import { expect, test } from "./fixtures";
-import { E2E_DB, JEFF_PASSWORD, loginAs, resetAndSeed } from "./helpers";
+import { E2E_DB, ADMIN_PASSWORD, loginAs, resetAndSeed } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 test.beforeAll(() => {
-  resetAndSeed({ jeffReady: true });
-  execSync("npx tsx e2e/seed-closets.ts Jeff", { stdio: "ignore", env: { ...process.env, DATABASE_URL: E2E_DB, MOCK_S3: "true" } });
+  resetAndSeed({ adminReady: true });
+  execSync("npx tsx e2e/seed-closets.ts Avery", { stdio: "ignore", env: { ...process.env, DATABASE_URL: E2E_DB, MOCK_S3: "true" } });
 });
 
 test("a top offers a bottom and shoes on one panel (the mannequin can wear them); the picture; other tops under it swap in and dress again", async ({ page }) => {
-  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
   await page.goto("/closet");
   await page.getByRole("link", { name: /white tee/i }).first().click();
   await expect(page.getByTestId("see-on-me")).toContainText("See it on a mannequin"); // no body photo yet
@@ -47,7 +47,7 @@ test("a top offers a bottom and shoes on one panel (the mannequin can wear them)
 });
 
 test("from the closet's picks a bottom offers a top and shoes; both can be left empty; a tap on a picked piece takes it off; the rows under the picture offer what is missing", async ({ page }) => {
-  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
   await page.goto("/closet");
   await page.getByTestId("closet-mirror").click();
   await page.getByTestId("item-card").filter({ hasText: /dark jeans/i }).click();
@@ -87,12 +87,12 @@ test("from the closet's picks a bottom offers a top and shoes; both can be left 
 });
 
 test("on your own photo with FASHN there is no shoes row, and a line says why", async ({ page }) => {
-  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
   await page.goto("/profile/body");
   const buffer = Buffer.from(await (await import("sharp")).default({ create: { width: 300, height: 400, channels: 3, background: { r: 120, g: 110, b: 100 } } }).jpeg().toBuffer());
   await page.getByTestId("body-photo").setInputFiles({ name: "me.jpg", mimeType: "image/jpeg", buffer });
   await expect(page.locator("[data-testid^=body-photo-]").first()).toBeVisible();
-  execSync("npx tsx e2e/seed-color.ts 'Jeff linen blazer' 'beige|cream|tan|oat'", { stdio: "ignore", env: { ...process.env, DATABASE_URL: E2E_DB, MOCK_S3: "true" } });
+  execSync("npx tsx e2e/seed-color.ts 'Avery linen blazer' 'beige|cream|tan|oat'", { stdio: "ignore", env: { ...process.env, DATABASE_URL: E2E_DB, MOCK_S3: "true" } });
   await page.goto("/closet");
   await page.getByRole("link", { name: /white tee/i }).first().click();
   await expect(page.getByTestId("see-on-me")).toContainText("See it on me");

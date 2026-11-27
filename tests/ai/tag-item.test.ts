@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { resetDb } from "../helpers";
-import { seed } from "../../prisma/seed";
+import { seed } from "../helpers";
 import { loadTagLists, mapTags, tagItem, tagSchema, type RawTags } from "@/lib/ai/tag-item";
 
 describe("tagging constrained to the lists", () => {

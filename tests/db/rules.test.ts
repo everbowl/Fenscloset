@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
-import { seed } from "../../prisma/seed";
+import { seed } from "../helpers";
 import { accentColor, getRuleFlag, ruleKind, setRule } from "@/lib/rules";
 
 describe("rules (Admin → Rules)", () => {

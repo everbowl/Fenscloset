@@ -5,18 +5,18 @@ import path from "node:path";
 import sharp from "sharp";
 import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
-import { seed } from "../../prisma/seed";
+import { seed } from "../helpers";
 import { getObject, newKey, objectExists, putObject } from "@/lib/storage";
 import { refitCutouts } from "@/lib/items/refit";
 
 describe("refit cutouts", () => {
-  let jeffId: string;
+  let averyId: string;
   beforeEach(async () => {
     await resetDb();
     process.env.DEV_MODE = "true"; process.env.MOCK_S3 = "true";
     process.env.MOCK_S3_DIR = await mkdtemp(path.join(os.tmpdir(), "fc-refit-"));
     await seed();
-    jeffId = (await db.person.findUniqueOrThrow({ where: { email: "jeff@everbowl.com" } })).id;
+    averyId = (await db.person.findUniqueOrThrow({ where: { email: "avery@example.test" } })).id;
   });
 
   it("trims roomy cutouts, remakes their thumbnails under new keys, and leaves fitted ones alone", async () => {
@@ -25,9 +25,9 @@ describe("refit cutouts", () => {
     const tight = await sharp({ create: { width: 200, height: 300, channels: 4, background: { r: 120, g: 90, b: 60, alpha: 1 } } }).png().toBuffer();
     const cat = await db.category.findFirstOrThrow();
     const make = async (png: Buffer) => {
-      const cutKey = newKey("cutouts", jeffId, "image/png"); await putObject(cutKey, png, "image/png");
-      const thumbKey = newKey("thumbs", jeffId, "image/jpeg"); await putObject(thumbKey, await sharp(png).flatten({ background: "#fff" }).jpeg().toBuffer(), "image/jpeg");
-      const item = await db.item.create({ data: { ownerId: jeffId, name: "Piece", categoryId: cat.id, photos: { create: [{ kind: "cutout", bucketKey: cutKey, isPrimary: true }, { kind: "thumb", bucketKey: thumbKey }] } } });
+      const cutKey = newKey("cutouts", averyId, "image/png"); await putObject(cutKey, png, "image/png");
+      const thumbKey = newKey("thumbs", averyId, "image/jpeg"); await putObject(thumbKey, await sharp(png).flatten({ background: "#fff" }).jpeg().toBuffer(), "image/jpeg");
+      const item = await db.item.create({ data: { ownerId: averyId, name: "Piece", categoryId: cat.id, photos: { create: [{ kind: "cutout", bucketKey: cutKey, isPrimary: true }, { kind: "thumb", bucketKey: thumbKey }] } } });
       return { item, cutKey, thumbKey };
     };
     const a = await make(roomy);

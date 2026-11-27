@@ -5,7 +5,7 @@ import path from "node:path";
 import sharp from "sharp";
 import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
-import { seed } from "../../prisma/seed";
+import { seed } from "../helpers";
 import { drainQueue, enqueueProcessing } from "@/lib/import/queue";
 import { getOrCreateOpenBatch } from "@/lib/import/service";
 import { getObject, newKey, objectExists, putObject } from "@/lib/storage";
@@ -19,20 +19,20 @@ async function threeShirts(): Promise<Buffer> {
     .jpeg().toBuffer();
 }
 
-describe("several shirts in one photo (Jeff, 2–3 Nov 2026, E1)", () => {
-  let jeffId: string;
+describe("several shirts in one photo (owner, 2–3 Nov 2026, E1)", () => {
+  let averyId: string;
   beforeEach(async () => {
     await resetDb();
     process.env.DEV_MODE = "true"; process.env.MOCK_AI = "true"; process.env.MOCK_S3 = "true"; process.env.MOCK_FETCH = "true"; process.env.MOCK_SERPER = "true";
     delete process.env.MOCK_REMOVE_BG_FAIL;
     process.env.MOCK_S3_DIR = await mkdtemp(path.join(os.tmpdir(), "fc-split-"));
     await seed();
-    jeffId = (await db.person.findUniqueOrThrow({ where: { email: "jeff@everbowl.com" } })).id;
+    averyId = (await db.person.findUniqueOrThrow({ where: { email: "avery@example.test" } })).id;
   });
 
   async function photoEntry() {
-    const batch = await getOrCreateOpenBatch(jeffId, 1);
-    const key = newKey("originals", jeffId, "image/jpeg");
+    const batch = await getOrCreateOpenBatch(averyId, 1);
+    const key = newKey("originals", averyId, "image/jpeg");
     await putObject(key, await threeShirts(), "image/jpeg");
     const entry = await db.importEntry.create({ data: { batchId: batch.id, order: batch.startOrder, originalKey: key, status: "uploaded" } });
     enqueueProcessing(entry.id);
@@ -53,7 +53,7 @@ describe("several shirts in one photo (Jeff, 2–3 Nov 2026, E1)", () => {
   it("splits the photo into one crop per garment, the same color twice as one entry with two copies; the original steps aside", async () => {
     process.env.MOCK_PIECE_COUNT = "3"; process.env.MOCK_PIECE_COLORS = "Black,Black,White";
     const entry = await photoEntry();
-    const r = await splitEntry(jeffId, entry.id);
+    const r = await splitEntry(averyId, entry.id);
     expect(r.pieces).toBe(3);
     expect(r.entryIds).toHaveLength(2);
     const made = await db.importEntry.findMany({ where: { id: { in: r.entryIds } }, orderBy: { order: "asc" } });
@@ -73,14 +73,14 @@ describe("several shirts in one photo (Jeff, 2–3 Nov 2026, E1)", () => {
     await drainQueue();
     const tagged = await db.importEntry.findMany({ where: { id: { in: r.entryIds } } });
     expect(tagged.every((e) => e.status === "needs_confirm")).toBe(true);
-    await expect(splitEntry(jeffId, entry.id)).rejects.toThrow(/still being tagged|already/);
+    await expect(splitEntry(averyId, entry.id)).rejects.toThrow(/still being tagged|already/);
     delete process.env.MOCK_PIECE_COUNT; delete process.env.MOCK_PIECE_COLORS;
   });
 
   it("one garment is not split", async () => {
     process.env.MOCK_PIECE_COUNT = "1";
     const entry = await photoEntry();
-    await expect(splitEntry(jeffId, entry.id)).rejects.toThrow(/Only one piece/);
+    await expect(splitEntry(averyId, entry.id)).rejects.toThrow(/Only one piece/);
     delete process.env.MOCK_PIECE_COUNT;
   });
 });

@@ -1,4 +1,4 @@
-/** e2e helper: five tagged pieces for Jeff (colors, seasons, brands, wear, laundry, prices) to sort and filter; Dark jeans is in the Family closet too. */
+/** e2e helper: five tagged pieces for Avery (colors, seasons, brands, wear, laundry, prices) to sort and filter; Dark jeans is in the Family closet too. */
 import "dotenv/config";
 import sharp from "sharp";
 import { db } from "../src/lib/db";
@@ -9,8 +9,8 @@ const day = 86400000;
 const ago = (d: number) => new Date(Date.now() - d * day);
 
 async function main() {
-  const jeff = await db.person.findUniqueOrThrow({ where: { email: "jeff@everbowl.com" } });
-  const mine = await personalClosetId(jeff.id);
+  const avery = await db.person.findUniqueOrThrow({ where: { email: "avery@example.test" } });
+  const mine = await personalClosetId(avery.id);
   const family = (await db.closet.findFirstOrThrow({ where: { kind: "family" } })).id;
   const one = async (find: Promise<{ id: string }>) => ({ id: (await find).id });
   const cat = (n: string) => db.category.findFirstOrThrow({ where: { name: n } });
@@ -28,12 +28,12 @@ async function main() {
     { name: "Running shorts", cat: "Bottoms", rgb: { r: 20, g: 20, b: 20 }, colors: ["Black"], seasons: ["Summer"], brand: "Nike", occasions: ["Gym"], laundryStatus: "cleaners" as const, wearCount: 3, lastWornAt: ago(10), createdAt: ago(20) },
   ];
   for (const s of specs) {
-    const thumb = newKey("thumbs", jeff.id, "image/jpeg");
+    const thumb = newKey("thumbs", avery.id, "image/jpeg");
     const buf = await sharp({ create: { width: 400, height: 400, channels: 3, background: s.rgb } }).jpeg().toBuffer();
     await putObject(thumb, buf, "image/jpeg");
     await db.item.create({
       data: {
-        ownerId: jeff.id, name: s.name, categoryId: (await cat(s.cat)).id, brandId: (await brand(s.brand)).id,
+        ownerId: avery.id, name: s.name, categoryId: (await cat(s.cat)).id, brandId: (await brand(s.brand)).id,
         colors: { connect: await Promise.all(s.colors.map(color)) }, seasons: { connect: await Promise.all(s.seasons.map(season)) },
         occasions: { connect: await Promise.all((s.occasions ?? []).map(occasion)) }, formalities: { connect: await Promise.all((s.formalities ?? []).map(formality)) },
         tags: { connect: await Promise.all((s.tags ?? []).map(tag)) },
