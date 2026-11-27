@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { readCapped, safeFetch } from "@/lib/net/safe-fetch";
 import { newKey, putObject } from "@/lib/storage";
 import { fetchImage, normalizeUrl, PageError, readProductPage } from "@/lib/shop/page";
 import { searchProducts, type Product } from "@/lib/shop/products";
@@ -83,6 +84,8 @@ export function storeNameFromUrl(url: string): string {
 type ShopifyProduct = { product_type?: string; options?: { name: string; values: string[] }[]; variants?: { option1?: string | null; option2?: string | null; option3?: string | null; featured_image?: { src?: string } | null }[]; images?: { src?: string }[] };
 
 /** Shopify stores expose `/products/<handle>.json`: color and size options plus a photo per color, and the store's product type. */
+const JSON_MAX_BYTES = 1 << 20; // a product JSON is kilobytes; a megabyte is already absurd
+
 async function shopifyVariants(url: string): Promise<Pick<StoreProduct, "colors" | "sizes" | "colorImages" | "category">> {
   const empty = { colors: [], sizes: [], colorImages: {}, category: null };
   const u = new URL(url);
@@ -93,9 +96,11 @@ async function shopifyVariants(url: string): Promise<Pick<StoreProduct, "colors"
     json = { product: { product_type: process.env.MOCK_SHOPIFY_TYPE ?? "", options: [{ name: "Color", values: ["Oatmeal", "Black"] }, { name: "Size", values: ["S", "M", "L"] }], variants: [{ option1: "Oatmeal", option2: "S", featured_image: { src: "https://mock.example/blazer.jpg" } }, { option1: "Black", option2: "S", featured_image: { src: "https://mock.example/blazer-black.jpg" } }] } };
   } else {
     try {
-      const res = await fetch(`${u.origin}/products/${m[1]}.json`, { headers: { accept: "application/json", "user-agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(8000) });
-      if (!res.ok || !/json/.test(res.headers.get("content-type") ?? "")) return empty;
-      json = (await res.json()) as { product?: ShopifyProduct };
+      // Through the guarded fetch like every other store call (security item 7): the origin came from a checked page, but a
+      // redirect from the store itself was followed unchecked before, and the body was read whole.
+      const { res } = await safeFetch(`${u.origin}/products/${m[1]}.json`, { headers: { accept: "application/json", "user-agent": "Mozilla/5.0" } }, { timeoutMs: 8000 });
+      if (!res.ok || !/json/.test(res.headers.get("content-type") ?? "")) { await res.body?.cancel().catch(() => {}); return empty; }
+      json = JSON.parse((await readCapped(res, JSON_MAX_BYTES)).toString("utf8")) as { product?: ShopifyProduct };
     } catch { return empty; }
   }
   const p = json?.product;
