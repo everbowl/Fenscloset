@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
+import { setPassword } from "@/lib/auth/change-password";
 import { resetDb } from "../helpers";
 import { seed } from "../helpers";
 import { acceptInvite, cancelInvite, createInvite, listOpenInvites, peekInvite, renewInvite } from "@/lib/auth/invite";
@@ -122,6 +123,7 @@ describe("people, invites, roles, removal", () => {
 
   it("an email that someone signs in with can change but not vanish", async () => {
     const j = await avery();
+    await setPassword(j.id, "closet-rocks-2026"); // the fixture admin has no password until a test gives one
     await expect(updatePersonDetails(j.id, { email: null })).rejects.toThrow(/can't be cleared/);
     const casey = await byName("Casey");
     await updatePersonDetails(casey.id, { email: "casey@example.com" });
