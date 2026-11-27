@@ -30,7 +30,6 @@ export default async function PeoplePage() {
                 <span className="caption block truncate">
                   {p.email ?? "No email yet"}
                   {p.hasPassword ? "" : p.pendingInvite ? " · Invite sent" : " · Needs an invite"}
-                  {p.devPasswordActive ? " · DEV password active" : ""}
                 </span>
               </span>
               <span className="pill pill-sm pointer-events-none shrink-0">{roleLabel[p.role]}</span>

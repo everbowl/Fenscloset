@@ -14,8 +14,7 @@ import { objectExists } from "@/lib/storage";
 describe("import batches", () => {
   let averyId: string; let caseyId: string;
   beforeEach(async () => {
-    await resetDb();
-    process.env.DEV_MODE = "true"; process.env.MOCK_AI = "true"; process.env.MOCK_S3 = "true";
+    await resetDb(); process.env.MOCK_AI = "true"; process.env.MOCK_S3 = "true";
     delete process.env.MOCK_REMOVE_BG_FAIL;
     process.env.MOCK_S3_DIR = await mkdtemp(path.join(os.tmpdir(), "fc-batch-"));
     await seed();

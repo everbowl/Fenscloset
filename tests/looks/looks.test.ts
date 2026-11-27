@@ -19,8 +19,7 @@ describe("looks: things to buy and things owned, together on you (owner, 2 Nov 2
   let avery: P, casey: P, devon: P;
   let tops: string, bottoms: string;
   beforeEach(async () => {
-    await resetDb();
-    process.env.DEV_MODE = "true"; process.env.MOCK_S3 = "true"; process.env.MOCK_TRYON = "true"; process.env.MOCK_FETCH = "true"; process.env.MOCK_AI = "true";
+    await resetDb(); process.env.MOCK_S3 = "true"; process.env.MOCK_TRYON = "true"; process.env.MOCK_FETCH = "true"; process.env.MOCK_AI = "true";
     process.env.MOCK_S3_DIR = await mkdtemp(path.join(os.tmpdir(), "fc-looks-"));
     await seed();
     const by = async (name: string) => { const p = await db.person.findFirstOrThrow({ where: { name } }); return { id: p.id, role: p.role } as P; };

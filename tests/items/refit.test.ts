@@ -12,8 +12,7 @@ import { refitCutouts } from "@/lib/items/refit";
 describe("refit cutouts", () => {
   let averyId: string;
   beforeEach(async () => {
-    await resetDb();
-    process.env.DEV_MODE = "true"; process.env.MOCK_S3 = "true";
+    await resetDb(); process.env.MOCK_S3 = "true";
     process.env.MOCK_S3_DIR = await mkdtemp(path.join(os.tmpdir(), "fc-refit-"));
     await seed();
     averyId = (await db.person.findUniqueOrThrow({ where: { email: "avery@example.test" } })).id;

@@ -1,6 +1,5 @@
 import { Resend } from "resend";
 import { appUrl } from "@/lib/app-url";
-import { isDevMode } from "@/lib/auth/dev-mode";
 
 export { appUrl }; // the one place that builds absolute links; re-exported for the auth callers
 
@@ -15,14 +14,14 @@ const SEND_TIMEOUT_MS = 10_000;
 
 /**
  * Sends through Resend when RESEND_API_KEY is set. Otherwise reports not-sent; the message itself (it carries a sign-in
- * link) is only printed while DEV_MODE is on, never in a production log (review A A3). Never throws: a provider that
+ * link) is only printed outside production, never in a production log (review A A3). Never throws: a provider that
  * hangs or fails comes back as { sent: false } after ten seconds at most (review A P9).
  */
 export async function sendEmail(msg: EmailMessage): Promise<{ sent: boolean; id?: string; error?: string }> {
   const key = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM ?? "Fen's Closet <onboarding@resend.dev>";
   if (!key) {
-    if (isDevMode()) console.info(`[email:dry-run] subject="${msg.subject}"\n${msg.text}`);
+    if (process.env.NODE_ENV !== "production") console.info(`[email:dry-run] subject="${msg.subject}"\n${msg.text}`);
     else console.info("[email] RESEND_API_KEY is not set; nothing was sent.");
     return { sent: false, error: "Email isn't set up on the site yet." };
   }

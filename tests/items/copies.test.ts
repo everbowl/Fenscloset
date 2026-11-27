@@ -18,8 +18,7 @@ const dayBefore = (n: number) => { const d = new Date(); d.setUTCDate(d.getUTCDa
 describe("copies: ten of the same shirt as one card (owner, 2–3 Nov 2026, F1 + C1)", () => {
   let avery: { id: string; role: "admin" };
   beforeEach(async () => {
-    await resetDb();
-    process.env.DEV_MODE = "true"; process.env.MOCK_AI = "true"; process.env.MOCK_S3 = "true"; process.env.MOCK_FETCH = "true"; process.env.MOCK_SERPER = "true";
+    await resetDb(); process.env.MOCK_AI = "true"; process.env.MOCK_S3 = "true"; process.env.MOCK_FETCH = "true"; process.env.MOCK_SERPER = "true";
     process.env.MOCK_S3_DIR = await mkdtemp(path.join(os.tmpdir(), "fc-copies-"));
     await seed();
     avery = { id: (await db.person.findUniqueOrThrow({ where: { email: "avery@example.test" } })).id, role: "admin" };

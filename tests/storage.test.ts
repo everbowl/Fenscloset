@@ -55,7 +55,7 @@ describe("storage (mock bucket)", () => {
 });
 
 describe("photo visibility", () => {
-  beforeEach(async () => { await resetDb(); process.env.DEV_MODE = "true"; await seed(); });
+  beforeEach(async () => { await resetDb(); await seed(); });
 
   async function people() {
     const [avery, blake, casey, devon] = await Promise.all(

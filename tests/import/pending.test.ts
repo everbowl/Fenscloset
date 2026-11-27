@@ -18,8 +18,7 @@ import { loadTagLists } from "@/lib/ai/tag-item";
 describe("pending adds on the closet", () => {
   let averyId: string;
   beforeEach(async () => {
-    await resetDb();
-    process.env.DEV_MODE = "true"; process.env.MOCK_AI = "true"; process.env.MOCK_S3 = "true";
+    await resetDb(); process.env.MOCK_AI = "true"; process.env.MOCK_S3 = "true";
     process.env.MOCK_S3_DIR = await mkdtemp(path.join(os.tmpdir(), "fc-pending-"));
     await seed();
     averyId = (await db.person.findUniqueOrThrow({ where: { email: "avery@example.test" } })).id;

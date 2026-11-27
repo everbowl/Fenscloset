@@ -14,7 +14,7 @@ import { listEntries } from "@/lib/lists/service";
 
 describe("profiles & privacy", () => {
   beforeEach(async () => {
-    await resetDb(); process.env.DEV_MODE = "true"; process.env.MOCK_S3 = "true";
+    await resetDb(); process.env.MOCK_S3 = "true";
     process.env.MOCK_S3_DIR = await mkdtemp(path.join(os.tmpdir(), "fc-prof-"));
     await seed();
   });

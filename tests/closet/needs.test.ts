@@ -9,8 +9,7 @@ import { addBodyPhoto } from "@/lib/profiles/service";
 describe("what's needed on the closet page (owner, 2 Nov 2026, D1)", () => {
   let avery: { id: string; role: "admin" };
   beforeEach(async () => {
-    await resetDb();
-    process.env.DEV_MODE = "true"; process.env.MOCK_TRYON = "true"; process.env.MOCK_S3 = "true";
+    await resetDb(); process.env.MOCK_TRYON = "true"; process.env.MOCK_S3 = "true";
     await seed();
     avery = { id: (await db.person.findUniqueOrThrow({ where: { email: "avery@example.test" } })).id, role: "admin" };
   });

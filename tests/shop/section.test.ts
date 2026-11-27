@@ -7,7 +7,7 @@ import { searchProducts } from "@/lib/shop/products";
 import { listEntries } from "@/lib/lists/service";
 
 describe("shop section (owner, 2 Nov 2026: men's and women's came back together)", () => {
-  beforeEach(async () => { await resetDb(); process.env.DEV_MODE = "true"; process.env.MOCK_SERPER = "true"; await seed(); });
+  beforeEach(async () => { await resetDb(); process.env.MOCK_SERPER = "true"; await seed(); });
 
   it("reads a section from its name, leads every search with it, and leaves a search alone that already says who it is for", () => {
     expect(sectionKey("Men's")).toBe("men");

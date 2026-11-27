@@ -32,6 +32,22 @@ describe("no personal data in the tree", () => {
     expect(hits).toEqual([]);
   });
 
+  it("the retired dev-password identifiers appear nowhere in src/, prisma/ (outside migrations) or scripts/", () => {
+    // Security item 3. The three columns stay in prisma/schema.prisma until the later drop migration (step 6), so the
+    // column name is allowed in that one file and nowhere else.
+    const FORBIDDEN = ["DEV_MODE", "DEV_PASSWORD", "isDevMode", "devPasswordActive"];
+    const files = execSync("git ls-files src prisma scripts", { encoding: "utf8" }).split("\n").filter((f) => f && !f.startsWith("prisma/migrations/"));
+    const hits: string[] = [];
+    for (const file of files) {
+      const text = readFileSync(file, "utf8");
+      for (const word of FORBIDDEN) {
+        if (word === "devPasswordActive" && file === "prisma/schema.prisma") continue;
+        if (text.includes(word)) hits.push(`${file}: ${word}`);
+      }
+    }
+    expect(hits).toEqual([]);
+  });
+
   it("the seed exports no people", () => {
     const seedData = readFileSync("prisma/seed-data.ts", "utf8");
     expect(seedData).not.toMatch(/export const PEOPLE\b/);

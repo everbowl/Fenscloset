@@ -10,13 +10,12 @@ export type SessionWithPerson = {
   id: string;
   personId: string;
   expiresAt: Date;
-  usedDevPassword: boolean;
   person: Person;
 };
 
 export async function createSession(
   personId: string,
-  meta: { userAgent?: string; usedDevPassword?: boolean } = {},
+  meta: { userAgent?: string } = {},
 ): Promise<{ token: string; expiresAt: Date }> {
   const token = generateToken();
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
@@ -26,7 +25,6 @@ export async function createSession(
       tokenHash: hashToken(token),
       expiresAt,
       userAgent: meta.userAgent?.slice(0, 255),
-      usedDevPassword: meta.usedDevPassword ?? false,
     },
   });
   return { token, expiresAt };

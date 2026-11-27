@@ -4,7 +4,7 @@ import { seed } from "../helpers";
 import { loadTagLists, mapTags, tagItem, tagSchema, type RawTags } from "@/lib/ai/tag-item";
 
 describe("tagging constrained to the lists", () => {
-  beforeEach(async () => { await resetDb(); process.env.DEV_MODE = "true"; process.env.MOCK_AI = "true"; await seed(); });
+  beforeEach(async () => { await resetDb(); process.env.MOCK_AI = "true"; await seed(); });
 
   it("builds enums from the editable lists", async () => {
     const lists = await loadTagLists();

@@ -8,7 +8,6 @@ describe("seed", () => {
   beforeEach(resetDb);
 
   it("an empty database seeds no people: the lists, rules and the Family closet, idempotently", async () => {
-    process.env.DEV_MODE = "true";
     await seedDefaults();
     const count = async () => ({
       people: await db.person.count(), closets: await db.closet.count(), cats: await db.category.count(),
@@ -32,12 +31,22 @@ describe("seed", () => {
     expect(await db.rule.findUnique({ where: { key: "photoRetouch" } })).toBeNull();
     expect(await db.rule.count()).toBe(20);
   });
+
+  it("FC_BOOTSTRAP_ADMIN_EMAIL on an empty database creates one admin with no password, and nothing after that", async () => {
+    process.env.FC_BOOTSTRAP_ADMIN_EMAIL = " First.Admin@Example.test ";
+    try { await seedDefaults(); } finally { delete process.env.FC_BOOTSTRAP_ADMIN_EMAIL; }
+    const people = await db.person.findMany();
+    expect(people).toHaveLength(1);
+    expect(people[0]).toMatchObject({ email: "first.admin@example.test", role: "admin", status: "invited", passwordHash: null });
+    expect(await db.closet.count({ where: { ownerId: people[0].id, kind: "personal" } })).toBe(1);
+    await seedDefaults(); // the variable is gone and people exist: nobody else is created
+    expect(await db.person.count()).toBe(1);
+  });
 });
 
 describe("seed guard", () => {
   it("does nothing on a database that already has people unless SEED_FORCE is set", async () => {
     await resetDb();
-    process.env.DEV_MODE = "true";
     process.env.SEED_FORCE = "true";
     await seedDefaults();
     await seedPeople();

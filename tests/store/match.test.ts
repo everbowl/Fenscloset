@@ -30,8 +30,7 @@ describe("brand catalog", () => {
 describe("style match", () => {
   let averyId: string;
   beforeEach(async () => {
-    await resetDb();
-    process.env.DEV_MODE = "true"; process.env.MOCK_AI = "true"; process.env.MOCK_S3 = "true"; process.env.MOCK_SERPER = "true"; process.env.MOCK_FETCH = "true";
+    await resetDb(); process.env.MOCK_AI = "true"; process.env.MOCK_S3 = "true"; process.env.MOCK_SERPER = "true"; process.env.MOCK_FETCH = "true";
     delete process.env.MOCK_REMOVE_BG_FAIL; delete process.env.MOCK_ORIENTATION;
     process.env.MOCK_S3_DIR = await mkdtemp(path.join(os.tmpdir(), "fc-match-"));
     await seed();

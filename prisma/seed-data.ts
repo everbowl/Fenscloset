@@ -107,7 +107,6 @@ export const RULES = [
   { key: "waistDivisorX10", value: "55", label: "Likely waist · divisor ×10", description: "Likely waist ≈ weight ÷ (this ÷ 10), nudged by height. 55 means weight ÷ 5.5: 170 lb → about 31." },
 ];
 
-export const DEV_PASSWORD = "0535";
 
 /**
  * The mirror's styling lists (the owner, 19 Oct 2026: "don't default to tucking it in; give me options on pose

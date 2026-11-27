@@ -22,8 +22,7 @@ async function threeShirts(): Promise<Buffer> {
 describe("several shirts in one photo (owner, 2–3 Nov 2026, E1)", () => {
   let averyId: string;
   beforeEach(async () => {
-    await resetDb();
-    process.env.DEV_MODE = "true"; process.env.MOCK_AI = "true"; process.env.MOCK_S3 = "true"; process.env.MOCK_FETCH = "true"; process.env.MOCK_SERPER = "true";
+    await resetDb(); process.env.MOCK_AI = "true"; process.env.MOCK_S3 = "true"; process.env.MOCK_FETCH = "true"; process.env.MOCK_SERPER = "true";
     delete process.env.MOCK_REMOVE_BG_FAIL;
     process.env.MOCK_S3_DIR = await mkdtemp(path.join(os.tmpdir(), "fc-split-"));
     await seed();

@@ -28,6 +28,9 @@ pasted into a chat. Claim work in `docs/SESSIONS.md` before starting it.
   PR, test, log line, doc or chat message — including code that removes them. Say "the retired dev value", "the owner's
   address", "the seeded family profiles". Tests use the synthetic fixture in `tests/fixtures/people.ts` only
   (`@example.test` addresses, invented first names).
+- The one-time dev password convention is retired for this app (security item 3, 27 Nov 2026): the value was published,
+  so it is a key everyone has. The way in is Forgot password, `npm run admin:bootstrap`, or `FC_BOOTSTRAP_ADMIN_EMAIL` on an
+  empty database. No `DEV_MODE`, no fixed password anywhere.
 - Keys live only in Railway variables. Never echo a variable value, never ask the owner to paste a key into chat.
 - Minors' body data and photos are visible only to the minor and their parent admins; a minor's body never goes to a try-on
   provider; body photos are served only through the authenticated proxy. No family invites until the owner says "launch".

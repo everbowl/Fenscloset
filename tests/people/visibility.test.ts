@@ -7,7 +7,7 @@ import { countClosetItems, listClosetItems, statusWord } from "@/lib/items/query
 import { cycleLaundry, personalClosetId, updateItem } from "@/lib/items/service";
 
 describe("who sees what", () => {
-  beforeEach(async () => { await resetDb(); process.env.DEV_MODE = "true"; await seed(); });
+  beforeEach(async () => { await resetDb(); await seed(); });
 
   async function people() {
     const by = async (name: string) => db.person.findFirstOrThrow({ where: { name } });

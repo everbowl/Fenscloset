@@ -8,7 +8,7 @@ export const ADMIN_PASSWORD = FIXTURE_ADMIN_PASSWORD;
 
 /** Fresh seeded database plus the synthetic household. With adminReady, the fixture admin already has a real password (skips the first-login flow). */
 export function resetAndSeed(opts: { adminReady?: boolean } = {}) {
-  const env = { ...process.env, DATABASE_URL: E2E_DB, DEV_MODE: "true", DEV_ADMIN_EMAIL: ADMIN_EMAIL, SEED_FORCE: "true" };
+  const env = { ...process.env, DATABASE_URL: E2E_DB, SEED_FORCE: "true" };
   execSync(`psql -h localhost -p 5433 -U postgres -d fenscloset_e2e -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'`, { stdio: "ignore" });
   execSync("npx prisma migrate deploy", { stdio: "ignore", env });
   execSync("npx tsx prisma/seed.ts", { stdio: "ignore", env });

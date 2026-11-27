@@ -17,7 +17,7 @@ import { setMeasurement } from "@/lib/profiles/service";
 
 describe("my brands & sizes by item type", () => {
   beforeEach(async () => {
-    await resetDb(); process.env.DEV_MODE = "true"; process.env.MOCK_AI = "true"; process.env.MOCK_S3 = "true";
+    await resetDb(); process.env.MOCK_AI = "true"; process.env.MOCK_S3 = "true";
     process.env.MOCK_S3_DIR = await mkdtemp(path.join(os.tmpdir(), "fc-mybrands-"));
     await seed();
   });
