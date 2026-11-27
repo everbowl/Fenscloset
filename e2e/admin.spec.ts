@@ -14,10 +14,10 @@ test("admin edits a list in place: add, rename, reorder, archive, blocked delete
   await sheet.getByRole("button", { name: "Add brand" }).click();
   await expect(page.getByText("Example Apparel")).toBeVisible();
 
-  await page.getByRole("button", { name: /^Everbowl Apparel/ }).click();
-  await sheet.getByLabel("Name").fill("Everbowl Merch");
+  await page.getByRole("button", { name: /^Example Apparel/ }).click();
+  await sheet.getByLabel("Name").fill("Example Merch");
   await sheet.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByText("Everbowl Merch")).toBeVisible();
+  await expect(page.getByText("Example Merch")).toBeVisible();
 
   // Drag to reorder: the fourth row goes up two rows (pointer events on the grip), and it sticks after a reload
   await expect(sheet).toBeHidden();
@@ -39,7 +39,7 @@ test("admin edits a list in place: add, rename, reorder, archive, blocked delete
   await page.getByTestId("list-filter").fill("");
 
   // Archive then restore
-  const row = page.locator("div", { has: page.getByRole("button", { name: /^Everbowl Merch/ }) }).last();
+  const row = page.locator("div", { has: page.getByRole("button", { name: /^Example Merch/ }) }).last();
   await row.getByRole("button", { name: "Archive" }).click();
   await expect(page.getByText("Archived (1)")).toBeVisible();
 
