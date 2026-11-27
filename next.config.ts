@@ -12,12 +12,19 @@ function buildId(): string {
   try { return execSync("git rev-parse --short=12 HEAD", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim(); } catch { return String(Date.now()); }
 }
 
-/* A private family app, still: never framed, no referrer past the origin, the camera only for ourselves. Only frame-ancestors in the CSP, so the inline <style> that carries the accent keeps working. */
+/*
+ * A private family app, still: never framed, no referrer past the origin, the camera and location only for ourselves,
+ * every visit over https once a browser has seen us (security items 10 and 11). HSTS starts at five minutes and is raised
+ * to a year with includeSubDomains after a week with no problems; never `preload` without the owner's say-so. The full
+ * Content-Security-Policy, with a per-request nonce, is set in src/proxy.ts (report-only first); frame-ancestors stays
+ * here as an enforcing header so framing is refused from day one.
+ */
 const securityHeaders = [
+  { key: "Strict-Transport-Security", value: "max-age=300" },
   { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy", value: "camera=(self)" },
+  { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=(self)" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   // Every response, photos and API answers included: nothing of the closet is indexed or shown in a search result.
   { key: "X-Robots-Tag", value: "noindex, nofollow" },
