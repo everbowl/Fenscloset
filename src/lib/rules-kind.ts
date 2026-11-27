@@ -27,6 +27,12 @@ export const RULE_COPY: Record<string, { label: string; description: string; uni
   notWornMonths: { label: "Months before a clean-out nudge", description: "A piece not worn in this many months lands on the Clean-out list.", unit: "months" },
   laundryCycleDays: { label: "Days between washes", description: "With ten of the same shirt, this says how many you really need: the Clean-out suggests the rest can go.", unit: "days" },
   needSnoozeDays: { label: "Days a Not now lasts", description: "Not now on a What’s-needed row of the Closet hides that row for this many days.", unit: "days" },
+  aiPerPersonClaude: { label: "Claude calls per person per day", description: "Tagging, reading labels, the Shop's verdicts, outfit ideas, notes. Floor 1.", unit: "a day" },
+  aiPerPersonTryOn: { label: "Try-ons per person per day", description: "Dressings on your body photo (Google, FASHN, Kling), Compare counted once per engine. Floor 1.", unit: "a day" },
+  aiPerPersonRemoveBg: { label: "Photo cut-outs per person per day", description: "remove.bg background removal on added pieces. Floor 1.", unit: "a day" },
+  aiPerPersonShop: { label: "Shop lookups per person per day", description: "Product searches (Serper); a cached answer is free. Floor 1.", unit: "a day" },
+  aiPerPersonGoogleImage: { label: "Image redraws per person per day", description: "Google's image model: the mannequin and styling passes. Floor 1.", unit: "a day" },
+  aiHouseholdPerDay: { label: "AI calls per household per day", description: "Every paid call by everyone, background sweeps included. When it is reached, nothing more runs until tomorrow. Floor 1.", unit: "a day" },
   timezone: { label: "Household time zone", description: "When “today” starts for check-ins, looks and the Fits calendar." },
   accentColor: { label: "Button color", description: "The color of the main buttons. Everything else stays black and white." },
   mirrorEngine: { label: "Mirror engine", description: "Who dresses a look on a body photo. Compare runs the engines switched on below, side by side." },
@@ -52,6 +58,7 @@ export const RULE_GROUPS: { title: string; blurb?: string; keys: string[]; compa
   { title: "Household", keys: ["timezone", "accentColor"] },
   { title: "Mirror", keys: ["mirrorEngine", "compareGoogle", "compareFashn", "compareKling"], advanced: true },
   { title: "Shop", keys: ["wantSweepHours"] },
+  { title: "AI allowance", blurb: "Daily caps on the paid AI calls, per person and for the whole household. A person past their cap sees a friendly line and tries tomorrow; an import waits instead of failing. Background work (the Looking-for sweep, an import with nobody signed in) counts as one more person. Each number has a floor of 1.", keys: ["aiPerPersonClaude", "aiPerPersonTryOn", "aiPerPersonRemoveBg", "aiPerPersonShop", "aiPerPersonGoogleImage", "aiHouseholdPerDay"], compact: true, advanced: true },
   { title: "Likely sizes", blurb: "A starting point from height and weight, shown on the Body page and offered when someone records a size.", keys: ["sizeBandXsMaxLb", "sizeBandSMaxLb", "sizeBandMMaxLb", "sizeBandLMaxLb", "sizeBandXlMaxLb", "sizeTallIn", "sizeShortIn", "waistDivisorX10"], compact: true, advanced: true },
 ];
 

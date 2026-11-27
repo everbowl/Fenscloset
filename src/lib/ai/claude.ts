@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { chargeAi } from "@/lib/ai/usage";
 
 const MODEL = "claude-opus-5-5";
 
@@ -31,6 +32,8 @@ export type StructuredRequest = {
   schema: Record<string, unknown>;
   effort?: "low" | "medium" | "high";
   maxTokens?: number;
+  /** Who pays for the call against the daily caps (security item 8): the signed-in person when unset, else the household. */
+  personId?: string;
 };
 
 /** JSON Schema keywords the structured-output endpoint rejects on number and integer properties (seen live 26 Nov: "For 'integer'
@@ -57,6 +60,7 @@ export function apiSchema(schema: Record<string, unknown>): Record<string, unkno
 
 /** One vision/text call that must come back as JSON matching `schema`. Server-side refusal fallbacks are on. */
 export async function structured<T>(req: StructuredRequest, retried = false): Promise<T> {
+  if (!retried) await chargeAi("claude", req.personId); // the cap is checked before the client is even built
   const content: Anthropic.Beta.BetaContentBlockParam[] = [];
   if (req.image) content.push({ type: "image", source: { type: "base64", media_type: req.image.mediaType, data: req.image.data } });
   for (const im of req.images ?? []) {

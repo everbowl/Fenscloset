@@ -41,7 +41,8 @@ describe("product search", () => {
     expect(out.length).toBeGreaterThan(0);
     expect(bodies.length).toBe(3);
     for (const b of bodies) { expect(b).not.toMatch(/32|34|size|waist|\bin\b/i); }
-    expect(bodies.map((b) => (JSON.parse(b) as { q: string }).q)).toEqual(["men's slim dark wash jeans", "tapered chino pants", "belt"]);
+    // every scrubbed query goes out exactly once; the three run in parallel, so their order is not part of the contract
+    expect(bodies.map((b) => (JSON.parse(b) as { q: string }).q).sort()).toEqual(["belt", "men's slim dark wash jeans", "tapered chino pants"]);
   });
 
   it("says which searches the stores did not answer (review E B5)", async () => {

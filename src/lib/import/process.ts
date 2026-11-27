@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { isAiCapError, nextHouseholdMidnight } from "@/lib/ai/usage";
 import { deleteObject, getObject, newKey, NotFoundError, putObject } from "@/lib/storage";
 import { removeBackground, RemoveBgError } from "@/lib/images/remove-bg";
 import { fitCutout, makeThumb, normalizeOriginal, toAiImage } from "@/lib/images/thumb";
@@ -33,7 +34,8 @@ export async function processEntry(entryId: string): Promise<ProcessOutcome> {
   const entry = await db.importEntry.findUnique({ where: { id: entryId }, include: { batch: true } });
   if (!entry) return { status: "failed", error: "Entry not found" };
   if (!CLAIMABLE.includes(entry.status)) return { status: entry.status };
-  const claimed = await db.importEntry.updateMany({ where: { id: entryId, status: { in: CLAIMABLE } }, data: { status: "processing", error: null } });
+  // An entry paused for the day's AI allowance (security item 8) is not claimable until its moment comes.
+  const claimed = await db.importEntry.updateMany({ where: { id: entryId, status: { in: CLAIMABLE }, OR: [{ retryAfter: null }, { retryAfter: { lte: new Date() } }] }, data: { status: "processing", error: null, retryAfter: null } });
   if (claimed.count === 0) return { status: entry.status };
   const ownerId = entry.batch.personId;
   const meta = (entry.storeMeta as StoreMeta | null) ?? null;
@@ -69,8 +71,8 @@ export async function processEntry(entryId: string): Promise<ProcessOutcome> {
     } else {
       // Tags come from the straightened original, so Claude and remove.bg run at the same time (review B B3).
       const [cut, tagged] = await Promise.all([
-        removeBackground(normalized).then(fitCutout).catch((e: unknown) => { if (e instanceof RemoveBgError) return e; throw e; }),
-        toAiImage(normalized).then((image) => tagItem({ image, lists })),
+        removeBackground(normalized, { personId: ownerId }).then(fitCutout).catch((e: unknown) => { if (e instanceof RemoveBgError) return e; throw e; }),
+        toAiImage(normalized).then((image) => tagItem({ image, lists, personId: ownerId })),
       ]);
       if (cut instanceof RemoveBgError) warnings.push(`bg_failed:${cut.code}`);
       else {
@@ -133,6 +135,12 @@ export async function processEntry(entryId: string): Promise<ProcessOutcome> {
     }
     return { status: "needs_confirm" };
   } catch (e) {
+    if (isAiCapError(e)) {
+      // The day's AI allowance ran out: the entry waits for tomorrow instead of failing (security item 8).
+      const retryAfter = await nextHouseholdMidnight();
+      await db.importEntry.updateMany({ where: { id: entryId, status: "processing" }, data: { status: "queued", error: e.message, retryAfter } });
+      return { status: "queued", error: e.message };
+    }
     const msg = e instanceof AiError
       ? (e.code === "no_key" ? "Tagging is not set up yet (missing ANTHROPIC_API_KEY)." : `Tagging failed: ${e.message}`)
       : `Processing failed: ${(e as Error).message}`;

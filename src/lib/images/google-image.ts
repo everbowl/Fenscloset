@@ -1,4 +1,5 @@
 import { accessToken, fetchWithBackoff } from "@/lib/tryon/google";
+import { chargeAi } from "@/lib/ai/usage";
 
 /**
  * One call to Google's image model on Vertex (Gemini 2.5 Flash Image), with the same service account as
@@ -43,7 +44,8 @@ export function clearGoogleImageHold(): void {
 }
 
 /** Zero or more JPEG/PNG inputs plus a prompt, image bytes out. */
-export async function googleImage(images: { data: Buffer; mimeType: "image/jpeg" | "image/png" }[], prompt: string, fetchImpl: typeof fetch = fetch, opts: { /** An adult's own body picture (the try-on styling pass): Google's filters are loosened for it (Jeff, 19 Oct 2026). Never set for a minor's look, the mannequin or garment photos, which keep Google's defaults. */ relaxed?: boolean } = {}): Promise<Buffer> {
+export async function googleImage(images: { data: Buffer; mimeType: "image/jpeg" | "image/png" }[], prompt: string, fetchImpl: typeof fetch = fetch, opts: { /** Who pays against the daily caps (security item 8). */ personId?: string; /** An adult's own body picture (the try-on styling pass): Google's filters are loosened for it (Jeff, 19 Oct 2026). Never set for a minor's look, the mannequin or garment photos, which keep Google's defaults. */ relaxed?: boolean } = {}): Promise<Buffer> {
+  await chargeAi("googleimage", opts.personId);
   if (googleImageOnHold()) throw new GoogleImageError(`Google’s image model is out of quota; not called again until ${new Date(holdUntil).toISOString().slice(11, 16)} UTC.`, 429);
   const project = process.env.GOOGLE_VERTEX_PROJECT!;
   const location = process.env.GOOGLE_VERTEX_IMAGE_LOCATION || process.env.GOOGLE_VERTEX_SMOOTH_LOCATION || "global";
