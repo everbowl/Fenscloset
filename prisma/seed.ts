@@ -37,10 +37,18 @@ export async function seed() {
     return;
   }
 
-  // No people: the repository holds no one's name or address (security item 1). The first admin is created by hand
-  // (see README); tests and e2e specs add the synthetic household from tests/fixtures/people.ts.
+  // No people: the repository holds no one's name or address (security item 1). Tests and e2e specs add the synthetic
+  // household from tests/fixtures/people.ts. A fresh environment's first admin comes from FC_BOOTSTRAP_ADMIN_EMAIL, read
+  // only while the database has no people (security item 3): that person is created as an admin with no password and sets
+  // one through Forgot password; afterwards the variable does nothing and the owner deletes it. Unset, nobody is created.
   const family = await db.closet.findFirst({ where: { kind: "family" } });
   if (!family) await db.closet.create({ data: { name: "Family", kind: "family", sortOrder: 100 } });
+  const bootstrap = process.env.FC_BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase();
+  if (bootstrap && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bootstrap)) {
+    const admin = await db.person.create({ data: { name: bootstrap.split("@")[0], email: bootstrap, role: "admin", status: "invited" } });
+    await db.closet.create({ data: { name: `${admin.name}'s closet`, kind: "personal", ownerId: admin.id } });
+    console.log("Seed: first admin created from FC_BOOTSTRAP_ADMIN_EMAIL — use Forgot password on the sign-in page, then delete the variable.");
+  }
 
   // Categories + subcategories
   let ci = 0;
@@ -89,7 +97,7 @@ export async function seed() {
   await SEED_SETS["brands-catalog-v1"]();
   await SEED_SETS["mirror-styling-v1"]();
   for (const name of Object.keys(SEED_SETS)) await db.seedSet.upsert({ where: { name }, update: {}, create: { name } });
-  console.log("Seed: lists, rules and the Family closet are in; no people are seeded — create the first admin by hand (README).");
+  if (!bootstrap) console.log("Seed: lists, rules and the Family closet are in; no people — set FC_BOOTSTRAP_ADMIN_EMAIL or run npm run admin:bootstrap for the first admin (README).");
 }
 
 async function seedSizeOptions() {

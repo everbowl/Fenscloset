@@ -1,7 +1,4 @@
 import { db } from "../../src/lib/db";
-import { hashPassword } from "../../src/lib/auth/password";
-import { isDevMode } from "../../src/lib/auth/dev-mode";
-import { DEV_PASSWORD } from "../../prisma/seed-data";
 import { FIXTURE_PEOPLE, type FixturePerson } from "./people-data";
 
 export { FIXTURE_ADMIN_EMAIL, FIXTURE_ADMIN_PASSWORD, FIXTURE_PEOPLE } from "./people-data";
@@ -9,8 +6,8 @@ export { FIXTURE_ADMIN_EMAIL, FIXTURE_ADMIN_PASSWORD, FIXTURE_PEOPLE } from "./p
 /**
  * Creates the synthetic household the way the seed used to create the real one: people (status invited), guardian links,
  * a personal closet each, the minor's body-image approval by the first admin, and the first admin shopping the first store
- * section. In DEV mode the first admin gets the one-time dev password exactly as the seed did, so the sign-in flow is still
- * covered until that path is removed (security item 3). Idempotent: an existing person is reused, never duplicated.
+ * section. Nobody has a password: a test that signs in sets one with setPassword, the e2e suite with e2e/set-password.ts.
+ * Idempotent: an existing person is reused, never duplicated.
  */
 export async function seedPeople(opts: { approveMinorBodyImages?: boolean } = {}): Promise<Record<FixturePerson["key"], string>> {
   const ids = {} as Record<FixturePerson["key"], string>;
@@ -22,14 +19,6 @@ export async function seedPeople(opts: { approveMinorBodyImages?: boolean } = {}
       ? await db.person.update({ where: { id: existing.id }, data: { role: p.role } })
       : await db.person.create({ data: { name: p.name, email: p.email, role: p.role, status: "invited" } });
     ids[p.key] = person.id;
-  }
-
-  const admin = await db.person.findUniqueOrThrow({ where: { id: ids.admin } });
-  if (isDevMode() && !admin.passwordHash) {
-    await db.person.update({
-      where: { id: admin.id },
-      data: { passwordHash: await hashPassword(DEV_PASSWORD), mustChangePassword: true, devPasswordActive: true, status: "active" },
-    });
   }
 
   for (const p of Object.values(FIXTURE_PEOPLE)) {

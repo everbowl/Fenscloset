@@ -46,9 +46,9 @@ export async function currentAdmin(): Promise<Person | null> {
   return isAdmin(person) ? person : null;
 }
 
-export async function signIn(personId: string, opts: { usedDevPassword?: boolean } = {}) {
+export async function signIn(personId: string) {
   const ua = (await headers()).get("user-agent") ?? undefined;
-  const { token, expiresAt } = await createSession(personId, { userAgent: ua, usedDevPassword: opts.usedDevPassword });
+  const { token, expiresAt } = await createSession(personId, { userAgent: ua });
   const store = await cookies();
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,

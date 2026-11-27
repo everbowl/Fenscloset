@@ -153,7 +153,6 @@ export function PersonEditor({ person, admins, smsReady, isSelf, bodyPhotos }: {
         <h2 className="section">Login</h2>
         <p className="note">
           {person.hasPassword ? "Has a password and can sign in." : person.pendingInvite ? "An invite is out. Send another if it got lost." : "Hasn't set a password yet. Send an invite."}
-          {person.devPasswordActive ? " The one-time DEV password is active." : ""}
         </p>
         <InviteSheet admins={admins} smsReady={smsReady} existing={{ id: person.id, name, email: email || null, phone: phone || null, role, guardianIds }}
           trigger={<Button variant="outline">{person.hasPassword ? "Send a new invite link" : "Send invite"}</Button>} />

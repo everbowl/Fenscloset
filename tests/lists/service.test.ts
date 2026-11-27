@@ -6,7 +6,7 @@ import { createEntry, deleteEntry, InUseError, listEntries, ProtectedEntryError,
 import { LIST_KINDS } from "@/lib/lists/registry";
 
 describe("editable lists", () => {
-  beforeEach(async () => { await resetDb(); process.env.DEV_MODE = "true"; await seed(); });
+  beforeEach(async () => { await resetDb(); await seed(); });
 
   it("creates, renames, archives and deletes entries of every simple kind", async () => {
     for (const kind of LIST_KINDS) {

@@ -7,7 +7,7 @@ import type { Role } from "@/generated/prisma/client";
 
 export type PersonSummary = {
   id: string; name: string; email: string | null; phone: string | null; role: Role; status: "active" | "invited" | "removed";
-  birthdate: Date | null; guardianIds: string[]; hasPassword: boolean; devPasswordActive: boolean;
+  birthdate: Date | null; guardianIds: string[]; hasPassword: boolean;
   pendingInvite: boolean;
 };
 
@@ -23,7 +23,7 @@ export async function listPeople(opts: { includeRemoved?: boolean } = {}): Promi
   const pendingIds = new Set(pending.map((p) => p.acceptedPersonId));
   return people.map((p) => ({
     id: p.id, name: p.name, email: p.email, phone: p.phone, role: p.role, status: p.status, birthdate: p.birthdate,
-    guardianIds: p.guardians.map((g) => g.parentId), hasPassword: hasUsablePassword(p), devPasswordActive: p.devPasswordActive,
+    guardianIds: p.guardians.map((g) => g.parentId), hasPassword: hasUsablePassword(p),
     pendingInvite: pendingIds.has(p.id),
   }));
 }
@@ -38,11 +38,9 @@ export async function updatePersonDetails(id: string, data: { name?: string; ema
   if (data.name !== undefined) { const n = data.name.trim(); if (!n) throw new Error("Name can't be blank."); patch.name = n; }
   if (data.email !== undefined) {
     const next = data.email ? normalizeEmail(data.email) : null;
-    const person = await db.person.findUniqueOrThrow({ where: { id }, select: { email: true, passwordHash: true, devPasswordActive: true } });
-    // The email is how they sign in: it can change, but not vanish, while a password exists (review A W7). The one-time
-    // DEV password is tied to its address, so that address holds until the real password is set.
-    if (!next && (person.passwordHash || person.devPasswordActive)) throw new Error("They sign in with this email, so it can't be cleared. Change it instead.");
-    if (next !== person.email && person.devPasswordActive) throw new Error("The one-time DEV password is tied to this email. Set the real password first, then change it.");
+    const person = await db.person.findUniqueOrThrow({ where: { id }, select: { email: true, passwordHash: true } });
+    // The email is how they sign in: it can change, but not vanish, while a password exists (review A W7).
+    if (!next && person.passwordHash) throw new Error("They sign in with this email, so it can't be cleared. Change it instead.");
     patch.email = next;
   }
   if (data.phone !== undefined) {
@@ -151,7 +149,7 @@ export async function removePerson(id: string, opts: { items: "delete" | "moveTo
     await tx.tryOn.deleteMany({ where: { personId: id } });
     await tx.inspirationLook.deleteMany({ where: { personId: id } });
     await tx.inviteToken.updateMany({ where: { acceptedPersonId: id, acceptedAt: null }, data: { expiresAt: new Date() } });
-    await tx.person.update({ where: { id }, data: { status: "removed", passwordHash: null, devPasswordActive: false, email: person.email ? `removed+${person.id}@${person.email.split("@")[1]}` : null } });
+    await tx.person.update({ where: { id }, data: { status: "removed", passwordHash: null, email: person.email ? `removed+${person.id}@${person.email.split("@")[1]}` : null } });
   });
   await destroyAllSessionsFor(id);
   await Promise.all(keys.map((k) => deleteObject(k).catch(() => {})));

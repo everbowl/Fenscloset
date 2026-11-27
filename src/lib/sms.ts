@@ -1,4 +1,3 @@
-import { isDevMode } from "@/lib/auth/dev-mode";
 
 /**
  * SMS via Twilio's REST API (no SDK needed for one endpoint). Requires TWILIO_ACCOUNT_SID,
@@ -21,8 +20,8 @@ const SEND_TIMEOUT_MS = 10_000;
 /** Never throws: a network error or a slow Twilio comes back as { sent: false } within ten seconds (review A P9). */
 export async function sendSms(to: string, body: string): Promise<{ sent: boolean; error?: string }> {
   if (!smsConfigured()) {
-    // The text carries a sign-in link: printed only while DEV_MODE is on, never in a production log (review A A3).
-    if (isDevMode()) console.info(`[sms:dry-run]\n${body}`);
+    // The text carries a sign-in link: printed only outside production, never in a production log (review A A3).
+    if (process.env.NODE_ENV !== "production") console.info(`[sms:dry-run]\n${body}`);
     else console.info("[sms] Twilio is not set up; nothing was sent.");
     return { sent: false, error: "Texting isn't set up on the site yet." };
   }

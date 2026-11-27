@@ -1,5 +1,4 @@
 import { defineConfig, devices } from "@playwright/test";
-import { FIXTURE_ADMIN_EMAIL } from "./tests/fixtures/people-data";
 
 const PORT = 3100;
 
@@ -27,6 +26,6 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     stdout: "pipe",
     timeout: 240_000,
-    env: { ...process.env, DATABASE_URL: "postgresql://postgres@localhost:5433/fenscloset_e2e", DEV_MODE: "true", DEV_ADMIN_EMAIL: FIXTURE_ADMIN_EMAIL, SESSION_SECRET: "e2e", APP_URL: `http://localhost:${PORT}`, MOCK_S3: "true", MOCK_AI: "true", MOCK_WEATHER: "true", MOCK_GOOGLE: "true", MOCK_FETCH: "true", MOCK_SERPER: "true", MOCK_TRYON: "true", MOCK_TRYON_SLOW_MS: "2500", MOCK_GOOGLE_IMAGE: "true", MOCK_FASHN: "true", MOCK_KLING: "true", MOCK_SHOP_SLOW_MS: "700", MOCK_WEATHER_SLOW_MS: "1200", UNTIDY_ON_START: "false", WANTS_ON_START: "false" },
+    env: { ...process.env, DATABASE_URL: "postgresql://postgres@localhost:5433/fenscloset_e2e", SESSION_SECRET: "e2e", APP_URL: `http://localhost:${PORT}`, MOCK_S3: "true", MOCK_AI: "true", MOCK_WEATHER: "true", MOCK_GOOGLE: "true", MOCK_FETCH: "true", MOCK_SERPER: "true", MOCK_TRYON: "true", MOCK_TRYON_SLOW_MS: "2500", MOCK_GOOGLE_IMAGE: "true", MOCK_FASHN: "true", MOCK_KLING: "true", MOCK_SHOP_SLOW_MS: "700", MOCK_WEATHER_SLOW_MS: "1200", UNTIDY_ON_START: "false", WANTS_ON_START: "false" },
   },
 });

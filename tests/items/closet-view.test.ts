@@ -13,7 +13,6 @@ describe("loadClosetView", () => {
   let avery: { id: string; name: string }, casey: { id: string }, ids: Record<string, string>, familyId: string;
   beforeEach(async () => {
     await resetDb();
-    process.env.DEV_MODE = "true";
     await seed();
     avery = await db.person.findUniqueOrThrow({ where: { email: "avery@example.test" }, select: { id: true, name: true } });
     casey = await db.person.findFirstOrThrow({ where: { name: "Casey" }, select: { id: true } });

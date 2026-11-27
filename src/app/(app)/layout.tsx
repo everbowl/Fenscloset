@@ -11,7 +11,6 @@ import { Crumbs } from "@/components/crumbs";
 import { MirrorJobProvider, MirrorStrip } from "@/components/mirror/mirror-job";
 import { accentColor } from "@/lib/rules";
 import { HeaderActionSlot } from "@/components/header-action";
-import { DevModeBanner } from "@/components/dev-mode-banner";
 import { ToastHost } from "@/components/ui/toast";
 import { ServiceWorkerRegistrar } from "@/components/sw-registrar";
 import { logoutAction } from "@/app/(auth)/login/actions";
@@ -27,7 +26,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="flex min-h-dvh flex-col bg-paper">
       <style>{`:root{--accent:${accent}}`}</style>
       <ServiceWorkerRegistrar />
-      <DevModeBanner />
       <AppHeader left={<div className="header-left flex items-center"><Suspense><HeaderBack /></Suspense><PersonMenu views={views} current={current} isAdmin={isAdmin(person)} logout={logoutAction} setView={setViewAction} /></div>} right={<HeaderActionSlot />} />
       {/* Desktop (Q17): the tab row sits under the header; on phones it is the pinned bottom bar. */}
       <AppNav />

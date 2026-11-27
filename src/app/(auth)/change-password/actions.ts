@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { requirePerson, getCurrentSession } from "@/lib/auth/current";
+import { requirePerson } from "@/lib/auth/current";
 import { setPassword, validateNewPassword } from "@/lib/auth/change-password";
 import { db } from "@/lib/db";
 import { SESSION_COOKIE } from "@/lib/auth/cookies";
@@ -20,9 +20,5 @@ export async function changePasswordAction(_prev: ChangePasswordState, formData:
   // Keep this session, drop every other one.
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   await db.session.deleteMany({ where: { personId: person.id, NOT: token ? { tokenHash: hashToken(token) } : undefined } });
-  const session = await getCurrentSession();
-  if (session?.usedDevPassword) {
-    await db.session.update({ where: { id: session.id }, data: { usedDevPassword: false } });
-  }
   redirect("/today");
 }

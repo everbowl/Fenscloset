@@ -16,12 +16,13 @@ npm run db:migrate              # applies migrations
 npm run db:seed                 # Family closet, default lists, rules — no people (the repository holds no one's name or address)
 npm run dev                     # http://localhost:3000
 ```
-The seed creates no people. For a local admin, add the synthetic household the tests use and give its admin a password
-of your own (security item 3 replaces this with `npm run admin:bootstrap`):
+The seed creates no people. The first admin comes from a reset link (there is no bootstrap password anywhere):
 ```bash
-npx tsx e2e/seed-people.ts                               # four invented people with @example.test addresses (tests/fixtures/people-data.ts)
-npx tsx e2e/set-password.ts avery@example.test <password> # the fixture admin can now sign in
+npm run admin:bootstrap -- --email you@example.test --print   # prints a single-use, 60-minute link; open it and choose a password
 ```
+It refuses while an admin with a password exists. On a fresh Railway environment, set `FC_BOOTSTRAP_ADMIN_EMAIL` before the
+first deploy instead, use Forgot password on the sign-in page, then delete the variable. Tests and e2e specs use the synthetic
+household in `tests/fixtures/people.ts`.
 
 ## Tests
 ```bash

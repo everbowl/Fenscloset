@@ -2,19 +2,15 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { login, normalizeEmail, type LoginReason } from "@/lib/auth/login";
+import { login, normalizeEmail } from "@/lib/auth/login";
 import { signIn, getCurrentPerson } from "@/lib/auth/current";
 import { checkRateLimit, clearRateLimit, clientIp, noteFailure, rateLimitKey, rateLimitMessage } from "@/lib/auth/rate-limit";
 import { cookieSecure } from "@/lib/app-url";
 
 export type LoginState = { error?: string; email?: string };
 
-// One line per way a sign-in fails. Unknown address and wrong password share a line on purpose (review A S11).
-const WORDS: Record<LoginReason, string> = {
-  invalid: "That email and password don't match.",
-  no_password: "This account doesn't have a password yet. Use the invite link you were sent, or tap “Forgot password”.",
-  dev_used: "The one-time password was already used on another phone. Finish setting the password on that phone, or tap “Forgot password”.",
-};
+// One line for every way a sign-in fails: unknown address, no password yet, wrong password (review A S11; security item 3).
+const FAILED = "That email and password don't match. Use Forgot password if you need a new one.";
 
 export async function loginAction(_prev: LoginState, formData: FormData): Promise<LoginState> {
   const email = String(formData.get("email") ?? "").trim();
@@ -36,10 +32,10 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   const result = await login(email, password);
   if (!result.ok) {
     noteFailure(key);
-    return { email, error: WORDS[result.reason] };
+    return { email, error: FAILED };
   }
   clearRateLimit(key);
-  await signIn(result.person.id, { usedDevPassword: result.usedDevPassword });
+  await signIn(result.person.id);
   if (result.person.mustChangePassword) redirect("/change-password");
   redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/today");
 }
