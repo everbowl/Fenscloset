@@ -4,7 +4,7 @@ import { clearGoogleTryOnRefusals, googleTryOn } from "@/lib/tryon/google";
 import { clearGoogleImageHold, googleImage, googleImageOnHold } from "@/lib/images/google-image";
 
 /**
- * Google's visual filters (Jeff, 19 Oct 2026: none on his own body pictures). The loosest level is sent first; when Google
+ * Google's visual filters (owner, 19 Oct 2026: none on his own body pictures). The loosest level is sent first; when Google
  * refuses it (400: the project is not on the allowlist) the next level down is sent, and the first one Google accepts wins.
  * A fake service account and a fake fetch stand in for Google.
  */
@@ -40,7 +40,7 @@ describe("Google visual filters: loosest first, step down on refusal", () => {
     expect(out.data.length).toBeGreaterThan(0);
     expect(calls.map((c) => (c.body.parameters as { safetySetting: string }).safetySetting)).toEqual(["block_none", "block_only_high"]);
     expect((calls[0].body.parameters as { personGeneration: string }).personGeneration).toBe("allow_adult");
-    expect((calls[0].body.parameters as { baseSteps: number }).baseSteps).toBe(50); // quality over speed (Jeff, 23 Oct 2026)
+    expect((calls[0].body.parameters as { baseSteps: number }).baseSteps).toBe(50); // quality over speed (owner, 23 Oct 2026)
     // the refusal is remembered: the next dressing asks for block_only_high straight away
     const second: Call[] = [];
     await googleTryOn(png, png, fakeGoogle((b) => (b.parameters as { safetySetting: string }).safetySetting === "block_none", second));

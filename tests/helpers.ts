@@ -1,4 +1,12 @@
 import { db } from "@/lib/db";
+import { seed as seedDefaults } from "../prisma/seed";
+import { seedPeople } from "./fixtures/people";
+
+/** What the seed used to give every test: the default lists and rules plus a household. The household is synthetic now. */
+export async function seed() {
+  await seedDefaults();
+  await seedPeople();
+}
 
 /** Wipe every table so each test file starts clean. Order handles FKs via CASCADE. */
 export async function resetDb() {

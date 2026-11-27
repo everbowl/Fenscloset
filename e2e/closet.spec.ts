@@ -1,15 +1,15 @@
 import { expect, test } from "./fixtures";
-import { JEFF_PASSWORD, loginAs, resetAndSeed } from "./helpers";
+import { ADMIN_PASSWORD, loginAs, resetAndSeed } from "./helpers";
 import { execSync } from "node:child_process";
 
 test.describe("closet", () => {
   test.beforeAll(() => {
-    resetAndSeed({ jeffReady: true });
+    resetAndSeed({ adminReady: true });
     execSync("npx tsx e2e/seed-items.ts", { stdio: "inherit", env: { ...process.env, DATABASE_URL: "postgresql://postgres@localhost:5433/fenscloset_e2e", MOCK_S3: "true" } });
   });
 
   test("grid, category tabs, search, item detail with one-tap laundry, person switcher and Family closet", async ({ page }) => {
-    await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+    await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
     await page.goto("/closet");
     await expect(page.getByRole("heading", { name: "Closet" })).toBeVisible();
     await expect(page.getByText("2 pieces")).toBeVisible();
@@ -43,25 +43,25 @@ test.describe("closet", () => {
     await page.getByRole("dialog").getByRole("button", { name: /Family/ }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Done" }).click();
     await expect(page.getByTestId("row-closets")).toContainText("Family");
-    await page.getByRole("button", { name: /Jeff menu/ }).click();
+    await page.getByRole("button", { name: /Avery menu/ }).click();
     await page.getByRole("button", { name: "Family closet" }).click();
     await expect(page.getByRole("button", { name: /Family menu/ })).toBeVisible(); // the cookie lands before we navigate
     await page.goto("/closet");
     await expect(page.getByRole("heading", { name: /Family closet/ })).toBeVisible();
     await expect(page.getByTestId("item-card")).toHaveCount(1);
-    await expect(page.getByTestId("item-card")).toContainText("Jeff");
+    await expect(page.getByTestId("item-card")).toContainText("Avery");
 
-    // browse Olivia's closet (Q13 A), then come back
+    // browse Casey's closet (Q13 A), then come back
     await page.getByRole("button", { name: /Family menu/ }).click();
-    await page.getByRole("button", { name: "Olivia" }).click();
-    await expect(page.getByRole("button", { name: /Olivia menu/ })).toBeVisible();
+    await page.getByRole("button", { name: "Casey" }).click();
+    await expect(page.getByRole("button", { name: /Casey menu/ })).toBeVisible();
     await page.goto("/closet");
-    await expect(page.getByRole("heading", { name: /Olivia/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Casey/ })).toBeVisible();
     await expect(page.getByText("0 pieces")).toBeVisible();
   });
 
   test("mirror from the closet: tap Mirror, pick pieces, see them on a mannequin (no body photo yet); a piece's page has See it on", async ({ page }) => {
-    await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+    await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
     await page.goto("/closet");
     await page.getByTestId("closet-mirror").click();
     await expect(page.getByTestId("pick-bar")).toContainText("Tap the pieces");

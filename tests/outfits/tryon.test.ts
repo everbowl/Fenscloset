@@ -5,7 +5,7 @@ import path from "node:path";
 import sharp from "sharp";
 import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
-import { seed } from "../../prisma/seed";
+import { seed } from "../helpers";
 import { personalClosetId } from "@/lib/items/service";
 import { newKey, putObject } from "@/lib/storage";
 import { canViewKey } from "@/lib/photos/visibility";
@@ -23,207 +23,207 @@ describe("virtual try-on", () => {
   const by = (name: string) => db.person.findFirstOrThrow({ where: { name } });
 
   it("adults only, opt-in, needs a body photo; result is the owner's alone and cached", async () => {
-    const [jeff, mya, brittney] = await Promise.all([by("Jeff"), by("Mya"), by("Brittney")]);
-    expect(await tryOnState(mya, mya.id)).toBe("minor");
-    await expect(setTryOnEnabled(mya, mya.id, true)).rejects.toMatchObject({ status: 403 });
-    await expect(setTryOnEnabled(brittney, jeff.id, true)).rejects.toMatchObject({ status: 403 });
-    expect(await tryOnState(jeff, jeff.id)).toBe("no_photo"); // on by default: only the body photo is missing
-    expect(await tryOnState(brittney, jeff.id)).toBe("not_you");
-    await setTryOnEnabled(jeff, jeff.id, false);
-    expect(await tryOnState(jeff, jeff.id)).toBe("off");
-    await setTryOnEnabled(jeff, jeff.id, true);
-    expect(await tryOnState(jeff, jeff.id)).toBe("no_photo");
-    expect((await getPrivacy(jeff.id)).tryOn).toMatchObject({ enabled: true, adult: true, configured: true, hasBodyPhoto: false });
-    const bodyKey = newKey("bodies", jeff.id, "image/jpeg"); await putObject(bodyKey, await jpeg(), "image/jpeg");
-    await db.bodyPhoto.create({ data: { personId: jeff.id, bucketKey: bodyKey } });
-    expect(await tryOnState(jeff, jeff.id)).toBe("ready");
+    const [avery, devon, blake] = await Promise.all([by("Avery"), by("Devon"), by("Blake")]);
+    expect(await tryOnState(devon, devon.id)).toBe("minor");
+    await expect(setTryOnEnabled(devon, devon.id, true)).rejects.toMatchObject({ status: 403 });
+    await expect(setTryOnEnabled(blake, avery.id, true)).rejects.toMatchObject({ status: 403 });
+    expect(await tryOnState(avery, avery.id)).toBe("no_photo"); // on by default: only the body photo is missing
+    expect(await tryOnState(blake, avery.id)).toBe("not_you");
+    await setTryOnEnabled(avery, avery.id, false);
+    expect(await tryOnState(avery, avery.id)).toBe("off");
+    await setTryOnEnabled(avery, avery.id, true);
+    expect(await tryOnState(avery, avery.id)).toBe("no_photo");
+    expect((await getPrivacy(avery.id)).tryOn).toMatchObject({ enabled: true, adult: true, configured: true, hasBodyPhoto: false });
+    const bodyKey = newKey("bodies", avery.id, "image/jpeg"); await putObject(bodyKey, await jpeg(), "image/jpeg");
+    await db.bodyPhoto.create({ data: { personId: avery.id, bucketKey: bodyKey } });
+    expect(await tryOnState(avery, avery.id)).toBe("ready");
     // a top with a cutout and shoes with only a plain photo
     const cat = (n: string) => db.category.findFirstOrThrow({ where: { name: n } });
-    const cutKey = newKey("cutouts", jeff.id, "image/png"); await putObject(cutKey, await sharp({ create: { width: 200, height: 200, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toBuffer(), "image/png");
-    const top = await db.item.create({ data: { ownerId: jeff.id, name: "Tee", categoryId: (await cat("Tops")).id, closets: { create: [{ closetId: await personalClosetId(jeff.id) }] }, photos: { create: [{ kind: "cutout", bucketKey: cutKey, isPrimary: true }] } } });
-    const shoeKey = newKey("originals", jeff.id, "image/jpeg"); await putObject(shoeKey, await jpeg(60), "image/jpeg");
-    const shoes = await db.item.create({ data: { ownerId: jeff.id, name: "Sneakers", categoryId: (await cat("Shoes")).id, photos: { create: [{ kind: "alone", bucketKey: shoeKey, isPrimary: true }] } } });
-    const bare = await db.item.create({ data: { ownerId: jeff.id, name: "No photo", categoryId: (await cat("Bottoms")).id } });
-    const first = await tryOnLook(jeff, jeff.id, [top.id, shoes.id, bare.id], "today");
+    const cutKey = newKey("cutouts", avery.id, "image/png"); await putObject(cutKey, await sharp({ create: { width: 200, height: 200, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toBuffer(), "image/png");
+    const top = await db.item.create({ data: { ownerId: avery.id, name: "Tee", categoryId: (await cat("Tops")).id, closets: { create: [{ closetId: await personalClosetId(avery.id) }] }, photos: { create: [{ kind: "cutout", bucketKey: cutKey, isPrimary: true }] } } });
+    const shoeKey = newKey("originals", avery.id, "image/jpeg"); await putObject(shoeKey, await jpeg(60), "image/jpeg");
+    const shoes = await db.item.create({ data: { ownerId: avery.id, name: "Sneakers", categoryId: (await cat("Shoes")).id, photos: { create: [{ kind: "alone", bucketKey: shoeKey, isPrimary: true }] } } });
+    const bare = await db.item.create({ data: { ownerId: avery.id, name: "No photo", categoryId: (await cat("Bottoms")).id } });
+    const first = await tryOnLook(avery, avery.id, [top.id, shoes.id, bare.id], "today");
     expect(first.cached).toBe(false);
     expect(first.key).toMatch(/^tryon\//);
-    expect(await canViewKey(jeff, first.key)).toBe(true);
-    expect(await canViewKey(brittney, first.key)).toBe(false);
-    const again = await tryOnLook(jeff, jeff.id, [shoes.id, top.id, bare.id], "today");
+    expect(await canViewKey(avery, first.key)).toBe(true);
+    expect(await canViewKey(blake, first.key)).toBe(false);
+    const again = await tryOnLook(avery, avery.id, [shoes.id, top.id, bare.id], "today");
     expect(again).toMatchObject({ id: first.id, cached: true });
-    expect((await listTryOns(jeff.id)).length).toBe(1);
-    await expect(tryOnLook(jeff, jeff.id, [bare.id], "today")).rejects.toMatchObject({ status: 400 });
-    await expect(tryOnLook(brittney, jeff.id, [top.id], "today")).rejects.toMatchObject({ status: 403 });
-    await setTryOnEnabled(jeff, jeff.id, false);
-    await expect(tryOnLook(jeff, jeff.id, [top.id], "today")).rejects.toThrow(/Settings/);
+    expect((await listTryOns(avery.id)).length).toBe(1);
+    await expect(tryOnLook(avery, avery.id, [bare.id], "today")).rejects.toMatchObject({ status: 400 });
+    await expect(tryOnLook(blake, avery.id, [top.id], "today")).rejects.toMatchObject({ status: 403 });
+    await setTryOnEnabled(avery, avery.id, false);
+    await expect(tryOnLook(avery, avery.id, [top.id], "today")).rejects.toThrow(/Settings/);
   });
 
   it("from behind: needs a back body photo; the back view is its own picture, cached apart from the front", async () => {
     await setRule("mirrorEngine", "google"); // the view is what is tested; the default engine is FASHN now, which leaves shoes out
-    const jeff = await by("Jeff");
-    await setTryOnEnabled(jeff, jeff.id, true);
-    const front = newKey("bodies", jeff.id, "image/jpeg"); await putObject(front, await jpeg(), "image/jpeg");
-    await db.bodyPhoto.create({ data: { personId: jeff.id, bucketKey: front, view: "front" } });
+    const avery = await by("Avery");
+    await setTryOnEnabled(avery, avery.id, true);
+    const front = newKey("bodies", avery.id, "image/jpeg"); await putObject(front, await jpeg(), "image/jpeg");
+    await db.bodyPhoto.create({ data: { personId: avery.id, bucketKey: front, view: "front" } });
     const cat = (n: string) => db.category.findFirstOrThrow({ where: { name: n } });
-    const shoeKey = newKey("originals", jeff.id, "image/jpeg"); await putObject(shoeKey, await jpeg(60), "image/jpeg");
-    const shoes = await db.item.create({ data: { ownerId: jeff.id, name: "Sneakers", categoryId: (await cat("Shoes")).id, photos: { create: [{ kind: "alone", bucketKey: shoeKey, isPrimary: true }] } } });
-    expect(await hasBackPhoto(jeff.id)).toBe(false);
-    await expect(tryOnLook(jeff, jeff.id, [shoes.id], "today", undefined, "back")).rejects.toThrow(/back photo/);
-    const back = newKey("bodies", jeff.id, "image/jpeg"); await putObject(back, await jpeg(90), "image/jpeg");
-    await db.bodyPhoto.create({ data: { personId: jeff.id, bucketKey: back, view: "back" } });
-    expect(await hasBackPhoto(jeff.id)).toBe(true);
-    const f = await tryOnLook(jeff, jeff.id, [shoes.id], "today");
-    const b = await tryOnLook(jeff, jeff.id, [shoes.id], "today", undefined, "back");
+    const shoeKey = newKey("originals", avery.id, "image/jpeg"); await putObject(shoeKey, await jpeg(60), "image/jpeg");
+    const shoes = await db.item.create({ data: { ownerId: avery.id, name: "Sneakers", categoryId: (await cat("Shoes")).id, photos: { create: [{ kind: "alone", bucketKey: shoeKey, isPrimary: true }] } } });
+    expect(await hasBackPhoto(avery.id)).toBe(false);
+    await expect(tryOnLook(avery, avery.id, [shoes.id], "today", undefined, "back")).rejects.toThrow(/back photo/);
+    const back = newKey("bodies", avery.id, "image/jpeg"); await putObject(back, await jpeg(90), "image/jpeg");
+    await db.bodyPhoto.create({ data: { personId: avery.id, bucketKey: back, view: "back" } });
+    expect(await hasBackPhoto(avery.id)).toBe(true);
+    const f = await tryOnLook(avery, avery.id, [shoes.id], "today");
+    const b = await tryOnLook(avery, avery.id, [shoes.id], "today", undefined, "back");
     expect(f.view).toBe("front");
     expect(b.view).toBe("back");
     expect(b.key).not.toBe(f.key);
-    expect((await tryOnLook(jeff, jeff.id, [shoes.id], "today", undefined, "back")).id).toBe(b.id); // cached per body photo
+    expect((await tryOnLook(avery, avery.id, [shoes.id], "today", undefined, "back")).id).toBe(b.id); // cached per body photo
   });
 
   it("engines: FASHN by the rule (shoes left out, said under the picture), pictures cached per engine; Compare dresses with both at once", async () => {
     process.env.MOCK_FASHN = "true";
-    const jeff = await by("Jeff");
-    const bodyKey = newKey("bodies", jeff.id, "image/jpeg"); await putObject(bodyKey, await jpeg(), "image/jpeg");
-    await db.bodyPhoto.create({ data: { personId: jeff.id, bucketKey: bodyKey, view: "front" } });
+    const avery = await by("Avery");
+    const bodyKey = newKey("bodies", avery.id, "image/jpeg"); await putObject(bodyKey, await jpeg(), "image/jpeg");
+    await db.bodyPhoto.create({ data: { personId: avery.id, bucketKey: bodyKey, view: "front" } });
     const cat = (n: string) => db.category.findFirstOrThrow({ where: { name: n } });
-    const pic = async () => { const k = newKey("originals", jeff.id, "image/jpeg"); await putObject(k, await jpeg(90), "image/jpeg"); return k; };
-    const tee = await db.item.create({ data: { ownerId: jeff.id, name: "Tee", categoryId: (await cat("Tops")).id, photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
-    const sneakers = await db.item.create({ data: { ownerId: jeff.id, name: "Sneakers", categoryId: (await cat("Shoes")).id, photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
-    expect(await mirrorEngines()).toEqual({ rule: "fashn", engines: ["fashn"] }); // FASHN by default (Jeff, 24 Oct 2026: no new photo)
-    const f = await tryOnLook(jeff, jeff.id, [tee.id, sneakers.id], "closet"); // the rule's engine
+    const pic = async () => { const k = newKey("originals", avery.id, "image/jpeg"); await putObject(k, await jpeg(90), "image/jpeg"); return k; };
+    const tee = await db.item.create({ data: { ownerId: avery.id, name: "Tee", categoryId: (await cat("Tops")).id, photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
+    const sneakers = await db.item.create({ data: { ownerId: avery.id, name: "Sneakers", categoryId: (await cat("Shoes")).id, photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
+    expect(await mirrorEngines()).toEqual({ rule: "fashn", engines: ["fashn"] }); // FASHN by default (owner, 24 Oct 2026: no new photo)
+    const f = await tryOnLook(avery, avery.id, [tee.id, sneakers.id], "closet"); // the rule's engine
     expect(f.engine).toBe("fashn");
     expect(f.cached).toBe(false);
     expect(f.note).toMatch(/FASHN doesn’t place shoes yet: Sneakers/);
-    const g = await tryOnLook(jeff, jeff.id, [tee.id, sneakers.id], "closet", undefined, "front", undefined, [], false, {}, "google");
+    const g = await tryOnLook(avery, avery.id, [tee.id, sneakers.id], "closet", undefined, "front", undefined, [], false, {}, "google");
     expect(g.engine).toBe("google");
     expect(g.key).not.toBe(f.key);
     expect(g.cached).toBe(false);
-    expect((await tryOnLook(jeff, jeff.id, [sneakers.id, tee.id], "closet")).id).toBe(f.id); // cached per engine
-    await expect(tryOnLook(jeff, jeff.id, [sneakers.id], "closet")).rejects.toThrow(/doesn’t place shoes/);
+    expect((await tryOnLook(avery, avery.id, [sneakers.id, tee.id], "closet")).id).toBe(f.id); // cached per engine
+    await expect(tryOnLook(avery, avery.id, [sneakers.id], "closet")).rejects.toThrow(/doesn’t place shoes/);
     await setRule("mirrorEngine", "compare");
     const steps: string[] = [];
-    const both = await dressOnMe(jeff, jeff.id, [tee.id], "closet", "front", undefined, true, { step: (s) => steps.push(s) });
+    const both = await dressOnMe(avery, avery.id, [tee.id], "closet", "front", undefined, true, { step: (s) => steps.push(s) });
     expect(both.engine).toBe("google");
-    expect(both.alts?.map((a) => a.engine)).toEqual(["fashn"]); // Kling is switched off by default (Jeff, 26 Nov 2026, 1B): left out, nothing to say
+    expect(both.alts?.map((a) => a.engine)).toEqual(["fashn"]); // Kling is switched off by default (owner, 26 Nov 2026, 1B): left out, nothing to say
     expect(both.alts?.[0].key).not.toBe(both.key);
     expect(both.engineNote).toBeUndefined();
     expect(steps.some((s) => s.includes("Google · ") && s.includes("FASHN · "))).toBe(true);
     // switched on without its key: left out and said
     await setRule("compareKling", "on");
-    const noKey = await dressOnMe(jeff, jeff.id, [tee.id], "closet", "front", undefined, true);
+    const noKey = await dressOnMe(avery, avery.id, [tee.id], "closet", "front", undefined, true);
     expect(noKey.alts?.map((a) => a.engine)).toEqual(["fashn"]);
     expect(noKey.engineNote).toMatch(/^Kling isn’t set up yet/);
-    expect((await db.tryOn.findMany({ where: { personId: jeff.id, itemIds: { equals: [tee.id] }, styling: null } })).map((r) => r.engine).sort()).toEqual(["fashn", "google"]);
+    expect((await db.tryOn.findMany({ where: { personId: avery.id, itemIds: { equals: [tee.id] }, styling: null } })).map((r) => r.engine).sort()).toEqual(["fashn", "google"]);
     // all three engines with keys: three pictures side by side
     process.env.MOCK_KLING = "true";
-    const three = await dressOnMe(jeff, jeff.id, [tee.id], "closet", "front", undefined, true);
+    const three = await dressOnMe(avery, avery.id, [tee.id], "closet", "front", undefined, true);
     expect(three.engine).toBe("google");
     expect(three.alts?.map((a) => a.engine)).toEqual(["fashn", "kling"]);
     expect(new Set([three.key, ...three.alts!.map((a) => a.key)]).size).toBe(3);
     expect(three.engineNote).toBeUndefined();
     // G1: keep a column, and the mirror shows that engine alone for this look until "Dress again"
     const fashnPic = three.alts!.find((a) => a.engine === "fashn")!;
-    const kept = await keepTryOn(jeff, jeff.id, fashnPic.id);
+    const kept = await keepTryOn(avery, avery.id, fashnPic.id);
     expect(kept.engine).toBe("fashn");
     expect(kept.kept).toBe(true);
     expect(kept.alts).toBeUndefined();
-    const again = await dressOnMe(jeff, jeff.id, [tee.id], "closet");
+    const again = await dressOnMe(avery, avery.id, [tee.id], "closet");
     expect(again.engine).toBe("fashn");
     expect(again.kept).toBe(true);
     expect(again.alts).toBeUndefined();
-    const afresh = await dressOnMe(jeff, jeff.id, [tee.id], "closet", "front", undefined, true);
+    const afresh = await dressOnMe(avery, avery.id, [tee.id], "closet", "front", undefined, true);
     expect(afresh.kept).toBeUndefined();
     expect(afresh.alts?.length).toBe(2);
     delete process.env.MOCK_KLING;
     // FASHN without its key: Google dresses, and the picture says so
     delete process.env.MOCK_FASHN;
-    const only = await dressOnMe(jeff, jeff.id, [tee.id], "closet");
+    const only = await dressOnMe(avery, avery.id, [tee.id], "closet");
     expect(only.engine).toBe("google");
     expect(only.alts).toBeUndefined();
     expect(only.engineNote).toMatch(/FASHN and Kling aren’t set up yet/);
   });
 
   it("reports its steps while it dresses (the mirror shows them); a cached look reports nothing", async () => {
-    const jeff = await by("Jeff");
-    const bodyKey = newKey("bodies", jeff.id, "image/jpeg"); await putObject(bodyKey, await jpeg(), "image/jpeg");
-    await db.bodyPhoto.create({ data: { personId: jeff.id, bucketKey: bodyKey, view: "front" } });
+    const avery = await by("Avery");
+    const bodyKey = newKey("bodies", avery.id, "image/jpeg"); await putObject(bodyKey, await jpeg(), "image/jpeg");
+    await db.bodyPhoto.create({ data: { personId: avery.id, bucketKey: bodyKey, view: "front" } });
     const cat = (n: string) => db.category.findFirstOrThrow({ where: { name: n } });
-    const pic = async () => { const k = newKey("originals", jeff.id, "image/jpeg"); await putObject(k, await jpeg(90), "image/jpeg"); return k; };
-    const tee = await db.item.create({ data: { ownerId: jeff.id, name: "Tee", categoryId: (await cat("Tops")).id, photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
-    const jeans = await db.item.create({ data: { ownerId: jeff.id, name: "Jeans", categoryId: (await cat("Bottoms")).id, photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
+    const pic = async () => { const k = newKey("originals", avery.id, "image/jpeg"); await putObject(k, await jpeg(90), "image/jpeg"); return k; };
+    const tee = await db.item.create({ data: { ownerId: avery.id, name: "Tee", categoryId: (await cat("Tops")).id, photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
+    const jeans = await db.item.create({ data: { ownerId: avery.id, name: "Jeans", categoryId: (await cat("Bottoms")).id, photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
     const steps: string[] = [];
-    await tryOnLook(jeff, jeff.id, [tee.id, jeans.id], "closet", undefined, "front", undefined, [], false, { step: (s) => steps.push(s) });
+    await tryOnLook(avery, avery.id, [tee.id, jeans.id], "closet", undefined, "front", undefined, [], false, { step: (s) => steps.push(s) });
     expect(steps[0]).toBe("Dressing you · Tee, Jeans");
     expect(steps).toContain("Checking the picture…");
     // a plain dressing: no styling pass (the person as photographed; one engine call), so the check is the last step
     expect(steps.some((s) => s.startsWith("Styling · "))).toBe(false);
     expect(steps.at(-1)).toBe("Checking the picture…");
     const again: string[] = [];
-    await tryOnLook(jeff, jeff.id, [tee.id, jeans.id], "closet", undefined, "front", undefined, [], false, { step: (s) => again.push(s) });
+    await tryOnLook(avery, avery.id, [tee.id, jeans.id], "closet", undefined, "front", undefined, [], false, { step: (s) => again.push(s) });
     expect(again).toEqual([]);
   });
 
   it("styling: a plain dressing is the try-on alone; a tapped chip adds one styled picture per set of choices, and the pick is remembered", async () => {
-    const jeff = await by("Jeff");
-    await setTryOnEnabled(jeff, jeff.id, true);
-    const bodyKey = newKey("bodies", jeff.id, "image/jpeg"); await putObject(bodyKey, await jpeg(), "image/jpeg");
-    await db.bodyPhoto.create({ data: { personId: jeff.id, bucketKey: bodyKey, view: "front" } });
+    const avery = await by("Avery");
+    await setTryOnEnabled(avery, avery.id, true);
+    const bodyKey = newKey("bodies", avery.id, "image/jpeg"); await putObject(bodyKey, await jpeg(), "image/jpeg");
+    await db.bodyPhoto.create({ data: { personId: avery.id, bucketKey: bodyKey, view: "front" } });
     const cat = (n: string) => db.category.findFirstOrThrow({ where: { name: n } });
     const sub = (n: string) => db.subcategory.findFirstOrThrow({ where: { name: n } });
-    const pic = async () => { const k = newKey("originals", jeff.id, "image/jpeg"); await putObject(k, await jpeg(90), "image/jpeg"); return k; };
-    const shirt = await db.item.create({ data: { ownerId: jeff.id, name: "Oxford", categoryId: (await cat("Tops")).id, subcategoryId: (await sub("Button-down")).id, features: ["button_front", "long_sleeve", "collar"], photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
-    const jeans = await db.item.create({ data: { ownerId: jeff.id, name: "Jeans", categoryId: (await cat("Bottoms")).id, photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
-    const dress = await db.item.create({ data: { ownerId: jeff.id, name: "Dress", categoryId: (await cat("Dresses")).id, photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
+    const pic = async () => { const k = newKey("originals", avery.id, "image/jpeg"); await putObject(k, await jpeg(90), "image/jpeg"); return k; };
+    const shirt = await db.item.create({ data: { ownerId: avery.id, name: "Oxford", categoryId: (await cat("Tops")).id, subcategoryId: (await sub("Button-down")).id, features: ["button_front", "long_sleeve", "collar"], photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
+    const jeans = await db.item.create({ data: { ownerId: avery.id, name: "Jeans", categoryId: (await cat("Bottoms")).id, photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
+    const dress = await db.item.create({ data: { ownerId: avery.id, name: "Dress", categoryId: (await cat("Dresses")).id, photos: { create: [{ kind: "alone", bucketKey: await pic(), isPrimary: true }] } } });
 
-    const first = await tryOnLook(jeff, jeff.id, [shirt.id, jeans.id], "today");
+    const first = await tryOnLook(avery, avery.id, [shirt.id, jeans.id], "today");
     expect(first.cached).toBe(false);
     expect(first.styling?.groups.map((g) => g.name)).toEqual(["Tuck", "Buttons", "Sleeves", "Collar", "Hem"]); // the chips show, with the defaults
     expect(first.styling?.groups.every((g) => !g.explicit)).toBe(true);
     expect(first.styling?.summary).toBe(""); // nothing was chosen: the try-on as it came, no image-model pass
     expect(first.styling?.poses[0]?.name).toBe("Standing, as photographed");
-    const rows = await db.tryOn.findMany({ where: { personId: jeff.id }, orderBy: { createdAt: "asc" } });
+    const rows = await db.tryOn.findMany({ where: { personId: avery.id }, orderBy: { createdAt: "asc" } });
     expect(rows.map((r) => r.styling)).toEqual([null]); // the raw try-on alone
     expect(first.key).toBe(rows[0].bucketKey);
     // same look again: the picture comes straight back
-    const again = await tryOnLook(jeff, jeff.id, [jeans.id, shirt.id], "today");
+    const again = await tryOnLook(avery, avery.id, [jeans.id, shirt.id], "today");
     expect(again).toMatchObject({ id: first.id, cached: true });
-    expect(await db.tryOn.count({ where: { personId: jeff.id } })).toBe(1);
+    expect(await db.tryOn.count({ where: { personId: avery.id } })).toBe(1);
     // a chip: tucked → one styled picture over the same dressing, no second dressing
     const tuck = first.styling!.groups.find((g) => g.name === "Tuck")!;
-    const tucked = await tryOnLook(jeff, jeff.id, [shirt.id, jeans.id], "today", undefined, "front", { options: { [tuck.id]: tuck.options.find((o) => o.name === "Tucked")!.id } });
+    const tucked = await tryOnLook(avery, avery.id, [shirt.id, jeans.id], "today", undefined, "front", { options: { [tuck.id]: tuck.options.find((o) => o.name === "Tucked")!.id } });
     expect(tucked.cached).toBe(false);
     expect(tucked.styling?.summary).toBe("Tucked");
     expect(tucked.styling?.groups.find((g) => g.name === "Tuck")?.explicit).toBe(true);
     expect((await db.tryOn.findUniqueOrThrow({ where: { id: tucked.id } })).styling).toMatch(/^pose=;.+=.+/);
-    expect(await db.tryOn.count({ where: { personId: jeff.id } })).toBe(2);
-    expect(await db.tryOn.count({ where: { personId: jeff.id, styling: null } })).toBe(1);
+    expect(await db.tryOn.count({ where: { personId: avery.id } })).toBe(2);
+    expect(await db.tryOn.count({ where: { personId: avery.id, styling: null } })).toBe(1);
     // remembered: the next look opens tucked; a pose rides along too
-    const remembered = await tryOnLook(jeff, jeff.id, [shirt.id, jeans.id], "today");
+    const remembered = await tryOnLook(avery, avery.id, [shirt.id, jeans.id], "today");
     expect(remembered).toMatchObject({ id: tucked.id, cached: true });
     const pockets = first.styling!.poses.find((p) => p.name === "Hands in pockets")!;
-    const posed = await tryOnLook(jeff, jeff.id, [shirt.id, jeans.id], "today", undefined, "front", { poseId: pockets.id });
+    const posed = await tryOnLook(avery, avery.id, [shirt.id, jeans.id], "today", undefined, "front", { poseId: pockets.id });
     expect(posed.styling?.summary).toBe("Tucked · Hands in pockets");
     expect(posed.styling?.poseId).toBe(pockets.id);
-    expect((await db.person.findUniqueOrThrow({ where: { id: jeff.id } })).mirrorPrefs).toMatchObject({ poseId: pockets.id });
+    expect((await db.person.findUniqueOrThrow({ where: { id: avery.id } })).mirrorPrefs).toMatchObject({ poseId: pockets.id });
     // a dress alone: no tuck, nothing to change → just the raw try-on, and the history lists only the styled pictures of the shirt look
-    const alone = await tryOnLook(jeff, jeff.id, [dress.id], "today", undefined, "front", { poseId: null });
+    const alone = await tryOnLook(avery, avery.id, [dress.id], "today", undefined, "front", { poseId: null });
     expect(alone.styling?.groups).toEqual([]);
     expect(alone.styling?.summary).toBe("");
     expect((await db.tryOn.findUniqueOrThrow({ where: { id: alone.id } })).styling).toBeNull();
-    const history = await listTryOns(jeff.id);
+    const history = await listTryOns(avery.id);
     expect(history.map((h) => h.id)).toEqual([alone.id, posed.id, tucked.id]); // the shirt look's raw picture hides behind its styled ones
   });
 
 
   it("garment pictures: a photo that does not show the whole piece is passed over (checked once); the person's own choice wins", async () => {
     process.env.MOCK_AI = "true";
-    const jeff = await by("Jeff");
+    const avery = await by("Avery");
     const cat = (n: string) => db.category.findFirstOrThrow({ where: { name: n } });
-    const png = async () => { const k = newKey("cutouts", jeff.id, "image/png"); await putObject(k, await sharp({ create: { width: 120, height: 120, channels: 4, background: { r: 10, g: 10, b: 10, alpha: 1 } } }).png().toBuffer(), "image/png"); return k; };
-    const jpg = async (r: number) => { const k = newKey("originals", jeff.id, "image/jpeg"); await putObject(k, await jpeg(r), "image/jpeg"); return k; };
+    const png = async () => { const k = newKey("cutouts", avery.id, "image/png"); await putObject(k, await sharp({ create: { width: 120, height: 120, channels: 4, background: { r: 10, g: 10, b: 10, alpha: 1 } } }).png().toBuffer(), "image/png"); return k; };
+    const jpg = async (r: number) => { const k = newKey("originals", avery.id, "image/jpeg"); await putObject(k, await jpeg(r), "image/jpeg"); return k; };
     const buf = async (k: string) => (await import("@/lib/storage")).getObject(k).then((o) => o.body);
     const cutKey = await png(); const retailKey = await jpg(70); const aloneKey = await jpg(50);
-    const polo = await db.item.create({ data: { ownerId: jeff.id, name: "Polo", categoryId: (await cat("Tops")).id, photos: { create: [{ kind: "alone", bucketKey: aloneKey }, { kind: "cutout", bucketKey: cutKey, isPrimary: true, wholeGarment: false }, { kind: "retail", bucketKey: retailKey }] } } });
+    const polo = await db.item.create({ data: { ownerId: avery.id, name: "Polo", categoryId: (await cat("Tops")).id, photos: { create: [{ kind: "alone", bucketKey: aloneKey }, { kind: "cutout", bucketKey: cutKey, isPrimary: true, wholeGarment: false }, { kind: "retail", bucketKey: retailKey }] } } });
     // the cutout was found folded before: the store photo is checked (whole) and used; the cutout is not looked at again
     let [g] = await garmentImages([polo.id]);
     expect(g.buf.equals(await buf(retailKey))).toBe(true);
@@ -232,36 +232,36 @@ describe("virtual try-on", () => {
     // the person says "use this one in the mirror": the cutout, folded or not; tapping again hands the pick back to the app
     const { setMirrorPhoto } = await import("@/lib/items/service");
     const cut = await db.itemPhoto.findFirstOrThrow({ where: { bucketKey: cutKey } });
-    expect(await setMirrorPhoto(jeff, cut.id)).toEqual({ photoId: cut.id });
+    expect(await setMirrorPhoto(avery, cut.id)).toEqual({ photoId: cut.id });
     [g] = await garmentImages([polo.id]);
     expect(g.buf.equals(await buf(cutKey))).toBe(true);
-    expect(await setMirrorPhoto(jeff, cut.id)).toEqual({ photoId: null });
+    expect(await setMirrorPhoto(avery, cut.id)).toEqual({ photoId: null });
     [g] = await garmentImages([polo.id]);
     expect(g.buf.equals(await buf(retailKey))).toBe(true);
     // every photo of a piece fails the check: the first in line is still used (a try-on beats none), and the answers are kept.
     // The person's own photo comes before the cutout: a cutout can have a background-removal hole, which is how a tee lost its hem.
     process.env.MOCK_GARMENT_WHOLE = "false";
     const cut2 = await png(); const alone2 = await jpg(30);
-    const tee = await db.item.create({ data: { ownerId: jeff.id, name: "Tee", categoryId: (await cat("Tops")).id, photos: { create: [{ kind: "alone", bucketKey: alone2 }, { kind: "cutout", bucketKey: cut2, isPrimary: true }] } } });
+    const tee = await db.item.create({ data: { ownerId: avery.id, name: "Tee", categoryId: (await cat("Tops")).id, photos: { create: [{ kind: "alone", bucketKey: alone2 }, { kind: "cutout", bucketKey: cut2, isPrimary: true }] } } });
     [g] = await garmentImages([tee.id]);
     expect(g.buf.equals(await buf(alone2))).toBe(true);
     expect((await db.itemPhoto.findMany({ where: { itemId: tee.id } })).map((p) => p.wholeGarment)).toEqual([false, false]);
     delete process.env.MOCK_GARMENT_WHOLE;
     // a photo change forgets every picture made with the piece, and "Dress again" dresses one look from scratch
-    const bodyKey = newKey("bodies", jeff.id, "image/jpeg"); await putObject(bodyKey, await jpeg(), "image/jpeg");
-    await db.bodyPhoto.create({ data: { personId: jeff.id, bucketKey: bodyKey, view: "front" } });
-    await setTryOnEnabled(jeff, jeff.id, true);
-    const first = await tryOnLook(jeff, jeff.id, [polo.id], "today");
-    expect((await tryOnLook(jeff, jeff.id, [polo.id], "today")).id).toBe(first.id);
-    const redone = await tryOnLook(jeff, jeff.id, [polo.id], "today", undefined, "front", undefined, [], true);
+    const bodyKey = newKey("bodies", avery.id, "image/jpeg"); await putObject(bodyKey, await jpeg(), "image/jpeg");
+    await db.bodyPhoto.create({ data: { personId: avery.id, bucketKey: bodyKey, view: "front" } });
+    await setTryOnEnabled(avery, avery.id, true);
+    const first = await tryOnLook(avery, avery.id, [polo.id], "today");
+    expect((await tryOnLook(avery, avery.id, [polo.id], "today")).id).toBe(first.id);
+    const redone = await tryOnLook(avery, avery.id, [polo.id], "today", undefined, "front", undefined, [], true);
     expect(redone.id).not.toBe(first.id);
-    expect(await db.tryOn.count({ where: { personId: jeff.id } })).toBe(1);
+    expect(await db.tryOn.count({ where: { personId: avery.id } })).toBe(1);
     const { forgetTryOns } = await import("@/lib/tryon");
     expect(await forgetTryOns(polo.id)).toBe(1);
-    expect(await db.tryOn.count({ where: { personId: jeff.id } })).toBe(0);
+    expect(await db.tryOn.count({ where: { personId: avery.id } })).toBe(0);
     // the render check is not satisfied even after the second dressing: the picture still comes, with the note under it
     process.env.MOCK_RENDER_OK = "false";
-    const unsure = await tryOnLook(jeff, jeff.id, [polo.id], "today");
+    const unsure = await tryOnLook(avery, avery.id, [polo.id], "today");
     expect(unsure.note).toMatch(/isn’t sure/);
     delete process.env.MOCK_RENDER_OK;
     delete process.env.MOCK_GARMENT_WHOLE;

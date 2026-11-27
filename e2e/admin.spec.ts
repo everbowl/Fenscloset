@@ -1,18 +1,18 @@
 import { expect, test } from "./fixtures";
-import { JEFF_PASSWORD, loginAs, resetAndSeed } from "./helpers";
+import { ADMIN_PASSWORD, loginAs, resetAndSeed } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 
-test.beforeAll(() => resetAndSeed({ jeffReady: true }));
+test.beforeAll(() => resetAndSeed({ adminReady: true }));
 
 test("admin edits a list in place: add, rename, reorder, archive, blocked delete message", async ({ page }) => {
-  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
   await page.goto("/admin/lists/brand");
   await page.getByRole("button", { name: "Add brand" }).click();
   const sheet = page.getByRole("dialog");
-  await sheet.getByLabel("Name").fill("Everbowl Apparel");
+  await sheet.getByLabel("Name").fill("Example Apparel");
   await sheet.getByRole("button", { name: "Add brand" }).click();
-  await expect(page.getByText("Everbowl Apparel")).toBeVisible();
+  await expect(page.getByText("Example Apparel")).toBeVisible();
 
   await page.getByRole("button", { name: /^Everbowl Apparel/ }).click();
   await sheet.getByLabel("Name").fill("Everbowl Merch");
@@ -57,7 +57,7 @@ test("admin edits a list in place: add, rename, reorder, archive, blocked delete
 });
 
 test("admin changes a rule", async ({ page }) => {
-  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
   await page.goto("/admin/rules");
   // a number saves when the field is left; "✓ Saved" shows beside the label
   await page.getByLabel("Days before a piece repeats").fill("21");
@@ -76,7 +76,7 @@ test("admin changes a rule", async ({ page }) => {
 });
 
 test("admin invites a new member; she accepts, lands in her closet, and cannot open admin", async ({ page, browser }) => {
-  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
   await page.goto("/admin/people");
   await page.getByRole("button", { name: "Add person" }).click();
   const sheet = page.getByRole("dialog");
@@ -108,10 +108,10 @@ test("admin invites a new member; she accepts, lands in her closet, and cannot o
 });
 
 test("admin re-invites a seeded family member and removes a person with the items prompt", async ({ page }) => {
-  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
   await page.goto("/admin/people");
-  await page.getByRole("link", { name: /Olivia/ }).click();
-  await page.getByLabel("Email").first().fill("olivia@example.com");
+  await page.getByRole("link", { name: /Casey/ }).click();
+  await page.getByLabel("Email").first().fill("casey@example.com");
   await page.getByLabel("Email").first().blur(); // details save when the field is left; "✓ Saved" lands beside the heading, not in a toast the keyboard would hide
   await expect(page.getByTestId("details-saved")).toHaveText("✓ Saved");
   await page.getByRole("button", { name: "Send invite" }).click();
@@ -121,14 +121,14 @@ test("admin re-invites a seeded family member and removes a person with the item
   await sheet.getByRole("button", { name: "Done" }).click();
 
   await page.getByRole("button", { name: "Remove person" }).click();
-  await expect(page.getByText(/What happens to the pieces in Olivia/)).toBeVisible();
-  await page.getByRole("button", { name: /Move Olivia.s pieces to Family/ }).click();
+  await expect(page.getByText(/What happens to the pieces in Casey/)).toBeVisible();
+  await page.getByRole("button", { name: /Move Casey.s pieces to Family/ }).click();
   await expect(page).toHaveURL(/\/admin\/people$/);
-  await expect(page.getByRole("link", { name: /Olivia/ })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /Casey/ })).toHaveCount(0);
 });
 
 test("admin lists: the mirror's poses and wear options are editable lists, untucked first", async ({ page }) => {
-  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
   await page.goto("/admin/lists");
   await expect(page.getByRole("link", { name: /Mirror poses/ })).toBeVisible();
   await page.goto("/admin/lists/mirrorPose");

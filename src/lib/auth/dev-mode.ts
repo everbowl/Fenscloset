@@ -3,7 +3,8 @@
  * After that single login the account is forced to a new password. When DEV_MODE is false the
  * 0535 path is disabled entirely, even on a fresh seed.
  */
-export const DEV_ADMIN_EMAIL = "jeff@everbowl.com";
+/** Tests point this at the synthetic fixture admin; unset, it is the household\'s first admin. */
+export const DEV_ADMIN_EMAIL = process.env.DEV_ADMIN_EMAIL ?? "jeff@everbowl.com";
 
 export function isDevMode(): boolean {
   return process.env.DEV_MODE === "true";

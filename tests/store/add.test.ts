@@ -5,7 +5,7 @@ import path from "node:path";
 import sharp from "sharp";
 import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
-import { seed } from "../../prisma/seed";
+import { seed } from "../helpers";
 import { newKey, objectExists, putObject } from "@/lib/storage";
 import { drainQueue } from "@/lib/import/queue";
 import { createStoreEntries, createStoreRows, findColorPhotos, lookupProduct, priceNumber, storeIdByName, storeNameFromUrl, wordsFromUrl } from "@/lib/store/add";
@@ -19,14 +19,14 @@ import { addItemPhoto, answerPhotoNudge, photoNudge } from "@/lib/items/service"
 import type { EntryAiResult } from "@/lib/import/process";
 
 describe("add from a store", () => {
-  let jeffId: string;
+  let averyId: string;
   beforeEach(async () => {
     await resetDb();
     process.env.DEV_MODE = "true"; process.env.MOCK_AI = "true"; process.env.MOCK_S3 = "true"; process.env.MOCK_FETCH = "true"; process.env.MOCK_SERPER = "true";
     delete process.env.MOCK_REMOVE_BG_FAIL; delete process.env.MOCK_FETCH_BLOCKED;
     process.env.MOCK_S3_DIR = await mkdtemp(path.join(os.tmpdir(), "fc-store-"));
     await seed();
-    jeffId = (await db.person.findUniqueOrThrow({ where: { email: "jeff@everbowl.com" } })).id;
+    averyId = (await db.person.findUniqueOrThrow({ where: { email: "avery@example.test" } })).id;
   });
   afterEach(() => { vi.unstubAllGlobals(); delete process.env.MOCK_SHOPIFY_TYPE; process.env.MOCK_FETCH = "true"; });
 
@@ -48,12 +48,12 @@ describe("add from a store", () => {
 
   it("makes one entry per row with the store photo and a count; store facts beat the guess; the piece lands in the closet on its own with price, link, store, copies and the store-photo mark", async () => {
     const p = await lookupProduct("https://mock.example/products/linen-blazer");
-    const r = await createStoreEntries(jeffId, { product: p, imageUrl: p.colorImages.Black, color: "Black", size: "M", quantity: 2 });
+    const r = await createStoreEntries(averyId, { product: p, imageUrl: p.colorImages.Black, color: "Black", size: "M", quantity: 2 });
     expect(r.entryIds).toHaveLength(1);
     expect(r.pieces).toBe(2);
     await drainQueue();
     const entries = await db.importEntry.findMany({ where: { id: { in: r.entryIds } } });
-    expect(entries[0].status).toBe("done"); // C1 (Jeff, 3 Nov 2026): no confirm card for a piece with store facts
+    expect(entries[0].status).toBe("done"); // C1 (owner, 3 Nov 2026): no confirm card for a piece with store facts
     expect(entries[0].quantity).toBe(2);
     expect(await objectExists(entries[0].originalKey)).toBe(true);
     const ai = entries[0].aiResult as EntryAiResult;
@@ -72,7 +72,7 @@ describe("add from a store", () => {
     expect(full.size).toBe("M");
     expect(full.photos.some((ph) => ph.kind === "cutout" && ph.isPrimary)).toBe(true);
     // a second piece from the same store reuses the store entry in the Stores list
-    await createStoreEntries(jeffId, { product: p, imageUrl: p.colorImages.Oatmeal, color: "Oatmeal", size: "M", quantity: 1 });
+    await createStoreEntries(averyId, { product: p, imageUrl: p.colorImages.Oatmeal, color: "Oatmeal", size: "M", quantity: 1 });
     await drainQueue();
     expect(await db.store.count({ where: { name: "Mock Store" } })).toBe(1);
   });
@@ -82,13 +82,13 @@ describe("add from a store", () => {
     expect(a).toBe(b);
     expect(await db.store.count({ where: { name: "Brand New Shop" } })).toBe(1);
     expect(await storeIdByName("brand new shop")).toBe(a); // the Stores list is one entry per name, whatever the case
-    const [c1, c2, c3] = await Promise.all([personalClosetId(jeffId), personalClosetId(jeffId), personalClosetId(jeffId)]);
+    const [c1, c2, c3] = await Promise.all([personalClosetId(averyId), personalClosetId(averyId), personalClosetId(averyId)]);
     expect(c1).toBe(c2); expect(c2).toBe(c3);
-    expect(await db.closet.count({ where: { ownerId: jeffId, kind: "personal" } })).toBe(1);
+    expect(await db.closet.count({ where: { ownerId: averyId, kind: "personal" } })).toBe(1);
     // the real thing: two colors of one product added at once from a store not yet in the list
     const p = await lookupProduct("https://mock.example/products/linen-blazer");
     const product = { ...p, storeName: "Another New Store" };
-    const r = await createStoreRows(jeffId, product, [{ color: "Black", size: "M", quantity: 1, imageUrl: p.colorImages.Black }, { color: "Oatmeal", size: "M", quantity: 1, imageUrl: p.colorImages.Oatmeal }]);
+    const r = await createStoreRows(averyId, product, [{ color: "Black", size: "M", quantity: 1, imageUrl: p.colorImages.Black }, { color: "Oatmeal", size: "M", quantity: 1, imageUrl: p.colorImages.Oatmeal }]);
     await drainQueue();
     const entries = await db.importEntry.findMany({ where: { id: { in: r.entryIds } } });
     expect(entries.map((e) => e.status)).toEqual(["done", "done"]);
@@ -100,7 +100,7 @@ describe("add from a store", () => {
     expect(p.colors).toEqual([]); expect(p.sizes).toEqual([]); expect(p.colorImages).toEqual({});
     expect(p.category).toBeNull();
     expect(p.imageUrl).toBe("https://mock.example/blazer.jpg");
-    const r = await createStoreEntries(jeffId, { product: p, imageUrl: p.imageUrl, color: null, size: null, quantity: 1 });
+    const r = await createStoreEntries(averyId, { product: p, imageUrl: p.imageUrl, color: null, size: null, quantity: 1 });
     expect(r.noPhoto).toBe(0);
     await drainQueue();
     const e = await db.importEntry.findUniqueOrThrow({ where: { id: r.entryIds[0] } });
@@ -112,7 +112,7 @@ describe("add from a store", () => {
     process.env.MOCK_SHOPIFY_TYPE = "Bottoms";
     const p = await lookupProduct("https://mock.example/products/linen-blazer");
     expect(p.category).toBe("Bottoms");
-    const r = await createStoreEntries(jeffId, { product: p, imageUrl: p.imageUrl, color: null, size: null, quantity: 1 });
+    const r = await createStoreEntries(averyId, { product: p, imageUrl: p.imageUrl, color: null, size: null, quantity: 1 });
     await drainQueue();
     const e = await db.importEntry.findUniqueOrThrow({ where: { id: r.entryIds[0] } });
     const bottoms = await db.category.findFirstOrThrow({ where: { name: "Bottoms" } });
@@ -123,7 +123,7 @@ describe("add from a store", () => {
     const page = parseProductPage("https://mock.example/products/belt", `<html><head><title>Woven Belt | Mock Store</title><meta property="og:title" content="Woven Belt"><meta property="og:site_name" content="Mock Store"></head><body></body></html>`);
     expect(page.imageUrl).toBeNull();
     const product = { url: page.url, name: page.title!, brandText: null, storeName: page.siteName!, priceText: null };
-    const r = await createStoreEntries(jeffId, { product, imageUrl: page.imageUrl, color: "Black", size: null, quantity: 1 });
+    const r = await createStoreEntries(averyId, { product, imageUrl: page.imageUrl, color: "Black", size: null, quantity: 1 });
     expect(r.noPhoto).toBe(1);
     const before = await db.importEntry.findUniqueOrThrow({ where: { id: r.entryIds[0] } });
     expect((before.storeMeta as { noPhoto?: boolean }).noPhoto).toBe(true);
@@ -141,7 +141,7 @@ describe("add from a store", () => {
     expect(item.categoryId).toBeNull(); // no photo, no page category: it asks in the closet
     expect(item.storePhoto).toBe(true);
     expect(item.photos.some((ph) => ph.kind === "alone" && ph.isPrimary)).toBe(true);
-    const pending = await pendingAdds(jeffId);
+    const pending = await pendingAdds(averyId);
     expect(pending.cards.map((c) => [c.status, c.itemId, c.noPhoto])).toEqual([["needs_category", item.id, true]]);
   });
 
@@ -149,7 +149,7 @@ describe("add from a store", () => {
     process.env.MOCK_FETCH = "false";
     vi.stubGlobal("fetch", async () => new Response("nope", { status: 403 })); // the store refuses the hot-link
     const product = { url: "https://mock.example/products/linen-blazer", name: "Linen Blazer", brandText: "Everlane", storeName: "Mock Store", priceText: "$128.00", category: "Tops" };
-    const r = await createStoreRows(jeffId, product, [{ color: "Black", size: "M", quantity: 2, imageUrl: "https://mock.example/blazer-black.jpg" }, { color: "Oatmeal", size: "M", quantity: 1, imageUrl: "https://mock.example/blazer.jpg" }]);
+    const r = await createStoreRows(averyId, product, [{ color: "Black", size: "M", quantity: 2, imageUrl: "https://mock.example/blazer-black.jpg" }, { color: "Oatmeal", size: "M", quantity: 1, imageUrl: "https://mock.example/blazer.jpg" }]);
     expect(r.pieces).toBe(3);
     expect(r.noPhoto).toBe(2);
     await drainQueue();
@@ -172,15 +172,15 @@ describe("add from a store", () => {
     expect(photoNudge({ storePhoto: true, wearCount: 7, photoNudgedAt: 1 })).toBe("refresh");
 
     const p = await lookupProduct("https://mock.example/products/linen-blazer");
-    const r = await createStoreEntries(jeffId, { product: p, imageUrl: p.imageUrl, color: null, size: null, quantity: 1 });
+    const r = await createStoreEntries(averyId, { product: p, imageUrl: p.imageUrl, color: null, size: null, quantity: 1 });
     await drainQueue();
     const item = { id: (await db.importEntry.findUniqueOrThrow({ where: { id: r.entryIds[0] } })).itemId! }; // auto-added (C1)
     await db.item.update({ where: { id: item.id }, data: { wearCount: 1 } });
-    const viewer = { id: jeffId, role: "admin" };
+    const viewer = { id: averyId, role: "admin" };
     await answerPhotoNudge(viewer, item.id);
     expect((await db.item.findUniqueOrThrow({ where: { id: item.id } })).photoNudgedAt).toBe(1);
     // your own hanger photo replaces the store photo as the photo of record
-    const key = newKey("originals", jeffId, "image/jpeg");
+    const key = newKey("originals", averyId, "image/jpeg");
     await putObject(key, await sharp({ create: { width: 300, height: 400, channels: 3, background: { r: 10, g: 10, b: 10 } } }).jpeg().toBuffer(), "image/jpeg");
     await addItemPhoto(viewer, item.id, "alone", key);
     const after = await db.item.findUniqueOrThrow({ where: { id: item.id }, include: { photos: true } });
@@ -205,7 +205,7 @@ describe("add from a store", () => {
     expect(lines[1].picks[0].imageUrl).toBe("https://mock.example/blazer-black.jpg"); // Black
     expect(lines[1].picks.length).toBeGreaterThan(1);
     expect(lines[1].quantity).toBe(2);
-    const r = await createStoreEntries(jeffId, { product: { url: lines[1].picks[0].url, name: lines[1].name, brandText: null, storeName: receipt.storeName!, priceText: lines[1].priceText, category: lines[1].category }, imageUrl: lines[1].picks[0].imageUrl, color: lines[1].color, size: lines[1].size, quantity: lines[1].quantity, purchaseDate: receipt.orderDate });
+    const r = await createStoreEntries(averyId, { product: { url: lines[1].picks[0].url, name: lines[1].name, brandText: null, storeName: receipt.storeName!, priceText: lines[1].priceText, category: lines[1].category }, imageUrl: lines[1].picks[0].imageUrl, color: lines[1].color, size: lines[1].size, quantity: lines[1].quantity, purchaseDate: receipt.orderDate });
     await drainQueue();
     const entry = await db.importEntry.findUniqueOrThrow({ where: { id: r.entryIds[0] } });
     const full = await db.item.findUniqueOrThrow({ where: { id: entry.itemId! } });
@@ -238,7 +238,7 @@ describe("add from a store", () => {
 
   it("rows of one product at once (the bulk add): each color and size gets its pieces in one batch, rows with no count are skipped", async () => {
     const product = { url: "https://mock.example/products/linen-blazer", name: "Linen Blazer", brandText: "Everlane", storeName: "Mock Store", priceText: "$128.00" };
-    const r = await createStoreRows(jeffId, product, [
+    const r = await createStoreRows(averyId, product, [
       { color: "Black", size: "M", quantity: 2, imageUrl: "https://mock.example/blazer-black.jpg" },
       { color: "Oatmeal", size: null, quantity: 0, imageUrl: "https://mock.example/blazer.jpg" },
       { color: "Oatmeal", size: "L", quantity: 1, imageUrl: "https://mock.example/blazer.jpg" },
@@ -249,6 +249,6 @@ describe("add from a store", () => {
     expect(entries.every((e) => e.batchId === r.batchId)).toBe(true);
     expect(entries.map((e) => [(e.storeMeta as { color: string }).color, e.quantity])).toEqual([["Black", 2], ["Oatmeal", 1]]);
     expect((entries[1].storeMeta as { size: string }).size).toBe("L");
-    await expect(createStoreRows(jeffId, product, [{ color: "Black", size: null, quantity: 0, imageUrl: null }])).rejects.toThrow(/how many/);
+    await expect(createStoreRows(averyId, product, [{ color: "Black", size: null, quantity: 0, imageUrl: null }])).rejects.toThrow(/how many/);
   });
 });

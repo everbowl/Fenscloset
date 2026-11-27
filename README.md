@@ -13,11 +13,15 @@ Next.js 16 (App Router, TypeScript) · Prisma 7 + PostgreSQL · Railway (app, Po
 cp .env.example .env            # every variable the app reads, with what each is for; DATABASE_URL must point at a Postgres 16
 npm install
 npm run db:migrate              # applies migrations
-npm run db:seed                 # 4 people, Family closet, default lists, rules
+npm run db:seed                 # Family closet, default lists, rules — no people (the repository holds no one's name or address)
 npm run dev                     # http://localhost:3000
 ```
-In DEV mode (`DEV_MODE=true`) the seed gives `jeff@everbowl.com` the one-time password `0535`.
-To reset it later: `npm run db:reset-dev-password`.
+The seed creates no people. For a local admin, add the synthetic household the tests use and give its admin a password
+of your own (security item 3 replaces this with `npm run admin:bootstrap`):
+```bash
+npx tsx e2e/seed-people.ts                               # four invented people with @example.test addresses (tests/fixtures/people-data.ts)
+npx tsx e2e/set-password.ts avery@example.test <password> # the fixture admin can now sign in
+```
 
 ## Tests
 ```bash

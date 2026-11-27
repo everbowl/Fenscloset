@@ -1,4 +1,4 @@
-/** e2e helper: give one seeded piece a color, e.g. `npx tsx e2e/seed-color.ts "Jeff linen blazer" "beige|cream|tan|oat"` (a regex over color names). */
+/** e2e helper: give one seeded piece a color, e.g. `npx tsx e2e/seed-color.ts "Avery linen blazer" "beige|cream|tan|oat"` (a regex over color names). */
 import "dotenv/config";
 import { db } from "../src/lib/db";
 

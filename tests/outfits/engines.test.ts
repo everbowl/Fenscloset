@@ -7,7 +7,7 @@ describe("which engines Compare runs", () => {
   it("runs every keyed engine when no switch is given", () => {
     expect(resolveEngines("compare", all).engines).toEqual(["google", "fashn", "kling"]);
   });
-  it("leaves a switched-off engine out without a note (Jeff, 26 Nov 2026, 1B: Kling off until its balance is topped up)", () => {
+  it("leaves a switched-off engine out without a note (owner, 26 Nov 2026, 1B: Kling off until its balance is topped up)", () => {
     const r = resolveEngines("compare", all, COMPARE_DEFAULTS);
     expect(r.engines).toEqual(["google", "fashn"]);
     expect(r.note).toBeUndefined();

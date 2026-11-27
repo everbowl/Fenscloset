@@ -1,16 +1,16 @@
 import { expect, test } from "./fixtures";
-import { JEFF_PASSWORD, loginAs, resetAndSeed } from "./helpers";
+import { ADMIN_PASSWORD, loginAs, resetAndSeed } from "./helpers";
 import { execSync } from "node:child_process";
 
-/** Shop v2 item 5 (Jeff, 28 Oct 2026: "C", filters and sorts): the Sort and Filter pills under the category tabs, all of it in the URL. */
+/** Shop v2 item 5 (owner, 28 Oct 2026: "C", filters and sorts): the Sort and Filter pills under the category tabs, all of it in the URL. */
 test.describe("closet views", () => {
   test.beforeAll(() => {
-    resetAndSeed({ jeffReady: true });
+    resetAndSeed({ adminReady: true });
     execSync("npx tsx e2e/seed-views.ts", { stdio: "inherit", env: { ...process.env, DATABASE_URL: "postgresql://postgres@localhost:5433/fenscloset_e2e", MOCK_S3: "true" } });
   });
 
   test("sort, filter with live counts, chips, the tabs and the search keep the view, the empty state clears it", async ({ page }) => {
-    await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+    await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
     await page.goto("/closet");
     await expect(page.getByText("5 pieces")).toBeVisible();
     const cards = page.getByTestId("item-card");

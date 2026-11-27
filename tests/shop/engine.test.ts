@@ -5,7 +5,7 @@ import path from "node:path";
 import sharp from "sharp";
 import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
-import { seed } from "../../prisma/seed";
+import { seed } from "../helpers";
 import { personalClosetId } from "@/lib/items/service";
 import { parseProductPage, normalizeUrl, MOCK_PAGE } from "@/lib/shop/page";
 import { deleteLookup, getLookup, listRecent, lookup, startLookup, storeSearchUrl, stripFitNotes } from "@/lib/shop/engine";
@@ -42,10 +42,10 @@ describe("shop", () => {
   });
 
   it("link lookup: verdict, similar-owned, pairings with the candidate as hero, recommendations; permissions; photo visibility", async () => {
-    const [jeff, olivia, mya, brittney] = await Promise.all([by("Jeff"), by("Olivia"), by("Mya"), by("Brittney")]);
-    await addItem(jeff.id, "Dark jeans", "Bottoms", "Navy");
-    await addItem(jeff.id, "White tee", "Tops", "White");
-    const v = await lookup(jeff, jeff.id, { source: "link", url: "https://mock.example/p/1" });
+    const [avery, casey, devon, blake] = await Promise.all([by("Avery"), by("Casey"), by("Devon"), by("Blake")]);
+    await addItem(avery.id, "Dark jeans", "Bottoms", "Navy");
+    await addItem(avery.id, "White tee", "Tops", "White");
+    const v = await lookup(avery, avery.id, { source: "link", url: "https://mock.example/p/1" });
     expect(v.title).toBe("Linen Blazer");
     expect(v.priceText).toBe("$128.00");
     expect(v.verdict.call).toBe("FITS");
@@ -55,15 +55,15 @@ describe("shop", () => {
     expect(v.pairings[0].pieces[0].thumbKey).toMatch(/^shop\//);
     expect(v.recommendations).toEqual([]); // FITS and nothing missing
     expect(v.products).toEqual([]);
-    expect(await canViewKey(jeff, v.imageKey!)).toBe(true);
-    expect(await canViewKey(olivia, v.imageKey!)).toBe(false);
+    expect(await canViewKey(avery, v.imageKey!)).toBe(true);
+    expect(await canViewKey(casey, v.imageKey!)).toBe(false);
     // PASS when two similar pieces are owned → recommendations appear (favorite store search links)
     const beige = (await db.color.findMany({ where: { isArchived: false }, orderBy: { sortOrder: "asc" } })).find((c) => /beige|cream|tan|oat/i.test(c.name))!; // same pick as the mock reader
-    await db.item.create({ data: { ownerId: jeff.id, name: "Blazer one", categoryId: (await db.category.findFirstOrThrow({ where: { name: "Outerwear" } })).id, colors: { connect: [{ id: beige.id }] } } });
-    await db.item.create({ data: { ownerId: jeff.id, name: "Blazer two", categoryId: (await db.category.findFirstOrThrow({ where: { name: "Outerwear" } })).id, colors: { connect: [{ id: beige.id }] } } });
+    await db.item.create({ data: { ownerId: avery.id, name: "Blazer one", categoryId: (await db.category.findFirstOrThrow({ where: { name: "Outerwear" } })).id, colors: { connect: [{ id: beige.id }] } } });
+    await db.item.create({ data: { ownerId: avery.id, name: "Blazer two", categoryId: (await db.category.findFirstOrThrow({ where: { name: "Outerwear" } })).id, colors: { connect: [{ id: beige.id }] } } });
     const nordstrom = await db.store.findFirst({ where: { url: { not: null } } });
-    await db.person.update({ where: { id: jeff.id }, data: { favoriteStores: { connect: nordstrom ? [{ id: nordstrom.id }] : [] } } });
-    const v2 = await lookup(jeff, jeff.id, { source: "link", url: "https://mock.example/p/1" });
+    await db.person.update({ where: { id: avery.id }, data: { favoriteStores: { connect: nordstrom ? [{ id: nordstrom.id }] : [] } } });
+    const v2 = await lookup(avery, avery.id, { source: "link", url: "https://mock.example/p/1" });
     expect(v2.verdict.call).toBe("PASS");
     expect(v2.similar.map((s) => s.name).sort()).toEqual(["Blazer one", "Blazer two"]);
     expect(v2.recommendations.length).toBeGreaterThan(0);
@@ -72,59 +72,59 @@ describe("shop", () => {
     expect(v2.verdict.shoppingQueries.length).toBeGreaterThan(0);
     expect(v2.products.length).toBeGreaterThan(0);
     expect(v2.products[0]).toMatchObject({ storeName: "Nordstrom", url: expect.stringMatching(/^https:\/\//) });
-    expect((await getLookup(jeff, v2.id))!.products.length).toBe(v2.products.length);
-    // permissions: Olivia cannot shop for Mya; Jeff (parent) can, and body data is used for Mya; Brittney shopping for Jeff gets no body data
-    await expect(lookup(olivia, mya.id, { source: "link", url: "https://mock.example/p/1" })).rejects.toMatchObject({ status: 403 });
+    expect((await getLookup(avery, v2.id))!.products.length).toBe(v2.products.length);
+    // permissions: Casey cannot shop for Devon; Avery (parent) can, and body data is used for Devon; Blake shopping for Avery gets no body data
+    await expect(lookup(casey, devon.id, { source: "link", url: "https://mock.example/p/1" })).rejects.toMatchObject({ status: 403 });
     const img = await sharp({ create: { width: 300, height: 400, channels: 3, background: { r: 20, g: 20, b: 20 } } }).jpeg().toBuffer();
-    await addItem(mya.id, "Mya jeans", "Bottoms", "Navy");
+    await addItem(devon.id, "Devon jeans", "Bottoms", "Navy");
     const kinds = await db.measurementKind.findMany();
-    await db.bodyMeasurement.create({ data: { personId: mya.id, kindId: kinds[0].id, value: "60" } });
-    const forMya = await lookup(jeff, mya.id, { source: "photo", data: img, contentType: "image/jpeg" });
+    await db.bodyMeasurement.create({ data: { personId: devon.id, kindId: kinds[0].id, value: "60" } });
+    const forMya = await lookup(avery, devon.id, { source: "photo", data: img, contentType: "image/jpeg" });
     expect(forMya.verdict.usedBodyData).toBe(true);
     expect(forMya.products).toEqual([]); // she owns bottoms: nothing missing
-    expect(forMya.forName).toBe("Mya");
-    expect(await canViewKey(mya, forMya.imageKey!)).toBe(true);
-    expect(await canViewKey(brittney, forMya.imageKey!)).toBe(true);
-    await db.bodyMeasurement.create({ data: { personId: jeff.id, kindId: kinds[0].id, value: "70" } });
-    await db.shopForGrant.create({ data: { ownerId: jeff.id, shopperId: brittney.id } });
-    const byB = await lookup(brittney, jeff.id, { source: "screenshot", data: img, contentType: "image/jpeg" });
+    expect(forMya.forName).toBe("Devon");
+    expect(await canViewKey(devon, forMya.imageKey!)).toBe(true);
+    expect(await canViewKey(blake, forMya.imageKey!)).toBe(true);
+    await db.bodyMeasurement.create({ data: { personId: avery.id, kindId: kinds[0].id, value: "70" } });
+    await db.shopForGrant.create({ data: { ownerId: avery.id, shopperId: blake.id } });
+    const byB = await lookup(blake, avery.id, { source: "screenshot", data: img, contentType: "image/jpeg" });
     expect(byB.verdict.usedBodyData).toBe(false);
-    // review E A2: Jeff's own lookup used his body data; Brittney (shop-for only) reads it without the size note
-    const own = await lookup(jeff, jeff.id, { source: "screenshot", data: img, contentType: "image/jpeg" });
+    // review E A2: Avery's own lookup used his body data; Blake (shop-for only) reads it without the size note
+    const own = await lookup(avery, avery.id, { source: "screenshot", data: img, contentType: "image/jpeg" });
     expect(own.verdict.usedBodyData).toBe(true);
     expect(own.verdict.sizeNote).toMatch(/size/);
-    const seenByB = (await getLookup(brittney, own.id))!;
+    const seenByB = (await getLookup(blake, own.id))!;
     expect(seenByB.verdict).toMatchObject({ sizeNote: null, usedBodyData: false });
-    expect((await listRecent(brittney, jeff.id)).every((v) => v.verdict.sizeNote === null)).toBe(true);
-    await deleteLookup(jeff, own.id);
+    expect((await listRecent(blake, avery.id)).every((v) => v.verdict.sizeNote === null)).toBe(true);
+    await deleteLookup(avery, own.id);
     // recent + delete
-    expect((await listRecent(jeff, jeff.id)).length).toBe(3);
-    await expect(deleteLookup(olivia, v.id)).rejects.toMatchObject({ status: 403 });
-    await deleteLookup(jeff, v.id);
-    expect(await getLookup(jeff, v.id)).toBeNull();
+    expect((await listRecent(avery, avery.id)).length).toBe(3);
+    await expect(deleteLookup(casey, v.id)).rejects.toMatchObject({ status: 403 });
+    await deleteLookup(avery, v.id);
+    expect(await getLookup(avery, v.id)).toBeNull();
   });
 
   it("runs in the background: a job to poll when it is slow, the same input joins it, the result is the lookup's id, the steps in order; a blocked store fails with its reason", async () => {
     forgetJobs();
-    const jeff = await by("Jeff");
+    const avery = await by("Avery");
     process.env.MOCK_SHOP_SLOW_MS = "40";
     try {
-      const job = startLookup(jeff, jeff.id, { source: "link", url: "https://mock.example/p/1" });
+      const job = startLookup(avery, avery.id, { source: "link", url: "https://mock.example/p/1" });
       expect(await settled(job, 10)).toMatchObject({ state: "running" }); // not done in time: the screen gets a job to poll
-      expect(startLookup(jeff, jeff.id, { source: "link", url: "https://mock.example/p/1" })).toBe(job); // tapped twice: one lookup, not two
+      expect(startLookup(avery, avery.id, { source: "link", url: "https://mock.example/p/1" })).toBe(job); // tapped twice: one lookup, not two
       expect(jobStatus(job.id, "someone-else")).toBeNull();
       const done = await settled(job, 10_000);
       expect(done.state).toBe("done");
-      expect((await getLookup(jeff, (done as { state: "done"; result: string }).result))?.title).toBe("Linen Blazer");
+      expect((await getLookup(avery, (done as { state: "done"; result: string }).result))?.title).toBe("Linen Blazer");
       const steps: string[] = [];
-      await lookup(jeff, jeff.id, { source: "link", url: "https://mock.example/p/1" }, { step: (s) => steps.push(s) });
+      await lookup(avery, avery.id, { source: "link", url: "https://mock.example/p/1" }, { step: (s) => steps.push(s) });
       expect(steps).toEqual(["Reading the store page…", "Looking at the piece…", "Judging it…", "Finding what to wear with it…"]);
       const img = await sharp({ create: { width: 60, height: 80, channels: 3, background: { r: 20, g: 20, b: 20 } } }).jpeg().toBuffer();
       const photoSteps: string[] = [];
-      await lookup(jeff, jeff.id, { source: "photo", data: img, contentType: "image/jpeg" }, { step: (s) => photoSteps.push(s) });
+      await lookup(avery, avery.id, { source: "photo", data: img, contentType: "image/jpeg" }, { step: (s) => photoSteps.push(s) });
       expect(photoSteps[0]).toBe("Looking at the piece…");
       process.env.MOCK_FETCH_BLOCKED = "true";
-      const bad = startLookup(jeff, jeff.id, { source: "link", url: "https://mock.example/blocked" });
+      const bad = startLookup(avery, avery.id, { source: "link", url: "https://mock.example/blocked" });
       expect(await settled(bad, 10_000)).toMatchObject({ state: "failed", error: { message: expect.stringMatching(/blocks link previews/) } });
     } finally { delete process.env.MOCK_SHOP_SLOW_MS; delete process.env.MOCK_FETCH_BLOCKED; forgetJobs(); }
   });

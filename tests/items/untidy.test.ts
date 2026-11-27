@@ -5,7 +5,7 @@ import path from "node:path";
 import sharp from "sharp";
 import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
-import { seed } from "../../prisma/seed";
+import { seed } from "../helpers";
 import { deleteObject, getObject, newKey, objectExists, putObject } from "@/lib/storage";
 import { getOrCreateOpenBatch, registerEntry } from "@/lib/import/service";
 import { drainQueue } from "@/lib/import/queue";
@@ -25,24 +25,24 @@ const dims = async (key: string) => { const m = await sharp((await getObject(key
 const warningsOf = async (id: string) => ((await db.importEntry.findUniqueOrThrow({ where: { id } })).aiResult as EntryAiResult).warnings;
 
 describe("untidy: Tidy and Smooth undone on the pieces they touched", () => {
-  let jeffId: string;
+  let averyId: string;
   beforeEach(async () => {
     await resetDb();
     process.env.DEV_MODE = "true"; process.env.MOCK_AI = "true"; process.env.MOCK_S3 = "true";
     delete process.env.MOCK_REMOVE_BG_FAIL; delete process.env.MOCK_ORIENTATION;
     process.env.MOCK_S3_DIR = await mkdtemp(path.join(os.tmpdir(), "fc-untidy-"));
     await seed();
-    jeffId = (await db.person.findUniqueOrThrow({ where: { email: "jeff@everbowl.com" } })).id;
+    averyId = (await db.person.findUniqueOrThrow({ where: { email: "avery@example.test" } })).id;
   });
 
   /** A piece added the normal way (the mock cutter's cutout is the photo itself). */
   async function piece() {
-    const b = await getOrCreateOpenBatch(jeffId, 1);
-    const key = newKey("originals", jeffId, "image/jpeg");
+    const b = await getOrCreateOpenBatch(averyId, 1);
+    const key = newKey("originals", averyId, "image/jpeg");
     await putObject(key, await photo(), "image/jpeg");
-    const e = await registerEntry(jeffId, b.id, key, 0);
+    const e = await registerEntry(averyId, b.id, key, 0);
     await drainQueue();
-    const item = await createItemFromEntry(jeffId, e.id);
+    const item = await createItemFromEntry(averyId, e.id);
     const entry = await db.importEntry.findUniqueOrThrow({ where: { id: e.id } });
     const cutout = await db.itemPhoto.findFirstOrThrow({ where: { itemId: item.id, kind: "cutout" } });
     const thumb = await db.itemPhoto.findFirstOrThrow({ where: { itemId: item.id, kind: "thumb" } });

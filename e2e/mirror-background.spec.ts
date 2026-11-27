@@ -1,20 +1,20 @@
 import { execSync } from "node:child_process";
 import { expect, test } from "./fixtures";
-import { E2E_DB, JEFF_PASSWORD, loginAs, resetAndSeed } from "./helpers";
+import { E2E_DB, ADMIN_PASSWORD, loginAs, resetAndSeed } from "./helpers";
 
 /**
- * The mirror keeps dressing while the person goes elsewhere (Jeff, 23 Nov 2026): close the sheet, leave the page, and
+ * The mirror keeps dressing while the person goes elsewhere (owner, 23 Nov 2026): close the sheet, leave the page, and
  * the bar under the header says where it stands; when it is done, "See it" opens the full-screen mirror. Needs
  * MOCK_TRYON_SLOW_MS in the web server's env (playwright.config.ts) so the stand-in takes longer than the quick window.
  */
 test.describe.configure({ mode: "serial" });
 test.beforeAll(() => {
-  resetAndSeed({ jeffReady: true });
-  execSync("npx tsx e2e/seed-closets.ts Jeff", { stdio: "ignore", env: { ...process.env, DATABASE_URL: E2E_DB, MOCK_S3: "true" } });
+  resetAndSeed({ adminReady: true });
+  execSync("npx tsx e2e/seed-closets.ts Avery", { stdio: "ignore", env: { ...process.env, DATABASE_URL: E2E_DB, MOCK_S3: "true" } });
 });
 
 test("a dressing started on Today keeps going on the closet; the bar lands on the full-screen mirror", async ({ page }) => {
-  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
   await page.goto("/mirror");
   await expect(page.getByTestId("mirror-empty")).toBeVisible(); // nothing dressed yet, and the page says what to do
   await expect(page.getByTestId("crumbs")).toContainText("Mirror");
@@ -44,7 +44,7 @@ test("a dressing started on Today keeps going on the closet; the bar lands on th
 });
 
 test("a reload mid-dressing keeps following the job", async ({ page }) => {
-  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
   await page.goto("/today");
   await page.getByTestId("see-on-mannequin").click();
   await expect(page.getByTestId("try-on-sheet")).toBeVisible({ timeout: 20_000 }); // the picture from the first test, saved

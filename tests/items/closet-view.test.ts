@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
-import { seed } from "../../prisma/seed";
+import { seed } from "../helpers";
 import { loadClosetView } from "@/lib/items/query";
 import { emptyFilters } from "@/lib/items/views";
 import { personalClosetId } from "@/lib/items/service";
@@ -10,13 +10,13 @@ const day = 86400000;
 const ago = (d: number) => new Date(Date.now() - d * day);
 
 describe("loadClosetView", () => {
-  let jeff: { id: string; name: string }, olivia: { id: string }, ids: Record<string, string>, familyId: string;
+  let avery: { id: string; name: string }, casey: { id: string }, ids: Record<string, string>, familyId: string;
   beforeEach(async () => {
     await resetDb();
     process.env.DEV_MODE = "true";
     await seed();
-    jeff = await db.person.findUniqueOrThrow({ where: { email: "jeff@everbowl.com" }, select: { id: true, name: true } });
-    olivia = await db.person.findFirstOrThrow({ where: { name: "Olivia" }, select: { id: true } });
+    avery = await db.person.findUniqueOrThrow({ where: { email: "avery@example.test" }, select: { id: true, name: true } });
+    casey = await db.person.findFirstOrThrow({ where: { name: "Casey" }, select: { id: true } });
     const by = async (find: () => Promise<{ id: string }>) => (await find()).id;
     ids = {
       tops: await by(() => db.category.findFirstOrThrow({ where: { name: "Tops" } })),
@@ -31,16 +31,16 @@ describe("loadClosetView", () => {
       comfy: await by(() => db.tag.findUniqueOrThrow({ where: { name: "Comfy" } })),
     };
     familyId = (await db.closet.findFirstOrThrow({ where: { kind: "family" } })).id;
-    const mine = await personalClosetId(jeff.id);
+    const mine = await personalClosetId(avery.id);
     const make = (data: Parameters<typeof db.item.create>[0]["data"]) => db.item.create({ data });
-    await make({ ownerId: jeff.id, name: "Black tee", categoryId: ids.tops, brandId: ids.nike, colors: { connect: [{ id: ids.black }] }, seasons: { connect: [{ id: ids.summer }] }, isFavorite: true, wearCount: 5, lastWornAt: ago(2), purchasePrice: 25, createdAt: ago(30), closets: { create: [{ closetId: mine }] } });
-    await make({ ownerId: jeff.id, name: "Black hoodie", categoryId: ids.tops, brandId: ids.nike, colors: { connect: [{ id: ids.black }] }, seasons: { connect: [{ id: ids.winter }] }, tags: { connect: [{ id: ids.comfy }] }, laundryStatus: "dirty", wearCount: 2, lastWornAt: ago(30), purchasePrice: 60, createdAt: ago(10), closets: { create: [{ closetId: mine }] } });
-    await make({ ownerId: jeff.id, name: "White shirt", categoryId: ids.tops, colors: { connect: [{ id: ids.white }] }, purchasePrice: 90, createdAt: ago(5), closets: { create: [{ closetId: mine }] } });
-    await make({ ownerId: jeff.id, name: "Dark jeans", categoryId: ids.bottoms, brandId: ids.levis, occasions: { connect: [{ id: ids.gym }] }, wearCount: 12, lastWornAt: ago(1), purchasePrice: 70, createdAt: ago(100), closets: { create: [{ closetId: mine }, { closetId: familyId }] } });
-    await make({ ownerId: jeff.id, name: "Given away", categoryId: ids.tops, colors: { connect: [{ id: ids.black }] }, retiredAt: ago(1), closets: { create: [{ closetId: mine }] } });
-    await make({ ownerId: olivia.id, name: "Olivia's black tee", categoryId: ids.tops, colors: { connect: [{ id: ids.black }] } });
+    await make({ ownerId: avery.id, name: "Black tee", categoryId: ids.tops, brandId: ids.nike, colors: { connect: [{ id: ids.black }] }, seasons: { connect: [{ id: ids.summer }] }, isFavorite: true, wearCount: 5, lastWornAt: ago(2), purchasePrice: 25, createdAt: ago(30), closets: { create: [{ closetId: mine }] } });
+    await make({ ownerId: avery.id, name: "Black hoodie", categoryId: ids.tops, brandId: ids.nike, colors: { connect: [{ id: ids.black }] }, seasons: { connect: [{ id: ids.winter }] }, tags: { connect: [{ id: ids.comfy }] }, laundryStatus: "dirty", wearCount: 2, lastWornAt: ago(30), purchasePrice: 60, createdAt: ago(10), closets: { create: [{ closetId: mine }] } });
+    await make({ ownerId: avery.id, name: "White shirt", categoryId: ids.tops, colors: { connect: [{ id: ids.white }] }, purchasePrice: 90, createdAt: ago(5), closets: { create: [{ closetId: mine }] } });
+    await make({ ownerId: avery.id, name: "Dark jeans", categoryId: ids.bottoms, brandId: ids.levis, occasions: { connect: [{ id: ids.gym }] }, wearCount: 12, lastWornAt: ago(1), purchasePrice: 70, createdAt: ago(100), closets: { create: [{ closetId: mine }, { closetId: familyId }] } });
+    await make({ ownerId: avery.id, name: "Given away", categoryId: ids.tops, colors: { connect: [{ id: ids.black }] }, retiredAt: ago(1), closets: { create: [{ closetId: mine }] } });
+    await make({ ownerId: casey.id, name: "Casey's black tee", categoryId: ids.tops, colors: { connect: [{ id: ids.black }] } });
   });
-  const view = () => ({ kind: "person" as const, personId: jeff.id, name: "Jeff" });
+  const view = () => ({ kind: "person" as const, personId: avery.id, name: "Avery" });
 
   it("shows the person's live pieces with every facet's counts, a swatch per color, the laundry words and the Family closet", async () => {
     const v = await loadClosetView(view(), { filters: emptyFilters(), sort: "newest" });
@@ -79,7 +79,7 @@ describe("loadClosetView", () => {
 
   it("the Family closet view lists what is in it, from anyone, and leaves the Family closet out of its own filter", async () => {
     const v = await loadClosetView({ kind: "family" }, { filters: emptyFilters(), sort: "newest" });
-    expect(v.items.map((i) => [i.name, i.ownerName])).toEqual([["Dark jeans", "Jeff"]]);
+    expect(v.items.map((i) => [i.name, i.ownerName])).toEqual([["Dark jeans", "Avery"]]);
     expect(v.total).toBe(1);
     expect(v.facets.find((f) => f.key === "closet")).toBeUndefined();
   });

@@ -12,9 +12,9 @@ test("signed-out visitors are sent to login, which shows Forgot password and the
   await expect(page.getByRole("status").filter({ hasText: /dev mode/i })).toBeVisible();
 });
 
-test("Jeff logs in with 0535 once, is forced to change it, then 0535 is dead", async ({ page }) => {
+test("Avery logs in with 0535 once, is forced to change it, then 0535 is dead", async ({ page }) => {
   await page.goto("/login");
-  await page.getByLabel("Email").fill("jeff@everbowl.com");
+  await page.getByLabel("Email").fill("avery@example.test");
   await page.getByLabel("Password").fill("0535");
   await page.getByRole("button", { name: "Sign in" }).click();
 
@@ -42,7 +42,7 @@ test("Jeff logs in with 0535 once, is forced to change it, then 0535 is dead", a
   await page.getByRole("button", { name: "Log out" }).click();
   await expect(page).toHaveURL(/\/login$/);
 
-  await page.getByLabel("Email").fill("jeff@everbowl.com");
+  await page.getByLabel("Email").fill("avery@example.test");
   await page.getByLabel("Password").fill("0535");
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "don't match" })).toBeVisible();
@@ -52,7 +52,7 @@ test("Jeff logs in with 0535 once, is forced to change it, then 0535 is dead", a
   await page.getByLabel("Password").fill("whatever-123");
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "don't match" })).toBeVisible();
-  await page.getByLabel("Email").fill("jeff@everbowl.com");
+  await page.getByLabel("Email").fill("avery@example.test");
 
   await page.getByLabel("Password").fill("closet-rocks-2026");
   await page.getByRole("button", { name: "Sign in" }).click();

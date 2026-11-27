@@ -1,17 +1,17 @@
 import { execSync } from "node:child_process";
 import { expect, test } from "./fixtures";
-import { E2E_DB, JEFF_PASSWORD, loginAs, resetAndSeed } from "./helpers";
+import { E2E_DB, ADMIN_PASSWORD, loginAs, resetAndSeed } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 test.beforeAll(() => {
-  resetAndSeed({ jeffReady: true });
+  resetAndSeed({ adminReady: true });
   const env = { ...process.env, DATABASE_URL: E2E_DB, MOCK_S3: "true" };
-  execSync("npx tsx e2e/seed-closets.ts Jeff Brittney Olivia Mya", { stdio: "ignore", env });
-  execSync(`npx tsx e2e/set-password.ts brittney@example.com ${JEFF_PASSWORD}`, { stdio: "ignore", env });
+  execSync("npx tsx e2e/seed-closets.ts Avery Blake Casey Devon", { stdio: "ignore", env });
+  execSync(`npx tsx e2e/set-password.ts blake@example.com ${ADMIN_PASSWORD}`, { stdio: "ignore", env });
 });
 
-test("morning flow: Jeff gets three looks, checks in, sets the plan, swaps, wears; the fit lands on the calendar; clean-out", async ({ page }) => {
-  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+test("morning flow: Avery gets three looks, checks in, sets the plan, swaps, wears; the fit lands on the calendar; clean-out", async ({ page }) => {
+  await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
   await page.goto("/today");
   await expect(page.getByTestId("today")).toBeVisible();
   // weather needs a zip the first time
@@ -68,7 +68,7 @@ test("morning flow: Jeff gets three looks, checks in, sets the plan, swaps, wear
   await page.getByTestId("see-fits").click();
   await expect(page).toHaveURL(/\/fits/);
   await expect(page.getByTestId("fit-panel")).toBeVisible();
-  await expect(page.getByTestId("visibility")).toContainText("Visible to Jeff only");
+  await expect(page.getByTestId("visibility")).toContainText("Visible to Avery only");
   await expect(page.getByTestId("day-with-fit")).toHaveCount(1);
 
   // how did it go? three taps on the fit panel; the chosen one goes solid
@@ -82,11 +82,11 @@ test("morning flow: Jeff gets three looks, checks in, sets the plan, swaps, wear
   await expect(page.getByTestId("taste-memory")).toContainText(/Nothing yet|Reaches for|Passed on|Loved wearing/);
   await page.goto("/fits");
 
-  // share with Brittney
+  // share with Blake
   await page.getByTestId("share").click();
-  await page.getByRole("dialog").getByRole("button", { name: "Brittney" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Blake" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Done" }).click();
-  await expect(page.getByTestId("visibility")).toContainText("Visible to Jeff, Brittney only");
+  await expect(page.getByTestId("visibility")).toContainText("Visible to Avery, Blake only");
 
   // clean-out strip on Today → keep the old parka
   await page.goto("/today");
@@ -98,7 +98,7 @@ test("morning flow: Jeff gets three looks, checks in, sets the plan, swaps, wear
 });
 
 test("Today paints before the weather answers: the page is there at once, the forecast fills in", async ({ page }) => {
-  await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+  await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
   // `commit`: as soon as the response starts, before the stream ends. The shell (title, boards, strips) does not wait for
   // Open-Meteo; the forecast cell breathes until the forecast lands (MOCK_WEATHER_SLOW_MS holds the mock back).
   await page.goto("/today", { waitUntil: "commit" });
@@ -111,29 +111,29 @@ test("Today paints before the weather answers: the page is there at once, the fo
   await expect(page.getByText("Weather by Open-Meteo")).toBeVisible();
 });
 
-test("Brittney sees Jeff's shared fit in the family calendar and gets her own looks; together mode for three", async ({ page }) => {
-  await loginAs(page, "brittney@example.com", JEFF_PASSWORD);
+test("Blake sees Avery's shared fit in the family calendar and gets her own looks; together mode for three", async ({ page }) => {
+  await loginAs(page, "blake@example.com", ADMIN_PASSWORD);
   await page.goto("/today");
   await expect(page.getByTestId("board")).toHaveCount(3);
   await page.getByTestId("wear-this").click();
   await expect(page.getByTestId("wearing-this")).toBeVisible();
 
-  await page.getByRole("button", { name: /Brittney menu/ }).click();
+  await page.getByRole("button", { name: /Blake menu/ }).click();
   await page.getByRole("button", { name: "Family" }).click();
   await expect(page.getByRole("button", { name: /Family menu/ })).toBeVisible();
   await page.goto("/fits");
-  await expect(page.getByTestId("fit-panel")).toHaveCount(2); // Jeff's (shared) + hers
-  await expect(page.getByTestId("fit-panel").first()).toContainText("Jeff"); // v2: the owner's name in sentence case on the family calendar
+  await expect(page.getByTestId("fit-panel")).toHaveCount(2); // Avery's (shared) + hers
+  await expect(page.getByTestId("fit-panel").first()).toContainText("Avery"); // v2: the owner's name in sentence case on the family calendar
 
-  // together: Brittney + Jeff + Olivia (Mya is not offered to a non-parent… Brittney is Mya's parent, so she is offered)
+  // together: Blake + Avery + Casey (Devon is not offered to a non-parent… Blake is Devon's parent, so she is offered)
   await page.goto("/today/together");
-  await page.getByTestId("together-person-Jeff").click();
-  await page.getByTestId("together-person-Olivia").click();
+  await page.getByTestId("together-person-Avery").click();
+  await page.getByTestId("together-person-Casey").click();
   await page.getByTestId("mode-match").click();
   await page.getByTestId("dress-us").click();
   await expect(page.getByTestId("together-boards")).toBeVisible();
   await expect(page.locator("[data-testid^=together-board-]")).toHaveCount(3);
-  await expect(page.getByTestId("together-board-Olivia")).toContainText("Mock match look for Olivia");
-  await expect(page.getByTestId("wear-Brittney")).toBeVisible();
-  await expect(page.getByTestId("wear-Olivia")).toHaveCount(0); // only Olivia (or her parent) wears for Olivia
+  await expect(page.getByTestId("together-board-Casey")).toContainText("Mock match look for Casey");
+  await expect(page.getByTestId("wear-Blake")).toBeVisible();
+  await expect(page.getByTestId("wear-Casey")).toHaveCount(0); // only Casey (or her parent) wears for Casey
 });

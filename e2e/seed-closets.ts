@@ -1,4 +1,4 @@
-/** e2e helper: a small clean closet (top, bottom, shoes, outerwear) for each named person, plus a stale piece for Jeff. */
+/** e2e helper: a small clean closet (top, bottom, shoes, outerwear) for each named person, plus a stale piece for Avery. */
 import "dotenv/config";
 import sharp from "sharp";
 import { db } from "../src/lib/db";
@@ -24,8 +24,8 @@ async function main() {
       await putObject(thumb, buf, "image/jpeg");
       await db.item.create({ data: { ownerId: person.id, name: s.name, categoryId: cats[s.cat], closets: { create: [{ closetId }] }, photos: { create: [{ kind: "thumb", bucketKey: thumb }] } } });
     }
-    if (name === "Brittney") await db.person.update({ where: { id: person.id }, data: { email: "brittney@example.com" } });
-    if (name === "Jeff") {
+    if (name === "Blake") await db.person.update({ where: { id: person.id }, data: { email: "blake@example.com" } });
+    if (name === "Avery") {
       await db.item.create({ data: { ownerId: person.id, name: "Old parka", categoryId: cats.Outerwear, createdAt: new Date(Date.now() - 400 * 86400000), closets: { create: [{ closetId }] } } });
     }
   }

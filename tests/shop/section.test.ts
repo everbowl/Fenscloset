@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { resetDb } from "../helpers";
-import { seed } from "../../prisma/seed";
+import { seed } from "../helpers";
 import { inOtherSection, sectionKey, sectionOf, withSection } from "@/lib/shop/section";
 import { searchProducts } from "@/lib/shop/products";
 import { listEntries } from "@/lib/lists/service";
 
-describe("shop section (Jeff, 2 Nov 2026: men's and women's came back together)", () => {
+describe("shop section (owner, 2 Nov 2026: men's and women's came back together)", () => {
   beforeEach(async () => { await resetDb(); process.env.DEV_MODE = "true"; process.env.MOCK_SERPER = "true"; await seed(); });
 
   it("reads a section from its name, leads every search with it, and leaves a search alone that already says who it is for", () => {
@@ -30,16 +30,16 @@ describe("shop section (Jeff, 2 Nov 2026: men's and women's came back together)"
     expect(inOtherSection("Women's Tee", "Unisex")).toBe(false); // a neutral section keeps everything
   });
 
-  it("the product search leaves the other section out; the seed makes the list and puts Jeff in Men's", async () => {
+  it("the product search leaves the other section out; the seed makes the list and puts Avery in Men's", async () => {
     const women = await searchProducts(["women's jeans"], { favoriteStores: [], favoriteBrands: [], section: "Men's" });
     expect(women).toEqual([]);
     const mine = await searchProducts(withSection(["jeans"], "Men's"), { favoriteStores: [], favoriteBrands: [], section: "Men's" });
     expect(mine.length).toBeGreaterThan(0);
     expect(mine.every((p) => /men's/i.test(p.title))).toBe(true);
     expect((await listEntries("shopSection")).map((s) => s.name)).toEqual(["Men's", "Women's", "Boys'", "Girls'", "Unisex"]);
-    const jeff = await db.person.findUniqueOrThrow({ where: { email: "jeff@everbowl.com" } });
-    expect(await sectionOf(jeff.id)).toMatchObject({ name: "Men's" });
-    const mya = await db.person.findFirstOrThrow({ where: { name: { startsWith: "Mya" } } });
-    expect(await sectionOf(mya.id)).toBeNull(); // picks hers on the Shop
+    const avery = await db.person.findUniqueOrThrow({ where: { email: "avery@example.test" } });
+    expect(await sectionOf(avery.id)).toMatchObject({ name: "Men's" });
+    const devon = await db.person.findFirstOrThrow({ where: { name: { startsWith: "Devon" } } });
+    expect(await sectionOf(devon.id)).toBeNull(); // picks hers on the Shop
   });
 });

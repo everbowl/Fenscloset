@@ -3,13 +3,13 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
-import { JEFF_PASSWORD, loginAs, resetAndSeed, settle } from "./helpers";
+import { ADMIN_PASSWORD, loginAs, resetAndSeed, settle } from "./helpers";
 
 test.describe("add from a store", () => {
-  test.beforeAll(() => resetAndSeed({ jeffReady: true }));
+  test.beforeAll(() => resetAndSeed({ adminReady: true }));
 
   test("a product link becomes pieces per color and size (tapped or said in words); several receipts at once become lines", async ({ page }) => {
-    await loginAs(page, "jeff@everbowl.com", JEFF_PASSWORD);
+    await loginAs(page, "avery@example.test", ADMIN_PASSWORD);
     await page.goto("/add");
     await page.getByTestId("add-by-link").click();
     await expect(page).toHaveURL(/\/add\/store\?tab=link$/);
