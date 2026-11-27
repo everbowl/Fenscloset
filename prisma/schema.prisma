@@ -97,6 +97,21 @@ model Person {
   brandFeed          BrandFeed?
 }
 
+/// Sign-in, reset-mail, invite-send and second-phone-code attempts, for the backoff and send limits (security item 6).
+/// Keys are hashes, never an address or an IP; rows older than a day are pruned on write.
+model AuthAttempt {
+  id         String   @id @default(cuid())
+  kind       String
+  accountKey String
+  ipKey      String
+  ok         Boolean
+  createdAt  DateTime @default(now())
+
+  @@index([kind, accountKey, createdAt])
+  @@index([kind, ipKey, createdAt])
+  @@index([createdAt])
+}
+
 model Session {
   id              String   @id @default(cuid())
   personId        String

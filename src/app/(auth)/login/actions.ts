@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { login, normalizeEmail } from "@/lib/auth/login";
 import { signIn, getCurrentPerson } from "@/lib/auth/current";
-import { checkRateLimit, clearRateLimit, clientIp, noteFailure, rateLimitKey, rateLimitMessage } from "@/lib/auth/rate-limit";
+import { accountKey, clientKey, recordAttempt, throttleStatus } from "@/lib/auth/rate-limit";
 import { cookieSecure } from "@/lib/app-url";
 
 export type LoginState = { error?: string; email?: string };
@@ -24,17 +24,16 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   if (cookieSecure() && h.get("x-forwarded-proto") === "http") {
     return { email, error: `This page was opened over plain http, so a sign-in can't stick. Open ${process.env.APP_URL ?? "the https address"} instead.` };
   }
-  // Five tries per address from one network, then a wait (review A S1).
-  const key = rateLimitKey(clientIp(h), normalizeEmail(email));
-  const gate = checkRateLimit(key);
-  if (!gate.ok) return { email, error: rateLimitMessage(gate.minutesLeft) };
+  // After a few failures each further wrong try waits, doubling up to a cap (security item 6); a try during the wait gets
+  // the same words as a wrong password and is not counted, so it cannot stretch the wait. Forgot password always works.
+  const client = clientKey(h);
+  const account = accountKey(normalizeEmail(email));
+  const gate = await throttleStatus("login", account, client);
+  if (!gate.ok) return { email, error: FAILED };
 
   const result = await login(email, password);
-  if (!result.ok) {
-    noteFailure(key);
-    return { email, error: FAILED };
-  }
-  clearRateLimit(key);
+  await recordAttempt("login", account, client, result.ok);
+  if (!result.ok) return { email, error: FAILED };
   await signIn(result.person.id);
   if (result.person.mustChangePassword) redirect("/change-password");
   redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/today");
